@@ -142,12 +142,14 @@ where
             )
             .await?;
 
-        let transformed = self.transform(
-            context,
-            claims,
-            proof_configuration,
-            Some(transformation_options)
-        ).await?;
+        let transformed = self
+            .transform(
+                context,
+                claims,
+                proof_configuration,
+                Some(transformation_options),
+            )
+            .await?;
 
         let hashed = self.hash(transformed, proof_configuration, &method)?;
 
