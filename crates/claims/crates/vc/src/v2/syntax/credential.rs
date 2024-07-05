@@ -28,10 +28,10 @@ pub type JsonCredential<S = NonEmptyObject> = SpecializedJsonCredential<S>;
 /// [`JsonCredential`] type alias instead.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(bound(
-    serialize = "S: Serialize",
-    deserialize = "S: Deserialize<'de>, C: RequiredContextList, T: RequiredTypeSet"
+    serialize = "S: Serialize + Clone",
+    deserialize = "S: Deserialize<'de> + Clone, C: RequiredContextList, T: RequiredTypeSet"
 ))]
-pub struct SpecializedJsonCredential<S: std::clone::Clone = NonEmptyObject, C = (), T = ()> {
+pub struct SpecializedJsonCredential<S = NonEmptyObject, C = (), T = ()> {
     /// JSON-LD context.
     #[serde(rename = "@context")]
     pub context: Context<C>,
@@ -112,9 +112,7 @@ pub struct SpecializedJsonCredential<S: std::clone::Clone = NonEmptyObject, C = 
     pub extra_properties: BTreeMap<String, json_syntax::Value>,
 }
 
-impl<S: std::clone::Clone, C: RequiredContextList, T: RequiredTypeSet>
-    SpecializedJsonCredential<S, C, T>
-{
+impl<S, C: RequiredContextList, T: RequiredTypeSet> SpecializedJsonCredential<S, C, T> {
     /// Creates a new credential.
     pub fn new(
         id: Option<UriBuf>,
@@ -139,13 +137,13 @@ impl<S: std::clone::Clone, C: RequiredContextList, T: RequiredTypeSet>
     }
 }
 
-impl<S: std::clone::Clone, C, T> JsonLdObject for SpecializedJsonCredential<S, C, T> {
+impl<S, C, T> JsonLdObject for SpecializedJsonCredential<S, C, T> {
     fn json_ld_context(&self) -> Option<Cow<ssi_json_ld::syntax::Context>> {
         Some(Cow::Borrowed(self.context.as_ref()))
     }
 }
 
-impl<S: std::clone::Clone, C, T> JsonLdNodeObject for SpecializedJsonCredential<S, C, T> {
+impl<S, C, T> JsonLdNodeObject for SpecializedJsonCredential<S, C, T> {
     fn json_ld_type(&self) -> JsonLdTypes {
         self.types.to_json_ld_types()
     }
@@ -154,20 +152,19 @@ impl<S: std::clone::Clone, C, T> JsonLdNodeObject for SpecializedJsonCredential<
 impl<S, C, T, E, P> ValidateClaims<E, P> for SpecializedJsonCredential<S, C, T>
 where
     E: DateTimeProvider,
-    S: std::clone::Clone,
 {
     fn validate_claims(&self, env: &E, _proof: &P) -> ClaimsValidity {
         crate::v2::Credential::validate_credential(self, env)
     }
 }
 
-impl<S: std::clone::Clone, C, T> crate::MaybeIdentified for SpecializedJsonCredential<S, C, T> {
+impl<S, C, T> crate::MaybeIdentified for SpecializedJsonCredential<S, C, T> {
     fn id(&self) -> Option<&Uri> {
         self.id.as_deref()
     }
 }
 
-impl<S: std::clone::Clone, C, T> crate::v2::Credential for SpecializedJsonCredential<S, C, T> {
+impl<S, C, T> crate::v2::Credential for SpecializedJsonCredential<S, C, T> {
     type Subject = S;
     type Description = InternationalString;
     type Issuer = IdOr<IdentifiedObject>;
@@ -221,7 +218,7 @@ impl<S: std::clone::Clone, C, T> crate::v2::Credential for SpecializedJsonCreden
 
 impl<S, C, T> ssi_json_ld::Expandable for SpecializedJsonCredential<S, C, T>
 where
-    S: Serialize + std::clone::Clone,
+    S: Serialize + Clone,
 {
     type Error = JsonLdError;
 

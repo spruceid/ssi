@@ -3,13 +3,17 @@ use std::ops::Deref;
 
 #[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
 #[serde(try_from = "Vec<T>", into = "Vec<T>")]
-pub struct NonEmptyVec<T: Clone>(Vec<T>);
+#[serde(bound(
+    serialize = "T: Serialize + Clone",
+    deserialize = "T: Deserialize<'de> + Clone"
+))]
+pub struct NonEmptyVec<T>(Vec<T>);
 
 #[derive(Debug, thiserror::Error)]
 #[error("empty vec")]
 pub struct EmptyVecError;
 
-impl<T: Clone> NonEmptyVec<T> {
+impl<T> NonEmptyVec<T> {
     pub fn new(t: T) -> Self {
         Self(vec![t])
     }
@@ -28,7 +32,7 @@ impl<T: Clone> NonEmptyVec<T> {
 
     pub fn into<T2>(self) -> NonEmptyVec<T2>
     where
-        T2: From<T> + Clone,
+        T2: From<T>,
     {
         self.into_inner()
             .into_iter()
@@ -42,7 +46,7 @@ impl<T: Clone> NonEmptyVec<T> {
 
     pub fn try_into<T2, E>(self) -> Result<NonEmptyVec<T2>, E>
     where
-        T2: TryFrom<T, Error = E> + Clone,
+        T2: TryFrom<T, Error = E>,
     {
         Ok(self
             .into_inner()
@@ -56,7 +60,7 @@ impl<T: Clone> NonEmptyVec<T> {
     }
 }
 
-impl<T: Clone> TryFrom<Vec<T>> for NonEmptyVec<T> {
+impl<T> TryFrom<Vec<T>> for NonEmptyVec<T> {
     type Error = EmptyVecError;
 
     fn try_from(v: Vec<T>) -> Result<NonEmptyVec<T>, Self::Error> {
@@ -67,19 +71,19 @@ impl<T: Clone> TryFrom<Vec<T>> for NonEmptyVec<T> {
     }
 }
 
-impl<T: Clone> From<NonEmptyVec<T>> for Vec<T> {
+impl<T> From<NonEmptyVec<T>> for Vec<T> {
     fn from(NonEmptyVec(v): NonEmptyVec<T>) -> Vec<T> {
         v
     }
 }
 
-impl<T: Clone> AsRef<[T]> for NonEmptyVec<T> {
+impl<T> AsRef<[T]> for NonEmptyVec<T> {
     fn as_ref(&self) -> &[T] {
         &self.0
     }
 }
 
-impl<T: Clone> Deref for NonEmptyVec<T> {
+impl<T> Deref for NonEmptyVec<T> {
     type Target = [T];
 
     fn deref(&self) -> &[T] {
