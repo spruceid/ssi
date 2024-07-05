@@ -1,12 +1,8 @@
 use serde::{Deserialize, Serialize};
 use std::ops::Deref;
 
-#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
-#[serde(try_from = "Vec<T>", into = "Vec<T>")]
-#[serde(bound(
-    serialize = "T: Serialize + Clone",
-    deserialize = "T: Deserialize<'de> + Clone"
-))]
+#[derive(Debug, Clone, Deserialize, PartialEq, Eq)]
+#[serde(try_from = "Vec<T>")]
 pub struct NonEmptyVec<T>(Vec<T>);
 
 #[derive(Debug, thiserror::Error)]
@@ -86,5 +82,17 @@ impl<'a, T> IntoIterator for &'a mut NonEmptyVec<T> {
 
     fn into_iter(self) -> Self::IntoIter {
         self.0.iter_mut()
+    }
+}
+
+impl<T> Serialize for NonEmptyVec<T>
+where
+    T: Serialize,
+{
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        self.0.serialize(serializer)
     }
 }

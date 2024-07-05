@@ -28,7 +28,7 @@ pub type JsonCredential<S = NonEmptyObject> = SpecializedJsonCredential<S>;
 /// [`JsonCredential`] type alias instead.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(bound(
-    serialize = "S: Serialize + Clone",
+    serialize = "S: Serialize",
     deserialize = "S: Deserialize<'de> + Clone, C: RequiredContextList, T: RequiredTypeSet"
 ))]
 pub struct SpecializedJsonCredential<S = NonEmptyObject, C = (), T = ()> {
@@ -218,7 +218,7 @@ impl<S, C, T> crate::v2::Credential for SpecializedJsonCredential<S, C, T> {
 
 impl<S, C, T> ssi_json_ld::Expandable for SpecializedJsonCredential<S, C, T>
 where
-    S: Serialize + Clone,
+    S: Serialize,
 {
     type Error = JsonLdError;
 

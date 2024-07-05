@@ -25,7 +25,7 @@ pub type AnyJsonCredential<S = json_syntax::Object> = AnySpecializedJsonCredenti
 #[serde(
     untagged,
     bound(
-        serialize = "S: Serialize + Clone",
+        serialize = "S: Serialize",
         deserialize = "S: Deserialize<'de> + Clone, C: RequiredContextList, T: RequiredTypeSet"
     )
 )]
@@ -75,7 +75,7 @@ impl<S, C, T> MaybeIdentified for AnySpecializedJsonCredential<S, C, T> {
 
 impl<S, C, T> ssi_json_ld::Expandable for AnySpecializedJsonCredential<S, C, T>
 where
-    S: Serialize + Clone,
+    S: Serialize,
 {
     type Error = JsonLdError;
 
