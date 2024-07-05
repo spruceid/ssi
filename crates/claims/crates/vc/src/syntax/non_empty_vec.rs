@@ -79,3 +79,12 @@ impl<'a, T> IntoIterator for &'a NonEmptyVec<T> {
         self.0.iter().collect::<Vec<Self::Item>>().into_iter()
     }
 }
+
+impl<'a, T> IntoIterator for &'a mut NonEmptyVec<T> {
+    type Item = &'a mut T;
+    type IntoIter = std::slice::IterMut<'a, T>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.0.iter_mut()
+    }
+}
