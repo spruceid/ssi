@@ -6,10 +6,8 @@ use std::ops::Deref;
 pub struct NonEmptyVec<T: Clone>(Vec<T>);
 
 #[derive(Debug, thiserror::Error)]
-pub enum Error {
-    #[error("expected a non-empty array")]
-    Empty,
-}
+#[error("empty vec")]
+pub struct EmptyVecError;
 
 impl<T: Clone> NonEmptyVec<T> {
     pub fn new(t: T) -> Self {
@@ -59,11 +57,11 @@ impl<T: Clone> NonEmptyVec<T> {
 }
 
 impl<T: Clone> TryFrom<Vec<T>> for NonEmptyVec<T> {
-    type Error = Error;
+    type Error = EmptyVecError;
 
-    fn try_from(v: Vec<T>) -> Result<NonEmptyVec<T>, Error> {
+    fn try_from(v: Vec<T>) -> Result<NonEmptyVec<T>, Self::Error> {
         if v.is_empty() {
-            return Err(Error::Empty);
+            return Err(EmptyVecError);
         }
         Ok(NonEmptyVec(v))
     }
