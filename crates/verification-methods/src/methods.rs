@@ -169,12 +169,7 @@ impl SigningMethod<JWK, ssi_jwk::Algorithm> for AnyMethod {
             },
             Self::JsonWebKey2020(m) => m.sign_bytes(secret, Some(algorithm), bytes),
             #[cfg(feature = "ed25519")]
-            Self::Multikey(m) => match algorithm {
-                ssi_jwk::Algorithm::EdDSA => m.sign_bytes(secret, bytes),
-                _ => Err(MessageSignatureError::UnsupportedAlgorithm(
-                    algorithm.to_string(),
-                )),
-            },
+            Self::Multikey(m) => m.sign_bytes(secret, algorithm, bytes),
             #[cfg(all(feature = "tezos", feature = "ed25519"))]
             Self::Ed25519PublicKeyBLAKE2BDigestSize20Base58CheckEncoded2021(m) => {
                 m.sign_bytes(secret, algorithm.try_into()?, bytes)
@@ -228,10 +223,6 @@ ssi_verification_methods_core::verification_method_union! {
         /// `JsonWebKey2020`.
         JsonWebKey2020,
 
-        /// `Multikey`.
-        #[cfg(feature = "ed25519")]
-        Multikey,
-
         #[cfg(feature = "solana")]
         SolanaMethod2021
     }
@@ -254,8 +245,6 @@ impl AnyJwkMethod {
             #[cfg(feature = "secp256r1")]
             Self::EcdsaSecp256r1VerificationKey2019(m) => Cow::Owned(m.public_key_jwk()),
             Self::JsonWebKey2020(m) => Cow::Borrowed(m.public_key_jwk()),
-            #[cfg(feature = "ed25519")]
-            Self::Multikey(m) => Cow::Owned(m.public_key_jwk()),
             #[cfg(feature = "solana")]
             Self::SolanaMethod2021(m) => Cow::Borrowed(m.public_key_jwk()),
         }
@@ -308,13 +297,6 @@ impl SigningMethod<JWK, ssi_jwk::Algorithm> for AnyJwkMethod {
                 )),
             },
             Self::JsonWebKey2020(m) => m.sign_bytes(secret, Some(algorithm), bytes),
-            #[cfg(feature = "ed25519")]
-            Self::Multikey(m) => match algorithm {
-                ssi_jwk::Algorithm::EdDSA => m.sign_bytes(secret, bytes),
-                _ => Err(MessageSignatureError::UnsupportedAlgorithm(
-                    algorithm.to_string(),
-                )),
-            },
             #[cfg(feature = "solana")]
             Self::SolanaMethod2021(m) => {
                 m.sign_bytes(secret, Some(algorithm), bytes) // FIXME: check algorithm?

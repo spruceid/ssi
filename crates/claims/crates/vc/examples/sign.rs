@@ -3,7 +3,7 @@
 use iref::{Iri, IriBuf, Uri, UriBuf};
 use linked_data::{LinkedDataResource, LinkedDataSubject};
 use rand_chacha::rand_core::SeedableRng;
-use ssi_claims_core::VerificationParameters;
+use ssi_claims_core::{SignatureError, VerificationParameters};
 use ssi_data_integrity::{suites::Ed25519Signature2020, CryptographicSuite, ProofOptions};
 use ssi_json_ld::{Expandable, Loader};
 use ssi_rdf::{Interpretation, LdEnvironment, VocabularyMut};
@@ -250,10 +250,11 @@ impl Signer<Ed25519VerificationKey2020> for Keyring {
     async fn for_method(
         &self,
         method: Cow<'_, Ed25519VerificationKey2020>,
-    ) -> Option<Self::MessageSigner> {
-        self.keys
+    ) -> Result<Option<Self::MessageSigner>, SignatureError> {
+        Ok(self
+            .keys
             .get(method.id())
-            .map(|(method, key_pair)| MethodWithSecret::new(method.clone(), key_pair.clone()))
+            .map(|(method, key_pair)| MethodWithSecret::new(method.clone(), key_pair.clone())))
     }
 }
 

@@ -67,8 +67,13 @@ pub trait StandardCryptographicSuite: Clone {
         &self,
         transformed_document: TransformedData<Self>,
         proof_configuration: ProofConfigurationRef<'_, Self>,
+        verification_method: &Self::VerificationMethod,
     ) -> Result<HashedData<Self>, HashingError> {
-        Self::Hashing::hash(transformed_document, proof_configuration)
+        Self::Hashing::hash(
+            transformed_document,
+            proof_configuration,
+            verification_method,
+        )
     }
 }
 
@@ -113,10 +118,6 @@ where
         claims: &C,
         proof_configuration: ProofConfigurationRef<'_, Self>,
     ) -> Result<Self::Signature, SignatureError> {
-        let transformed = self.transform(context, claims, proof_configuration).await?;
-
-        let hashed = self.hash(transformed, proof_configuration)?;
-
         let options = ssi_verification_methods_core::ResolutionOptions {
             accept: Some(Box::new(Self::VerificationMethod::type_set())),
         };
@@ -130,10 +131,14 @@ where
             )
             .await?;
 
+        let transformed = self.transform(context, claims, proof_configuration).await?;
+
+        let hashed = self.hash(transformed, proof_configuration, &method)?;
+
         // Find a signer for this verification method.
         let signer = signers
             .for_method(Cow::Borrowed(&method))
-            .await
+            .await?
             .ok_or(SignatureError::MissingSigner)?;
 
         S::SignatureAlgorithm::sign(&method, signer, hashed, proof_configuration).await
@@ -153,14 +158,6 @@ where
         claims: &C,
         proof: ProofRef<'_, Self>,
     ) -> Result<ProofValidity, ProofValidationError> {
-        let proof_configuration = proof.configuration();
-
-        let transformed = self
-            .transform(verifier, claims, proof_configuration)
-            .await?;
-
-        let hashed = self.hash(transformed, proof_configuration)?;
-
         let options = ssi_verification_methods_core::ResolutionOptions {
             accept: Some(Box::new(Self::VerificationMethod::type_set())),
         };
@@ -170,6 +167,14 @@ where
             .resolver()
             .resolve_verification_method_with(None, Some(proof.verification_method), options)
             .await?;
+
+        let proof_configuration = proof.configuration();
+
+        let transformed = self
+            .transform(verifier, claims, proof_configuration)
+            .await?;
+
+        let hashed = self.hash(transformed, proof_configuration, &method)?;
 
         S::SignatureAlgorithm::verify(&method, hashed, proof)
     }

@@ -8,7 +8,7 @@ use ssi_jwk::JWK;
 use ssi_multicodec::MultiEncodedBuf;
 use ssi_security::{Multibase, MultibaseBuf};
 use ssi_verification_methods_core::{
-    JwkVerificationMethod, MessageSignatureError, VerificationMethodSet, VerifyBytes,
+    JwkVerificationMethod, MessageSignatureError, SigningMethod, VerificationMethodSet, VerifyBytes,
 };
 use static_iref::iri;
 
@@ -81,43 +81,6 @@ impl Multikey {
     pub fn public_key_jwk(&self) -> JWK {
         self.public_key.to_jwk()
     }
-
-    pub fn sign_bytes(
-        &self,
-        secret_key: &JWK,
-        signing_bytes: &[u8],
-    ) -> Result<Vec<u8>, MessageSignatureError> {
-        let algorithm = self
-            .public_key
-            .decoded
-            .get_algorithm()
-            .ok_or(MessageSignatureError::MissingAlgorithm)?;
-        let key_algorithm = secret_key.get_algorithm().unwrap_or(algorithm);
-        if !algorithm.is_compatible_with(key_algorithm) {
-            return Err(MessageSignatureError::InvalidSecretKey);
-        }
-        ssi_jws::sign_bytes(algorithm, signing_bytes, secret_key)
-            .map_err(|_| MessageSignatureError::InvalidSecretKey)
-    }
-
-    pub fn verify_bytes(
-        &self,
-        signing_bytes: &[u8],
-        signature: &[u8],
-    ) -> Result<ProofValidity, ProofValidationError> {
-        let algorithm = self
-            .public_key
-            .decoded
-            .get_algorithm()
-            .ok_or(ProofValidationError::MissingAlgorithm)?;
-        Ok(ssi_jws::verify_bytes(
-            algorithm,
-            signing_bytes,
-            &self.public_key.decoded,
-            signature,
-        )
-        .map_err(|_| InvalidProof::Signature))
-    }
 }
 
 impl VerificationMethod for Multikey {
@@ -138,14 +101,44 @@ impl VerificationMethodSet for Multikey {
     }
 }
 
-impl<A> VerifyBytes<A> for Multikey {
+impl<A: Into<ssi_jwk::Algorithm>> VerifyBytes<A> for Multikey {
     fn verify_bytes(
         &self,
-        _: A,
+        algorithm: A,
         signing_bytes: &[u8],
         signature: &[u8],
     ) -> Result<ProofValidity, ProofValidationError> {
-        self.verify_bytes(signing_bytes, signature)
+        let key = self.public_key_jwk();
+        Ok(
+            ssi_jws::verify_bytes(algorithm.into(), signing_bytes, &key, signature)
+                .map_err(|_| InvalidProof::Signature),
+        )
+    }
+}
+
+impl SigningMethod<JWK, ssi_jwk::Algorithm> for Multikey {
+    fn sign_bytes(
+        &self,
+        secret: &JWK,
+        algorithm: ssi_jwk::Algorithm,
+        bytes: &[u8],
+    ) -> Result<Vec<u8>, MessageSignatureError> {
+        ssi_jws::sign_bytes(algorithm, bytes, secret)
+            .map_err(MessageSignatureError::signature_failed)
+    }
+}
+
+#[cfg(feature = "ed25519")]
+impl SigningMethod<ed25519_dalek::SigningKey, ssi_jwk::algorithm::EdDSA> for Multikey {
+    fn sign_bytes(
+        &self,
+        secret: &ed25519_dalek::SigningKey,
+        _algorithm: ssi_jwk::algorithm::EdDSA,
+        bytes: &[u8],
+    ) -> Result<Vec<u8>, MessageSignatureError> {
+        use ed25519_dalek::Signer;
+        let signature = secret.sign(bytes);
+        Ok(signature.to_bytes().to_vec())
     }
 }
 
@@ -201,6 +194,8 @@ pub struct PublicKey {
     /// Multibase-encoded public key.
     encoded: MultibaseBuf,
 
+    codec: u64,
+
     /// Decoded public key.
     decoded: JWK,
 }
@@ -209,8 +204,8 @@ impl PublicKey {
     pub fn decode(encoded: MultibaseBuf) -> Result<Self, InvalidPublicKey> {
         let pk_multi_encoded = MultiEncodedBuf::new(encoded.decode()?.1)?;
 
-        let (pk_codec, pk_data) = pk_multi_encoded.parts();
-        let decoded = match pk_codec {
+        let (codec, pk_data) = pk_multi_encoded.parts();
+        let decoded = match codec {
             #[cfg(feature = "ed25519")]
             ssi_multicodec::ED25519_PUB => ssi_jwk::ed25519_parse(pk_data)?,
             #[cfg(feature = "secp256k1")]
@@ -221,7 +216,15 @@ impl PublicKey {
             ssi_multicodec::P384_PUB => ssi_jwk::p384_parse(pk_data)?,
             c => return Err(InvalidPublicKey::UnsupportedKeyType(format!("{c:#x}")))?,
         };
-        Ok(Self { encoded, decoded })
+        Ok(Self {
+            encoded,
+            codec,
+            decoded,
+        })
+    }
+
+    pub fn codec(&self) -> u64 {
+        self.codec
     }
 
     pub fn encoded(&self) -> &Multibase {

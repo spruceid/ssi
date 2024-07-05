@@ -1,5 +1,6 @@
 use std::borrow::Cow;
 
+use ssi_claims_core::SignatureError;
 use ssi_verification_methods::{protocol::WithProtocol, VerificationMethod};
 
 use crate::AnyProtocol;
@@ -13,12 +14,16 @@ where
 {
     type MessageSigner = AnyMessageSigner<S::MessageSigner>;
 
-    async fn for_method(&self, method: Cow<'_, M>) -> Option<Self::MessageSigner> {
+    async fn for_method(
+        &self,
+        method: Cow<'_, M>,
+    ) -> Result<Option<Self::MessageSigner>, SignatureError> {
         let any_method = method.into_owned().into();
-        self.0
+        Ok(self
+            .0
             .for_method(Cow::Owned(any_method))
-            .await
-            .map(AnyMessageSigner)
+            .await?
+            .map(AnyMessageSigner))
     }
 }
 
@@ -95,6 +100,13 @@ impl IntoAnySignatureAlgorithm for ssi_jwk::algorithm::EdBlake2b {
 }
 
 impl IntoAnySignatureAlgorithm for ssi_jwk::algorithm::ESBlake2b {
+    fn into_any_signature_algorithm(self) -> AnySignatureAlgorithm {
+        WithProtocol(self.into(), AnyProtocol::None)
+    }
+}
+
+#[cfg(all(feature = "w3c", any(feature = "secp256r1", feature = "secp384r1")))]
+impl IntoAnySignatureAlgorithm for ssi_data_integrity_suites::ecdsa_rdfc_2019::ES256OrES384 {
     fn into_any_signature_algorithm(self) -> AnySignatureAlgorithm {
         WithProtocol(self.into(), AnyProtocol::None)
     }

@@ -9,6 +9,9 @@ use crate::{suite::ConfigurationError, CryptographicSuite, ProofConfiguration};
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ProofOptions<M, T> {
+    #[serde(rename = "@context", skip_serializing_if = "Option::is_none")]
+    pub context: Option<ssi_json_ld::syntax::Context>,
+
     /// Date a creation of the proof.
     #[serde(default = "xsd_types::DateTime::now")]
     pub created: xsd_types::DateTime,
@@ -70,6 +73,7 @@ pub struct ProofOptions<M, T> {
 impl<M, T: Default> Default for ProofOptions<M, T> {
     fn default() -> Self {
         Self {
+            context: None,
             created: xsd_types::DateTime::now_ms(),
             verification_method: None,
             proof_purpose: ProofPurpose::default(),
@@ -91,6 +95,7 @@ impl<M, T> ProofOptions<M, T> {
         options: T,
     ) -> Self {
         Self {
+            context: None,
             created,
             verification_method: Some(verification_method),
             proof_purpose,
@@ -105,6 +110,7 @@ impl<M, T> ProofOptions<M, T> {
 
     pub fn from_method_and_options(verification_method: ReferenceOrOwned<M>, options: T) -> Self {
         Self {
+            context: None,
             created: xsd_types::DateTime::now_ms(),
             verification_method: Some(verification_method),
             proof_purpose: ProofPurpose::default(),
@@ -130,6 +136,7 @@ impl<M, T> ProofOptions<M, T> {
         map_options: impl FnOnce(T) -> U,
     ) -> ProofOptions<N, U> {
         ProofOptions {
+            context: self.context,
             created: self.created,
             verification_method: self
                 .verification_method
@@ -158,6 +165,7 @@ impl<M, T> ProofOptions<M, T> {
         map_options: impl FnOnce(T) -> Result<U, E>,
     ) -> Result<ProofOptions<N, U>, E> {
         Ok(ProofOptions {
+            context: self.context,
             created: self.created,
             verification_method: self
                 .verification_method
@@ -182,7 +190,7 @@ impl<M, T> ProofOptions<M, T> {
         S: CryptographicSuite<VerificationMethod = M>,
     {
         Ok(ProofConfiguration {
-            context: None,
+            context: self.context,
             type_,
             created: self.created,
             verification_method: self

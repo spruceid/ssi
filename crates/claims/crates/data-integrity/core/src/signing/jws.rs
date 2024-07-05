@@ -99,8 +99,7 @@ where
             prepared_claims.as_ref(),
             signer,
             None,
-            A::select_algorithm(verification_method, proof_configuration.options)
-                .ok_or(SignatureError::MissingAlgorithm)?,
+            A::select_algorithm(verification_method, proof_configuration.options)?,
         )
         .await
     }
@@ -161,8 +160,7 @@ where
             prepared_claims.as_ref(),
             signer,
             proof_configuration.options.public_jwk().key_id.clone(),
-            A::select_algorithm(verification_method, proof_configuration.options)
-                .ok_or(SignatureError::MissingAlgorithm)?,
+            A::select_algorithm(verification_method, proof_configuration.options)?,
         )
         .await
     }

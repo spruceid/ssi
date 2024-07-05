@@ -15,6 +15,7 @@ where
     fn hash(
         input: ssi_eip712::TypedData,
         _proof_configuration: ProofConfigurationRef<S>,
+        _verification_method: &S::VerificationMethod,
     ) -> Result<Self::Output, HashingError> {
         input
             .encode()

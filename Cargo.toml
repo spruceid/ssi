@@ -143,11 +143,15 @@ secp256k1 = ["ssi-claims/secp256k1", "ssi-dids/secp256k1"]
 ## Signature suites based on secp256r1.
 ##
 ## This includes:
-##   - `EcdsaSecp256r1Signature2019` (requires `secp256r1`)
+##   - `EcdsaSecp256r1Signature2019` (requires `w3c`)
+##   - `EcdsaRdfc2019` (requires `w3c`)
 secp256r1 = ["ssi-claims/secp256r1", "ssi-dids/secp256r1"]
 
-## Enable secp384r1 keys.
-secp384r1 = ["ssi-jwk/secp384r1", "ssi-verification-methods/secp384r1", "ssi-dids/secp384r1"]
+## Enable secp384r1 keys and signature suites based on secp384r1.
+##
+## This includes:
+##   - `EcdsaRdfc2019` (requires `w3c`)
+secp384r1 = ["ssi-claims/secp384r1", "ssi-dids/secp384r1"]
 
 ## Signature suites based on RSA.
 ##

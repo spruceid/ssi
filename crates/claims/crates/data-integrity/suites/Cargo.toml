@@ -46,8 +46,15 @@ secp256k1 = ["ssi-verification-methods/secp256k1", "k256"]
 ## Signature suites based on secp256r1.
 ##
 ## This includes:
-##   - `EcdsaSecp256r1Signature2019` (requires `secp256r1`)
+##   - `EcdsaSecp256r1Signature2019` (requires `w3c`)
+##   - `EcdsaRdfc2019` (requires `w3c`)
 secp256r1 = ["ssi-verification-methods/secp256r1", "p256"]
+
+## Signature suites based on secp384r1.
+##
+## This includes:
+##   - `EcdsaRdfc2019` (requires `w3c`)
+secp384r1 = ["ssi-verification-methods/secp384r1", "p384"]
 
 ## Signature suites based on RSA.
 ##
@@ -104,6 +111,7 @@ ssi-security.workspace = true
 ssi-tzkey = { workspace = true, optional = true }
 ssi-eip712.workspace = true
 ssi-caips.workspace = true
+ssi-multicodec.workspace = true
 chrono.workspace = true
 multibase.workspace = true
 iref.workspace = true
@@ -136,6 +144,7 @@ serde_jcs = { workspace = true, optional = true }
 
 [dev-dependencies]
 async-std = { version = "1.9", features = ["attributes"] }
+serde_json.workspace = true
 static-iref.workspace = true
 rand = "0.7"
 hashbrown = "0.13.0"
