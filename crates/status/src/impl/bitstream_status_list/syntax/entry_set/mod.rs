@@ -36,6 +36,23 @@ pub struct BitstringStatusListEntry {
     pub status_list_index: usize,
 }
 
+impl BitstringStatusListEntry {
+    /// Creates a new bit-string status list entry.
+    pub fn new(
+        id: Option<UriBuf>,
+        status_purpose: StatusPurpose,
+        status_list_credential: UriBuf,
+        status_list_index: usize,
+    ) -> Self {
+        Self {
+            id,
+            status_purpose,
+            status_list_credential,
+            status_list_index,
+        }
+    }
+}
+
 impl StatusMapEntry for BitstringStatusListEntry {
     type Key = usize;
 
