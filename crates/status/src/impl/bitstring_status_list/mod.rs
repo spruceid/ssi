@@ -5,6 +5,7 @@
 //! Credentials through use of bitstrings.
 //!
 //! See: <https://www.w3.org/TR/vc-bitstring-status-list/>
+use core::fmt;
 use iref::UriBuf;
 use serde::{Deserialize, Serialize};
 use std::{hash::Hash, str::FromStr, time::Duration};
@@ -208,6 +209,12 @@ impl<'a> PartialEq<crate::StatusPurpose<&'a str>> for StatusPurpose {
                 | (Self::Suspension, crate::StatusPurpose::Suspension)
                 | (Self::Message, crate::StatusPurpose::Other("message"))
         )
+    }
+}
+
+impl fmt::Display for StatusPurpose {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        self.name().fmt(f)
     }
 }
 
