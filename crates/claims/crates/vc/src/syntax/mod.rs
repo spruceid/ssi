@@ -1,9 +1,9 @@
 mod context;
 mod credential;
 mod non_empty_object;
+mod non_empty_vec;
 mod presentation;
 mod types;
-mod non_empty_vec;
 
 use std::collections::BTreeMap;
 
@@ -155,7 +155,9 @@ pub(crate) mod non_empty_value_or_array {
         Single(T),
     }
 
-    pub fn deserialize<'de, T: Deserialize<'de> + std::clone::Clone, D>(deserializer: D) -> Result<NonEmptyVec<T>, D::Error>
+    pub fn deserialize<'de, T: Deserialize<'de> + std::clone::Clone, D>(
+        deserializer: D,
+    ) -> Result<NonEmptyVec<T>, D::Error>
     where
         D: serde::Deserializer<'de>,
     {
