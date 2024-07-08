@@ -29,7 +29,7 @@ pub type JsonCredential<S = NonEmptyObject> = SpecializedJsonCredential<S>;
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(bound(
     serialize = "S: Serialize",
-    deserialize = "S: Deserialize<'de> + Clone, C: RequiredContextList, T: RequiredTypeSet"
+    deserialize = "S: Deserialize<'de>, C: RequiredContextList, T: RequiredTypeSet"
 ))]
 pub struct SpecializedJsonCredential<S = NonEmptyObject, C = (), T = ()> {
     /// JSON-LD context.

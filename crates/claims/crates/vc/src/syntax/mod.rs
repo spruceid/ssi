@@ -104,6 +104,7 @@ pub struct TypedObject {
 
 pub(crate) mod value_or_array {
     use serde::{Deserialize, Serialize};
+    use ssi_core::OneOrMany;
 
     pub fn serialize<T: Serialize, S>(value: &[T], serializer: S) -> Result<S::Ok, S::Error>
     where
@@ -115,26 +116,17 @@ pub(crate) mod value_or_array {
         }
     }
 
-    #[derive(Deserialize)]
-    #[serde(untagged)]
-    enum SingleOrArray<T> {
-        Array(Vec<T>),
-        Single(T),
-    }
-
     pub fn deserialize<'de, T: Deserialize<'de>, D>(deserializer: D) -> Result<Vec<T>, D::Error>
     where
         D: serde::Deserializer<'de>,
     {
-        match SingleOrArray::deserialize(deserializer)? {
-            SingleOrArray::Array(v) => Ok(v),
-            SingleOrArray::Single(t) => Ok(vec![t]),
-        }
+        Ok(OneOrMany::deserialize(deserializer)?.into_vec())
     }
 }
 
 pub(crate) mod non_empty_value_or_array {
-    use serde::{de, Deserialize, Serialize};
+    use serde::{Deserialize, Serialize};
+    use ssi_core::OneOrMany;
 
     use super::NonEmptyVec;
 
@@ -148,23 +140,16 @@ pub(crate) mod non_empty_value_or_array {
         }
     }
 
-    #[derive(Deserialize)]
-    #[serde(untagged)]
-    enum SingleOrArray<T> {
-        Array(Vec<T>),
-        Single(T),
-    }
-
-    pub fn deserialize<'de, T: Deserialize<'de> + std::clone::Clone, D>(
+    pub fn deserialize<'de, T: Deserialize<'de>, D>(
         deserializer: D,
     ) -> Result<NonEmptyVec<T>, D::Error>
     where
         D: serde::Deserializer<'de>,
     {
-        match SingleOrArray::deserialize(deserializer)? {
-            SingleOrArray::Array(v) => v.try_into().map_err(de::Error::custom),
-            SingleOrArray::Single(t) => Ok(vec![t].try_into().unwrap()),
-        }
+        OneOrMany::deserialize(deserializer)?
+            .into_vec()
+            .try_into()
+            .map_err(serde::de::Error::custom)
     }
 }
 

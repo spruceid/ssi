@@ -1,8 +1,8 @@
 use serde::{Deserialize, Serialize};
 use std::ops::Deref;
 
-#[derive(Debug, Clone, Deserialize, PartialEq, Eq)]
-#[serde(try_from = "Vec<T>")]
+#[derive(Debug, Clone, Serialize, PartialEq, Eq)]
+#[serde(transparent)]
 pub struct NonEmptyVec<T>(Vec<T>);
 
 #[derive(Debug, thiserror::Error)]
@@ -85,14 +85,13 @@ impl<'a, T> IntoIterator for &'a mut NonEmptyVec<T> {
     }
 }
 
-impl<T> Serialize for NonEmptyVec<T>
-where
-    T: Serialize,
-{
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+impl<'de, T: Deserialize<'de>> Deserialize<'de> for NonEmptyVec<T> {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
-        S: serde::Serializer,
+        D: serde::Deserializer<'de>,
     {
-        self.0.serialize(serializer)
+        Vec::<T>::deserialize(deserializer)?
+            .try_into()
+            .map_err(serde::de::Error::custom)
     }
 }
