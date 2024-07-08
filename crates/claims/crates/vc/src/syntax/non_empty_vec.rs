@@ -22,7 +22,7 @@ impl<T> NonEmptyVec<T> {
         self.0.push(t)
     }
 
-    pub fn inner(self) -> Vec<T> {
+    pub fn into_inner(self) -> Vec<T> {
         self.0
     }
 }
