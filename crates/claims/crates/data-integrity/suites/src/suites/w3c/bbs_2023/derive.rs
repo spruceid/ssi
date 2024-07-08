@@ -5,7 +5,7 @@ use k256::sha2::Sha256;
 use rdf_types::{BlankIdBuf, Quad};
 use serde::{Deserialize, Serialize};
 use ssi_bbs::{proof_gen, ProofGenFailed};
-use ssi_data_integrity_core::{DataIntegrity, Proof};
+use ssi_data_integrity_core::{DataIntegrity, Proof, ProofRef};
 use ssi_di_sd_primitives::{
     group::{canonicalize_and_group, GroupError},
     select::{select_json_ld, DanglingJsonPointer},
@@ -83,7 +83,6 @@ impl From<UnsupportedBbs2023Signature> for DeriveError {
 }
 
 pub struct DeriveOptions {
-    pub base_proof: Proof<Bbs2023>,
     pub selective_pointers: Vec<JsonPointerBuf>,
     pub presentation_header: Option<Vec<u8>>,
     pub feature_option: DerivedFeatureOption,
@@ -113,6 +112,7 @@ pub async fn add_derived_proof<T>(
     unsecured_document: &T,
     verification_method: &Multikey,
     options: DeriveOptions,
+    base_proof: ProofRef<'_, Bbs2023>,
 ) -> Result<DataIntegrity<json_syntax::Object, Bbs2023>, DeriveError>
 where
     T: Serialize + JsonLdNodeObject + Expandable,
@@ -122,22 +122,34 @@ where
         loader,
         unsecured_document,
         verification_method,
-        &options.base_proof.signature,
+        base_proof.signature,
         options.selective_pointers,
         options.presentation_header.as_deref(),
         &options.feature_option,
     )
     .await?;
 
-    let mut new_proof = options.base_proof;
-    new_proof.signature = Bbs2023Signature::encode_derived(
-        &data.bbs_proof,
-        &data.label_map,
-        &data.mandatory_indexes,
-        &data.selective_indexes,
-        options.presentation_header.as_deref(),
-        &options.feature_option,
-    )?;
+    let new_proof = Proof {
+        context: base_proof.context.cloned(),
+        type_: Bbs2023,
+        created: base_proof.created,
+        verification_method: base_proof.verification_method.cloned(),
+        proof_purpose: base_proof.proof_purpose,
+        expires: base_proof.expires,
+        domains: base_proof.domains.to_vec(),
+        challenge: base_proof.challenge.map(ToOwned::to_owned),
+        nonce: base_proof.nonce.map(ToOwned::to_owned),
+        options: *base_proof.options,
+        signature: Bbs2023Signature::encode_derived(
+            &data.bbs_proof,
+            &data.label_map,
+            &data.mandatory_indexes,
+            &data.selective_indexes,
+            options.presentation_header.as_deref(),
+            &options.feature_option,
+        )?,
+        extra_properties: base_proof.extra_properties.clone(),
+    };
 
     Ok(DataIntegrity::new(data.reveal_document, new_proof.into()))
 }

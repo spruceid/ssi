@@ -1,13 +1,20 @@
 //! Data Integrity BBS Cryptosuite 2023 (v1.0) implementation.
 //!
 //! See: <https://www.w3.org/TR/vc-di-bbs/#bbs-2023>
+use serde::Serialize;
+use ssi_claims_core::ResolverProvider;
 use ssi_data_integrity_core::{
-    suite::{ConfigurationAlgorithm, ConfigurationError, InputProofOptions},
-    CryptosuiteStr, ProofConfiguration, StandardCryptographicSuite, Type, TypeRef,
-    UnsupportedProofSuite,
+    suite::{
+        ConfigurationAlgorithm, ConfigurationError, CryptographicSuiteSelect, InputProofOptions,
+        SelectionError, SelectiveCryptographicSuite,
+    },
+    CryptosuiteStr, DataIntegrity, ProofConfiguration, ProofRef, StandardCryptographicSuite, Type,
+    TypeRef, UnsupportedProofSuite,
 };
 use ssi_di_sd_primitives::JsonPointerBuf;
-use ssi_verification_methods::Multikey;
+use ssi_json_ld::{Expandable, ExpandedDocument, JsonLdLoaderProvider, JsonLdNodeObject};
+use ssi_rdf::LexicalInterpretation;
+use ssi_verification_methods::{Multikey, VerificationMethodResolver};
 
 pub(crate) mod transformation;
 pub use transformation::{Bbs2023Transformation, Bbs2023TransformationOptions, Transformed};
@@ -29,6 +36,41 @@ mod tests;
 /// The `bbs-2023` cryptographic suite.
 #[derive(Debug, Clone, Copy)]
 pub struct Bbs2023;
+
+impl SelectiveCryptographicSuite for Bbs2023 {
+    type SelectionOptions = DeriveOptions;
+}
+
+impl<T, P> CryptographicSuiteSelect<T, P> for Bbs2023
+where
+    T: Serialize + JsonLdNodeObject + Expandable,
+    T::Expanded<LexicalInterpretation, ()>: Into<ExpandedDocument>,
+    P: JsonLdLoaderProvider + ResolverProvider,
+    P::Resolver: VerificationMethodResolver<Method = Multikey>,
+{
+    async fn select(
+        &self,
+        document: &T,
+        proof: ProofRef<'_, Self>,
+        params: P,
+        options: DeriveOptions,
+    ) -> Result<DataIntegrity<json_syntax::Object, Self>, SelectionError> {
+        let verification_method = params
+            .resolver()
+            .resolve_verification_method(None, Some(proof.verification_method))
+            .await?;
+
+        add_derived_proof(
+            params.loader(),
+            document,
+            &verification_method,
+            options,
+            proof,
+        )
+        .await
+        .map_err(SelectionError::proof_derivation)
+    }
+}
 
 impl StandardCryptographicSuite for Bbs2023 {
     type Configuration = Bbs2023Configuration;

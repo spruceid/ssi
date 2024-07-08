@@ -2,7 +2,6 @@
 use std::{borrow::Cow, hash::Hash};
 
 use json_ld::expansion::Action;
-use json_ld::Expand;
 use linked_data::{LinkedData, LinkedDataResource, LinkedDataSubject};
 
 pub use json_ld;

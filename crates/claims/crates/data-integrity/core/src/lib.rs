@@ -25,6 +25,7 @@ pub use suite::{
     CloneCryptographicSuite, CryptographicSuite, DebugCryptographicSuite,
     DeserializeCryptographicSuite, SerializeCryptographicSuite, StandardCryptographicSuite,
 };
+use suite::{CryptographicSuiteSelect, SelectionError};
 
 pub use document::*;
 #[doc(hidden)]
@@ -71,6 +72,33 @@ impl<T, S: CryptographicSuite> DataIntegrity<T, S> {
         Proofs<S>: ValidateProof<P, T>,
     {
         VerifiableClaims::verify(self, params).await
+    }
+
+    /// Select a subset of claims to disclose.
+    ///
+    /// The `params` argument is similar to the verification parameters of the
+    /// `verify` function. It must provides resources necessary to the selection
+    /// of claims. This depends on the cryptosuite type `S`, but probably
+    /// includes a verification method resolver.
+    /// Using `ssi::claims::VerificationParameters` will work in most cases.
+    pub async fn select<P>(
+        &self,
+        params: P,
+        options: S::SelectionOptions,
+    ) -> Result<DataIntegrity<ssi_json_ld::syntax::Object, S>, SelectionError>
+    where
+        S: CryptographicSuiteSelect<T, P>,
+    {
+        match self.proofs.split_first() {
+            Some((proof, [])) => {
+                proof
+                    .suite()
+                    .select(&self.claims, proof.borrowed(), params, options)
+                    .await
+            }
+            Some(_) => Err(SelectionError::AmbiguousProof),
+            None => Err(SelectionError::MissingProof),
+        }
     }
 }
 

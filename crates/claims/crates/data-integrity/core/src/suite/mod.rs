@@ -25,6 +25,9 @@ use self::standard::{HashingError, TransformationError};
 pub mod standard;
 pub use standard::StandardCryptographicSuite;
 
+mod sd;
+pub use sd::*;
+
 /// Cryptographic suite.
 ///
 /// See: <https://www.w3.org/TR/vc-data-integrity/#cryptographic-suites>
