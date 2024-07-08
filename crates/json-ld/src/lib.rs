@@ -231,3 +231,46 @@ impl<T> WithContext<T> {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use crate::{CompactJsonLd, ContextLoader, Expandable};
+
+    #[async_std::test]
+    async fn accept_defined_type() {
+        let input = CompactJsonLd(json_syntax::json!({
+            "@context": { "Defined": "http://example.org/#Defined" },
+            "@type": ["Defined"]
+        }));
+
+        assert!(input.expand(&ContextLoader::default()).await.is_ok());
+    }
+
+    #[async_std::test]
+    async fn reject_undefined_type() {
+        let input = CompactJsonLd(json_syntax::json!({
+            "@type": ["Undefined"]
+        }));
+
+        assert!(input.expand(&ContextLoader::default()).await.is_err());
+    }
+
+    #[async_std::test]
+    async fn accept_defined_property() {
+        let input = CompactJsonLd(json_syntax::json!({
+            "@context": { "defined": "http://example.org/#defined" },
+            "defined": "foo"
+        }));
+
+        assert!(input.expand(&ContextLoader::default()).await.is_ok());
+    }
+
+    #[async_std::test]
+    async fn reject_undefined_property() {
+        let input = CompactJsonLd(json_syntax::json!({
+            "undefined": "foo"
+        }));
+
+        assert!(input.expand(&ContextLoader::default()).await.is_err());
+    }
+}
