@@ -26,7 +26,7 @@ pub type AnyJsonCredential<S = json_syntax::Object> = AnySpecializedJsonCredenti
     untagged,
     bound(
         serialize = "S: Serialize",
-        deserialize = "S: Deserialize<'de> + Clone, C: RequiredContextList, T: RequiredTypeSet"
+        deserialize = "S: Deserialize<'de>, C: RequiredContextList, T: RequiredTypeSet"
     )
 )]
 pub enum AnySpecializedJsonCredential<S = json_syntax::Object, C = (), T = ()> {
