@@ -266,3 +266,28 @@ where
         json.expand_with(ld, loader).await
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use ssi_json_ld::{CompactJsonLd, ContextLoader, Expandable};
+
+    #[async_std::test]
+    async fn reject_undefined_type() {
+        let input = CompactJsonLd(json_syntax::json!({
+            "@context": [
+                "https://www.w3.org/2018/credentials/v1",
+                { "@vocab": null }
+            ],
+            "type": [
+                "VerifiableCredential",
+                "ExampleTestCredential"
+            ],
+            "issuer": "did:example:issuer",
+            "credentialSubject": {
+                "id": "did:example:subject"
+            }
+        }));
+
+        assert!(input.expand(&ContextLoader::default()).await.is_err());
+    }
+}
