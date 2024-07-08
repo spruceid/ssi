@@ -4,7 +4,7 @@ use serde::{Deserialize, Serialize};
 mod credential;
 pub use credential::*;
 
-use crate::{bitstream_status_list::StatusPurpose, StatusMapEntry};
+use crate::{bitstring_status_list::StatusPurpose, StatusMapEntry};
 
 pub const BITSTRING_STATUS_LIST_ENTRY_TYPE: &str = "BitstringStatusListEntry";
 
@@ -16,28 +16,41 @@ pub const BITSTRING_STATUS_LIST_ENTRY_TYPE: &str = "BitstringStatusListEntry";
 ///
 /// See: <https://www.w3.org/TR/vc-bitstring-status-list/#bitstringstatuslistentry>
 #[derive(Debug, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
+#[serde(tag = "type", rename_all = "camelCase")]
 pub struct BitstringStatusListEntry {
     /// Optional identifier for the status list entry.
     ///
     /// Identifies the status information associated with the verifiable
     /// credential. Must *not* be the URL of the status list.
-    id: Option<UriBuf>,
-
-    /// `BitstringStatusListEntry` type.
-    #[serde(rename = "type")]
-    type_: BitstringStatusListEntryType,
+    pub id: Option<UriBuf>,
 
     /// Purpose of the status entry.
-    status_purpose: StatusPurpose,
+    pub status_purpose: StatusPurpose,
 
     /// URL to a `BitstringStatusListCredential` verifiable credential.
-    status_list_credential: UriBuf,
+    pub status_list_credential: UriBuf,
 
     /// Arbitrary size integer greater than or equal to 0, encoded as a string
     /// in base 10.
     #[serde(with = "base10_nat_string")]
-    status_list_index: usize,
+    pub status_list_index: usize,
+}
+
+impl BitstringStatusListEntry {
+    /// Creates a new bit-string status list entry.
+    pub fn new(
+        id: Option<UriBuf>,
+        status_purpose: StatusPurpose,
+        status_list_credential: UriBuf,
+        status_list_index: usize,
+    ) -> Self {
+        Self {
+            id,
+            status_purpose,
+            status_list_credential,
+            status_list_index,
+        }
+    }
 }
 
 impl StatusMapEntry for BitstringStatusListEntry {
@@ -49,34 +62,6 @@ impl StatusMapEntry for BitstringStatusListEntry {
 
     fn key(&self) -> Self::Key {
         self.status_list_index
-    }
-}
-
-#[derive(Debug, Default, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub struct BitstringStatusListEntryType;
-
-impl Serialize for BitstringStatusListEntryType {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: serde::Serializer,
-    {
-        BITSTRING_STATUS_LIST_ENTRY_TYPE.serialize(serializer)
-    }
-}
-
-impl<'de> Deserialize<'de> for BitstringStatusListEntryType {
-    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-    where
-        D: serde::Deserializer<'de>,
-    {
-        let type_ = String::deserialize(deserializer)?;
-        if type_ == BITSTRING_STATUS_LIST_ENTRY_TYPE {
-            Ok(Self)
-        } else {
-            Err(serde::de::Error::custom(
-                "expected `BitstringStatusListEntry` type",
-            ))
-        }
     }
 }
 

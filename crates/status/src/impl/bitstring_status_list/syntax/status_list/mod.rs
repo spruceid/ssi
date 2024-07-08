@@ -4,21 +4,17 @@ use serde::{Deserialize, Serialize};
 mod credential;
 pub use credential::*;
 
-use crate::bitstream_status_list::{
+use crate::bitstring_status_list::{
     EncodedList, StatusList, StatusMessage, StatusPurpose, StatusSize, TimeToLive,
 };
 
 pub const BITSTRING_STATUS_LIST_TYPE: &str = "BitstringStatusList";
 
 #[derive(Debug, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
+#[serde(tag = "type", rename_all = "camelCase")]
 pub struct BitstringStatusList {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub id: Option<UriBuf>,
-
-    /// `BitstringStatusList` type.
-    #[serde(rename = "type")]
-    pub type_: BitstringStatusListType,
 
     /// Status purpose.
     pub status_purpose: StatusPurpose,
@@ -52,7 +48,6 @@ impl BitstringStatusList {
     ) -> Self {
         Self {
             id,
-            type_: BitstringStatusListType,
             status_purpose,
             status_size,
             encoded_list,
@@ -65,33 +60,5 @@ impl BitstringStatusList {
     pub fn decode(&self) -> Result<StatusList, DecodeError> {
         let bytes = self.encoded_list.decode(None)?;
         Ok(StatusList::from_bytes(self.status_size, bytes, self.ttl))
-    }
-}
-
-#[derive(Debug, Default, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub struct BitstringStatusListType;
-
-impl Serialize for BitstringStatusListType {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: serde::Serializer,
-    {
-        BITSTRING_STATUS_LIST_TYPE.serialize(serializer)
-    }
-}
-
-impl<'de> Deserialize<'de> for BitstringStatusListType {
-    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-    where
-        D: serde::Deserializer<'de>,
-    {
-        let type_ = String::deserialize(deserializer)?;
-        if type_ == BITSTRING_STATUS_LIST_TYPE {
-            Ok(Self)
-        } else {
-            Err(serde::de::Error::custom(
-                "expected `BitstringStatusList` type",
-            ))
-        }
     }
 }

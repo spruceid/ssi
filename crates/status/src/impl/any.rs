@@ -5,7 +5,7 @@ use ssi_jwk::JWKResolver;
 use ssi_verification_methods::{AnyMethod, VerificationMethodResolver};
 
 use crate::{
-    bitstream_status_list::{
+    bitstring_status_list::{
         self, BitstringStatusListCredential, BitstringStatusListEntry,
         BitstringStatusListEntrySetCredential,
     },
@@ -34,7 +34,7 @@ pub enum FromBytesError {
     UnexpectedMediaType(String),
 
     #[error(transparent)]
-    BitstringStatusList(bitstream_status_list::FromBytesError),
+    BitstringStatusList(bitstring_status_list::FromBytesError),
 
     #[error(transparent)]
     TokenStatusList(token_status_list::FromBytesError),
@@ -77,7 +77,7 @@ where
 #[derive(Debug, thiserror::Error)]
 pub enum DecodeError {
     #[error(transparent)]
-    BitstringStatusList(#[from] bitstream_status_list::DecodeError),
+    BitstringStatusList(#[from] bitstring_status_list::DecodeError),
 
     #[error(transparent)]
     TokenStatusList(#[from] token_status_list::DecodeError),
@@ -103,7 +103,7 @@ impl EncodedStatusMap for AnyStatusMap {
 
 #[derive(Clone)]
 pub enum AnyDecodedStatusMap {
-    BitstringStatusList(bitstream_status_list::StatusList),
+    BitstringStatusList(bitstring_status_list::StatusList),
     TokenStatusList(token_status_list::StatusList),
 }
 
@@ -145,7 +145,7 @@ impl<'a> IntoIterator for &'a AnyDecodedStatusMap {
 }
 
 pub enum AnyDecodedStatusMapIter<'a> {
-    BitstringStatusList(bitstream_status_list::BitStringIter<'a>),
+    BitstringStatusList(bitstring_status_list::BitStringIter<'a>),
     TokenStatusList(token_status_list::BitStringIter<'a>),
 }
 
@@ -166,7 +166,7 @@ pub enum EntrySetFromBytesError {
     TokenStatusList(#[from] token_status_list::EntrySetFromBytesError),
 
     #[error(transparent)]
-    BitstringStatusList(#[from] bitstream_status_list::FromBytesError),
+    BitstringStatusList(#[from] bitstring_status_list::FromBytesError),
 
     #[error("unexpected media type `{0}`")]
     UnexpectedMediaType(String),
@@ -203,7 +203,7 @@ where
             | "application/vc+ld+json+sd-jwt"
             | "application/vc+ld+json+cose"
             | "application/vc+ld+json" => {
-                bitstream_status_list::BitstringStatusListEntrySetCredential::from_bytes_with(
+                bitstring_status_list::BitstringStatusListEntrySetCredential::from_bytes_with(
                     bytes, media_type, params, options,
                 )
                 .await

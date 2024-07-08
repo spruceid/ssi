@@ -21,7 +21,7 @@ use ssi_data_integrity::{AnySuite, ProofOptions};
 use ssi_dids::{VerificationMethodDIDResolver, DIDJWK};
 use ssi_jwk::JWK;
 use ssi_status::{
-    any::AnyStatusMap, bitstream_status_list, EncodedStatusMap, FromBytes, FromBytesOptions,
+    any::AnyStatusMap, bitstring_status_list, EncodedStatusMap, FromBytes, FromBytesOptions,
 };
 use ssi_verification_methods::{ReferenceOrOwned, SingleSecretSigner};
 use std::{
@@ -139,7 +139,7 @@ impl Command {
                 Ok(())
             }
             Self::Create { id, list, key } => {
-                let data = create_bitstream_status_list(id.clone(), list, key).await?;
+                let data = create_bitstring_status_list(id.clone(), list, key).await?;
                 stdout().write_all(&data).unwrap();
                 Ok(())
             }
@@ -147,14 +147,14 @@ impl Command {
     }
 }
 
-async fn create_bitstream_status_list(
+async fn create_bitstring_status_list(
     id: UriBuf,
     list: Vec<StatusValue>,
     key: Option<PathBuf>,
 ) -> Result<Vec<u8>, Error> {
-    let mut status_list = bitstream_status_list::StatusList::new(
-        bitstream_status_list::StatusSize::default(),
-        bitstream_status_list::TimeToLive::default(),
+    let mut status_list = bitstring_status_list::StatusList::new(
+        bitstring_status_list::StatusSize::default(),
+        bitstring_status_list::TimeToLive::default(),
         // list.into_iter().map(|v| v.0).collect(),
     );
 
@@ -162,11 +162,11 @@ async fn create_bitstream_status_list(
         status_list.push(v.0).unwrap();
     }
 
-    let credential = bitstream_status_list::BitstringStatusListCredential::new(
+    let credential = bitstring_status_list::BitstringStatusListCredential::new(
         Some(id),
         status_list.to_credential_subject(
             None,
-            bitstream_status_list::StatusPurpose::Revocation,
+            bitstring_status_list::StatusPurpose::Revocation,
             Vec::new(),
         ),
     );

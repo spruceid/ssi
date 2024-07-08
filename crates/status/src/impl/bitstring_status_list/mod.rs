@@ -5,9 +5,10 @@
 //! Credentials through use of bitstrings.
 //!
 //! See: <https://www.w3.org/TR/vc-bitstring-status-list/>
+use core::fmt;
 use iref::UriBuf;
 use serde::{Deserialize, Serialize};
-use std::{hash::Hash, time::Duration};
+use std::{hash::Hash, str::FromStr, time::Duration};
 
 use crate::{Overflow, StatusMap};
 
@@ -127,7 +128,7 @@ impl From<TimeToLive> for Duration {
     }
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub enum StatusPurpose {
     /// Cancel the validity of a verifiable credential.
@@ -142,7 +143,52 @@ pub enum StatusPurpose {
 
     /// Convey an arbitrary message related to the status of the verifiable
     /// credential.
+    ///
+    /// The actual message is stored in the status list credential, in
+    /// [`BitstringStatusList::status_message`].
     Message,
+}
+
+impl StatusPurpose {
+    /// Creates a new status purpose from its name.
+    pub fn from_name(name: &str) -> Option<Self> {
+        match name {
+            "revocation" => Some(Self::Revocation),
+            "suspension" => Some(Self::Suspension),
+            "message" => Some(Self::Message),
+            _ => None,
+        }
+    }
+
+    /// Returns the name of this status purpose.
+    pub fn name(&self) -> &'static str {
+        match self {
+            Self::Revocation => "revocation",
+            Self::Suspension => "suspension",
+            Self::Message => "message",
+        }
+    }
+
+    /// Returns the string representation of this status purpose.
+    ///
+    /// Same as [`Self::name`].
+    pub fn as_str(&self) -> &'static str {
+        self.name()
+    }
+
+    /// Turns this status purpose into its name.
+    ///
+    /// Same as [`Self::name`].
+    pub fn into_name(self) -> &'static str {
+        self.name()
+    }
+
+    /// Turns this status purpose into its string representation.
+    ///
+    /// Same as [`Self::name`].
+    pub fn into_str(self) -> &'static str {
+        self.name()
+    }
 }
 
 impl<'a> From<&'a StatusPurpose> for crate::StatusPurpose<&'a str> {
@@ -163,6 +209,25 @@ impl<'a> PartialEq<crate::StatusPurpose<&'a str>> for StatusPurpose {
                 | (Self::Suspension, crate::StatusPurpose::Suspension)
                 | (Self::Message, crate::StatusPurpose::Other("message"))
         )
+    }
+}
+
+impl fmt::Display for StatusPurpose {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        self.name().fmt(f)
+    }
+}
+
+/// Error raised when converting a string into a [`StatusPurpose`] fails.
+#[derive(Debug, Clone, thiserror::Error)]
+#[error("invalid status purpose: {0}")]
+pub struct InvalidStatusPurpose(pub String);
+
+impl FromStr for StatusPurpose {
+    type Err = InvalidStatusPurpose;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        Self::from_name(s).ok_or_else(|| InvalidStatusPurpose(s.to_owned()))
     }
 }
 
