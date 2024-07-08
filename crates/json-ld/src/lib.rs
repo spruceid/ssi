@@ -4,6 +4,7 @@ mod context;
 use std::{borrow::Cow, hash::Hash};
 
 pub use context::*;
+use json_ld::expansion::Action;
 use json_ld::Expand;
 use linked_data::{LinkedData, LinkedDataResource, LinkedDataSubject};
 
@@ -111,7 +112,11 @@ impl Expandable for CompactJsonLd {
                 None,
                 loader,
                 json_ld::expansion::Options {
-                    policy: json_ld::expansion::Policy::Strict,
+                    policy: json_ld::expansion::Policy {
+                        invalid: Action::Reject,
+                        allow_undefined: false,
+                        ..Default::default()
+                    },
                     ..Default::default()
                 },
                 (),
@@ -224,5 +229,48 @@ impl<T> WithContext<T> {
             context: self.context,
             value: f(self.value),
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::{CompactJsonLd, ContextLoader, Expandable};
+
+    #[async_std::test]
+    async fn accept_defined_type() {
+        let input = CompactJsonLd(json_syntax::json!({
+            "@context": { "Defined": "http://example.org/#Defined" },
+            "@type": ["Defined"]
+        }));
+
+        assert!(input.expand(&ContextLoader::default()).await.is_ok());
+    }
+
+    #[async_std::test]
+    async fn reject_undefined_type() {
+        let input = CompactJsonLd(json_syntax::json!({
+            "@type": ["Undefined"]
+        }));
+
+        assert!(input.expand(&ContextLoader::default()).await.is_err());
+    }
+
+    #[async_std::test]
+    async fn accept_defined_property() {
+        let input = CompactJsonLd(json_syntax::json!({
+            "@context": { "defined": "http://example.org/#defined" },
+            "defined": "foo"
+        }));
+
+        assert!(input.expand(&ContextLoader::default()).await.is_ok());
+    }
+
+    #[async_std::test]
+    async fn reject_undefined_property() {
+        let input = CompactJsonLd(json_syntax::json!({
+            "undefined": "foo"
+        }));
+
+        assert!(input.expand(&ContextLoader::default()).await.is_err());
     }
 }
