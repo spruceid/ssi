@@ -4,6 +4,7 @@ mod context;
 use std::{borrow::Cow, hash::Hash};
 
 pub use context::*;
+use json_ld::expansion::Action;
 use json_ld::Expand;
 use linked_data::{LinkedData, LinkedDataResource, LinkedDataSubject};
 
@@ -111,7 +112,11 @@ impl Expandable for CompactJsonLd {
                 None,
                 loader,
                 json_ld::expansion::Options {
-                    policy: json_ld::expansion::Policy::Strict,
+                    policy: json_ld::expansion::Policy {
+                        invalid: Action::Reject,
+                        allow_undefined: false,
+                        ..Default::default()
+                    },
                     ..Default::default()
                 },
                 (),
