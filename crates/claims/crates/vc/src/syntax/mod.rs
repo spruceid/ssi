@@ -1,6 +1,7 @@
 mod context;
 mod credential;
 mod non_empty_object;
+mod non_empty_vec;
 mod presentation;
 mod types;
 
@@ -10,6 +11,7 @@ pub use context::*;
 pub use credential::*;
 use iref::{Uri, UriBuf};
 pub use non_empty_object::*;
+pub use non_empty_vec::*;
 pub use presentation::*;
 use serde::{Deserialize, Serialize};
 pub use types::*;
@@ -102,6 +104,7 @@ pub struct TypedObject {
 
 pub(crate) mod value_or_array {
     use serde::{Deserialize, Serialize};
+    use ssi_core::OneOrMany;
 
     pub fn serialize<T: Serialize, S>(value: &[T], serializer: S) -> Result<S::Ok, S::Error>
     where
@@ -113,21 +116,40 @@ pub(crate) mod value_or_array {
         }
     }
 
-    #[derive(Deserialize)]
-    #[serde(untagged)]
-    enum SingleOrArray<T> {
-        Array(Vec<T>),
-        Single(T),
-    }
-
     pub fn deserialize<'de, T: Deserialize<'de>, D>(deserializer: D) -> Result<Vec<T>, D::Error>
     where
         D: serde::Deserializer<'de>,
     {
-        match SingleOrArray::deserialize(deserializer)? {
-            SingleOrArray::Array(v) => Ok(v),
-            SingleOrArray::Single(t) => Ok(vec![t]),
+        Ok(OneOrMany::deserialize(deserializer)?.into_vec())
+    }
+}
+
+pub(crate) mod non_empty_value_or_array {
+    use serde::{Deserialize, Serialize};
+    use ssi_core::OneOrMany;
+
+    use super::NonEmptyVec;
+
+    pub fn serialize<T: Serialize, S>(value: &[T], serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        match value.split_first() {
+            Some((first, [])) => first.serialize(serializer),
+            _ => value.serialize(serializer),
         }
+    }
+
+    pub fn deserialize<'de, T: Deserialize<'de>, D>(
+        deserializer: D,
+    ) -> Result<NonEmptyVec<T>, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        OneOrMany::deserialize(deserializer)?
+            .into_vec()
+            .try_into()
+            .map_err(serde::de::Error::custom)
     }
 }
 

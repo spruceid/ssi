@@ -2,8 +2,9 @@ use std::{borrow::Cow, collections::BTreeMap, hash::Hash};
 
 use super::{Context, InternationalString, RelatedResource};
 use crate::syntax::{
-    not_null, value_or_array, IdOr, IdentifiedObject, IdentifiedTypedObject,
-    MaybeIdentifiedTypedObject, NonEmptyObject, RequiredContextList, RequiredTypeSet, TypedObject,
+    non_empty_value_or_array, not_null, value_or_array, IdOr, IdentifiedObject,
+    IdentifiedTypedObject, MaybeIdentifiedTypedObject, NonEmptyObject, NonEmptyVec,
+    RequiredContextList, RequiredTypeSet, TypedObject,
 };
 use iref::{Uri, UriBuf};
 use rdf_types::VocabularyMut;
@@ -49,12 +50,8 @@ pub struct SpecializedJsonCredential<S = NonEmptyObject, C = (), T = ()> {
 
     /// Credential subjects.
     #[serde(rename = "credentialSubject")]
-    #[serde(
-        with = "value_or_array",
-        default,
-        skip_serializing_if = "Vec::is_empty"
-    )]
-    pub credential_subjects: Vec<S>,
+    #[serde(with = "non_empty_value_or_array")]
+    pub credential_subjects: NonEmptyVec<S>,
 
     /// Issuer.
     pub issuer: IdOr<IdentifiedObject>,
@@ -120,7 +117,7 @@ impl<S, C: RequiredContextList, T: RequiredTypeSet> SpecializedJsonCredential<S,
     pub fn new(
         id: Option<UriBuf>,
         issuer: IdOr<IdentifiedObject>,
-        credential_subjects: Vec<S>,
+        credential_subjects: NonEmptyVec<S>,
     ) -> Self {
         Self {
             context: Context::default(),
