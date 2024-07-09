@@ -5,7 +5,7 @@ use ssi_claims::{
     vc::v2::JsonCredential,
     VerificationParameters,
 };
-use ssi_dids::{AnyDidMethod, DIDKey, VerificationMethodDIDResolver};
+use ssi_dids::{AnyDidMethod, VerificationMethodDIDResolver};
 use ssi_verification_methods::{AnyMethod, SingleSecretSigner};
 use static_iref::iri;
 
@@ -141,7 +141,7 @@ async fn bbs_2023() {
     use json_syntax::Value;
 
     let jwk = JWK::generate_bls12381g2();
-    let did_url = DIDKey::generate_url(&jwk).unwrap();
+    let did_url = ssi::dids::DIDKey::generate_url(&jwk).unwrap();
 
     let resolver = VerificationMethodDIDResolver::<_, AnyMethod>::new(AnyDidMethod::default());
     let vc: JsonCredential = serde_json::from_value(json!({

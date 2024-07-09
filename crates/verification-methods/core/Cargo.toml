@@ -9,7 +9,7 @@ repository = "https://github.com/spruceid/ssi/"
 documentation = "https://docs.rs/ssi-verification-methods/"
 
 [features]
-bbs = ["ssi-bbs"]
+bbs = ["ssi-jwk/bbs", "ssi-bbs"]
 
 [dependencies]
 ssi-core.workspace = true
