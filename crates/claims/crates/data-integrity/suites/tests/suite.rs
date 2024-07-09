@@ -3,13 +3,13 @@ use std::{borrow::Cow, path::Path};
 use hashbrown::HashMap;
 use iref::UriBuf;
 use serde::{de::DeserializeOwned, Deserialize};
-use ssi_claims_core::SignatureError;
+use ssi_claims_core::{MessageSignatureError, SignatureError};
 use ssi_data_integrity_core::{CryptographicSuite, DataIntegrityDocument, ProofOptions};
 use ssi_multicodec::MultiEncodedBuf;
 use ssi_security::{Multibase, MultibaseBuf};
 use ssi_verification_methods::{
-    MessageSignatureError, MessageSigner, ReferenceOrOwnedRef, ResolutionOptions,
-    VerificationMethodResolutionError, VerificationMethodResolver,
+    MessageSigner, ReferenceOrOwnedRef, ResolutionOptions, VerificationMethodResolutionError,
+    VerificationMethodResolver,
 };
 
 fn load_json(path: impl AsRef<Path>) -> serde_json::Value {

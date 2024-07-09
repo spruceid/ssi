@@ -30,7 +30,7 @@ impl StandardCryptographicSuite for EcdsaSecp256r1Signature2019 {
 
     type VerificationMethod = EcdsaSecp256r1VerificationKey2019;
 
-    type SignatureAlgorithm = DetachedJwsSigning<ssi_jwk::algorithm::ES256>;
+    type SignatureAlgorithm = DetachedJwsSigning<ssi_crypto::algorithm::ES256>;
 
     type ProofOptions = ();
 

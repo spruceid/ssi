@@ -1,11 +1,9 @@
 use std::ops::Deref;
 
-use ssi_claims_core::SignatureError;
+use ssi_claims_core::{MessageSignatureError, SignatureError};
+use ssi_crypto::algorithm::{SignatureAlgorithmInstance, SignatureAlgorithmType};
 
-use crate::{
-    protocol::WithProtocol, MessageSignatureError, MessageSigner, SignatureProtocol, Signer,
-    VerificationMethod,
-};
+use crate::{protocol::WithProtocol, MessageSigner, SignatureProtocol, Signer, VerificationMethod};
 
 pub struct LocalSigner<S>(pub S);
 
@@ -30,16 +28,28 @@ impl<S> Deref for LocalSigner<S> {
 
 pub struct LocalMessageSigner<S>(pub S);
 
-impl<A: Copy, P: SignatureProtocol<A>, S: MessageSigner<A>> MessageSigner<WithProtocol<A, P>>
-    for LocalMessageSigner<S>
+impl<A: SignatureAlgorithmType, P: SignatureProtocol<A>, S: MessageSigner<A>>
+    MessageSigner<WithProtocol<A, P>> for LocalMessageSigner<S>
 {
     async fn sign(
         self,
-        WithProtocol(algorithm, protocol): WithProtocol<A, P>,
+        WithProtocol(algorithm_instance, protocol): WithProtocol<A::Instance, P>,
         message: &[u8],
     ) -> Result<Vec<u8>, MessageSignatureError> {
+        let algorithm = algorithm_instance.algorithm();
         let message = protocol.prepare_message(message);
-        let signature = self.0.sign(algorithm, &message).await?;
+        let signature = self.0.sign(algorithm_instance, &message).await?;
+        protocol.encode_signature(algorithm, signature)
+    }
+
+    async fn sign_multi(
+        self,
+        WithProtocol(algorithm_instance, protocol): WithProtocol<A::Instance, P>,
+        messages: &[Vec<u8>],
+    ) -> Result<Vec<u8>, MessageSignatureError> {
+        let algorithm = algorithm_instance.algorithm();
+        let messages = protocol.prepare_messages(messages);
+        let signature = self.0.sign_multi(algorithm_instance, &messages).await?;
         protocol.encode_signature(algorithm, signature)
     }
 }

@@ -1,6 +1,7 @@
 use std::borrow::Cow;
 
-use crate::MessageSignatureError;
+use ssi_claims_core::MessageSignatureError;
+use ssi_crypto::algorithm::{SignatureAlgorithmInstance, SignatureAlgorithmType};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct WithProtocol<A, P>(pub A, pub P);
@@ -8,6 +9,18 @@ pub struct WithProtocol<A, P>(pub A, pub P);
 impl<A, P> WithProtocol<A, P> {
     pub fn new(algorithm: A, protocol: P) -> Self {
         Self(algorithm, protocol)
+    }
+}
+
+impl<A: SignatureAlgorithmType, P: Copy> SignatureAlgorithmType for WithProtocol<A, P> {
+    type Instance = WithProtocol<A::Instance, P>;
+}
+
+impl<I: SignatureAlgorithmInstance, P: Copy> SignatureAlgorithmInstance for WithProtocol<I, P> {
+    type Algorithm = WithProtocol<I::Algorithm, P>;
+
+    fn algorithm(&self) -> Self::Algorithm {
+        WithProtocol(self.0.algorithm(), self.1)
     }
 }
 
@@ -28,8 +41,12 @@ impl<A, P> WithProtocol<A, P> {
 /// The simplest protocol is described by the unit `()` type, where the raw
 /// message is transmitted to the signer, which must sign it and return the
 /// raw bytes.
-pub trait SignatureProtocol<A> {
+pub trait SignatureProtocol<A>: Copy {
     fn prepare_message<'b>(&self, bytes: &'b [u8]) -> Cow<'b, [u8]> {
+        Cow::Borrowed(bytes)
+    }
+
+    fn prepare_messages<'b>(&self, bytes: &'b [Vec<u8>]) -> Cow<'b, [Vec<u8>]> {
         Cow::Borrowed(bytes)
     }
 
@@ -61,6 +78,7 @@ impl<A> SignatureProtocol<A> for () {}
 /// the `Base58Btc` base.
 ///
 /// [1]: <https://github.com/multiformats/multibase>
+#[derive(Debug, Clone, Copy)]
 pub struct Base58BtcMultibase;
 
 impl Base58BtcMultibase {
@@ -104,6 +122,7 @@ impl<A> SignatureProtocol<A> for Base58BtcMultibase {
 ///
 /// The signer must sent back the signature encoded in base58 (bitcoin
 /// alphabet).
+#[derive(Debug, Clone, Copy)]
 pub struct Base58Btc;
 
 impl Base58Btc {

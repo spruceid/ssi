@@ -88,9 +88,10 @@ pub struct DeriveOptions {
     pub feature_option: DerivedFeatureOption,
 }
 
-#[derive(Clone, Serialize, Deserialize)]
+#[derive(Default, Clone, Serialize, Deserialize)]
 #[serde(tag = "featureOption")]
 pub enum DerivedFeatureOption {
+    #[default]
     Baseline,
     AnonymousHolderBinding {
         holder_secret: String,

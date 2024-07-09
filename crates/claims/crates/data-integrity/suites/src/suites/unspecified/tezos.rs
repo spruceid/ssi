@@ -14,13 +14,14 @@ pub use ed25519_blake2b_digest_size20_base58_check_encoded_signature_2021::Ed255
 
 #[cfg(feature = "secp256r1")]
 pub use p256_blake2b_digest_size20_base58_check_encoded_signature_2021::P256BLAKE2BDigestSize20Base58CheckEncodedSignature2021;
-use ssi_claims_core::{ProofValidationError, SignatureError};
+use ssi_claims_core::{MessageSignatureError, ProofValidationError, SignatureError};
+use ssi_crypto::algorithm::AnyBlake2b;
 use ssi_data_integrity_core::signing::RecoverPublicJwk;
-use ssi_jwk::{algorithm::AnyBlake2b, JWK};
+use ssi_jwk::JWK;
 use ssi_security::{Multibase, MultibaseBuf};
 use ssi_verification_methods::{
     protocol::{InvalidProtocolSignature, WithProtocol},
-    MessageSignatureError, MessageSigner, SignatureProtocol,
+    MessageSigner, SignatureProtocol,
 };
 pub use tezos_jcs_signature_2021::TezosJcsSignature2021;
 pub use tezos_signature_2021::TezosSignature2021;
@@ -138,7 +139,11 @@ impl Signature {
         signer: S,
     ) -> Result<Self, SignatureError> {
         match public_key {
-            Some(jwk) => match jwk.algorithm.try_into() {
+            Some(jwk) => match jwk
+                .algorithm
+                .ok_or(MessageSignatureError::MissingAlgorithm)?
+                .try_into()
+            {
                 Ok(algorithm) => {
                     let proof_value_bytes = signer
                         .sign(WithProtocol(algorithm, TezosWallet), message)

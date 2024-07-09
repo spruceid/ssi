@@ -62,8 +62,9 @@ pub async fn compact_to_deskolemized_nquads(
     urn_scheme: &str,
     document: ssi_json_ld::syntax::Object,
 ) -> Result<Vec<LexicalQuad>, SkolemError> {
+    let mut generator = generator::Blank::new();
     let mut quads: Vec<LexicalQuad> = RemoteDocument::new(None, None, Value::Object(document))
-        .to_rdf(&mut generator::Blank::new(), loader)
+        .to_rdf(&mut generator, loader)
         .await
         .map_err(SkolemError::to_rdf)?
         .cloned_quads()

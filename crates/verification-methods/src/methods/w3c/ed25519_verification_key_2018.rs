@@ -4,12 +4,12 @@ use ed25519_dalek::{Signer, Verifier};
 use iref::{Iri, IriBuf, UriBuf};
 use rdf_types::{Interpretation, Vocabulary};
 use serde::{Deserialize, Serialize};
-use ssi_claims_core::{InvalidProof, ProofValidationError, ProofValidity, SignatureError};
+use ssi_claims_core::{
+    InvalidProof, MessageSignatureError, ProofValidationError, ProofValidity, SignatureError,
+};
 use ssi_jwk::JWK;
 use ssi_jws::CompactJWSString;
-use ssi_verification_methods_core::{
-    JwkVerificationMethod, MessageSignatureError, VerificationMethodSet, VerifyBytes,
-};
+use ssi_verification_methods_core::{JwkVerificationMethod, VerificationMethodSet, VerifyBytes};
 use static_iref::iri;
 
 use crate::{
@@ -146,11 +146,11 @@ impl TryFrom<GenericVerificationMethod> for Ed25519VerificationKey2018 {
     }
 }
 
-impl SigningMethod<JWK, ssi_jwk::algorithm::EdDSA> for Ed25519VerificationKey2018 {
+impl SigningMethod<JWK, ssi_crypto::algorithm::EdDSA> for Ed25519VerificationKey2018 {
     fn sign_bytes(
         &self,
         secret: &JWK,
-        _algorithm: ssi_jwk::algorithm::EdDSA,
+        _algorithm: ssi_crypto::algorithm::EdDSA,
         bytes: &[u8],
     ) -> Result<Vec<u8>, MessageSignatureError> {
         ssi_jws::sign_bytes(ssi_jwk::Algorithm::EdDSA, bytes, secret)
@@ -158,10 +158,10 @@ impl SigningMethod<JWK, ssi_jwk::algorithm::EdDSA> for Ed25519VerificationKey201
     }
 }
 
-impl VerifyBytes<ssi_jwk::algorithm::EdDSA> for Ed25519VerificationKey2018 {
+impl VerifyBytes<ssi_crypto::algorithm::EdDSA> for Ed25519VerificationKey2018 {
     fn verify_bytes(
         &self,
-        _: ssi_jwk::algorithm::EdDSA,
+        _: ssi_crypto::algorithm::EdDSA,
         signing_bytes: &[u8],
         signature: &[u8],
     ) -> Result<ProofValidity, ProofValidationError> {

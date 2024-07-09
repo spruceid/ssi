@@ -11,7 +11,7 @@ use ssi_data_integrity_core::{
     CryptosuiteStr, DataIntegrity, ProofConfiguration, ProofRef, StandardCryptographicSuite, Type,
     TypeRef, UnsupportedProofSuite,
 };
-use ssi_di_sd_primitives::JsonPointerBuf;
+use ssi_di_sd_primitives::{HmacKey, JsonPointerBuf};
 use ssi_json_ld::{Expandable, ExpandedDocument, JsonLdLoaderProvider, JsonLdNodeObject};
 use ssi_rdf::LexicalInterpretation;
 use ssi_verification_methods::{Multikey, VerificationMethodResolver};
@@ -101,7 +101,7 @@ impl TryFrom<Type> for Bbs2023 {
     }
 }
 
-#[derive(Clone)]
+#[derive(Debug, Default, Clone)]
 pub struct Bbs2023SignatureOptions {
     pub mandatory_pointers: Vec<JsonPointerBuf>,
 
@@ -120,8 +120,6 @@ pub enum FeatureOption {
     PseudonymIssuerPid,
     PseudonymHiddenPid,
 }
-
-pub type HmacKey = [u8; 32];
 
 /// Base Proof Configuration.
 ///

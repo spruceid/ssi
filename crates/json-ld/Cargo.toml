@@ -11,7 +11,8 @@ documentation = "https://docs.rs/ssi-json-ld/"
 [dependencies]
 thiserror.workspace = true
 async-std = { version = "1.9", features = ["attributes"] }
-json-ld = { version = "0.20", features = ["serde"] }
+# json-ld = { version = "0.20", features = ["serde"] }
+json-ld = { git = "https://github.com/timothee-haudebourg/json-ld", branch = "ensure-to-rdf-is-send", features = ["serde"] }
 iref.workspace = true
 static-iref.workspace = true
 rdf-types.workspace = true

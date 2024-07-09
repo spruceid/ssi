@@ -104,7 +104,7 @@ impl Transformed {
 /// Result of the Base Proof Transformation algorithm.
 ///
 /// See: <https://www.w3.org/TR/vc-di-bbs/#base-proof-transformation-bbs-2023>
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 pub struct TransformedBase {
     pub options: Bbs2023SignatureOptions,
     pub mandatory: Vec<LexicalQuad>,

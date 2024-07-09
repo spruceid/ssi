@@ -17,21 +17,6 @@ use ssi_multicodec::MultiEncodedBuf;
 use static_iref::{iri, iri_ref};
 use std::collections::BTreeMap;
 
-#[derive(Debug, thiserror::Error)]
-pub enum GenerateError {
-    #[error("missing curve")]
-    MissingCurve,
-
-    #[error("unsupported curve `{0}`")]
-    UnsupportedCurve(String),
-
-    #[error("unsupported key type")]
-    UnsupportedKeyType,
-
-    #[error("invalid input key")]
-    InvalidInputKey,
-}
-
 /// The did:key Method v0.7.
 ///
 /// See: <https://w3c-ccg.github.io/did-method-key>
@@ -39,98 +24,21 @@ pub struct DIDKey;
 
 impl DIDKey {
     pub fn generate(jwk: &JWK) -> Result<DIDBuf, GenerateError> {
-        use ssi_jwk::Params;
-        let id = match jwk.params {
-            Params::OKP(ref params) => match &params.curve[..] {
-                "Ed25519" => multibase::encode(
-                    multibase::Base::Base58Btc,
-                    MultiEncodedBuf::encode_bytes(
-                        ssi_multicodec::ED25519_PUB,
-                        &params.public_key.0,
-                    )
-                    .into_bytes(),
-                ),
-                "Bls12381G2" => multibase::encode(
-                    multibase::Base::Base58Btc,
-                    MultiEncodedBuf::encode_bytes(
-                        ssi_multicodec::BLS12_381_G2_PUB,
-                        &params.public_key.0,
-                    )
-                    .into_bytes(),
-                ),
-                _ => return Err(GenerateError::UnsupportedCurve(params.curve.clone())),
-            },
-            Params::EC(ref params) => {
-                let curve = match params.curve {
-                    Some(ref curve) => curve,
-                    None => return Err(GenerateError::MissingCurve),
-                };
-
-                match curve.as_str() {
-                    #[cfg(feature = "secp256k1")]
-                    "secp256k1" => {
-                        use k256::elliptic_curve::sec1::ToEncodedPoint;
-                        let pk = match k256::PublicKey::try_from(params) {
-                            Ok(pk) => pk,
-                            Err(_err) => return Err(GenerateError::InvalidInputKey),
-                        };
-
-                        multibase::encode(
-                            multibase::Base::Base58Btc,
-                            MultiEncodedBuf::encode_bytes(
-                                ssi_multicodec::SECP256K1_PUB,
-                                pk.to_encoded_point(true).as_bytes(),
-                            )
-                            .into_bytes(),
-                        )
-                    }
-                    #[cfg(feature = "secp256r1")]
-                    "P-256" => {
-                        use p256::elliptic_curve::sec1::ToEncodedPoint;
-                        let pk = match p256::PublicKey::try_from(params) {
-                            Ok(pk) => pk,
-                            Err(_err) => return Err(GenerateError::InvalidInputKey),
-                        };
-
-                        multibase::encode(
-                            multibase::Base::Base58Btc,
-                            MultiEncodedBuf::encode_bytes(
-                                ssi_multicodec::P256_PUB,
-                                pk.to_encoded_point(true).as_bytes(),
-                            )
-                            .into_bytes(),
-                        )
-                    }
-                    #[cfg(feature = "secp384r1")]
-                    "P-384" => {
-                        let pk_bytes = match ssi_jwk::serialize_p384(params) {
-                            Ok(pk) => pk,
-                            Err(_err) => return Err(GenerateError::InvalidInputKey),
-                        };
-
-                        multibase::encode(
-                            multibase::Base::Base58Btc,
-                            MultiEncodedBuf::encode_bytes(ssi_multicodec::P384_PUB, &pk_bytes)
-                                .into_bytes(),
-                        )
-                    }
-                    _ => return Err(GenerateError::UnsupportedCurve(curve.to_owned())),
-                }
-            }
-            Params::RSA(ref params) => {
-                let der = simple_asn1::der_encode(&params.to_public())
-                    .map_err(|_| GenerateError::InvalidInputKey)?;
-                multibase::encode(
-                    multibase::Base::Base58Btc,
-                    MultiEncodedBuf::encode_bytes(ssi_multicodec::RSA_PUB, &der).into_bytes(),
-                )
-            }
-            _ => return Err(GenerateError::UnsupportedKeyType),
-        };
+        let multi_encoded = jwk.to_multicodec()?;
+        let id = multibase::encode(multibase::Base::Base58Btc, multi_encoded.into_bytes());
 
         Ok(DIDBuf::from_string(format!("did:key:{id}")).unwrap())
     }
+
+    pub fn generate_url(jwk: &JWK) -> Result<DIDURLBuf, GenerateError> {
+        let multi_encoded = jwk.to_multicodec()?;
+        let id = multibase::encode(multibase::Base::Base58Btc, multi_encoded.into_bytes());
+
+        Ok(DIDURLBuf::from_string(format!("did:key:{id}#{id}")).unwrap())
+    }
 }
+
+pub type GenerateError = ssi_jwk::ToMulticodecError;
 
 impl DIDMethod for DIDKey {
     const DID_METHOD_NAME: &'static str = "key";

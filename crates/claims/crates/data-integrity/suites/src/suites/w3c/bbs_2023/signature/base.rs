@@ -1,12 +1,11 @@
-use std::borrow::Cow;
-
 use multibase::Base;
 use ssi_bbs::{BBSplusPublicKey, Bbs};
 use ssi_claims_core::SignatureError;
+use ssi_crypto::algorithm::{BbsInstance, BbsParameters};
 use ssi_di_sd_primitives::JsonPointerBuf;
 use ssi_rdf::IntoNQuads;
 use ssi_security::MultibaseBuf;
-use ssi_verification_methods::{multikey::DecodedMultikey, MultiMessageSigner, Multikey, Signer};
+use ssi_verification_methods::{multikey::DecodedMultikey, MessageSigner, Multikey};
 
 use crate::bbs_2023::{hashing::BaseHashData, FeatureOption};
 
@@ -18,8 +17,7 @@ pub async fn generate_base_proof<T>(
     hash_data: BaseHashData,
 ) -> Result<Bbs2023Signature, SignatureError>
 where
-    T: Signer<Multikey>,
-    T::MessageSigner: MultiMessageSigner<Bbs>,
+    T: MessageSigner<Bbs>,
 {
     // See: <https://www.w3.org/TR/vc-di-bbs/#base-proof-serialization-bbs-2023>
     let DecodedMultikey::Bls12_381(public_key) = verification_method.public_key.decode()? else {
@@ -42,18 +40,13 @@ where
         .map(String::into_bytes)
         .collect();
 
-    let message_signer = signer
-        .for_method(Cow::Borrowed(verification_method))
-        .await?
-        .ok_or(SignatureError::MissingSigner)?;
-
-    let (algorithm, description) = match feature_option {
+    let (bbs_params, description) = match feature_option {
         FeatureOption::Baseline => (
-            Bbs::Baseline { header: bbs_header },
+            BbsParameters::Baseline { header: bbs_header },
             Bbs2023SignatureDescription::Baseline,
         ),
         FeatureOption::AnonymousHolderBinding => (
-            Bbs::Blind {
+            BbsParameters::Blind {
                 header: bbs_header,
                 commitment_with_proof: None,
                 signer_blind: None,
@@ -68,7 +61,7 @@ where
             messages.push(pid.to_vec());
 
             (
-                Bbs::Baseline { header: bbs_header },
+                BbsParameters::Baseline { header: bbs_header },
                 Bbs2023SignatureDescription::PseudonymIssuerPid { pid },
             )
         }
@@ -82,7 +75,7 @@ where
                 .ok_or_else(|| SignatureError::missing_required_option("commitment_with_proof"))?;
 
             (
-                Bbs::Blind {
+                BbsParameters::Blind {
                     header: bbs_header,
                     commitment_with_proof: Some(commitment_with_proof),
                     signer_blind: None,
@@ -92,7 +85,9 @@ where
         }
     };
 
-    let signature = message_signer.sign_multi(algorithm, &messages).await?;
+    let signature = signer
+        .sign_multi(BbsInstance(Box::new(bbs_params)), &messages)
+        .await?;
 
     Ok(Bbs2023Signature::encode_base(
         &signature,

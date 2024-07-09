@@ -333,3 +333,6 @@ pub use ssi_multicodec as multicodec;
 /// Secure Shell utilities.
 #[doc(inline)]
 pub use ssi_ssh as ssh;
+
+#[cfg(feature = "bbs")]
+pub use ssi_bbs as bbs;

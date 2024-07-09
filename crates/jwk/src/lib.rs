@@ -3,7 +3,6 @@
 use core::fmt;
 use num_bigint::{BigInt, Sign};
 use simple_asn1::{ASN1Block, ASN1Class, ToASN1};
-use ssi_multicodec::MultiEncoded;
 use std::result::Result;
 use std::{convert::TryFrom, str::FromStr};
 use zeroize::Zeroize;
@@ -28,6 +27,12 @@ pub mod eip155;
 
 #[cfg(feature = "tezos")]
 pub mod blakesig;
+
+#[cfg(feature = "bbs")]
+mod bbs;
+
+mod multicodec;
+pub use multicodec::*;
 
 pub mod der;
 
@@ -494,87 +499,6 @@ impl JWK {
         let thumbprint = String::from(Base64urlUInt(hash.to_vec()));
         Ok(thumbprint)
     }
-
-    pub fn from_multicodec(multicodec: &MultiEncoded) -> Result<Self, FromMulticodecError> {
-        #[allow(unused_variables)]
-        let (codec, k) = multicodec.parts();
-        match codec {
-            #[cfg(feature = "rsa")]
-            ssi_multicodec::RSA_PUB => rsa_x509_pub_parse(k).map_err(FromMulticodecError::RsaPub),
-            #[cfg(feature = "ed25519")]
-            ssi_multicodec::ED25519_PUB => {
-                ed25519_parse(k).map_err(FromMulticodecError::Ed25519Pub)
-            }
-            #[cfg(feature = "ed25519")]
-            ssi_multicodec::ED25519_PRIV => {
-                ed25519_parse_private(k).map_err(FromMulticodecError::Ed25519Priv)
-            }
-            #[cfg(feature = "secp256k1")]
-            ssi_multicodec::SECP256K1_PUB => {
-                secp256k1_parse(k).map_err(FromMulticodecError::Secp256k1Pub)
-            }
-            #[cfg(feature = "secp256k1")]
-            ssi_multicodec::SECP256K1_PRIV => {
-                secp256k1_parse_private(k).map_err(FromMulticodecError::Secp256k1Priv)
-            }
-            #[cfg(feature = "secp256r1")]
-            ssi_multicodec::P256_PUB => p256_parse(k).map_err(FromMulticodecError::Secp256r1Pub),
-            #[cfg(feature = "secp256r1")]
-            ssi_multicodec::P256_PRIV => {
-                p256_parse_private(k).map_err(FromMulticodecError::Secp256r1Priv)
-            }
-            #[cfg(feature = "secp384r1")]
-            ssi_multicodec::P384_PUB => p384_parse(k).map_err(FromMulticodecError::Secp384r1Pub),
-            #[cfg(feature = "secp384r1")]
-            ssi_multicodec::P384_PRIV => {
-                p384_parse_private(k).map_err(FromMulticodecError::Secp384r1Priv)
-            }
-            _ => Err(FromMulticodecError::UnsupportedCodec(codec)),
-        }
-    }
-}
-
-#[derive(Debug, thiserror::Error)]
-pub enum FromMulticodecError {
-    #[cfg(feature = "rsa")]
-    #[error(transparent)]
-    RsaPub(RsaX509PubParseError),
-
-    #[cfg(feature = "ed25519")]
-    #[error(transparent)]
-    Ed25519Pub(Error),
-
-    #[cfg(feature = "ed25519")]
-    #[error(transparent)]
-    Ed25519Priv(Error),
-
-    #[cfg(feature = "secp256k1")]
-    #[error(transparent)]
-    Secp256k1Pub(Error),
-
-    #[cfg(feature = "secp256k1")]
-    #[error(transparent)]
-    Secp256k1Priv(Error),
-
-    #[cfg(feature = "secp256r1")]
-    #[error(transparent)]
-    Secp256r1Pub(Error),
-
-    #[cfg(feature = "secp256r1")]
-    #[error(transparent)]
-    Secp256r1Priv(Error),
-
-    #[cfg(feature = "secp384r1")]
-    #[error(transparent)]
-    Secp384r1Pub(Error),
-
-    #[cfg(feature = "secp384r1")]
-    #[error(transparent)]
-    Secp384r1Priv(Error),
-
-    /// Unexpected multibase (multicodec) key prefix multicodec
-    #[error("Unsupported multicodec key type 0x{0:x}")]
-    UnsupportedCodec(u64),
 }
 
 impl From<Params> for JWK {

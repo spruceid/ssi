@@ -3,9 +3,9 @@ use std::hash::Hash;
 use iref::{Iri, IriBuf, UriBuf};
 use serde::{Deserialize, Serialize};
 use ssi_caips::caip10::BlockchainAccountIdVerifyError;
-use ssi_claims_core::{InvalidProof, ProofValidationError, ProofValidity};
+use ssi_claims_core::{InvalidProof, MessageSignatureError, ProofValidationError, ProofValidity};
 use ssi_jwk::JWK;
-use ssi_verification_methods_core::{MessageSignatureError, VerificationMethodSet};
+use ssi_verification_methods_core::VerificationMethodSet;
 use static_iref::iri;
 
 use crate::{
@@ -185,11 +185,11 @@ impl TryFrom<GenericVerificationMethod> for Eip712Method2021 {
     }
 }
 
-impl SigningMethod<JWK, ssi_jwk::algorithm::ESKeccakKR> for Eip712Method2021 {
+impl SigningMethod<JWK, ssi_crypto::algorithm::ESKeccakKR> for Eip712Method2021 {
     fn sign_bytes(
         &self,
         key: &JWK,
-        _algorithm: ssi_jwk::algorithm::ESKeccakKR,
+        _algorithm: ssi_crypto::algorithm::ESKeccakKR,
         bytes: &[u8],
     ) -> Result<Vec<u8>, MessageSignatureError> {
         self.sign_bytes(key, bytes)

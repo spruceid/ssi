@@ -22,6 +22,7 @@ secp256r1 = [
 	"ssi-jwk/secp256r1"
 ]
 secp384r1 = ["ssi-jwk/secp384r1"]
+bbs = ["ssi-jwk/bbs"]
 
 [dependencies]
 ssi-dids-core.workspace = true

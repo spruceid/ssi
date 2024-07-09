@@ -1,8 +1,9 @@
 use iref::{Iri, IriBuf, UriBuf};
 use serde::{Deserialize, Serialize};
-use ssi_claims_core::{InvalidProof, ProofValidationError, ProofValidity};
-use ssi_jwk::{algorithm::AnyBlake2b, JWK};
-use ssi_verification_methods_core::{MessageSignatureError, VerificationMethodSet};
+use ssi_claims_core::{InvalidProof, MessageSignatureError, ProofValidationError, ProofValidity};
+use ssi_crypto::algorithm::AnyBlake2b;
+use ssi_jwk::JWK;
+use ssi_verification_methods_core::VerificationMethodSet;
 use static_iref::iri;
 use std::{collections::BTreeMap, hash::Hash};
 
@@ -176,7 +177,7 @@ impl PublicKey {
     pub fn sign_bytes(
         &self,
         key: &JWK,
-        algorithm: ssi_jwk::algorithm::AnyBlake2b,
+        algorithm: ssi_crypto::algorithm::AnyBlake2b,
         bytes: &[u8],
     ) -> Result<Vec<u8>, MessageSignatureError> {
         ssi_jws::sign_bytes(algorithm.into(), bytes, key)
@@ -235,11 +236,11 @@ impl TryFrom<GenericVerificationMethod> for TezosMethod2021 {
     }
 }
 
-impl SigningMethod<JWK, ssi_jwk::algorithm::AnyBlake2b> for TezosMethod2021 {
+impl SigningMethod<JWK, ssi_crypto::algorithm::AnyBlake2b> for TezosMethod2021 {
     fn sign_bytes(
         &self,
         key: &JWK,
-        algorithm: ssi_jwk::algorithm::AnyBlake2b,
+        algorithm: ssi_crypto::algorithm::AnyBlake2b,
         bytes: &[u8],
     ) -> Result<Vec<u8>, MessageSignatureError> {
         ssi_jws::sign_bytes(algorithm.into(), bytes, key)

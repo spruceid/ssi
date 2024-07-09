@@ -1,7 +1,8 @@
 use std::{borrow::Cow, collections::HashMap, sync::Arc};
 
 use iref::{Iri, IriBuf};
-use ssi_claims_core::{ProofValidationError, SignatureError};
+use ssi_claims_core::{MessageSignatureError, ProofValidationError, SignatureError};
+use ssi_crypto::algorithm::SignatureAlgorithmType;
 use ssi_jwk::JWK;
 use static_iref::iri;
 
@@ -187,22 +188,27 @@ impl<M: VerificationMethod> VerificationMethodResolver for HashMap<IriBuf, M> {
     }
 }
 
-pub trait SigningMethod<S, A>: VerificationMethod {
+pub trait SigningMethod<S, A: SignatureAlgorithmType>: VerificationMethod {
     fn sign_bytes(
         &self,
         secret: &S,
-        algorithm: A,
+        algorithm: A::Instance,
         bytes: &[u8],
     ) -> Result<Vec<u8>, MessageSignatureError>;
-}
 
-pub trait MultiSigningMethod<S, A>: VerificationMethod {
     fn sign_bytes_multi(
         &self,
         secret: &S,
-        algorithm: A,
+        algorithm: A::Instance,
         messages: &[Vec<u8>],
-    ) -> Result<Vec<u8>, MessageSignatureError>;
+    ) -> Result<Vec<u8>, MessageSignatureError> {
+        match messages.split_first() {
+            Some((message, [])) => self.sign_bytes(secret, algorithm, message),
+            // Some(_) => Err(MessageSignatureError::TooManyMessages),
+            Some(_) => todo!(),
+            None => Err(MessageSignatureError::MissingMessage),
+        }
+    }
 }
 
 pub struct MethodWithSecret<M: VerificationMethod, S> {
@@ -216,16 +222,20 @@ impl<M: VerificationMethod, S> MethodWithSecret<M, S> {
     }
 }
 
-impl<A, M: SigningMethod<S, A>, S> MessageSigner<A> for MethodWithSecret<M, S> {
-    async fn sign(self, algorithm: A, message: &[u8]) -> Result<Vec<u8>, MessageSignatureError> {
+impl<A: SignatureAlgorithmType, M: SigningMethod<S, A>, S> MessageSigner<A>
+    for MethodWithSecret<M, S>
+{
+    async fn sign(
+        self,
+        algorithm: A::Instance,
+        message: &[u8],
+    ) -> Result<Vec<u8>, MessageSignatureError> {
         self.method.sign_bytes(&self.secret, algorithm, message)
     }
-}
 
-impl<A, M: MultiSigningMethod<S, A>, S> MultiMessageSigner<A> for MethodWithSecret<M, S> {
     async fn sign_multi(
         self,
-        algorithm: A,
+        algorithm: <A as SignatureAlgorithmType>::Instance,
         messages: &[Vec<u8>],
     ) -> Result<Vec<u8>, MessageSignatureError> {
         self.method

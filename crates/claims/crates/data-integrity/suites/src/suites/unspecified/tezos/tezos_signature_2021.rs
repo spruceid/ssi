@@ -1,5 +1,6 @@
 use crate::TezosWallet;
 use ssi_claims_core::{ProofValidationError, ProofValidity, SignatureError};
+use ssi_crypto::algorithm::AnyBlake2b;
 use ssi_data_integrity_core::{
     canonicalization::{CanonicalClaimsAndConfiguration, CanonicalizeClaimsAndConfiguration},
     suite::{
@@ -11,7 +12,7 @@ use ssi_data_integrity_core::{
     },
     CryptographicSuite, ProofConfigurationRef, ProofRef, StandardCryptographicSuite, TypeRef,
 };
-use ssi_jwk::{algorithm::AnyBlake2b, JWK};
+use ssi_jwk::JWK;
 use ssi_tzkey::EncodeTezosSignedMessageError;
 use ssi_verification_methods::{protocol::WithProtocol, MessageSigner, TezosMethod2021};
 use static_iref::iri;

@@ -1,12 +1,19 @@
-use ssi_claims_core::{InvalidProof, ProofValidationError, ProofValidity};
-use ssi_verification_methods::{
-    multikey::DecodedMultikey, MessageSignatureError, MultiSigningMethod, Multikey,
-};
+use ssi_claims_core::{InvalidProof, MessageSignatureError, ProofValidationError, ProofValidity};
+use ssi_crypto::algorithm::BbsParameters;
 pub use zkryptium::bbsplus::keys::{BBSplusPublicKey, BBSplusSecretKey};
 use zkryptium::{
-    bbsplus::{ciphersuites::Bls12381Sha256, commitment::BlindFactor},
-    schemes::algorithms::BBSplus,
+    bbsplus::{
+        ciphersuites::{BbsCiphersuite, Bls12381Sha256},
+        commitment::BlindFactor,
+    },
+    keys::pair::KeyPair,
+    schemes::{
+        algorithms::BBSplus,
+        generics::{BlindSignature, Signature},
+    },
 };
+
+pub use ssi_crypto::algorithm::Bbs;
 
 #[derive(Debug)]
 pub struct ProofGenFailed;
@@ -57,60 +64,46 @@ pub fn proof_verify(
         )
         .map_err(|_| InvalidProof::Signature))
 }
-pub enum Bbs {
-    Baseline {
-        header: [u8; 64],
-    },
-    Blind {
-        header: [u8; 64],
-        commitment_with_proof: Option<Vec<u8>>,
-        signer_blind: Option<[u8; 32]>,
-    },
-}
 
-impl MultiSigningMethod<BBSplusSecretKey, Bbs> for Multikey {
-    fn sign_bytes_multi(
-        &self,
-        secret: &BBSplusSecretKey,
-        algorithm: Bbs,
-        messages: &[Vec<u8>],
-    ) -> Result<Vec<u8>, MessageSignatureError> {
-        use zkryptium::schemes::generics::{BlindSignature, Signature};
-
-        let DecodedMultikey::Bls12_381(pk) = self.public_key.decode()? else {
-            return Err(MessageSignatureError::InvalidPublicKey);
-        };
-
-        let signature = match algorithm {
-            Bbs::Baseline { header } => Signature::<BBSplus<Bls12381Sha256>>::sign(
-                Some(messages),
-                secret,
+pub fn sign(
+    params: BbsParameters,
+    sk: &BBSplusSecretKey,
+    pk: &BBSplusPublicKey,
+    messages: &[Vec<u8>],
+) -> Result<Vec<u8>, MessageSignatureError> {
+    match params {
+        BbsParameters::Baseline { header } => {
+            Ok(
+                Signature::<BBSplus<Bls12381Sha256>>::sign(Some(messages), sk, pk, Some(&header))
+                    .map_err(MessageSignatureError::signature_failed)?
+                    .to_bytes()
+                    .to_vec(),
+            )
+        }
+        BbsParameters::Blind {
+            header,
+            commitment_with_proof,
+            signer_blind,
+        } => {
+            let signer_blind = signer_blind.map(|b| BlindFactor::from_bytes(&b).unwrap());
+            Ok(BlindSignature::<BBSplus<Bls12381Sha256>>::blind_sign(
+                sk,
                 pk,
+                commitment_with_proof.as_deref(),
                 Some(&header),
+                Some(messages),
+                signer_blind.as_ref(),
             )
             .map_err(MessageSignatureError::signature_failed)?
             .to_bytes()
-            .to_vec(),
-            Bbs::Blind {
-                header,
-                commitment_with_proof,
-                signer_blind,
-            } => {
-                let signer_blind = signer_blind.map(|b| BlindFactor::from_bytes(&b).unwrap());
-                BlindSignature::<BBSplus<Bls12381Sha256>>::blind_sign(
-                    secret,
-                    pk,
-                    commitment_with_proof.as_deref(),
-                    Some(&header),
-                    Some(messages),
-                    signer_blind.as_ref(),
-                )
-                .map_err(MessageSignatureError::signature_failed)?
-                .to_bytes()
-                .to_vec()
-            }
-        };
-
-        Ok(signature)
+            .to_vec())
+        }
     }
+}
+
+pub fn generate_secret_key(rng: &mut impl rand::RngCore) -> BBSplusSecretKey {
+    let mut key_material = [0; Bls12381Sha256::IKM_LEN as usize];
+    rng.fill_bytes(&mut key_material);
+    let pair = KeyPair::<BBSplus<Bls12381Sha256>>::generate(&key_material, None, None).unwrap();
+    pair.into_parts().0
 }

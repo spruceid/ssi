@@ -3,11 +3,12 @@ use serde::{Deserialize, Serialize};
 use ssi_bbs::Bbs;
 use ssi_claims_core::{ProofValidationError, SignatureError};
 use ssi_data_integrity_core::{
+    signing::AlterSignature,
     suite::standard::{SignatureAlgorithm, SignatureAndVerificationAlgorithm},
     ProofConfigurationRef,
 };
 use ssi_security::MultibaseBuf;
-use ssi_verification_methods::{MultiMessageSigner, Multikey, Signer};
+use ssi_verification_methods::{MessageSigner, Multikey};
 
 use super::HashData;
 
@@ -26,7 +27,7 @@ impl From<InvalidBbs2023Signature> for ProofValidationError {
 #[error("unsupported bbs-2023 signature type")]
 pub struct UnsupportedBbs2023Signature;
 
-#[derive(Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Bbs2023Signature {
     pub proof_value: MultibaseBuf,
@@ -35,6 +36,12 @@ pub struct Bbs2023Signature {
 impl AsRef<str> for Bbs2023Signature {
     fn as_ref(&self) -> &str {
         self.proof_value.as_str()
+    }
+}
+
+impl AlterSignature for Bbs2023Signature {
+    fn alter(&mut self) {
+        self.proof_value = MultibaseBuf::encode(multibase::Base::Base58Btc, [0])
     }
 }
 
@@ -54,8 +61,7 @@ impl SignatureAndVerificationAlgorithm for Bbs2023SignatureAlgorithm {
 
 impl<T> SignatureAlgorithm<Bbs2023, T> for Bbs2023SignatureAlgorithm
 where
-    T: Signer<Multikey>,
-    T::MessageSigner: MultiMessageSigner<Bbs>,
+    T: MessageSigner<Bbs>,
 {
     async fn sign(
         verification_method: &Multikey,
@@ -76,9 +82,13 @@ where
 
 #[cfg(test)]
 mod tests {
+    use std::borrow::Cow;
+
     use nquads_syntax::Parse;
     use ssi_data_integrity_core::{suite::standard::SignatureAlgorithm, ProofConfiguration};
-    use ssi_verification_methods::{Multikey, ProofPurpose, ReferenceOrOwned, SingleSecretSigner};
+    use ssi_verification_methods::{
+        Multikey, ProofPurpose, ReferenceOrOwned, Signer, SingleSecretSigner,
+    };
     use static_iref::uri;
 
     use crate::{
@@ -182,7 +192,11 @@ _:b5 <https://windsurf.grotto-networking.com/selective#year> \"2023\"^^<http://w
 
         let signature = Bbs2023SignatureAlgorithm::sign(
             &verification_method,
-            signer,
+            signer
+                .for_method(Cow::Borrowed(&verification_method))
+                .await
+                .unwrap()
+                .unwrap(),
             HashData::Base(BaseHashData {
                 transformed_document: TransformedBase {
                     options: Bbs2023SignatureOptions {

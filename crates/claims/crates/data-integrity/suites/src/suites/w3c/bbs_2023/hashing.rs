@@ -72,20 +72,20 @@ fn create_verify_data2(t: TransformedDerived) -> DerivedHashData {
     }
 }
 
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 pub enum HashData {
     Base(BaseHashData),
     Derived(DerivedHashData),
 }
 
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 pub struct BaseHashData {
     pub transformed_document: TransformedBase,
     pub proof_hash: [u8; 32],
     pub mandatory_hash: [u8; 32],
 }
 
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 pub struct DerivedHashData {
     pub canonical_configuration: Vec<String>,
     pub quads: Vec<LexicalQuad>,

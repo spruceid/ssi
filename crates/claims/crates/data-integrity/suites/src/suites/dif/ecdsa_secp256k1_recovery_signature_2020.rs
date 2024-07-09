@@ -30,7 +30,7 @@ impl StandardCryptographicSuite for EcdsaSecp256k1RecoverySignature2020 {
 
     type VerificationMethod = EcdsaSecp256k1RecoveryMethod2020;
 
-    type SignatureAlgorithm = DetachedJwsSigning<ssi_jwk::algorithm::ES256KR>;
+    type SignatureAlgorithm = DetachedJwsSigning<ssi_crypto::algorithm::ES256KR>;
 
     type ProofOptions = ();
 

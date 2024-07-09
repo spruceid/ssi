@@ -2,11 +2,9 @@ use std::{borrow::Cow, hash::Hash};
 
 use iref::{Iri, IriBuf, UriBuf};
 use serde::{Deserialize, Serialize};
-use ssi_claims_core::{InvalidProof, ProofValidationError, ProofValidity};
+use ssi_claims_core::{InvalidProof, MessageSignatureError, ProofValidationError, ProofValidity};
 use ssi_jwk::JWK;
-use ssi_verification_methods_core::{
-    JwkVerificationMethod, MessageSignatureError, VerificationMethodSet,
-};
+use ssi_verification_methods_core::{JwkVerificationMethod, VerificationMethodSet};
 use static_iref::iri;
 
 use crate::{

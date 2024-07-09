@@ -199,7 +199,7 @@ ethereum = ["ssi-claims/ethereum", "ssi-jwk/eip", "ssi-dids/eip"]
 ripemd-160 = ["ssi-jwk/ripemd-160", "ssi-dids/ripemd-160"]
 
 ## Enable bbs.
-bbs = ["ssi-crypto/bbs", "ssi-claims/bbs"]
+bbs = ["ssi-crypto/bbs", "ssi-claims/bbs", "ssi-bbs"]
 
 ## Use the Ring crate for crypto operations
 ring = ["ssi-jwk/ring", "ssi-jws/ring", "ssi-crypto/ring"]
@@ -231,6 +231,7 @@ ssi-ucan.workspace = true
 ssi-zcap-ld.workspace = true
 ssi-multicodec.workspace = true
 ssi-ssh.workspace = true
+ssi-bbs = { workspace = true, optional = true }
 xsd-types.workspace = true # public reexport
 document-features = "0.2"
 

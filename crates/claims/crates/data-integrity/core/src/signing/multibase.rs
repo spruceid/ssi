@@ -2,6 +2,7 @@ use std::marker::PhantomData;
 
 use multibase::Base;
 use ssi_claims_core::{ProofValidationError, ProofValidity, SignatureError};
+use ssi_crypto::algorithm::SignatureAlgorithmInstance;
 use ssi_verification_methods_core::{MessageSigner, VerifyBytes};
 
 use crate::{
@@ -112,9 +113,13 @@ where
         prepared_claims: S::PreparedClaims,
         proof: ProofRef<S>,
     ) -> Result<ProofValidity, ProofValidationError> {
-        let algorithm = A::select_algorithm(verification_method, proof.options)?;
+        let algorithm_instance = A::select_algorithm(verification_method, proof.options)?;
 
         let (_, signature_bytes) = proof.signature.decode()?; // Should we check the base?
-        verification_method.verify_bytes(algorithm, prepared_claims.as_ref(), &signature_bytes)
+        verification_method.verify_bytes(
+            algorithm_instance.algorithm(),
+            prepared_claims.as_ref(),
+            &signature_bytes,
+        )
     }
 }

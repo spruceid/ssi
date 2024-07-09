@@ -2,6 +2,7 @@
 //!
 //! See: <https://www.w3.org/TR/vc-di-ecdsa/#ecdsa-rdfc-2019>
 use core::fmt;
+use ssi_crypto::algorithm::{SignatureAlgorithmInstance, SignatureAlgorithmType};
 use ssi_data_integrity_core::{
     canonicalization::{
         CanonicalClaimsAndConfiguration, CanonicalizeClaimsAndConfiguration,
@@ -100,6 +101,7 @@ impl AsRef<[u8]> for EcdsaRdfc2019Hash {
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum ES256OrES384 {
     ES256,
     ES384,
@@ -111,6 +113,18 @@ impl ES256OrES384 {
             Self::ES256 => "ES256",
             Self::ES384 => "ES384",
         }
+    }
+}
+
+impl SignatureAlgorithmType for ES256OrES384 {
+    type Instance = Self;
+}
+
+impl SignatureAlgorithmInstance for ES256OrES384 {
+    type Algorithm = Self;
+
+    fn algorithm(&self) -> Self {
+        *self
     }
 }
 
@@ -140,6 +154,24 @@ impl<O> AlgorithmSelection<Multikey, O> for ES256OrES384 {
 }
 
 impl From<ES256OrES384> for ssi_jwk::Algorithm {
+    fn from(value: ES256OrES384) -> Self {
+        match value {
+            ES256OrES384::ES256 => Self::ES256,
+            ES256OrES384::ES384 => Self::ES384,
+        }
+    }
+}
+
+impl From<ES256OrES384> for ssi_crypto::Algorithm {
+    fn from(value: ES256OrES384) -> Self {
+        match value {
+            ES256OrES384::ES256 => Self::ES256,
+            ES256OrES384::ES384 => Self::ES384,
+        }
+    }
+}
+
+impl From<ES256OrES384> for ssi_crypto::AlgorithmInstance {
     fn from(value: ES256OrES384) -> Self {
         match value {
             ES256OrES384::ES256 => Self::ES256,

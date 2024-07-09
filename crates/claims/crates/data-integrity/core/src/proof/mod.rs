@@ -330,6 +330,12 @@ impl<S: CryptographicSuite> From<Vec<Proof<S>>> for Proofs<S> {
     }
 }
 
+impl<S: CryptographicSuite> FromIterator<Proof<S>> for Proofs<S> {
+    fn from_iter<T: IntoIterator<Item = Proof<S>>>(iter: T) -> Self {
+        Proofs(Vec::from_iter(iter))
+    }
+}
+
 impl<S: CryptographicSuite, T, V> ssi_claims_core::ValidateProof<V, T> for Proofs<S>
 where
     S: CryptographicSuiteVerification<T, V>,
