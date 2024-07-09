@@ -11,7 +11,7 @@ use ssi_claims_core::{
     InvalidProof, MessageSignatureError, ProofValidationError, ProofValidity, SignatureError,
 };
 use ssi_jwk::JWK;
-use ssi_multicodec::{Codec, MultiCodec, MultiEncodedBuf};
+use ssi_multicodec::{MultiCodec, MultiEncodedBuf};
 use ssi_security::MultibaseBuf;
 use ssi_verification_methods_core::{
     MaybeJwkVerificationMethod, SigningMethod, VerificationMethodSet, VerifyBytes,
@@ -238,7 +238,9 @@ impl SigningMethod<ssi_bbs::BBSplusSecretKey, ssi_crypto::algorithm::Bbs> for Mu
         algorithm: ssi_crypto::algorithm::BbsInstance,
         messages: &[Vec<u8>],
     ) -> Result<Vec<u8>, MessageSignatureError> {
-        let DecodedMultikey::Bls12_381(pk) = self.public_key.decode()? else {
+        #[allow(irrefutable_let_patterns)]
+        let DecodedMultikey::Bls12_381(pk) = self.public_key.decode()?
+        else {
             return Err(MessageSignatureError::InvalidPublicKey);
         };
 
@@ -470,15 +472,21 @@ impl MultiCodec for DecodedMultikey {
     fn from_codec_and_bytes(codec: u64, bytes: &[u8]) -> Result<Self, ssi_multicodec::Error> {
         match codec {
             #[cfg(feature = "ed25519")]
-            ssi_multicodec::ED25519_PUB => Codec::from_bytes(bytes).map(Self::Ed25519),
+            ssi_multicodec::ED25519_PUB => {
+                ssi_multicodec::Codec::from_bytes(bytes).map(Self::Ed25519)
+            }
             #[cfg(feature = "secp256k1")]
-            ssi_multicodec::SECP256K1_PUB => Codec::from_bytes(bytes).map(Self::Secp256k1),
+            ssi_multicodec::SECP256K1_PUB => {
+                ssi_multicodec::Codec::from_bytes(bytes).map(Self::Secp256k1)
+            }
             #[cfg(feature = "secp256r1")]
-            ssi_multicodec::P256_PUB => Codec::from_bytes(bytes).map(Self::P256),
+            ssi_multicodec::P256_PUB => ssi_multicodec::Codec::from_bytes(bytes).map(Self::P256),
             #[cfg(feature = "secp384r1")]
-            ssi_multicodec::P384_PUB => Codec::from_bytes(bytes).map(Self::P384),
+            ssi_multicodec::P384_PUB => ssi_multicodec::Codec::from_bytes(bytes).map(Self::P384),
             #[cfg(feature = "bbs")]
-            ssi_multicodec::BLS12_381_G2_PUB => Codec::from_bytes(bytes).map(Self::Bls12_381),
+            ssi_multicodec::BLS12_381_G2_PUB => {
+                ssi_multicodec::Codec::from_bytes(bytes).map(Self::Bls12_381)
+            }
             _ => Err(ssi_multicodec::Error::UnexpectedCodec(codec)),
         }
     }

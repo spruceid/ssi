@@ -1,3 +1,4 @@
+#![allow(unused)]
 use std::{borrow::Cow, path::Path};
 
 use hashbrown::HashMap;

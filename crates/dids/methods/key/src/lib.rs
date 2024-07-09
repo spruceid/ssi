@@ -485,6 +485,7 @@ mod tests {
         assert_eq!(did1, did);
     }
 
+    #[cfg(feature = "bbs")]
     #[async_std::test]
     async fn from_did_key_bls() {
         // https://w3c-ccg.github.io/did-method-key/#bls-12381
