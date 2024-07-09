@@ -40,6 +40,7 @@ where
     P: JsonLdLoaderProvider + ResolverProvider,
     P::Resolver: VerificationMethodResolver<Method = AnyMethod>,
 {
+    #[allow(unused_variables)]
     async fn select(
         &self,
         unsecured_document: &T,
@@ -83,7 +84,7 @@ where
                             domains: p.domains,
                             challenge: p.challenge,
                             nonce: p.nonce,
-                            options: crate::AnyProofOptions::Bbs2023(p.options),
+                            options: crate::AnyProofOptions::Bbs2023(()),
                             signature: crate::AnySignature::Bbs2023(p.signature),
                             extra_properties: p.extra_properties,
                         })

@@ -30,6 +30,8 @@ pub mod blakesig;
 
 #[cfg(feature = "bbs")]
 mod bbs;
+#[cfg(feature = "bbs")]
+pub use bbs::*;
 
 mod multicodec;
 pub use multicodec::*;

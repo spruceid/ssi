@@ -13,6 +13,10 @@ impl JWK {
     }
 }
 
+pub fn bls12381g2_parse(bytes: &[u8]) -> Result<JWK, ssi_bbs::Error> {
+    Ok(BBSplusPublicKey::from_bytes(bytes)?.into())
+}
+
 impl<'a> TryFrom<&'a JWK> for BBSplusPublicKey {
     type Error = Error;
 

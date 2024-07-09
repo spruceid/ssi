@@ -10,7 +10,6 @@ use serde::{Deserialize, Serialize};
 use ssi_claims_core::{
     InvalidProof, MessageSignatureError, ProofValidationError, ProofValidity, SignatureError,
 };
-use ssi_crypto::algorithm::{Bbs, BbsInstance};
 use ssi_jwk::JWK;
 use ssi_multicodec::{Codec, MultiCodec, MultiEncodedBuf};
 use ssi_security::MultibaseBuf;
@@ -186,6 +185,7 @@ impl SigningMethod<JWK, ssi_crypto::Algorithm> for Multikey {
             .map_err(MessageSignatureError::signature_failed)
     }
 
+    #[allow(unused_variables)]
     fn sign_bytes_multi(
         &self,
         secret: &JWK,
@@ -222,11 +222,11 @@ impl SigningMethod<ed25519_dalek::SigningKey, ssi_crypto::algorithm::EdDSA> for 
 }
 
 #[cfg(feature = "bls12-381")]
-impl SigningMethod<ssi_bbs::BBSplusSecretKey, Bbs> for Multikey {
+impl SigningMethod<ssi_bbs::BBSplusSecretKey, ssi_crypto::algorithm::Bbs> for Multikey {
     fn sign_bytes(
         &self,
         secret: &ssi_bbs::BBSplusSecretKey,
-        algorithm: BbsInstance,
+        algorithm: ssi_crypto::algorithm::BbsInstance,
         bytes: &[u8],
     ) -> Result<Vec<u8>, MessageSignatureError> {
         self.sign_bytes_multi(secret, algorithm, &[bytes.to_vec()])
@@ -235,7 +235,7 @@ impl SigningMethod<ssi_bbs::BBSplusSecretKey, Bbs> for Multikey {
     fn sign_bytes_multi(
         &self,
         secret: &ssi_bbs::BBSplusSecretKey,
-        algorithm: BbsInstance,
+        algorithm: ssi_crypto::algorithm::BbsInstance,
         messages: &[Vec<u8>],
     ) -> Result<Vec<u8>, MessageSignatureError> {
         let DecodedMultikey::Bls12_381(pk) = self.public_key.decode()? else {

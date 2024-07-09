@@ -69,6 +69,7 @@ where
             .map_err(MessageSignatureError::signature_failed)
     }
 
+    #[allow(unused_variables)]
     async fn sign_multi(
         self,
         algorithm: <A as SignatureAlgorithmType>::Instance,

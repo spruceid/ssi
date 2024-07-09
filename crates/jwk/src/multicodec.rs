@@ -43,6 +43,10 @@ impl JWK {
             ssi_multicodec::P384_PRIV => {
                 crate::p384_parse_private(k).map_err(FromMulticodecError::Secp384r1Priv)
             }
+            #[cfg(feature = "bbs")]
+            ssi_multicodec::BLS12_381_G2_PUB => {
+                crate::bls12381g2_parse(k).map_err(FromMulticodecError::Bls12381G2Pub)
+            }
             _ => Err(FromMulticodecError::UnsupportedCodec(codec)),
         }
     }
@@ -156,6 +160,10 @@ pub enum FromMulticodecError {
     #[cfg(feature = "secp384r1")]
     #[error(transparent)]
     Secp384r1Priv(Error),
+
+    #[cfg(feature = "bbs")]
+    #[error(transparent)]
+    Bls12381G2Pub(ssi_bbs::Error),
 
     /// Unexpected multibase (multicodec) key prefix multicodec
     #[error("Unsupported multicodec key type 0x{0:x}")]
