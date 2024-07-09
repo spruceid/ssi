@@ -193,7 +193,7 @@ impl SigningMethod<JWK, ssi_crypto::Algorithm> for Multikey {
         messages: &[Vec<u8>],
     ) -> Result<Vec<u8>, MessageSignatureError> {
         match algorithm {
-            #[cfg(feature = "bls12-381")]
+            #[cfg(feature = "bbs")]
             ssi_crypto::AlgorithmInstance::Bbs(bbs_algorithm) => {
                 let secret: ssi_bbs::BBSplusSecretKey = secret
                     .try_into()
@@ -221,7 +221,7 @@ impl SigningMethod<ed25519_dalek::SigningKey, ssi_crypto::algorithm::EdDSA> for 
     }
 }
 
-#[cfg(feature = "bls12-381")]
+#[cfg(feature = "bbs")]
 impl SigningMethod<ssi_bbs::BBSplusSecretKey, ssi_crypto::algorithm::Bbs> for Multikey {
     fn sign_bytes(
         &self,
@@ -444,7 +444,7 @@ pub enum DecodedMultikey {
     #[cfg(feature = "secp384r1")]
     P384(p384::PublicKey),
 
-    #[cfg(feature = "bls12-381")]
+    #[cfg(feature = "bbs")]
     Bls12_381(ssi_bbs::BBSplusPublicKey),
 }
 
@@ -477,7 +477,7 @@ impl MultiCodec for DecodedMultikey {
             ssi_multicodec::P256_PUB => Codec::from_bytes(bytes).map(Self::P256),
             #[cfg(feature = "secp384r1")]
             ssi_multicodec::P384_PUB => Codec::from_bytes(bytes).map(Self::P384),
-            #[cfg(feature = "bls12-381")]
+            #[cfg(feature = "bbs")]
             ssi_multicodec::BLS12_381_G2_PUB => Codec::from_bytes(bytes).map(Self::Bls12_381),
             _ => Err(ssi_multicodec::Error::UnexpectedCodec(codec)),
         }
@@ -493,7 +493,7 @@ impl MultiCodec for DecodedMultikey {
             Self::P256(k) => k.to_codec_and_bytes(),
             #[cfg(feature = "secp384r1")]
             Self::P384(k) => k.to_codec_and_bytes(),
-            #[cfg(feature = "bls12-381")]
+            #[cfg(feature = "bbs")]
             Self::Bls12_381(k) => k.to_codec_and_bytes(),
             #[allow(unreachable_patterns)]
             _ => unreachable!(), // references are always considered inhabited.

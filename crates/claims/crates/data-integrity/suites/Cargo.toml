@@ -92,7 +92,7 @@ solana = ["ssi-verification-methods/solana", "k256"]
 ethereum = ["serde_json"]
 
 ## BBS cryptographic suites.
-bbs = ["ssi-verification-methods/bls12-381"]
+bbs = ["ssi-verification-methods/bbs"]
 
 [dependencies]
 ssi-data-integrity-core.workspace = true

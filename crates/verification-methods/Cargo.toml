@@ -37,7 +37,7 @@ aleo = ["ssi-caips/aleo"]
 
 solana = []
 
-bls12-381 = ["ssi-multicodec/bls12-381", "ssi-jwk/bbs", "ssi-bbs", "ssi-verification-methods-core/bbs"]
+bbs = ["ssi-multicodec/bls12-381", "ssi-jwk/bbs", "ssi-bbs", "ssi-verification-methods-core/bbs"]
 
 [dependencies]
 ssi-core.workspace = true
