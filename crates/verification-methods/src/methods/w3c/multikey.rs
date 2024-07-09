@@ -466,6 +466,7 @@ impl DecodedMultikey {
 }
 
 impl MultiCodec for DecodedMultikey {
+    #[allow(unused_variables)]
     fn from_codec_and_bytes(codec: u64, bytes: &[u8]) -> Result<Self, ssi_multicodec::Error> {
         match codec {
             #[cfg(feature = "ed25519")]

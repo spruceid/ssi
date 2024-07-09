@@ -38,7 +38,6 @@ ssi_verification_methods_core::complete_verification_method_union! {
         JsonWebKey2020,
 
         /// `Multikey`.
-        #[cfg(feature = "ed25519")]
         Multikey,
 
         #[cfg(all(feature = "tezos", feature = "ed25519"))]
@@ -82,7 +81,6 @@ impl AnyMethod {
             #[cfg(feature = "secp256r1")]
             Self::EcdsaSecp256r1VerificationKey2019(m) => Some(Cow::Owned(m.public_key_jwk())),
             Self::JsonWebKey2020(m) => Some(Cow::Borrowed(m.public_key_jwk())),
-            #[cfg(feature = "ed25519")]
             Self::Multikey(m) => m.public_key_jwk().map(Cow::Owned),
             #[cfg(all(feature = "tezos", feature = "ed25519"))]
             Self::Ed25519PublicKeyBLAKE2BDigestSize20Base58CheckEncoded2021(_) => None,
@@ -178,7 +176,6 @@ impl SigningMethod<JWK, ssi_crypto::Algorithm> for AnyMethod {
                 )),
             },
             Self::JsonWebKey2020(m) => m.sign_bytes(secret, Some(algorithm.try_into()?), bytes),
-            #[cfg(feature = "ed25519")]
             Self::Multikey(m) => m.sign_bytes(secret, algorithm, bytes),
             #[cfg(all(feature = "tezos", feature = "ed25519"))]
             Self::Ed25519PublicKeyBLAKE2BDigestSize20Base58CheckEncoded2021(m) => {
