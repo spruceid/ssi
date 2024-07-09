@@ -10,7 +10,7 @@ use serde::{Deserialize, Serialize};
 use ssi_claims_core::{
     InvalidProof, MessageSignatureError, ProofValidationError, ProofValidity, SignatureError,
 };
-use ssi_jwk::JWK;
+use ssi_jwk::{Base64urlUInt, ECParams, Params, JWK};
 use ssi_multicodec::{MultiCodec, MultiEncodedBuf};
 use ssi_security::MultibaseBuf;
 use ssi_verification_methods_core::{
@@ -462,6 +462,27 @@ impl DecodedMultikey {
             Self::P256(key) => Some((*key).into()),
             #[cfg(feature = "secp384r1")]
             Self::P384(key) => Some((*key).into()),
+            #[cfg(feature = "bbs")]
+            Self::Bls12_381(key) => {
+                let (x, y) = key.to_coordinates();
+                let params = ECParams {
+                    curve: Some("BLS12381G2".to_string()),
+                    x_coordinate: Some(Base64urlUInt(x.to_vec())),
+                    y_coordinate: Some(Base64urlUInt(y.to_vec())),
+                    ecc_private_key: None,
+                };
+                Some(JWK {
+                    params: Params::EC(params),
+                    public_key_use: None,
+                    key_operations: None,
+                    algorithm: None,
+                    key_id: None,
+                    x509_url: None,
+                    x509_certificate_chain: None,
+                    x509_thumbprint_sha1: None,
+                    x509_thumbprint_sha256: None,
+                })
+            }
             _ => None,
         }
     }
