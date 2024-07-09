@@ -102,3 +102,56 @@ where
         json.expand_with(ld, loader).await
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use ssi_json_ld::{json_ld, ContextLoader, Expandable};
+
+    use super::*;
+
+    #[async_std::test]
+    async fn reject_undefined_type_v2() {
+        let input: AnyJsonCredential = serde_json::from_value(serde_json::json!({
+            "@context": [
+                "https://www.w3.org/ns/credentials/v2",
+                { "@vocab": null }
+            ],
+            "type": [
+                "VerifiableCredential",
+                "ExampleTestCredential"
+            ],
+            "issuer": "did:example:issuer",
+            "credentialSubject": {
+                "id": "did:example:subject"
+            }
+        }))
+        .unwrap();
+        match input.expand(&ContextLoader::default()).await.unwrap_err() {
+            JsonLdError::Expansion(json_ld::expansion::Error::InvalidTypeValue) => (),
+            e => panic!("{:?}", e),
+        }
+    }
+
+    #[async_std::test]
+    async fn reject_undefined_type_v1() {
+        let input: AnyJsonCredential = serde_json::from_value(serde_json::json!({
+            "@context": [
+                "https://www.w3.org/2018/credentials/v1",
+                { "@vocab": null }
+            ],
+            "type": [
+                "VerifiableCredential",
+                "ExampleTestCredential"
+            ],
+            "issuer": "did:example:issuer",
+            "credentialSubject": {
+                "id": "did:example:subject"
+            }
+        }))
+        .unwrap();
+        match input.expand(&ContextLoader::default()).await.unwrap_err() {
+            JsonLdError::Expansion(json_ld::expansion::Error::InvalidTypeValue) => (),
+            e => panic!("{:?}", e),
+        }
+    }
+}

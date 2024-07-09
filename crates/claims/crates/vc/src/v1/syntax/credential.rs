@@ -269,11 +269,13 @@ where
 
 #[cfg(test)]
 mod tests {
-    use ssi_json_ld::{CompactJsonLd, ContextLoader, Expandable};
+    use ssi_json_ld::{json_ld, ContextLoader, Expandable};
+
+    use super::*;
 
     #[async_std::test]
     async fn reject_undefined_type() {
-        let input = CompactJsonLd(json_syntax::json!({
+        let input: JsonCredential = serde_json::from_value(serde_json::json!({
             "@context": [
                 "https://www.w3.org/2018/credentials/v1",
                 { "@vocab": null }
@@ -286,8 +288,11 @@ mod tests {
             "credentialSubject": {
                 "id": "did:example:subject"
             }
-        }));
-
-        assert!(input.expand(&ContextLoader::default()).await.is_err());
+        }))
+        .unwrap();
+        match input.expand(&ContextLoader::default()).await.unwrap_err() {
+            JsonLdError::Expansion(json_ld::expansion::Error::InvalidTypeValue) => (),
+            e => panic!("{:?}", e),
+        }
     }
 }
