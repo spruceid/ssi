@@ -1,6 +1,6 @@
 use ssi_multicodec::{MultiEncoded, MultiEncodedBuf};
 
-use crate::{Error, Params, RsaX509PubParseError, JWK};
+use crate::{Error, Params, JWK};
 
 impl JWK {
     pub fn from_multicodec(multicodec: &MultiEncoded) -> Result<Self, FromMulticodecError> {
@@ -127,7 +127,7 @@ impl JWK {
 pub enum FromMulticodecError {
     #[cfg(feature = "rsa")]
     #[error(transparent)]
-    RsaPub(RsaX509PubParseError),
+    RsaPub(crate::RsaX509PubParseError),
 
     #[cfg(feature = "ed25519")]
     #[error(transparent)]

@@ -42,7 +42,7 @@ tezos = ["blake2b_simd", "secp256k1", "secp256r1", "bs58"]
 
 ring = ["dep:ring"]
 
-bbs = ["ssi-bbs"]
+bbs = ["ssi-bbs", "rand"]
 
 [dependencies]
 ssi-claims-core.workspace = true
