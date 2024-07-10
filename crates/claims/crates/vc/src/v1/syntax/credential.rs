@@ -35,13 +35,14 @@ pub type JsonCredentialTypes<T = ()> = Types<CredentialType, T>;
 
 /// JSON Credential, without required context nor type.
 ///
-/// If you care about required context and/or type, use the
-/// [`SpecializedJsonCredential`] type directly.
+/// If you care about required context and/or type, or want to customize other
+/// aspects of the credential, use the [`SpecializedJsonCredential`] type
+/// directly.
 pub type JsonCredential<S = json_syntax::Object> = SpecializedJsonCredential<S>;
 
-/// Specialized JSON Credential with custom required context and type.
+/// Specialized JSON Credential with custom types for each component.
 ///
-/// If you don't care about required context and/or type, you can use the
+/// If you don't care about the type of each component, you can use the
 /// [`JsonCredential`] type alias instead.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(bound(
