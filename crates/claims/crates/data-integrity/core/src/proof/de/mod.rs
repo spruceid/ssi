@@ -84,8 +84,7 @@ impl<'de, T: DeserializeCryptographicSuite<'de>> Proof<T> {
         Ok(Self {
             context,
             type_: suite,
-            created: created
-                .ok_or_else(|| serde::de::Error::custom("missing `created` property"))?,
+            created,
             verification_method: verification_method
                 .map(|v| v.map(VerificationMethodOf::unwrap).into())
                 .ok_or_else(|| serde::de::Error::custom("missing `verificationMethod` property"))?,
