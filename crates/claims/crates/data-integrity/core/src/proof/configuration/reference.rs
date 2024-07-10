@@ -20,7 +20,7 @@ pub struct ProofConfigurationRef<'a, S: CryptographicSuite> {
     pub type_: &'a S,
 
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub created: Option<xsd_types::DateTime>,
+    pub created: Option<xsd_types::DateTimeStamp>,
 
     #[serde(serialize_with = "S::serialize_verification_method_ref_ref")]
     pub verification_method: ReferenceOrOwnedRef<'a, S::VerificationMethod>,
@@ -141,7 +141,7 @@ pub struct ProofConfigurationRefWithoutOptions<'a, S: CryptographicSuite> {
     pub type_: &'a S,
 
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub created: Option<xsd_types::DateTime>,
+    pub created: Option<xsd_types::DateTimeStamp>,
 
     #[serde(serialize_with = "S::serialize_verification_method_ref_ref")]
     pub verification_method: ReferenceOrOwnedRef<'a, S::VerificationMethod>,

@@ -9,7 +9,7 @@ pub struct ProofRef<'a, S: CryptographicSuite> {
 
     pub type_: &'a S,
 
-    pub created: Option<xsd_types::DateTime>,
+    pub created: Option<xsd_types::DateTimeStamp>,
 
     pub verification_method: ReferenceOrOwnedRef<'a, S::VerificationMethod>,
 

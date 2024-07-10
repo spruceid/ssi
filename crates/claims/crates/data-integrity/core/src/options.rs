@@ -14,7 +14,7 @@ pub struct ProofOptions<M, T> {
 
     /// Date a creation of the proof.
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub created: Option<xsd_types::DateTime>,
+    pub created: Option<xsd_types::DateTimeStamp>,
 
     /// Verification method.
     pub verification_method: Option<ReferenceOrOwned<M>>,
@@ -74,7 +74,7 @@ impl<M, T: Default> Default for ProofOptions<M, T> {
     fn default() -> Self {
         Self {
             context: None,
-            created: Some(xsd_types::DateTime::now_ms()),
+            created: Some(xsd_types::DateTimeStamp::now_ms()),
             verification_method: None,
             proof_purpose: ProofPurpose::default(),
             expires: None,
@@ -89,7 +89,7 @@ impl<M, T: Default> Default for ProofOptions<M, T> {
 
 impl<M, T> ProofOptions<M, T> {
     pub fn new(
-        created: xsd_types::DateTime,
+        created: xsd_types::DateTimeStamp,
         verification_method: ReferenceOrOwned<M>,
         proof_purpose: ProofPurpose,
         options: T,
@@ -111,7 +111,7 @@ impl<M, T> ProofOptions<M, T> {
     pub fn from_method_and_options(verification_method: ReferenceOrOwned<M>, options: T) -> Self {
         Self {
             context: None,
-            created: Some(xsd_types::DateTime::now_ms()),
+            created: Some(xsd_types::DateTimeStamp::now_ms()),
             verification_method: Some(verification_method),
             proof_purpose: ProofPurpose::default(),
             expires: None,
