@@ -27,6 +27,7 @@ linked-data = ["dep:linked-data"]
 
 [dependencies]
 ssi-core.workspace = true
+ssi-crypto.workspace = true
 educe.workspace = true
 thiserror.workspace = true
 chrono.workspace = true

@@ -4,11 +4,9 @@ use hex::FromHexError;
 use iref::{Iri, IriBuf, UriBuf};
 use rdf_types::{Interpretation, Vocabulary};
 use serde::{Deserialize, Serialize};
-use ssi_claims_core::{InvalidProof, ProofValidationError, ProofValidity};
+use ssi_claims_core::{InvalidProof, MessageSignatureError, ProofValidationError, ProofValidity};
 use ssi_jwk::JWK;
-use ssi_verification_methods_core::{
-    JwkVerificationMethod, MessageSignatureError, VerificationMethodSet, VerifyBytes,
-};
+use ssi_verification_methods_core::{JwkVerificationMethod, VerificationMethodSet, VerifyBytes};
 use static_iref::iri;
 
 use crate::{
@@ -159,10 +157,10 @@ impl JwkVerificationMethod for EcdsaSecp256k1VerificationKey2019 {
     }
 }
 
-impl VerifyBytes<ssi_jwk::algorithm::ES256K> for EcdsaSecp256k1VerificationKey2019 {
+impl VerifyBytes<ssi_crypto::algorithm::ES256K> for EcdsaSecp256k1VerificationKey2019 {
     fn verify_bytes(
         &self,
-        _: ssi_jwk::algorithm::ES256K,
+        _: ssi_crypto::algorithm::ES256K,
         signing_bytes: &[u8],
         signature: &[u8],
     ) -> Result<ProofValidity, ProofValidationError> {
@@ -248,17 +246,7 @@ impl PublicKeyHex {
     }
 
     pub fn to_jwk(&self) -> JWK {
-        JWK {
-            params: ssi_jwk::Params::EC(ssi_jwk::ECParams::try_from(&self.decoded).unwrap()),
-            public_key_use: None,
-            key_operations: None,
-            algorithm: None,
-            key_id: None,
-            x509_url: None,
-            x509_certificate_chain: None,
-            x509_thumbprint_sha1: None,
-            x509_thumbprint_sha256: None,
-        }
+        self.decoded.into()
     }
 }
 

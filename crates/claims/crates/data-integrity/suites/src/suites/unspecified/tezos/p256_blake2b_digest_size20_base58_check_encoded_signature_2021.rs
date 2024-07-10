@@ -30,7 +30,7 @@ impl StandardCryptographicSuite for P256BLAKE2BDigestSize20Base58CheckEncodedSig
 
     type VerificationMethod = P256PublicKeyBLAKE2BDigestSize20Base58CheckEncoded2021;
 
-    type SignatureAlgorithm = DetachedJwsRecoverySigning<ssi_jwk::algorithm::ESBlake2b>;
+    type SignatureAlgorithm = DetachedJwsRecoverySigning<ssi_crypto::algorithm::ESBlake2b>;
 
     type ProofOptions = Options;
 

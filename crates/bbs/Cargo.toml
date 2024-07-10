@@ -1,0 +1,15 @@
+[package]
+name = "ssi-bbs"
+version = "0.1.0"
+edition = "2021"
+authors = ["Spruce Systems, Inc."]
+license = "Apache-2.0"
+description = "The BBS Signature Scheme implementation for SSI"
+repository = "https://github.com/spruceid/ssi/"
+documentation = "https://docs.rs/ssi-bbs/"
+
+[dependencies]
+ssi-crypto.workspace = true
+ssi-claims-core.workspace = true
+zkryptium = "0.2.2"
+rand.workspace = true

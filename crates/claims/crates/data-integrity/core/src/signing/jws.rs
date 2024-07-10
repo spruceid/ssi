@@ -1,6 +1,7 @@
 use std::{borrow::Cow, marker::PhantomData};
 
 use ssi_claims_core::{ProofValidationError, SignatureError};
+use ssi_crypto::algorithm::{SignatureAlgorithmInstance, SignatureAlgorithmType};
 use ssi_jwk::{Algorithm, JWK};
 use ssi_jws::{CompactJWSString, JWSSignature, JWS};
 use ssi_verification_methods_core::{MessageSigner, VerifyBytes, VerifyBytesWithRecoveryJwk};
@@ -50,15 +51,15 @@ impl JwsSignature {
         Ok((signing_bytes, signature, header.algorithm))
     }
 
-    pub async fn sign_detached<A: Clone + Into<Algorithm>, S: MessageSigner<A>>(
+    pub async fn sign_detached<A: SignatureAlgorithmType + Into<Algorithm>, S: MessageSigner<A>>(
         payload: &[u8],
         signer: S,
         key_id: Option<String>,
-        algorithm: A,
+        algorithm_instance: A::Instance,
     ) -> Result<Self, SignatureError> {
-        let header = ssi_jws::Header::new_unencoded(algorithm.clone().into(), key_id);
+        let header = ssi_jws::Header::new_unencoded(algorithm_instance.algorithm().into(), key_id);
         let signing_bytes = header.encode_signing_bytes(payload);
-        let signature = signer.sign(algorithm, &signing_bytes).await?;
+        let signature = signer.sign(algorithm_instance, &signing_bytes).await?;
         let jws = ssi_jws::CompactJWSString::encode_detached(header, &signature);
         Ok(JwsSignature::new(jws))
     }
@@ -86,7 +87,9 @@ impl<A, S, T> SignatureAlgorithm<S, T> for DetachedJwsSigning<A>
 where
     S: CryptographicSuite,
     S::PreparedClaims: AsRef<[u8]>,
-    A: Clone + AlgorithmSelection<S::VerificationMethod, S::ProofOptions> + Into<Algorithm>,
+    A: SignatureAlgorithmType
+        + AlgorithmSelection<S::VerificationMethod, S::ProofOptions>
+        + Into<Algorithm>,
     T: MessageSigner<A>,
 {
     async fn sign(
@@ -147,7 +150,7 @@ where
     S: CryptographicSuite,
     S::PreparedClaims: AsRef<[u8]>,
     S::ProofOptions: RecoverPublicJwk,
-    A: Clone + AlgorithmSelection<S::VerificationMethod, S::ProofOptions> + Into<Algorithm>,
+    A: Clone + Into<Algorithm> + AlgorithmSelection<S::VerificationMethod, S::ProofOptions>,
     T: MessageSigner<A>,
 {
     async fn sign(

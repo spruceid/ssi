@@ -56,7 +56,7 @@ impl StandardCryptographicSuite for Ed25519Signature2020 {
 
     type VerificationMethod = Ed25519VerificationKey2020;
 
-    type SignatureAlgorithm = MultibaseSigning<ssi_jwk::algorithm::EdDSA, Base58Btc>;
+    type SignatureAlgorithm = MultibaseSigning<ssi_crypto::algorithm::EdDSA, Base58Btc>;
 
     type ProofOptions = ();
 

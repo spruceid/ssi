@@ -1,5 +1,6 @@
 use core::fmt;
 
+use ssi_crypto::algorithm::{AlgorithmError, UnsupportedAlgorithm};
 use ssi_eip712::Eip712TypesLoaderProvider;
 use ssi_json_ld::JsonLdLoaderProvider;
 
@@ -26,6 +27,9 @@ pub enum SignatureError {
     #[error("claims: {0}")]
     Claims(String),
 
+    #[error("missing required option `{0}`")]
+    MissingRequiredOption(String),
+
     #[error("missing signer")]
     MissingSigner,
 
@@ -43,11 +47,82 @@ impl SignatureError {
     pub fn other(e: impl fmt::Display) -> Self {
         Self::Other(e.to_string())
     }
+
+    pub fn missing_required_option(name: &str) -> Self {
+        Self::MissingRequiredOption(name.to_string())
+    }
 }
 
 impl From<std::convert::Infallible> for SignatureError {
     fn from(_value: std::convert::Infallible) -> Self {
         unreachable!()
+    }
+}
+
+#[derive(Debug, thiserror::Error)]
+pub enum MessageSignatureError {
+    #[error("0")]
+    SignatureFailed(String),
+
+    #[error("invalid signature client query")]
+    InvalidQuery,
+
+    #[error("invalid signer response")]
+    InvalidResponse,
+
+    #[error("invalid public key")]
+    InvalidPublicKey,
+
+    #[error("invalid secret key")]
+    InvalidSecretKey,
+
+    #[error("missing signature algorithm")]
+    MissingAlgorithm,
+
+    #[error("unsupported signature algorithm `{0}`")]
+    UnsupportedAlgorithm(String),
+
+    #[error("unsupported verification method `{0}`")]
+    UnsupportedVerificationMethod(String),
+
+    /// Signature algorithm does not support multi-message signing.
+    #[error("too many messages")]
+    TooManyMessages,
+
+    /// Signature algorithm requires at least one message.
+    #[error("missing message")]
+    MissingMessage,
+}
+
+impl MessageSignatureError {
+    pub fn signature_failed(e: impl ToString) -> Self {
+        Self::SignatureFailed(e.to_string())
+    }
+}
+
+impl From<MessageSignatureError> for SignatureError {
+    fn from(value: MessageSignatureError) -> Self {
+        match value {
+            MessageSignatureError::MissingAlgorithm => Self::MissingAlgorithm,
+            MessageSignatureError::UnsupportedAlgorithm(name) => Self::UnsupportedAlgorithm(name),
+            MessageSignatureError::InvalidSecretKey => Self::InvalidSecretKey,
+            other => Self::other(other),
+        }
+    }
+}
+
+impl From<AlgorithmError> for MessageSignatureError {
+    fn from(value: AlgorithmError) -> Self {
+        match value {
+            AlgorithmError::Missing => Self::MissingAlgorithm,
+            AlgorithmError::Unsupported(a) => Self::UnsupportedAlgorithm(a.to_string()),
+        }
+    }
+}
+
+impl From<UnsupportedAlgorithm> for MessageSignatureError {
+    fn from(value: UnsupportedAlgorithm) -> Self {
+        Self::UnsupportedAlgorithm(value.0.to_string())
     }
 }
 

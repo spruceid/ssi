@@ -70,7 +70,7 @@ impl SignatureAndVerificationAlgorithm for RsaSignatureAlgorithm {
 
 impl<T> SignatureAlgorithm<RsaSignature2018, T> for RsaSignatureAlgorithm
 where
-    T: MessageSigner<ssi_jwk::algorithm::RS256>,
+    T: MessageSigner<ssi_crypto::algorithm::RS256>,
 {
     async fn sign(
         _verification_method: &RsaVerificationKey2018,
@@ -79,7 +79,7 @@ where
         _proof_configuration: ProofConfigurationRef<'_, RsaSignature2018>,
     ) -> Result<Signature, SignatureError> {
         let signature = signer
-            .sign(ssi_jwk::algorithm::RS256, &prepared_claims)
+            .sign(ssi_crypto::algorithm::RS256, &prepared_claims)
             .await?;
 
         Ok(Signature {

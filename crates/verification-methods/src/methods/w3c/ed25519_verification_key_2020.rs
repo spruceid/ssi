@@ -5,13 +5,11 @@ use iref::{Iri, IriBuf, UriBuf};
 use rand_core::{CryptoRng, RngCore};
 use rdf_types::{Interpretation, Vocabulary};
 use serde::{Deserialize, Serialize};
-use ssi_claims_core::{InvalidProof, ProofValidationError, ProofValidity};
+use ssi_claims_core::{InvalidProof, MessageSignatureError, ProofValidationError, ProofValidity};
 use ssi_jwk::JWK;
 use ssi_multicodec::MultiEncodedBuf;
 use ssi_security::{Multibase, MultibaseBuf};
-use ssi_verification_methods_core::{
-    JwkVerificationMethod, MessageSignatureError, VerificationMethodSet, VerifyBytes,
-};
+use ssi_verification_methods_core::{JwkVerificationMethod, VerificationMethodSet, VerifyBytes};
 use static_iref::iri;
 
 use crate::{
@@ -189,34 +187,34 @@ impl JwkVerificationMethod for Ed25519VerificationKey2020 {
     }
 }
 
-impl SigningMethod<ed25519_dalek::SigningKey, ssi_jwk::algorithm::EdDSA>
+impl SigningMethod<ed25519_dalek::SigningKey, ssi_crypto::algorithm::EdDSA>
     for Ed25519VerificationKey2020
 {
     fn sign_bytes(
         &self,
         secret: &ed25519_dalek::SigningKey,
-        _algorithm: ssi_jwk::algorithm::EdDSA,
+        _algorithm: ssi_crypto::algorithm::EdDSA,
         message: &[u8],
     ) -> Result<Vec<u8>, MessageSignatureError> {
         self.sign_bytes(secret, message)
     }
 }
 
-impl SigningMethod<JWK, ssi_jwk::algorithm::EdDSA> for Ed25519VerificationKey2020 {
+impl SigningMethod<JWK, ssi_crypto::algorithm::EdDSA> for Ed25519VerificationKey2020 {
     fn sign_bytes(
         &self,
         secret_key: &JWK,
-        _algorithm: ssi_jwk::algorithm::EdDSA,
+        _algorithm: ssi_crypto::algorithm::EdDSA,
         message: &[u8],
     ) -> Result<Vec<u8>, MessageSignatureError> {
         self.sign_bytes(secret_key, message)
     }
 }
 
-impl VerifyBytes<ssi_jwk::algorithm::EdDSA> for Ed25519VerificationKey2020 {
+impl VerifyBytes<ssi_crypto::algorithm::EdDSA> for Ed25519VerificationKey2020 {
     fn verify_bytes(
         &self,
-        _: ssi_jwk::algorithm::EdDSA,
+        _: ssi_crypto::algorithm::EdDSA,
         signing_bytes: &[u8],
         signature: &[u8],
     ) -> Result<ProofValidity, ProofValidationError> {
@@ -269,7 +267,7 @@ pub struct PublicKey {
 impl PublicKey {
     pub fn encode(decoded: ed25519_dalek::VerifyingKey) -> Self {
         let multi_encoded =
-            MultiEncodedBuf::encode(ssi_multicodec::ED25519_PUB, decoded.as_bytes());
+            MultiEncodedBuf::encode_bytes(ssi_multicodec::ED25519_PUB, decoded.as_bytes());
 
         Self {
             encoded: MultibaseBuf::encode(multibase::Base::Base58Btc, multi_encoded.as_bytes()),

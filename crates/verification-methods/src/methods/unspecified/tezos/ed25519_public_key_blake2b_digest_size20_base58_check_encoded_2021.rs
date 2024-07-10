@@ -2,11 +2,9 @@ use std::hash::Hash;
 
 use iref::{Iri, IriBuf, UriBuf};
 use serde::{Deserialize, Serialize};
-use ssi_claims_core::{InvalidProof, ProofValidationError, ProofValidity};
+use ssi_claims_core::{InvalidProof, MessageSignatureError, ProofValidationError, ProofValidity};
 use ssi_jwk::{Algorithm, JWK};
-use ssi_verification_methods_core::{
-    MessageSignatureError, VerificationMethodSet, VerifyBytesWithRecoveryJwk,
-};
+use ssi_verification_methods_core::{VerificationMethodSet, VerifyBytesWithRecoveryJwk};
 use static_iref::iri;
 
 use crate::{
@@ -158,13 +156,13 @@ impl TryFrom<GenericVerificationMethod>
     }
 }
 
-impl SigningMethod<JWK, ssi_jwk::algorithm::EdBlake2b>
+impl SigningMethod<JWK, ssi_crypto::algorithm::EdBlake2b>
     for Ed25519PublicKeyBLAKE2BDigestSize20Base58CheckEncoded2021
 {
     fn sign_bytes(
         &self,
         key: &JWK,
-        _algorithm: ssi_jwk::algorithm::EdBlake2b,
+        _algorithm: ssi_crypto::algorithm::EdBlake2b,
         bytes: &[u8],
     ) -> Result<Vec<u8>, MessageSignatureError> {
         ssi_jws::sign_bytes(Algorithm::EdBlake2b, bytes, key)

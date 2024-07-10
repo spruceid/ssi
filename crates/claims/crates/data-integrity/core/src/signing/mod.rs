@@ -1,5 +1,8 @@
 use ssi_claims_core::{ProofValidationError, SignatureError};
-use ssi_jwk::algorithm;
+use ssi_crypto::{
+    algorithm::{self, Algorithm, SignatureAlgorithmType},
+    AlgorithmInstance,
+};
 
 mod jws;
 pub use jws::*;
@@ -30,15 +33,30 @@ impl From<AlgorithmSelectionError> for ProofValidationError {
     }
 }
 
-pub trait AlgorithmSelection<M, O>: Sized {
+pub trait AlgorithmSelection<M, O>: SignatureAlgorithmType {
     fn select_algorithm(
         verification_method: &M,
         options: &O,
-    ) -> Result<Self, AlgorithmSelectionError>;
+    ) -> Result<Self::Instance, AlgorithmSelectionError>;
 }
 
 impl<M: ssi_verification_methods_core::JwkVerificationMethod, O> AlgorithmSelection<M, O>
-    for algorithm::Algorithm
+    for Algorithm
+{
+    fn select_algorithm(
+        verification_method: &M,
+        _options: &O,
+    ) -> Result<AlgorithmInstance, AlgorithmSelectionError> {
+        verification_method
+            .to_jwk()
+            .get_algorithm()
+            .ok_or(AlgorithmSelectionError::MissingAlgorithm)
+            .map(Into::into)
+    }
+}
+
+impl<M: ssi_verification_methods_core::JwkVerificationMethod, O> AlgorithmSelection<M, O>
+    for ssi_jwk::Algorithm
 {
     fn select_algorithm(
         verification_method: &M,

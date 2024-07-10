@@ -16,7 +16,7 @@ thiserror.workspace = true
 keccak-hash = "0.7"
 hex.workspace = true
 rdf-types.workspace = true
-indexmap = { version = "2.0.0", features = ["serde"] }
+indexmap = { workspace = true, features = ["serde"] }
 json-syntax = { workspace = true, features = ["serde"] }
 linked-data.workspace = true
 iref.workspace = true

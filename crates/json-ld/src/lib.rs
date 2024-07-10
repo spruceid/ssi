@@ -1,22 +1,19 @@
 //! Linked-Data types.
-mod context;
-
 use std::{borrow::Cow, hash::Hash};
 
-pub use context::*;
 use json_ld::expansion::Action;
-use json_ld::Expand;
 use linked_data::{LinkedData, LinkedDataResource, LinkedDataSubject};
 
 pub use json_ld;
-pub use json_ld::{
-    syntax, Direction, ExpandedDocument, Id, LangString, LenientLangTag, LoadError, Loader,
-    Nullable, ToRdfError,
-};
+pub use json_ld::*;
+use serde::{Deserialize, Serialize};
 use ssi_rdf::{
     generator, interpretation::WithGenerator, Interpretation, LdEnvironment, Vocabulary,
     VocabularyMut,
 };
+
+mod contexts;
+pub use contexts::*;
 
 /// Type that provides a JSON-LD document loader.
 pub trait JsonLdLoaderProvider {
@@ -43,6 +40,8 @@ pub enum JsonLdError {
 }
 
 #[repr(transparent)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(transparent)]
 pub struct CompactJsonLd(pub json_syntax::Value);
 
 impl CompactJsonLd {
@@ -132,6 +131,14 @@ pub trait JsonLdObject {
     /// Returns the JSON-LD context attached to `self`.
     fn json_ld_context(&self) -> Option<Cow<json_ld::syntax::Context>> {
         None
+    }
+}
+
+impl JsonLdObject for CompactJsonLd {
+    fn json_ld_context(&self) -> Option<Cow<json_ld::syntax::Context>> {
+        json_syntax::from_value(self.0.as_object()?.get("@context").next()?.clone())
+            .map(Cow::Owned)
+            .ok()
     }
 }
 

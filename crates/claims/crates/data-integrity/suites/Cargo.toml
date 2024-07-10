@@ -91,6 +91,9 @@ solana = ["ssi-verification-methods/solana", "k256"]
 ##   - `Eip712Signature2021` (requires `eip712`)
 ethereum = ["serde_json"]
 
+## BBS cryptographic suites.
+bbs = ["ssi-verification-methods/bbs"]
+
 [dependencies]
 ssi-data-integrity-core.workspace = true
 ssi-verification-methods.workspace = true
@@ -127,6 +130,8 @@ futures.workspace = true
 self_cell = "1.0.1"
 contextual.workspace = true
 lazy_static.workspace = true
+rand.workspace = true
+getrandom.workspace = true
 
 bs58 = { workspace = true, optional = true }
 base64.workspace = true
@@ -137,18 +142,27 @@ p256 = { workspace = true, optional = true, features = ["ecdsa"] }
 p384 = { workspace = true, optional = true, features = ["ecdsa"] }
 sha2 = { workspace = true, optional = true }
 
-# only needed by non LD suites and EIP-712.
+# only needed by non LD suites, EIP-712 and BBS.
 json-syntax = { workspace = true, features = ["canonicalize"] }
 serde_json = { workspace = true, optional = true }
 serde_jcs = { workspace = true, optional = true }
 
+# BBS
+ssi-di-sd-primitives.workspace = true
+ssi-bbs.workspace = true
+hmac = "0.12.1"
+serde_cbor = "0.11.2"
+# rand_chacha.workspace = true
+
 [dev-dependencies]
 async-std = { version = "1.9", features = ["attributes"] }
-serde_json.workspace = true
+serde_json = { workspace = true, features = ["arbitrary_precision"] }
 static-iref.workspace = true
 rand = "0.7"
 hashbrown = "0.13.0"
 iref = { workspace = true, features = ["hashbrown"] }
+ssi-vc.workspace = true
+nquads-syntax.workspace = true
 
 [package.metadata.docs.rs]
 all-features = true

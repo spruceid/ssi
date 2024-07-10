@@ -1,6 +1,7 @@
 use std::borrow::Cow;
 
-use ssi_claims_core::SignatureError;
+use ssi_claims_core::{MessageSignatureError, SignatureError};
+use ssi_crypto::algorithm::SignatureAlgorithmType;
 use ssi_verification_methods::{protocol::WithProtocol, VerificationMethod};
 
 use crate::AnyProtocol;
@@ -29,105 +30,131 @@ where
 
 pub struct AnyMessageSigner<S>(pub S);
 
-impl<S, A> ssi_verification_methods::MessageSigner<A> for AnyMessageSigner<S>
+impl<S, A: SignatureAlgorithmType> ssi_verification_methods::MessageSigner<A>
+    for AnyMessageSigner<S>
 where
     S: ssi_verification_methods::MessageSigner<AnySignatureAlgorithm>,
-    A: IntoAnySignatureAlgorithm,
+    A::Instance: IntoAnySignatureAlgorithm,
 {
     async fn sign(
         self,
-        algorithm: A,
+        algorithm: A::Instance,
         message: &[u8],
-    ) -> Result<Vec<u8>, ssi_verification_methods::MessageSignatureError> {
+    ) -> Result<Vec<u8>, MessageSignatureError> {
         self.0
             .sign(algorithm.into_any_signature_algorithm(), message)
             .await
     }
+
+    async fn sign_multi(
+        self,
+        algorithm: <A as SignatureAlgorithmType>::Instance,
+        messages: &[Vec<u8>],
+    ) -> Result<Vec<u8>, MessageSignatureError> {
+        self.0
+            .sign_multi(algorithm.into_any_signature_algorithm(), messages)
+            .await
+    }
 }
 
-pub type AnySignatureAlgorithm = WithProtocol<ssi_jwk::Algorithm, AnyProtocol>;
+pub type AnySignatureAlgorithm = WithProtocol<ssi_crypto::Algorithm, AnyProtocol>;
+
+pub type AnySignatureAlgorithmInstance = WithProtocol<ssi_crypto::AlgorithmInstance, AnyProtocol>;
 
 pub trait IntoAnySignatureAlgorithm {
-    fn into_any_signature_algorithm(self) -> AnySignatureAlgorithm;
+    fn into_any_signature_algorithm(self) -> AnySignatureAlgorithmInstance;
 }
 
 impl IntoAnySignatureAlgorithm for ssi_jwk::Algorithm {
-    fn into_any_signature_algorithm(self) -> AnySignatureAlgorithm {
+    fn into_any_signature_algorithm(self) -> AnySignatureAlgorithmInstance {
+        WithProtocol(self.into(), AnyProtocol::None)
+    }
+}
+
+impl IntoAnySignatureAlgorithm for ssi_crypto::AlgorithmInstance {
+    fn into_any_signature_algorithm(self) -> AnySignatureAlgorithmInstance {
         WithProtocol(self, AnyProtocol::None)
     }
 }
 
-impl IntoAnySignatureAlgorithm for ssi_jwk::algorithm::RS256 {
-    fn into_any_signature_algorithm(self) -> AnySignatureAlgorithm {
+impl IntoAnySignatureAlgorithm for ssi_crypto::algorithm::RS256 {
+    fn into_any_signature_algorithm(self) -> AnySignatureAlgorithmInstance {
         WithProtocol(self.into(), AnyProtocol::None)
     }
 }
 
-impl IntoAnySignatureAlgorithm for ssi_jwk::algorithm::ES256 {
-    fn into_any_signature_algorithm(self) -> AnySignatureAlgorithm {
+impl IntoAnySignatureAlgorithm for ssi_crypto::algorithm::ES256 {
+    fn into_any_signature_algorithm(self) -> AnySignatureAlgorithmInstance {
         WithProtocol(self.into(), AnyProtocol::None)
     }
 }
 
-impl IntoAnySignatureAlgorithm for ssi_jwk::algorithm::ES256K {
-    fn into_any_signature_algorithm(self) -> AnySignatureAlgorithm {
+impl IntoAnySignatureAlgorithm for ssi_crypto::algorithm::ES256K {
+    fn into_any_signature_algorithm(self) -> AnySignatureAlgorithmInstance {
         WithProtocol(self.into(), AnyProtocol::None)
     }
 }
 
-impl IntoAnySignatureAlgorithm for ssi_jwk::algorithm::ES256KR {
-    fn into_any_signature_algorithm(self) -> AnySignatureAlgorithm {
+impl IntoAnySignatureAlgorithm for ssi_crypto::algorithm::ES256KR {
+    fn into_any_signature_algorithm(self) -> AnySignatureAlgorithmInstance {
         WithProtocol(self.into(), AnyProtocol::None)
     }
 }
 
-impl IntoAnySignatureAlgorithm for ssi_jwk::algorithm::AnyESKeccakK {
-    fn into_any_signature_algorithm(self) -> AnySignatureAlgorithm {
+impl IntoAnySignatureAlgorithm for ssi_crypto::algorithm::AnyESKeccakK {
+    fn into_any_signature_algorithm(self) -> AnySignatureAlgorithmInstance {
         WithProtocol(self.into(), AnyProtocol::None)
     }
 }
 
-impl IntoAnySignatureAlgorithm for ssi_jwk::algorithm::EdDSA {
-    fn into_any_signature_algorithm(self) -> AnySignatureAlgorithm {
+impl IntoAnySignatureAlgorithm for ssi_crypto::algorithm::EdDSA {
+    fn into_any_signature_algorithm(self) -> AnySignatureAlgorithmInstance {
         WithProtocol(self.into(), AnyProtocol::None)
     }
 }
 
-impl IntoAnySignatureAlgorithm for ssi_jwk::algorithm::EdBlake2b {
-    fn into_any_signature_algorithm(self) -> AnySignatureAlgorithm {
+impl IntoAnySignatureAlgorithm for ssi_crypto::algorithm::EdBlake2b {
+    fn into_any_signature_algorithm(self) -> AnySignatureAlgorithmInstance {
         WithProtocol(self.into(), AnyProtocol::None)
     }
 }
 
-impl IntoAnySignatureAlgorithm for ssi_jwk::algorithm::ESBlake2b {
-    fn into_any_signature_algorithm(self) -> AnySignatureAlgorithm {
+impl IntoAnySignatureAlgorithm for ssi_crypto::algorithm::ESBlake2b {
+    fn into_any_signature_algorithm(self) -> AnySignatureAlgorithmInstance {
         WithProtocol(self.into(), AnyProtocol::None)
     }
 }
 
 #[cfg(all(feature = "w3c", any(feature = "secp256r1", feature = "secp384r1")))]
 impl IntoAnySignatureAlgorithm for ssi_data_integrity_suites::ecdsa_rdfc_2019::ES256OrES384 {
-    fn into_any_signature_algorithm(self) -> AnySignatureAlgorithm {
+    fn into_any_signature_algorithm(self) -> AnySignatureAlgorithmInstance {
+        WithProtocol(self.into(), AnyProtocol::None)
+    }
+}
+
+#[cfg(all(feature = "w3c", feature = "bbs"))]
+impl IntoAnySignatureAlgorithm for ssi_crypto::algorithm::BbsInstance {
+    fn into_any_signature_algorithm(self) -> AnySignatureAlgorithmInstance {
         WithProtocol(self.into(), AnyProtocol::None)
     }
 }
 
 #[cfg(feature = "tezos")]
 impl IntoAnySignatureAlgorithm
-    for WithProtocol<ssi_jwk::algorithm::AnyBlake2b, ssi_data_integrity_suites::TezosWallet>
+    for WithProtocol<ssi_crypto::algorithm::AnyBlake2b, ssi_data_integrity_suites::TezosWallet>
 {
-    fn into_any_signature_algorithm(self) -> AnySignatureAlgorithm {
+    fn into_any_signature_algorithm(self) -> AnySignatureAlgorithmInstance {
         WithProtocol(self.0.into(), self.1.into())
     }
 }
 
 impl IntoAnySignatureAlgorithm
     for WithProtocol<
-        ssi_jwk::algorithm::AnyESKeccakK,
+        ssi_crypto::algorithm::AnyESKeccakK,
         ssi_verification_methods::protocol::EthereumWallet,
     >
 {
-    fn into_any_signature_algorithm(self) -> AnySignatureAlgorithm {
+    fn into_any_signature_algorithm(self) -> AnySignatureAlgorithmInstance {
         WithProtocol(self.0.into(), self.1.into())
     }
 }
@@ -136,8 +163,8 @@ impl IntoAnySignatureAlgorithm
 impl IntoAnySignatureAlgorithm
     for WithProtocol<ssi_jwk::Algorithm, ssi_verification_methods::protocol::Base58Btc>
 {
-    fn into_any_signature_algorithm(self) -> AnySignatureAlgorithm {
-        WithProtocol(self.0, self.1.into())
+    fn into_any_signature_algorithm(self) -> AnySignatureAlgorithmInstance {
+        WithProtocol(self.0.into(), self.1.into())
     }
 }
 
@@ -145,7 +172,7 @@ impl IntoAnySignatureAlgorithm
 impl IntoAnySignatureAlgorithm
     for WithProtocol<ssi_jwk::Algorithm, ssi_verification_methods::protocol::Base58BtcMultibase>
 {
-    fn into_any_signature_algorithm(self) -> AnySignatureAlgorithm {
-        WithProtocol(self.0, self.1.into())
+    fn into_any_signature_algorithm(self) -> AnySignatureAlgorithmInstance {
+        WithProtocol(self.0.into(), self.1.into())
     }
 }

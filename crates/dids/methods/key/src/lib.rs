@@ -17,21 +17,6 @@ use ssi_multicodec::MultiEncodedBuf;
 use static_iref::{iri, iri_ref};
 use std::collections::BTreeMap;
 
-#[derive(Debug, thiserror::Error)]
-pub enum GenerateError {
-    #[error("missing curve")]
-    MissingCurve,
-
-    #[error("unsupported curve `{0}`")]
-    UnsupportedCurve(String),
-
-    #[error("unsupported key type")]
-    UnsupportedKeyType,
-
-    #[error("invalid input key")]
-    InvalidInputKey,
-}
-
 /// The did:key Method v0.7.
 ///
 /// See: <https://w3c-ccg.github.io/did-method-key>
@@ -39,92 +24,21 @@ pub struct DIDKey;
 
 impl DIDKey {
     pub fn generate(jwk: &JWK) -> Result<DIDBuf, GenerateError> {
-        use ssi_jwk::Params;
-        let id = match jwk.params {
-            Params::OKP(ref params) => match &params.curve[..] {
-                "Ed25519" => multibase::encode(
-                    multibase::Base::Base58Btc,
-                    MultiEncodedBuf::encode(ssi_multicodec::ED25519_PUB, &params.public_key.0)
-                        .into_bytes(),
-                ),
-                "Bls12381G2" => multibase::encode(
-                    multibase::Base::Base58Btc,
-                    MultiEncodedBuf::encode(ssi_multicodec::BLS12_381_G2_PUB, &params.public_key.0)
-                        .into_bytes(),
-                ),
-                _ => return Err(GenerateError::UnsupportedCurve(params.curve.clone())),
-            },
-            Params::EC(ref params) => {
-                let curve = match params.curve {
-                    Some(ref curve) => curve,
-                    None => return Err(GenerateError::MissingCurve),
-                };
-
-                match curve.as_str() {
-                    #[cfg(feature = "secp256k1")]
-                    "secp256k1" => {
-                        use k256::elliptic_curve::sec1::ToEncodedPoint;
-                        let pk = match k256::PublicKey::try_from(params) {
-                            Ok(pk) => pk,
-                            Err(_err) => return Err(GenerateError::InvalidInputKey),
-                        };
-
-                        multibase::encode(
-                            multibase::Base::Base58Btc,
-                            MultiEncodedBuf::encode(
-                                ssi_multicodec::SECP256K1_PUB,
-                                pk.to_encoded_point(true).as_bytes(),
-                            )
-                            .into_bytes(),
-                        )
-                    }
-                    #[cfg(feature = "secp256r1")]
-                    "P-256" => {
-                        use p256::elliptic_curve::sec1::ToEncodedPoint;
-                        let pk = match p256::PublicKey::try_from(params) {
-                            Ok(pk) => pk,
-                            Err(_err) => return Err(GenerateError::InvalidInputKey),
-                        };
-
-                        multibase::encode(
-                            multibase::Base::Base58Btc,
-                            MultiEncodedBuf::encode(
-                                ssi_multicodec::P256_PUB,
-                                pk.to_encoded_point(true).as_bytes(),
-                            )
-                            .into_bytes(),
-                        )
-                    }
-                    #[cfg(feature = "secp384r1")]
-                    "P-384" => {
-                        let pk_bytes = match ssi_jwk::serialize_p384(params) {
-                            Ok(pk) => pk,
-                            Err(_err) => return Err(GenerateError::InvalidInputKey),
-                        };
-
-                        multibase::encode(
-                            multibase::Base::Base58Btc,
-                            MultiEncodedBuf::encode(ssi_multicodec::P384_PUB, &pk_bytes)
-                                .into_bytes(),
-                        )
-                    }
-                    _ => return Err(GenerateError::UnsupportedCurve(curve.to_owned())),
-                }
-            }
-            Params::RSA(ref params) => {
-                let der = simple_asn1::der_encode(&params.to_public())
-                    .map_err(|_| GenerateError::InvalidInputKey)?;
-                multibase::encode(
-                    multibase::Base::Base58Btc,
-                    MultiEncodedBuf::encode(ssi_multicodec::RSA_PUB, &der).into_bytes(),
-                )
-            }
-            _ => return Err(GenerateError::UnsupportedKeyType),
-        };
+        let multi_encoded = jwk.to_multicodec()?;
+        let id = multibase::encode(multibase::Base::Base58Btc, multi_encoded.into_bytes());
 
         Ok(DIDBuf::from_string(format!("did:key:{id}")).unwrap())
     }
+
+    pub fn generate_url(jwk: &JWK) -> Result<DIDURLBuf, GenerateError> {
+        let multi_encoded = jwk.to_multicodec()?;
+        let id = multibase::encode(multibase::Base::Base58Btc, multi_encoded.into_bytes());
+
+        Ok(DIDURLBuf::from_string(format!("did:key:{id}#{id}")).unwrap())
+    }
 }
+
+pub type GenerateError = ssi_jwk::ToMulticodecError;
 
 impl DIDMethod for DIDKey {
     const DID_METHOD_NAME: &'static str = "key";
@@ -199,6 +113,7 @@ impl DIDMethodResolver for DIDKey {
 }
 
 #[derive(Debug, Clone, Copy)]
+#[non_exhaustive]
 pub enum VerificationMethodType {
     Multikey,
     Ed25519VerificationKey2020,
@@ -207,6 +122,7 @@ pub enum VerificationMethodType {
     EcdsaSecp256k1VerificationKey2019,
     EcdsaSecp256r1VerificationKey2019,
     JsonWebKey2020,
+    #[cfg(feature = "bbs")]
     Bls12381G2Key2020,
 }
 
@@ -220,6 +136,7 @@ impl VerificationMethodType {
             "EcdsaSecp256k1VerificationKey2019" => Some(Self::EcdsaSecp256k1VerificationKey2019),
             "EcdsaSecp256r1VerificationKey2019" => Some(Self::EcdsaSecp256r1VerificationKey2019),
             "JsonWebKey2020" => Some(Self::JsonWebKey2020),
+            #[cfg(feature = "bbs")]
             "Bls12381G2Key2020" => Some(Self::Bls12381G2Key2020),
             _ => None,
         }
@@ -234,6 +151,7 @@ impl VerificationMethodType {
             Self::EcdsaSecp256k1VerificationKey2019 => "EcdsaSecp256k1VerificationKey2019",
             Self::EcdsaSecp256r1VerificationKey2019 => "EcdsaSecp256r1VerificationKey2019",
             Self::JsonWebKey2020 => "JsonWebKey2020",
+            #[cfg(feature = "bbs")]
             Self::Bls12381G2Key2020 => "Bls12381G2Key2020",
         }
     }
@@ -281,13 +199,10 @@ impl VerificationMethodType {
                     .map_err(Error::internal)?;
                 Ok(PublicKey::Jwk(Box::new(key)))
             }
+            #[cfg(feature = "bbs")]
             Self::Bls12381G2Key2020 => match encoded.codec() {
                 ssi_multicodec::BLS12_381_G2_PUB => {
-                    let jwk = JWK::from(ssi_jwk::Params::OKP(ssi_jwk::OctetParams {
-                        curve: "Bls12381G2".to_string(),
-                        public_key: ssi_jwk::Base64urlUInt(encoded.data().to_vec()),
-                        private_key: None,
-                    }));
+                    let jwk = ssi_jwk::bls12381g2_parse(encoded.data()).map_err(Error::internal)?;
                     // https://datatracker.ietf.org/doc/html/draft-denhartog-pairing-curves-jose-cose-00#section-3.1.3
                     // FIXME: This should be a base 58 key according to the spec.
                     Ok(PublicKey::Jwk(Box::new(jwk)))
@@ -371,6 +286,7 @@ impl VerificationMethodType {
             Self::JsonWebKey2020 => Some(ContextEntry::IriRef(
                 iri_ref!("https://w3id.org/security/suites/jws-2020/v1").to_owned(),
             )),
+            #[cfg(feature = "bbs")]
             Self::Bls12381G2Key2020 => {
                 let mut definition = Definition::new();
                 definition.bindings.insert(
@@ -569,6 +485,7 @@ mod tests {
         assert_eq!(did1, did);
     }
 
+    #[cfg(feature = "bbs")]
     #[async_std::test]
     async fn from_did_key_bls() {
         // https://w3c-ccg.github.io/did-method-key/#bls-12381
@@ -598,9 +515,10 @@ mod tests {
         // implementations.
         // Related issue: https://github.com/mattrglobal/bls12381-jwk-draft/issues/5
         let key_expected: JWK = serde_json::from_value(serde_json::json!({
-            "kty": "OKP",
-            "crv": "Bls12381G2",
-            "x": "tKWJu0SOY7onl4tEyOOH11XBriQN2JgzV-UmjgBMSsNkcAx3_l97SVYViSDBouTVBkBfrLh33C5icDD-4UEDxNO3Wn1ijMHvn2N63DU4pkezA3kGN81jGbwbrsMPpiOF"
+            "kty": "EC",
+            "crv": "BLS12381G2",
+            "x": "FKWJu0SOY7onl4tEyOOH11XBriQN2JgzV-UmjgBMSsNkcAx3_l97SVYViSDBouTVBkBfrLh33C5icDD-4UEDxNO3Wn1ijMHvn2N63DU4pkezA3kGN81jGbwbrsMPpiOF",
+            "y": "DxwQn0pJ1DsBB8esxf3JvxFzS8BlyJVYvY_-HkYUxI-u6GdOHnMvNVSXKlEGjHw3DyTPeGOZ8KNbh62CaqWGE-4XAm23nzoD5dWg61Nvs5DGV4S4tLPmOXRYgHIPfRdq"
         }))
         .unwrap();
         assert_eq!(key, key_expected);
@@ -705,7 +623,7 @@ mod tests {
         let params = VerificationParameters::from_resolver(&didkey);
 
         let mut rng = rand_chacha::ChaCha8Rng::seed_from_u64(2);
-        let key = JWK::generate_secp256k1_from(&mut rng).unwrap();
+        let key = JWK::generate_secp256k1_from(&mut rng);
         let did = DIDKey::generate(&key).unwrap();
 
         let cred = JsonCredential::new(
@@ -827,7 +745,7 @@ mod tests {
     #[async_std::test]
     #[cfg(feature = "secp256k1")]
     async fn fetch_jwk_secp256k1() {
-        let jwk = JWK::generate_secp256k1().unwrap();
+        let jwk = JWK::generate_secp256k1();
         fetch_jwk(jwk).await;
     }
 
@@ -841,7 +759,7 @@ mod tests {
     #[async_std::test]
     #[cfg(feature = "secp384r1")]
     async fn fetch_jwk_secp384r1() {
-        let jwk = JWK::generate_p384().unwrap();
+        let jwk = JWK::generate_p384();
         fetch_jwk(jwk).await;
     }
 }

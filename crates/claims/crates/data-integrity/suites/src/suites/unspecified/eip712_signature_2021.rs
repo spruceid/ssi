@@ -112,6 +112,7 @@ where
         context: &C,
         data: &T,
         proof_configuration: ProofConfigurationRef<'_, Eip712Signature2021>,
+        _transformation_options: (),
     ) -> Result<ssi_eip712::TypedData, TransformationError> {
         let mut ld = LdEnvironment::default();
 
@@ -242,7 +243,7 @@ impl SignatureAndVerificationAlgorithm for Eip712SignatureAlgorithm {
 
 impl<T> SignatureAlgorithm<Eip712Signature2021, T> for Eip712SignatureAlgorithm
 where
-    T: MessageSigner<ssi_jwk::algorithm::AnyESKeccakK>,
+    T: MessageSigner<ssi_crypto::algorithm::AnyESKeccakK>,
 {
     async fn sign(
         verification_method: &<Eip712Signature2021 as CryptographicSuite>::VerificationMethod,
@@ -281,13 +282,13 @@ verification_method_union! {
 }
 
 impl VerificationMethod {
-    pub fn algorithm(&self) -> ssi_jwk::algorithm::AnyESKeccakK {
+    pub fn algorithm(&self) -> ssi_crypto::algorithm::AnyESKeccakK {
         match self {
             Self::EcdsaSecp256k1VerificationKey2019(_) => {
-                ssi_jwk::algorithm::AnyESKeccakK::ESKeccakK
+                ssi_crypto::algorithm::AnyESKeccakK::ESKeccakK
             }
             Self::Eip712Method2021(_) | Self::EcdsaSecp256k1RecoveryMethod2020(_) => {
-                ssi_jwk::algorithm::AnyESKeccakK::ESKeccakKR
+                ssi_crypto::algorithm::AnyESKeccakK::ESKeccakKR
             }
         }
     }

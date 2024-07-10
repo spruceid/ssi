@@ -1,8 +1,21 @@
 use std::ops::Deref;
 
-pub use unsigned_varint::decode::Error;
+mod codec;
+pub use codec::*;
 
 include!(concat!(env!("OUT_DIR"), "/table.rs"));
+
+#[derive(Debug, Clone, thiserror::Error)]
+pub enum Error {
+    #[error(transparent)]
+    Varint(#[from] unsigned_varint::decode::Error),
+
+    #[error("unexpected codec {0}")]
+    UnexpectedCodec(u64),
+
+    #[error("invalid data")]
+    InvalidData,
+}
 
 /// Multi-encoded byte slice.
 pub struct MultiEncoded([u8]);
@@ -56,6 +69,12 @@ impl MultiEncoded {
     pub fn as_bytes(&self) -> &[u8] {
         &self.0
     }
+
+    #[inline(always)]
+    pub fn decode<T: MultiCodec>(&self) -> Result<T, Error> {
+        let (codec, bytes) = self.parts();
+        T::from_codec_and_bytes(codec, bytes)
+    }
 }
 
 pub struct MultiEncodedBuf(Vec<u8>);
@@ -74,13 +93,18 @@ impl MultiEncodedBuf {
         Ok(Self(bytes))
     }
 
-    pub fn encode(codec: u64, bytes: &[u8]) -> Self {
+    pub fn encode_bytes(codec: u64, bytes: &[u8]) -> Self {
         let mut codec_buffer = [0u8; 10];
         let encoded_codec = unsigned_varint::encode::u64(codec, &mut codec_buffer);
         let mut result = Vec::with_capacity(encoded_codec.len() + bytes.len());
         result.extend(encoded_codec);
         result.extend(bytes);
         Self(result)
+    }
+
+    pub fn encode<T: MultiCodec>(value: &T) -> Self {
+        let (codec, bytes) = value.to_codec_and_bytes();
+        Self::encode_bytes(codec, &bytes)
     }
 
     /// Creates a new multi-encoded slice from the given `bytes` without
@@ -115,5 +139,11 @@ impl Deref for MultiEncodedBuf {
 
     fn deref(&self) -> &Self::Target {
         self.as_multi_encoded()
+    }
+}
+
+impl AsRef<[u8]> for MultiEncodedBuf {
+    fn as_ref(&self) -> &[u8] {
+        self.as_bytes()
     }
 }

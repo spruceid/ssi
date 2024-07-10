@@ -1,13 +1,11 @@
 use iref::{Iri, IriBuf, UriBuf};
 use rdf_types::{Interpretation, Vocabulary};
 use serde::{Deserialize, Serialize};
-use ssi_claims_core::{InvalidProof, ProofValidationError, ProofValidity};
+use ssi_claims_core::{InvalidProof, MessageSignatureError, ProofValidationError, ProofValidity};
 use ssi_jwk::JWK;
 use ssi_multicodec::MultiEncodedBuf;
 use ssi_security::{Multibase, MultibaseBuf};
-use ssi_verification_methods_core::{
-    JwkVerificationMethod, MessageSignatureError, VerificationMethodSet, VerifyBytes,
-};
+use ssi_verification_methods_core::{JwkVerificationMethod, VerificationMethodSet, VerifyBytes};
 use static_iref::iri;
 use std::{borrow::Cow, hash::Hash, str::FromStr};
 
@@ -180,10 +178,10 @@ impl JwkVerificationMethod for EcdsaSecp256r1VerificationKey2019 {
     }
 }
 
-impl VerifyBytes<ssi_jwk::algorithm::ES256> for EcdsaSecp256r1VerificationKey2019 {
+impl VerifyBytes<ssi_crypto::algorithm::ES256> for EcdsaSecp256r1VerificationKey2019 {
     fn verify_bytes(
         &self,
-        _: ssi_jwk::algorithm::ES256,
+        _: ssi_crypto::algorithm::ES256,
         signing_bytes: &[u8],
         signature: &[u8],
     ) -> Result<ProofValidity, ProofValidationError> {

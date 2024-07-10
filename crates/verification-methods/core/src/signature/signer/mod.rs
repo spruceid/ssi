@@ -1,4 +1,5 @@
-use ssi_claims_core::SignatureError;
+use ssi_claims_core::{MessageSignatureError, SignatureError};
+use ssi_crypto::algorithm::SignatureAlgorithmType;
 use ssi_jwk::JWK;
 use std::{borrow::Cow, marker::PhantomData};
 
@@ -32,73 +33,61 @@ impl<'s, M: VerificationMethod, S: Signer<M>> Signer<M> for &'s S {
     }
 }
 
-#[derive(Debug, thiserror::Error)]
-pub enum MessageSignatureError {
-    #[error("0")]
-    SignatureFailed(String),
-
-    #[error("invalid signature client query")]
-    InvalidQuery,
-
-    #[error("invalid signer response")]
-    InvalidResponse,
-
-    #[error("invalid secret key")]
-    InvalidSecretKey,
-
-    #[error("missing signature algorithm")]
-    MissingAlgorithm,
-
-    #[error("unsupported signature algorithm `{0}`")]
-    UnsupportedAlgorithm(String),
-
-    #[error("unsupported verification method `{0}`")]
-    UnsupportedVerificationMethod(String),
-}
-
-impl MessageSignatureError {
-    pub fn signature_failed(e: impl ToString) -> Self {
-        Self::SignatureFailed(e.to_string())
-    }
-}
-
-impl From<ssi_jwk::algorithm::AlgorithmError> for MessageSignatureError {
-    fn from(value: ssi_jwk::algorithm::AlgorithmError) -> Self {
-        match value {
-            ssi_jwk::algorithm::AlgorithmError::Missing => Self::MissingAlgorithm,
-            ssi_jwk::algorithm::AlgorithmError::Unsupported(a) => {
-                Self::UnsupportedAlgorithm(a.to_string())
-            }
-        }
-    }
-}
-
-impl From<ssi_jwk::algorithm::UnsupportedAlgorithm> for MessageSignatureError {
-    fn from(value: ssi_jwk::algorithm::UnsupportedAlgorithm) -> Self {
-        Self::UnsupportedAlgorithm(value.0.to_string())
-    }
-}
-
-impl From<MessageSignatureError> for SignatureError {
-    fn from(value: MessageSignatureError) -> Self {
-        match value {
-            MessageSignatureError::MissingAlgorithm => Self::MissingAlgorithm,
-            MessageSignatureError::UnsupportedAlgorithm(name) => Self::UnsupportedAlgorithm(name),
-            MessageSignatureError::InvalidSecretKey => Self::InvalidSecretKey,
-            other => Self::other(other),
-        }
-    }
-}
-
-pub trait MessageSigner<A> {
+pub trait MessageSigner<A: SignatureAlgorithmType>: Sized {
     #[allow(async_fn_in_trait)]
-    async fn sign(self, algorithm: A, message: &[u8]) -> Result<Vec<u8>, MessageSignatureError>;
+    async fn sign(
+        self,
+        algorithm: A::Instance,
+        message: &[u8],
+    ) -> Result<Vec<u8>, MessageSignatureError>;
+
+    #[allow(async_fn_in_trait)]
+    async fn sign_multi(
+        self,
+        algorithm: A::Instance,
+        messages: &[Vec<u8>],
+    ) -> Result<Vec<u8>, MessageSignatureError> {
+        match messages.split_first() {
+            Some((message, [])) => self.sign(algorithm, message).await,
+            // Some(_) => Err(MessageSignatureError::TooManyMessages),
+            Some(_) => todo!(),
+            None => Err(MessageSignatureError::MissingMessage),
+        }
+    }
 }
 
-impl<A: Into<ssi_jwk::Algorithm>> MessageSigner<A> for JWK {
-    async fn sign(self, algorithm: A, message: &[u8]) -> Result<Vec<u8>, MessageSignatureError> {
-        ssi_jws::sign_bytes(algorithm.into(), message, &self)
+impl<A: SignatureAlgorithmType> MessageSigner<A> for JWK
+where
+    A::Instance: Into<ssi_crypto::AlgorithmInstance>,
+{
+    async fn sign(
+        self,
+        algorithm: A::Instance,
+        message: &[u8],
+    ) -> Result<Vec<u8>, MessageSignatureError> {
+        ssi_jws::sign_bytes(algorithm.into().try_into()?, message, &self)
             .map_err(MessageSignatureError::signature_failed)
+    }
+
+    #[allow(unused_variables)]
+    async fn sign_multi(
+        self,
+        algorithm: <A as SignatureAlgorithmType>::Instance,
+        messages: &[Vec<u8>],
+    ) -> Result<Vec<u8>, MessageSignatureError> {
+        match algorithm.into() {
+            #[cfg(feature = "bbs")]
+            ssi_crypto::AlgorithmInstance::Bbs(bbs) => {
+                let sk: ssi_bbs::BBSplusSecretKey = self
+                    .try_into()
+                    .map_err(|_| MessageSignatureError::InvalidSecretKey)?;
+                let pk = sk.public_key();
+                ssi_bbs::sign(*bbs.0, &sk, &pk, messages)
+            }
+            other => Err(MessageSignatureError::UnsupportedAlgorithm(
+                other.algorithm().to_string(),
+            )),
+        }
     }
 }
 
@@ -118,15 +107,32 @@ impl<S, A> MessageSignerAdapter<S, A> {
     }
 }
 
-impl<S: MessageSigner<A>, A, B> MessageSigner<B> for MessageSignerAdapter<S, A>
+impl<S: MessageSigner<A>, A: SignatureAlgorithmType, B: SignatureAlgorithmType> MessageSigner<B>
+    for MessageSignerAdapter<S, A>
 where
-    A: TryFrom<B>,
+    A::Instance: TryFrom<B::Instance>,
 {
-    async fn sign(self, algorithm: B, message: &[u8]) -> Result<Vec<u8>, MessageSignatureError> {
+    async fn sign(
+        self,
+        algorithm: B::Instance,
+        message: &[u8],
+    ) -> Result<Vec<u8>, MessageSignatureError> {
         let algorithm = algorithm
             .try_into()
             .map_err(|_| MessageSignatureError::InvalidQuery)?;
 
         self.signer.sign(algorithm, message).await
+    }
+
+    async fn sign_multi(
+        self,
+        algorithm: <B as SignatureAlgorithmType>::Instance,
+        messages: &[Vec<u8>],
+    ) -> Result<Vec<u8>, MessageSignatureError> {
+        let algorithm = algorithm
+            .try_into()
+            .map_err(|_| MessageSignatureError::InvalidQuery)?;
+
+        self.signer.sign_multi(algorithm, messages).await
     }
 }

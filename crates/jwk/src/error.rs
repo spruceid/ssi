@@ -136,6 +136,9 @@ pub enum Error {
     /// Error parsing or producing multibase
     #[error(transparent)]
     Multibase(#[from] multibase::Error),
+
+    #[error("Invalid coordinates")]
+    InvalidCoordinates,
 }
 
 #[cfg(feature = "ring")]

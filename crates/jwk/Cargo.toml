@@ -42,6 +42,8 @@ tezos = ["blake2b_simd", "secp256k1", "secp256r1", "bs58"]
 
 ring = ["dep:ring"]
 
+bbs = ["ssi-bbs", "rand"]
+
 [dependencies]
 ssi-claims-core.workspace = true
 num-bigint = "0.4"
@@ -62,6 +64,7 @@ rand = { workspace = true, optional = true }
 ed25519-dalek = { workspace = true, optional = true, features = ["rand_core"] }
 lazy_static = "1.4"
 bs58 = { workspace = true, features = ["check"], optional = true }
+ssi-bbs = { workspace = true, optional = true }
 
 blake2b_simd = { version = "0.5", optional = true }
 multibase = "0.9.1"
@@ -82,7 +85,7 @@ snarkvm-utilities = { version = "0.7.9", optional = true }
 snarkvm-parameters = { version = "0.7.9", optional = true }
 
 [target.'cfg(target_arch = "wasm32")'.dependencies]
-getrandom = { version = "0.2", features = ["js"], optional = true }
+getrandom = { workspace = true, features = ["js"], optional = true }
 
 [dev-dependencies]
 hex.workspace = true

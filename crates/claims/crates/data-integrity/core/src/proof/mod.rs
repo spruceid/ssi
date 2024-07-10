@@ -1,12 +1,14 @@
 use crate::suite::bounds::{OptionsRefOf, SignatureRefOf, VerificationMethodRefOf};
-use crate::suite::{CryptographicSuiteVerification, SerializeCryptographicSuite};
+use crate::suite::{
+    CryptographicSuiteVerification, InputVerificationOptions, SerializeCryptographicSuite,
+};
 use crate::{
     CloneCryptographicSuite, CryptographicSuite, DataIntegrity, DebugCryptographicSuite,
     DeserializeCryptographicSuite,
 };
 use educe::Educe;
 use serde::{Deserialize, Serialize};
-use ssi_claims_core::{AttachProof, ProofValidationError, ProofValidity};
+use ssi_claims_core::{AttachProof, ProofValidationError, ProofValidity, ResourceProvider};
 use ssi_core::{one_or_many::OneOrManyRef, OneOrMany};
 use ssi_verification_methods_core::{ProofPurpose, ReferenceOrOwned};
 use std::collections::BTreeMap;
@@ -221,14 +223,18 @@ impl<S: DebugCryptographicSuite> fmt::Debug for Proof<S> {
 impl<S: CryptographicSuite, T, V> ssi_claims_core::ValidateProof<V, T> for Proof<S>
 where
     S: CryptographicSuiteVerification<T, V>,
+    V: ResourceProvider<InputVerificationOptions<S>>,
 {
     async fn validate_proof<'a>(
         &'a self,
         verifier: &'a V,
         claims: &'a T,
     ) -> Result<ProofValidity, ProofValidationError> {
+        let transformation_options = self
+            .suite()
+            .configure_verification(verifier.get_resource())?;
         self.suite()
-            .verify_proof(verifier, claims, self.borrowed())
+            .verify_proof(verifier, claims, self.borrowed(), transformation_options)
             .await
     }
 }
@@ -324,9 +330,16 @@ impl<S: CryptographicSuite> From<Vec<Proof<S>>> for Proofs<S> {
     }
 }
 
+impl<S: CryptographicSuite> FromIterator<Proof<S>> for Proofs<S> {
+    fn from_iter<T: IntoIterator<Item = Proof<S>>>(iter: T) -> Self {
+        Proofs(Vec::from_iter(iter))
+    }
+}
+
 impl<S: CryptographicSuite, T, V> ssi_claims_core::ValidateProof<V, T> for Proofs<S>
 where
     S: CryptographicSuiteVerification<T, V>,
+    V: ResourceProvider<InputVerificationOptions<S>>,
 {
     async fn validate_proof<'a>(
         &'a self,

@@ -56,6 +56,9 @@ solana = ["ssi-data-integrity/solana", "ssi-verification-methods/solana"]
 # Enables `EthereumPersonalSignature2021`
 ethereum = ["ssi-jws/eip", "ssi-data-integrity/ethereum"]
 
+# Enables `Bbs2023`
+bbs = ["ssi-data-integrity/bbs"]
+
 [dependencies]
 ssi-core.workspace = true
 ssi-crypto.workspace = true

@@ -40,6 +40,7 @@ ssi-ucan = { path = "./crates/ucan", version = "0.2", default-features = false }
 ssi-zcap-ld = { path = "./crates/zcap-ld", version = "0.2", default-features = false }
 ssi-ssh = { path = "./crates/ssh", version = "0.2", default-features = false }
 ssi-status = { path = "./crates/status", version = "0.1", default-features = false }
+ssi-bbs = { path = "./crates/bbs", version = "0.1", default-features = false }
 
 # Verifiable Claims
 ssi-claims-core = { path = "./crates/claims/core", version = "0.1", default-features = false }
@@ -48,6 +49,7 @@ ssi-jwt = { path = "./crates/claims/crates/jwt", version = "0.2", default-featur
 ssi-sd-jwt = { path = "./crates/claims/crates/sd-jwt", version = "0.2", default-features = false }
 ssi-vc = { path = "./crates/claims/crates/vc", version = "0.3", default-features = false }
 ssi-data-integrity-core = { path = "./crates/claims/crates/data-integrity/core", version = "0.1", default-features = false }
+ssi-di-sd-primitives = { path = "./crates/claims/crates/data-integrity/sd-primitives", version = "0.1", default-features = false }
 ssi-data-integrity-suites = { path = "./crates/claims/crates/data-integrity/suites", version = "0.1", default-features = false }
 ssi-data-integrity = { path = "./crates/claims/crates/data-integrity", version = "0.1", default-features = false }
 ssi-claims = { path = "./crates/claims", version = "0.1", default-features = false }
@@ -64,6 +66,7 @@ did-web = { path = "./crates/dids/methods/web", version = "0.3", default-feature
 ssi-dids = { path = "./crates/dids", version = "0.2", default-features = false }
 
 # crypto
+digest = "0.10"
 k256 = "0.13.1"
 p256 = "0.13.2"
 p384 = "0.13.0"
@@ -72,6 +75,7 @@ blake2 = "0.10"
 sha2 = "0.10.0"
 sha3 = "0.10.8"
 rsa = "0.6"
+zkryptium = "0.2.2" # BBS
 
 # other common dependencies
 log = "0.4.21"
@@ -100,8 +104,11 @@ futures = "0.3.28"
 linked-data = "0.1.2"
 rand = "0.8"
 rand_chacha = "0.3.1"
+getrandom = "0.2"
 contextual = "0.1.6"
 lazy_static = "1.4.0"
+indexmap = "2.0.0"
+uuid = "1.9"
 
 [features]
 default = ["w3c", "rsa", "ed25519", "secp256k1", "secp256r1", "ripemd-160", "eip712"]
@@ -192,7 +199,7 @@ ethereum = ["ssi-claims/ethereum", "ssi-jwk/eip", "ssi-dids/eip"]
 ripemd-160 = ["ssi-jwk/ripemd-160", "ssi-dids/ripemd-160"]
 
 ## Enable bbs.
-bbs = ["ssi-crypto/bbs"]
+bbs = ["ssi-crypto/bbs", "ssi-claims/bbs", "ssi-bbs"]
 
 ## Use the Ring crate for crypto operations
 ring = ["ssi-jwk/ring", "ssi-jws/ring", "ssi-crypto/ring"]
@@ -224,12 +231,13 @@ ssi-ucan.workspace = true
 ssi-zcap-ld.workspace = true
 ssi-multicodec.workspace = true
 ssi-ssh.workspace = true
+ssi-bbs = { workspace = true, optional = true }
 xsd-types.workspace = true # public reexport
 document-features = "0.2"
 
 [dev-dependencies]
 async-std = { workspace = true, features = ["attributes"] }
-uuid = { version = "0.8", features = ["v4", "serde"] }
+uuid = { workspace = true, features = ["v4", "serde"] }
 iref.workspace = true
 static-iref.workspace = true
 serde = { workspace = true, features = ["derive"] }

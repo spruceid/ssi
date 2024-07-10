@@ -6,7 +6,10 @@ use ssi_rdf::{AnyLdEnvironment, LdEnvironment};
 
 use crate::{
     hashing::ConcatOutputSize,
-    suite::standard::{self, HashingAlgorithm, TransformationAlgorithm, TransformationError},
+    suite::{
+        standard::{self, HashingAlgorithm, TransformationAlgorithm, TransformationError},
+        TransformationOptions,
+    },
     CryptographicSuite, ProofConfigurationRef, SerializeCryptographicSuite,
     StandardCryptographicSuite,
 };
@@ -36,6 +39,7 @@ where
         context: &C,
         data: &T,
         proof_configuration: ProofConfigurationRef<'_, S>,
+        _transformation_options: TransformationOptions<S>,
     ) -> Result<Self::Output, TransformationError> {
         let mut ld = LdEnvironment::default();
 

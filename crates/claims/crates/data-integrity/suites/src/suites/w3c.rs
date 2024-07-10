@@ -47,3 +47,8 @@ pub use ecdsa_secp256r1_signature_2019::EcdsaSecp256r1Signature2019;
 
 pub mod json_web_signature_2020;
 pub use json_web_signature_2020::JsonWebSignature2020;
+
+#[cfg(feature = "bbs")]
+pub mod bbs_2023;
+#[cfg(feature = "bbs")]
+pub use bbs_2023::Bbs2023;

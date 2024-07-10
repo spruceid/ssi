@@ -30,7 +30,7 @@ impl StandardCryptographicSuite for Ed25519BLAKE2BDigestSize20Base58CheckEncoded
 
     type VerificationMethod = Ed25519PublicKeyBLAKE2BDigestSize20Base58CheckEncoded2021;
 
-    type SignatureAlgorithm = DetachedJwsRecoverySigning<ssi_jwk::algorithm::EdBlake2b>;
+    type SignatureAlgorithm = DetachedJwsRecoverySigning<ssi_crypto::algorithm::EdBlake2b>;
 
     type ProofOptions = Options;
 

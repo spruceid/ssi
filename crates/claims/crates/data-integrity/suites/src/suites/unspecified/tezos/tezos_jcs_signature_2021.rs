@@ -2,6 +2,7 @@ use iref::Iri;
 use json_syntax::Print;
 use lazy_static::lazy_static;
 use ssi_claims_core::{ProofValidationError, ProofValidity, SignatureError};
+use ssi_crypto::algorithm::AnyBlake2b;
 use ssi_data_integrity_core::{
     suite::{
         standard::{
@@ -12,7 +13,6 @@ use ssi_data_integrity_core::{
     },
     CryptographicSuite, ProofConfigurationRef, ProofRef, StandardCryptographicSuite, TypeRef,
 };
-use ssi_jwk::algorithm::AnyBlake2b;
 use ssi_security::MultibaseBuf;
 use ssi_tzkey::EncodeTezosSignedMessageError;
 use ssi_verification_methods::{protocol::WithProtocol, MessageSigner, TezosMethod2021};

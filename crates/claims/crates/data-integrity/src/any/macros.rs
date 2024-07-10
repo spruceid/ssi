@@ -47,10 +47,10 @@ macro_rules! crypto_suites {
         }
 
         #[allow(unused)]
-        trait Project<S: ssi_data_integrity_core::CryptographicSuite>: ssi_data_integrity_core::CryptographicSuite {
+        pub(crate) trait Project<S: ssi_data_integrity_core::CryptographicSuite>: ssi_data_integrity_core::CryptographicSuite {
             fn project_input_options(
-                options: ssi_data_integrity_core::suite::InputOptions<Self>
-            ) -> Result<ssi_data_integrity_core::suite::InputOptions<S>, ssi_data_integrity_core::suite::ConfigurationError>;
+                options: ssi_data_integrity_core::suite::InputProofOptions<Self>
+            ) -> Result<ssi_data_integrity_core::suite::InputProofOptions<S>, ssi_data_integrity_core::suite::ConfigurationError>;
 
             fn project_prepared_claims(
                 prepared_claims: &Self::PreparedClaims
@@ -63,6 +63,10 @@ macro_rules! crypto_suites {
             fn project_proof(
                 proof: ssi_data_integrity_core::ProofRef<Self>
             ) -> ssi_data_integrity_core::ProofRef<S>;
+
+            fn project_transformation_options(
+                options: AnyTransformationOptions
+            ) -> ssi_data_integrity_core::suite::TransformationOptions<S>;
         }
 
         $(
@@ -122,6 +126,15 @@ macro_rules! crypto_suites {
                         }
                     )
                 }
+
+                fn project_transformation_options(
+                    options: AnyTransformationOptions
+                ) -> ssi_data_integrity_core::suite::TransformationOptions<ssi_data_integrity_suites::$name> {
+                    match options {
+                        AnyTransformationOptions::$name(o) => o,
+                        _ => panic!("malformed `AnySuite` instance")
+                    }
+                }
             }
         )*
 
@@ -131,6 +144,7 @@ macro_rules! crypto_suites {
             C: ssi_json_ld::JsonLdLoaderProvider
                 + ssi_eip712::Eip712TypesLoaderProvider,
             T: serde::Serialize + ssi_json_ld::Expandable + ssi_json_ld::JsonLdNodeObject,
+            T::Expanded<ssi_rdf::LexicalInterpretation, ()>: Into<ssi_json_ld::ExpandedDocument>,
             //
             R: ssi_verification_methods::VerificationMethodResolver<Method = ssi_verification_methods::AnyMethod>,
             S: ssi_verification_methods::Signer<ssi_verification_methods::AnyMethod>,
@@ -143,6 +157,7 @@ macro_rules! crypto_suites {
                 signer: S,
                 claims: &T,
                 proof_configuration: ssi_data_integrity_core::ProofConfigurationRef<'_, Self>,
+                transformation_options: AnyTransformationOptions
             ) -> Result<Self::Signature, ssi_claims_core::SignatureError> {
                 match self {
                     $(
@@ -157,7 +172,8 @@ macro_rules! crypto_suites {
                                 resolver,
                                 signer,
                                 claims,
-                                Self::project_proof_configuration(proof_configuration)
+                                Self::project_proof_configuration(proof_configuration),
+                                <Self as Project<ssi_data_integrity_suites::$name>>::project_transformation_options(transformation_options)
                             ).await.map(AnySignature::$name)
                         },
                     )*
@@ -172,6 +188,7 @@ macro_rules! crypto_suites {
         impl<T, V> ssi_data_integrity_core::suite::CryptographicSuiteVerification<T, V> for AnySuite
         where
             T: serde::Serialize + ssi_json_ld::Expandable + ssi_json_ld::JsonLdNodeObject,
+            T::Expanded<ssi_rdf::LexicalInterpretation, ()>: Into<ssi_json_ld::ExpandedDocument>,
             V: ssi_claims_core::ResolverProvider + ssi_json_ld::JsonLdLoaderProvider + ssi_eip712::Eip712TypesLoaderProvider,
             V::Resolver: ssi_verification_methods::VerificationMethodResolver<Method = ssi_verification_methods::AnyMethod>,
         {
@@ -180,6 +197,7 @@ macro_rules! crypto_suites {
                 verifier: &V,
                 claims: &T,
                 proof: ssi_data_integrity_core::ProofRef<'_, Self>,
+                transformation_options: AnyTransformationOptions
             ) -> Result<ssi_claims_core::ProofValidity, ssi_claims_core::ProofValidationError> {
                 match self {
                     $(
@@ -195,7 +213,8 @@ macro_rules! crypto_suites {
                                 &ssi_data_integrity_suites::$name,
                                 &verifier,
                                 claims,
-                                Self::project_proof(proof)
+                                Self::project_proof(proof),
+                                <Self as Project<ssi_data_integrity_suites::$name>>::project_transformation_options(transformation_options)
                             ).await
                         },
                     )*
@@ -289,7 +308,7 @@ macro_rules! crypto_suites {
             }
         }
 
-        /// Any hashed document.
+        /// Any signature.
         #[derive(Debug, Clone, serde::Serialize)]
         #[serde(untagged)]
         pub enum AnySignature {
@@ -391,14 +410,30 @@ macro_rules! crypto_suites {
             }
         }
 
+        /// Any transformation options.
+        pub enum AnyTransformationOptions {
+            $(
+                $(#[cfg($($t)*)])?
+                $name(ssi_data_integrity_core::suite::TransformationOptions<ssi_data_integrity_suites::$name>),
+            )*
+            Unknown
+        }
+
         pub struct AnyConfigurationAlgorithm;
 
         #[allow(unused_variables)]
         impl ssi_data_integrity_core::suite::ConfigurationAlgorithm<AnySuite> for AnyConfigurationAlgorithm {
             type InputVerificationMethod = ssi_verification_methods::AnyMethod;
             type InputSuiteOptions = crate::AnyInputSuiteOptions;
+            type InputSignatureOptions = AnySignatureOptions;
+            type InputVerificationOptions = ();
+            type TransformationOptions = AnyTransformationOptions;
 
-            fn configure(suite: &AnySuite, options: ssi_data_integrity_core::suite::InputOptions<AnySuite>) -> Result<ssi_data_integrity_core::ProofConfiguration<AnySuite>, ssi_data_integrity_core::suite::ConfigurationError> {
+            fn configure_signature(
+                suite: &AnySuite,
+                options: ssi_data_integrity_core::suite::InputProofOptions<AnySuite>,
+                signature_options: AnySignatureOptions
+            ) -> Result<(ssi_data_integrity_core::ProofConfiguration<AnySuite>, AnyTransformationOptions), ssi_data_integrity_core::suite::ConfigurationError> {
                 match suite {
                     $(
                         $(#[cfg($($t)*)])?
@@ -407,22 +442,44 @@ macro_rules! crypto_suites {
                                 options
                             )?;
 
-                            let proof_configuration = <ssi_data_integrity_suites::$name as ssi_data_integrity_core::CryptographicSuite>::configure(
+                            let (proof_configuration, transformation_options) = <ssi_data_integrity_suites::$name as ssi_data_integrity_core::CryptographicSuite>::configure_signature(
                                 &ssi_data_integrity_suites::$name,
-                                options
+                                options,
+                                signature_options.try_into()?
                             )?;
 
-                            Ok(proof_configuration.map(
+                            Ok((proof_configuration.map(
                                 |_| AnySuite::$name,
                                 |m| AnySuiteVerificationMethod::$name(m),
                                 |o| AnyProofOptions::$name(o)
-                            ))
+                            ), AnyTransformationOptions::$name(transformation_options)))
                         },
                     )*
-                    AnySuite::Unknown(_) => options.map(
-                        |m| AnySuiteVerificationMethod::Unknown(m.into()),
-                        |_| AnyProofOptions::Unknown
-                    ).into_configuration(suite.clone())
+                    AnySuite::Unknown(_) => Ok((
+                        options.map(
+                            |m| AnySuiteVerificationMethod::Unknown(m.into()),
+                            |_| AnyProofOptions::Unknown
+                        ).into_configuration(suite.clone())?,
+                        AnyTransformationOptions::Unknown
+                    ))
+                }
+            }
+
+            fn configure_verification(
+                suite: &AnySuite,
+                verification_options: &()
+            ) -> Result<AnyTransformationOptions, ssi_data_integrity_core::suite::ConfigurationError> {
+                match suite {
+                    $(
+                        $(#[cfg($($t)*)])?
+                        AnySuite::$name => {
+                            <ssi_data_integrity_suites::$name as ssi_data_integrity_core::CryptographicSuite>::configure_verification(
+                                &ssi_data_integrity_suites::$name,
+                                verification_options
+                            ).map(AnyTransformationOptions::$name)
+                        },
+                    )*
+                    AnySuite::Unknown(_) => Ok(AnyTransformationOptions::Unknown)
                 }
             }
         }

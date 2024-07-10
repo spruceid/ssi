@@ -3,9 +3,9 @@ use std::hash::Hash;
 use iref::{Iri, IriBuf, UriBuf};
 use serde::{Deserialize, Serialize};
 use ssi_caips::caip10::BlockchainAccountIdVerifyError;
-use ssi_claims_core::{InvalidProof, ProofValidationError, ProofValidity};
+use ssi_claims_core::{InvalidProof, MessageSignatureError, ProofValidationError, ProofValidity};
 use ssi_jwk::JWK;
-use ssi_verification_methods_core::{MessageSignatureError, VerificationMethodSet};
+use ssi_verification_methods_core::VerificationMethodSet;
 use static_iref::iri;
 
 use crate::{
@@ -111,12 +111,9 @@ impl Eip712Method2021 {
 
         // Check the signing key.
         let jwk = JWK {
-            params: ssi_jwk::Params::EC(
-                ssi_jwk::ECParams::try_from(
-                    &k256::PublicKey::from_sec1_bytes(&recovered_key.to_sec1_bytes()).unwrap(),
-                )
-                .unwrap(),
-            ),
+            params: ssi_jwk::Params::EC(ssi_jwk::ECParams::from(
+                &k256::PublicKey::from_sec1_bytes(&recovered_key.to_sec1_bytes()).unwrap(),
+            )),
             public_key_use: None,
             key_operations: None,
             algorithm: None,
@@ -188,11 +185,11 @@ impl TryFrom<GenericVerificationMethod> for Eip712Method2021 {
     }
 }
 
-impl SigningMethod<JWK, ssi_jwk::algorithm::ESKeccakKR> for Eip712Method2021 {
+impl SigningMethod<JWK, ssi_crypto::algorithm::ESKeccakKR> for Eip712Method2021 {
     fn sign_bytes(
         &self,
         key: &JWK,
-        _algorithm: ssi_jwk::algorithm::ESKeccakKR,
+        _algorithm: ssi_crypto::algorithm::ESKeccakKR,
         bytes: &[u8],
     ) -> Result<Vec<u8>, MessageSignatureError> {
         self.sign_bytes(key, bytes)

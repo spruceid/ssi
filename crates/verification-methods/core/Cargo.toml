@@ -8,6 +8,9 @@ description = "Core traits and types for verification methods in ssi"
 repository = "https://github.com/spruceid/ssi/"
 documentation = "https://docs.rs/ssi-verification-methods/"
 
+[features]
+bbs = ["ssi-jwk/bbs", "ssi-bbs"]
+
 [dependencies]
 ssi-core.workspace = true
 ssi-crypto.workspace = true
@@ -15,6 +18,7 @@ ssi-claims-core.workspace = true
 ssi-jwk.workspace = true
 ssi-jws.workspace = true
 ssi-json-ld.workspace = true
+ssi-bbs = { workspace = true, optional = true }
 serde = { workspace = true, features = ["derive"] }
 serde_json.workspace = true
 iref = { workspace = true, features = ["serde"] }

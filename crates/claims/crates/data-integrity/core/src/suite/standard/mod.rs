@@ -1,7 +1,9 @@
 //! Cryptographic suites.
 use std::borrow::Cow;
 
-use ssi_claims_core::{ProofValidationError, ProofValidity, ResolverProvider, SignatureError};
+use ssi_claims_core::{
+    ProofValidationError, ProofValidity, ResolverProvider, ResourceProvider, SignatureError,
+};
 use ssi_verification_methods_core::{Signer, VerificationMethodResolver, VerificationMethodSet};
 
 use crate::{CryptographicSuite, ProofConfigurationRef, ProofRef, TypeRef};
@@ -18,7 +20,10 @@ pub use signature::*;
 mod verification;
 pub use verification::*;
 
-use super::{ConfigurationAlgorithm, CryptographicSuiteSigning, CryptographicSuiteVerification};
+use super::{
+    ConfigurationAlgorithm, CryptographicSuiteSigning, CryptographicSuiteVerification,
+    InputVerificationOptions, TransformationOptions,
+};
 
 // mod test_bbs;
 
@@ -55,12 +60,19 @@ pub trait StandardCryptographicSuite: Clone {
         &self,
         context: &C,
         unsecured_document: &T,
-        options: ProofConfigurationRef<'_, Self>,
+        proof_configuration: ProofConfigurationRef<'_, Self>,
+        transformation_options: TransformationOptions<Self>,
     ) -> Result<TransformedData<Self>, TransformationError>
     where
         Self::Transformation: TypedTransformationAlgorithm<Self, T, C>,
     {
-        Self::Transformation::transform(context, unsecured_document, options).await
+        Self::Transformation::transform(
+            context,
+            unsecured_document,
+            proof_configuration,
+            transformation_options,
+        )
+        .await
     }
 
     fn hash(
@@ -117,6 +129,7 @@ where
         signers: T,
         claims: &C,
         proof_configuration: ProofConfigurationRef<'_, Self>,
+        transformation_options: TransformationOptions<Self>,
     ) -> Result<Self::Signature, SignatureError> {
         let options = ssi_verification_methods_core::ResolutionOptions {
             accept: Some(Box::new(Self::VerificationMethod::type_set())),
@@ -131,7 +144,9 @@ where
             )
             .await?;
 
-        let transformed = self.transform(context, claims, proof_configuration).await?;
+        let transformed = self
+            .transform(context, claims, proof_configuration, transformation_options)
+            .await?;
 
         let hashed = self.hash(transformed, proof_configuration, &method)?;
 
@@ -147,7 +162,7 @@ where
 
 impl<S: StandardCryptographicSuite, C, V> CryptographicSuiteVerification<C, V> for S
 where
-    V: ResolverProvider,
+    V: ResolverProvider + ResourceProvider<InputVerificationOptions<S>>,
     V::Resolver: VerificationMethodResolver<Method = S::VerificationMethod>,
     S::Transformation: TypedTransformationAlgorithm<Self, C, V>,
     S::SignatureAlgorithm: VerificationAlgorithm<S>,
@@ -157,6 +172,7 @@ where
         verifier: &V,
         claims: &C,
         proof: ProofRef<'_, Self>,
+        transformation_options: TransformationOptions<S>,
     ) -> Result<ProofValidity, ProofValidationError> {
         let options = ssi_verification_methods_core::ResolutionOptions {
             accept: Some(Box::new(Self::VerificationMethod::type_set())),
@@ -171,7 +187,12 @@ where
         let proof_configuration = proof.configuration();
 
         let transformed = self
-            .transform(verifier, claims, proof_configuration)
+            .transform(
+                verifier,
+                claims,
+                proof_configuration,
+                transformation_options,
+            )
             .await?;
 
         let hashed = self.hash(transformed, proof_configuration, &method)?;

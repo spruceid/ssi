@@ -1,7 +1,8 @@
-use std::{borrow::Cow, sync::Arc};
+use std::{borrow::Cow, collections::HashMap, sync::Arc};
 
 use iref::{Iri, IriBuf};
-use ssi_claims_core::{ProofValidationError, SignatureError};
+use ssi_claims_core::{MessageSignatureError, ProofValidationError, SignatureError};
+use ssi_crypto::algorithm::SignatureAlgorithmType;
 use ssi_jwk::JWK;
 use static_iref::iri;
 
@@ -167,20 +168,47 @@ impl<'t, T: VerificationMethodResolver> VerificationMethodResolver for &'t T {
     }
 }
 
-pub trait SigningMethod<S, A: Copy>: VerificationMethod {
-    // fn sign(
-    //     &self,
-    //     secret: &S,
-    //     algorithm: A,
-    //     bytes: &[u8],
-    // ) -> Result<Vec<u8>, MessageSignatureError>;
+impl<M: VerificationMethod> VerificationMethodResolver for HashMap<IriBuf, M> {
+    type Method = M;
 
+    async fn resolve_verification_method_with(
+        &self,
+        _issuer: Option<&Iri>,
+        method: Option<ReferenceOrOwnedRef<'_, Self::Method>>,
+        _options: ResolutionOptions,
+    ) -> Result<Cow<Self::Method>, VerificationMethodResolutionError> {
+        match method {
+            Some(ReferenceOrOwnedRef::Owned(method)) => Ok(Cow::Owned(method.clone())),
+            Some(ReferenceOrOwnedRef::Reference(iri)) => match self.get(iri) {
+                Some(method) => Ok(Cow::Borrowed(method)),
+                None => Err(VerificationMethodResolutionError::UnknownKey),
+            },
+            None => Err(VerificationMethodResolutionError::MissingVerificationMethod),
+        }
+    }
+}
+
+pub trait SigningMethod<S, A: SignatureAlgorithmType>: VerificationMethod {
     fn sign_bytes(
         &self,
         secret: &S,
-        algorithm: A,
+        algorithm: A::Instance,
         bytes: &[u8],
     ) -> Result<Vec<u8>, MessageSignatureError>;
+
+    fn sign_bytes_multi(
+        &self,
+        secret: &S,
+        algorithm: A::Instance,
+        messages: &[Vec<u8>],
+    ) -> Result<Vec<u8>, MessageSignatureError> {
+        match messages.split_first() {
+            Some((message, [])) => self.sign_bytes(secret, algorithm, message),
+            // Some(_) => Err(MessageSignatureError::TooManyMessages),
+            Some(_) => todo!(),
+            None => Err(MessageSignatureError::MissingMessage),
+        }
+    }
 }
 
 pub struct MethodWithSecret<M: VerificationMethod, S> {
@@ -194,9 +222,24 @@ impl<M: VerificationMethod, S> MethodWithSecret<M, S> {
     }
 }
 
-impl<A: Copy, M: SigningMethod<S, A>, S> MessageSigner<A> for MethodWithSecret<M, S> {
-    async fn sign(self, algorithm: A, message: &[u8]) -> Result<Vec<u8>, MessageSignatureError> {
+impl<A: SignatureAlgorithmType, M: SigningMethod<S, A>, S> MessageSigner<A>
+    for MethodWithSecret<M, S>
+{
+    async fn sign(
+        self,
+        algorithm: A::Instance,
+        message: &[u8],
+    ) -> Result<Vec<u8>, MessageSignatureError> {
         self.method.sign_bytes(&self.secret, algorithm, message)
+    }
+
+    async fn sign_multi(
+        self,
+        algorithm: <A as SignatureAlgorithmType>::Instance,
+        messages: &[Vec<u8>],
+    ) -> Result<Vec<u8>, MessageSignatureError> {
+        self.method
+            .sign_bytes_multi(&self.secret, algorithm, messages)
     }
 }
 

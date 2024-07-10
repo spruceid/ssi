@@ -15,16 +15,16 @@ default = ["ed25519", "rsa", "secp256k1", "secp256r1", "secp384r1", "tezos", "ei
 rsa = []
 
 ## enable ed25519 keys
-ed25519 = ["ed25519-dalek", "rand_core", "ssi-jws/ed25519"]
+ed25519 = ["ed25519-dalek", "rand_core", "ssi-jws/ed25519", "ssi-multicodec/ed25519"]
 
 ## enable secp256k1 keys
-secp256k1 = ["k256", "sha2", "ssi-jws/secp256k1"]
+secp256k1 = ["k256", "sha2", "ssi-jws/secp256k1", "ssi-multicodec/k256"]
 
 ## enable secp256r1 (p256) keys
-secp256r1 = ["p256", "ssi-jws/secp256r1"]
+secp256r1 = ["p256", "ssi-jws/secp256r1", "ssi-multicodec/p256"]
 
 ## enable secp384r1 (p384) keys
-secp384r1 = ["p384", "ssi-jws/secp384r1"]
+secp384r1 = ["p384", "ssi-jws/secp384r1", "ssi-multicodec/p384"]
 
 tezos = ["ssi-tzkey", "ssi-caips/tezos"]
 
@@ -37,6 +37,8 @@ aleo = ["ssi-caips/aleo"]
 
 solana = []
 
+bbs = ["ssi-multicodec/bls12-381", "ssi-jwk/bbs", "ssi-bbs", "ssi-verification-methods-core/bbs"]
+
 [dependencies]
 ssi-core.workspace = true
 ssi-crypto.workspace = true
@@ -48,6 +50,7 @@ ssi-claims-core.workspace = true
 ssi-verification-methods-core.workspace = true
 ssi-tzkey = { workspace = true, optional = true }
 ssi-eip712 = { workspace = true, optional = true }
+ssi-bbs = { workspace = true, optional = true }
 serde = { workspace = true, features = ["derive"] }
 serde_json.workspace = true
 json-syntax = { workspace = true, features = ["serde"] }

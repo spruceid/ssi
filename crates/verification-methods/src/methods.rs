@@ -1,10 +1,10 @@
 mod w3c;
 use std::borrow::Cow;
 
+use ssi_claims_core::MessageSignatureError;
 use ssi_jwk::JWK;
 use ssi_verification_methods_core::{
-    GenericVerificationMethod, JwkVerificationMethod, MaybeJwkVerificationMethod,
-    MessageSignatureError, SigningMethod,
+    GenericVerificationMethod, JwkVerificationMethod, MaybeJwkVerificationMethod, SigningMethod,
 };
 pub use w3c::*;
 
@@ -38,7 +38,6 @@ ssi_verification_methods_core::complete_verification_method_union! {
         JsonWebKey2020,
 
         /// `Multikey`.
-        #[cfg(feature = "ed25519")]
         Multikey,
 
         #[cfg(all(feature = "tezos", feature = "ed25519"))]
@@ -82,8 +81,7 @@ impl AnyMethod {
             #[cfg(feature = "secp256r1")]
             Self::EcdsaSecp256r1VerificationKey2019(m) => Some(Cow::Owned(m.public_key_jwk())),
             Self::JsonWebKey2020(m) => Some(Cow::Borrowed(m.public_key_jwk())),
-            #[cfg(feature = "ed25519")]
-            Self::Multikey(m) => Some(Cow::Owned(m.public_key_jwk())),
+            Self::Multikey(m) => m.public_key_jwk().map(Cow::Owned),
             #[cfg(all(feature = "tezos", feature = "ed25519"))]
             Self::Ed25519PublicKeyBLAKE2BDigestSize20Base58CheckEncoded2021(_) => None,
             #[cfg(all(feature = "tezos", feature = "secp256r1"))]
@@ -116,11 +114,11 @@ impl MaybeJwkVerificationMethod for AnyMethod {
     }
 }
 
-impl SigningMethod<JWK, ssi_jwk::Algorithm> for AnyMethod {
+impl SigningMethod<JWK, ssi_crypto::Algorithm> for AnyMethod {
     fn sign_bytes(
         &self,
         secret: &JWK,
-        algorithm: ssi_jwk::Algorithm,
+        algorithm: ssi_crypto::AlgorithmInstance,
         bytes: &[u8],
     ) -> Result<Vec<u8>, MessageSignatureError> {
         match self {
@@ -132,43 +130,52 @@ impl SigningMethod<JWK, ssi_jwk::Algorithm> for AnyMethod {
             }
             #[cfg(feature = "ed25519")]
             Self::Ed25519VerificationKey2020(m) => match algorithm {
-                ssi_jwk::Algorithm::EdDSA => m.sign_bytes(secret, bytes),
+                ssi_crypto::AlgorithmInstance::EdDSA => m.sign_bytes(secret, bytes),
                 _ => Err(MessageSignatureError::UnsupportedAlgorithm(
-                    algorithm.to_string(),
+                    algorithm.algorithm().to_string(),
                 )),
             },
             #[cfg(feature = "secp256k1")]
             Self::EcdsaSecp256k1VerificationKey2019(m) => match algorithm {
-                ssi_jwk::Algorithm::ES256K => m.sign_bytes(
+                ssi_crypto::AlgorithmInstance::ES256K => m.sign_bytes(
                     secret,
                     ecdsa_secp_256k1_verification_key_2019::DigestFunction::Sha256,
                     bytes,
                 ),
                 _ => Err(MessageSignatureError::UnsupportedAlgorithm(
-                    algorithm.to_string(),
+                    algorithm.algorithm().to_string(),
                 )),
             },
             #[cfg(feature = "secp256k1")]
             Self::EcdsaSecp256k1RecoveryMethod2020(m) => match algorithm {
-                ssi_jwk::Algorithm::ES256KR => {
-                    m.sign_bytes(secret, ssi_jwk::algorithm::ES256KR, bytes)
+                ssi_crypto::AlgorithmInstance::ES256KR => {
+                    SigningMethod::<_, ssi_crypto::algorithm::ES256KR>::sign_bytes(
+                        m,
+                        secret,
+                        ssi_crypto::algorithm::ES256KR,
+                        bytes,
+                    )
                 }
-                ssi_jwk::Algorithm::ESKeccakKR => {
-                    m.sign_bytes(secret, ssi_jwk::algorithm::ESKeccakKR, bytes)
+                ssi_crypto::AlgorithmInstance::ESKeccakKR => {
+                    SigningMethod::<_, ssi_crypto::algorithm::ESKeccakKR>::sign_bytes(
+                        m,
+                        secret,
+                        ssi_crypto::algorithm::ESKeccakKR,
+                        bytes,
+                    )
                 }
                 _ => Err(MessageSignatureError::UnsupportedAlgorithm(
-                    algorithm.to_string(),
+                    algorithm.algorithm().to_string(),
                 )),
             },
             #[cfg(feature = "secp256r1")]
             Self::EcdsaSecp256r1VerificationKey2019(m) => match algorithm {
-                ssi_jwk::Algorithm::ES256 => m.sign_bytes(secret, bytes),
+                ssi_crypto::AlgorithmInstance::ES256 => m.sign_bytes(secret, bytes),
                 _ => Err(MessageSignatureError::UnsupportedAlgorithm(
-                    algorithm.to_string(),
+                    algorithm.algorithm().to_string(),
                 )),
             },
-            Self::JsonWebKey2020(m) => m.sign_bytes(secret, Some(algorithm), bytes),
-            #[cfg(feature = "ed25519")]
+            Self::JsonWebKey2020(m) => m.sign_bytes(secret, Some(algorithm.try_into()?), bytes),
             Self::Multikey(m) => m.sign_bytes(secret, algorithm, bytes),
             #[cfg(all(feature = "tezos", feature = "ed25519"))]
             Self::Ed25519PublicKeyBLAKE2BDigestSize20Base58CheckEncoded2021(m) => {
@@ -184,15 +191,31 @@ impl SigningMethod<JWK, ssi_jwk::Algorithm> for AnyMethod {
             Self::AleoMethod2021(m) => {
                 m.sign_bytes(secret, bytes) // FIXME: check key algorithm?
             }
-            Self::BlockchainVerificationMethod2021(m) => m.sign_bytes(secret, algorithm, bytes),
+            Self::BlockchainVerificationMethod2021(m) => {
+                m.sign_bytes(secret, algorithm.try_into()?, bytes)
+            }
             #[cfg(all(feature = "eip712", feature = "secp256k1"))]
             Self::Eip712Method2021(m) => {
                 SigningMethod::sign_bytes(m, secret, algorithm.try_into()?, bytes)
             }
             #[cfg(feature = "solana")]
             Self::SolanaMethod2021(m) => {
-                m.sign_bytes(secret, Some(algorithm), bytes) // FIXME: check algorithm?
+                m.sign_bytes(secret, Some(algorithm.try_into()?), bytes) // FIXME: check algorithm?
             }
+            m => Err(MessageSignatureError::UnsupportedVerificationMethod(
+                m.type_().name().to_owned(),
+            )),
+        }
+    }
+
+    fn sign_bytes_multi(
+        &self,
+        secret: &JWK,
+        algorithm: ssi_crypto::AlgorithmInstance,
+        messages: &[Vec<u8>],
+    ) -> Result<Vec<u8>, MessageSignatureError> {
+        match self {
+            Self::Multikey(m) => m.sign_bytes_multi(secret, algorithm, messages),
             m => Err(MessageSignatureError::UnsupportedVerificationMethod(
                 m.type_().name().to_owned(),
             )),
@@ -257,11 +280,11 @@ impl JwkVerificationMethod for AnyJwkMethod {
     }
 }
 
-impl SigningMethod<JWK, ssi_jwk::Algorithm> for AnyJwkMethod {
+impl SigningMethod<JWK, ssi_crypto::Algorithm> for AnyJwkMethod {
     fn sign_bytes(
         &self,
         secret: &JWK,
-        algorithm: ssi_jwk::Algorithm,
+        algorithm: ssi_crypto::AlgorithmInstance,
         bytes: &[u8],
     ) -> Result<Vec<u8>, MessageSignatureError> {
         match self {
@@ -273,33 +296,33 @@ impl SigningMethod<JWK, ssi_jwk::Algorithm> for AnyJwkMethod {
             }
             #[cfg(feature = "ed25519")]
             Self::Ed25519VerificationKey2020(m) => match algorithm {
-                ssi_jwk::Algorithm::EdDSA => m.sign_bytes(secret, bytes),
+                ssi_crypto::AlgorithmInstance::EdDSA => m.sign_bytes(secret, bytes),
                 _ => Err(MessageSignatureError::UnsupportedAlgorithm(
-                    algorithm.to_string(),
+                    algorithm.algorithm().to_string(),
                 )),
             },
             #[cfg(feature = "secp256k1")]
             Self::EcdsaSecp256k1VerificationKey2019(m) => match algorithm {
-                ssi_jwk::Algorithm::ES256K => m.sign_bytes(
+                ssi_crypto::AlgorithmInstance::ES256K => m.sign_bytes(
                     secret,
                     ecdsa_secp_256k1_verification_key_2019::DigestFunction::Sha256,
                     bytes,
                 ),
                 _ => Err(MessageSignatureError::UnsupportedAlgorithm(
-                    algorithm.to_string(),
+                    algorithm.algorithm().to_string(),
                 )),
             },
             #[cfg(feature = "secp256r1")]
             Self::EcdsaSecp256r1VerificationKey2019(m) => match algorithm {
-                ssi_jwk::Algorithm::ES256 => m.sign_bytes(secret, bytes),
+                ssi_crypto::AlgorithmInstance::ES256 => m.sign_bytes(secret, bytes),
                 _ => Err(MessageSignatureError::UnsupportedAlgorithm(
-                    algorithm.to_string(),
+                    algorithm.algorithm().to_string(),
                 )),
             },
-            Self::JsonWebKey2020(m) => m.sign_bytes(secret, Some(algorithm), bytes),
+            Self::JsonWebKey2020(m) => m.sign_bytes(secret, Some(algorithm.try_into()?), bytes),
             #[cfg(feature = "solana")]
             Self::SolanaMethod2021(m) => {
-                m.sign_bytes(secret, Some(algorithm), bytes) // FIXME: check algorithm?
+                m.sign_bytes(secret, Some(algorithm.try_into()?), bytes) // FIXME: check algorithm?
             }
         }
     }

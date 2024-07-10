@@ -3,25 +3,24 @@
 //! See: <https://w3c-ccg.github.io/ethereum-eip712-signature-2021-spec/>
 use lazy_static::lazy_static;
 use serde::Serialize;
-use ssi_claims_core::{ProofValidationError, ProofValidity, SignatureError};
+use ssi_claims_core::{MessageSignatureError, ProofValidationError, ProofValidity, SignatureError};
+use ssi_crypto::algorithm::{AlgorithmError, AnyESKeccakK};
 use ssi_data_integrity_core::{
     suite::{
         standard::{
             SignatureAlgorithm, SignatureAndVerificationAlgorithm, TransformationAlgorithm,
             TransformationError, TypedTransformationAlgorithm, VerificationAlgorithm,
         },
-        AddProofContext,
+        AddProofContext, TransformationOptions,
     },
     CryptographicSuite, ProofConfigurationRef, ProofRef, SerializeCryptographicSuite,
     StandardCryptographicSuite, TypeRef,
 };
 use ssi_eip712::{Eip712TypesLoaderProvider, TypesLoader, Value};
-use ssi_jwk::algorithm::{AlgorithmError, AnyESKeccakK};
 use ssi_verification_methods::{
     ecdsa_secp_256k1_recovery_method_2020, ecdsa_secp_256k1_verification_key_2019,
     verification_method_union, AnyMethod, EcdsaSecp256k1RecoveryMethod2020,
-    EcdsaSecp256k1VerificationKey2019, InvalidVerificationMethod, JsonWebKey2020,
-    MessageSignatureError, MessageSigner,
+    EcdsaSecp256k1VerificationKey2019, InvalidVerificationMethod, JsonWebKey2020, MessageSigner,
 };
 use static_iref::{iri, iri_ref};
 
@@ -198,7 +197,7 @@ impl VerificationMethod {
             Self::JsonWebKey2020(m) => match m.public_key.algorithm {
                 Some(ssi_jwk::Algorithm::ES256K) => Ok(AnyESKeccakK::ESKeccakK),
                 Some(ssi_jwk::Algorithm::ES256KR) => Ok(AnyESKeccakK::ESKeccakKR),
-                Some(other) => Err(AlgorithmError::Unsupported(other)),
+                Some(other) => Err(AlgorithmError::Unsupported(other.into())),
                 None => Err(AlgorithmError::Missing),
             },
         }
@@ -275,6 +274,7 @@ where
         context: &C,
         data: &T,
         proof_configuration: ProofConfigurationRef<'_, S>,
+        _transformation_options: TransformationOptions<S>,
     ) -> Result<Self::Output, ssi_data_integrity_core::suite::standard::TransformationError> {
         let types = match proof_configuration.options.types() {
             Some(TypesOrURI::Object(types)) => Some(types.clone()),
@@ -319,7 +319,7 @@ impl<S, T> SignatureAlgorithm<S, T> for EthereumEip712SignatureAlgorithm
 where
     S: CryptographicSuite<VerificationMethod = VerificationMethod>,
     S::PreparedClaims: AsRef<[u8]>,
-    T: MessageSigner<ssi_jwk::algorithm::AnyESKeccakK>,
+    T: MessageSigner<ssi_crypto::algorithm::AnyESKeccakK>,
 {
     async fn sign(
         verification_method: &S::VerificationMethod,

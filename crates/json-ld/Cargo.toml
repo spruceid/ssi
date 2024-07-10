@@ -11,13 +11,13 @@ documentation = "https://docs.rs/ssi-json-ld/"
 [dependencies]
 thiserror.workspace = true
 async-std = { version = "1.9", features = ["attributes"] }
-json-ld = { version = "0.20", features = ["serde"] }
+json-ld = { version = "0.21.1", features = ["serde"] }
 iref.workspace = true
 static-iref.workspace = true
 rdf-types.workspace = true
 xsd-types.workspace = true
 locspan.workspace = true
-json-syntax.workspace = true
+json-syntax = { workspace = true, features = ["serde"] }
 linked-data.workspace = true
 futures = "0.3"
 lazy_static = "1.4"

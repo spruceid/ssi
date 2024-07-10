@@ -108,7 +108,7 @@ impl<S, T> SignatureAlgorithm<S, T> for EthereumWalletSigning
 where
     S: CryptographicSuite<VerificationMethod = VerificationMethod>,
     S::PreparedClaims: AsRef<[u8]>,
-    T: MessageSigner<WithProtocol<ssi_jwk::algorithm::AnyESKeccakK, EthereumWallet>>,
+    T: MessageSigner<WithProtocol<ssi_crypto::algorithm::AnyESKeccakK, EthereumWallet>>,
 {
     async fn sign(
         verification_method: &S::VerificationMethod,
@@ -153,13 +153,13 @@ verification_method_union! {
 }
 
 impl VerificationMethod {
-    pub fn algorithm(&self) -> ssi_jwk::algorithm::AnyESKeccakK {
+    pub fn algorithm(&self) -> ssi_crypto::algorithm::AnyESKeccakK {
         match self {
             Self::EcdsaSecp256k1VerificationKey2019(_) => {
-                ssi_jwk::algorithm::AnyESKeccakK::ESKeccakK
+                ssi_crypto::algorithm::AnyESKeccakK::ESKeccakK
             }
             Self::EcdsaSecp256k1RecoveryMethod2020(_) => {
-                ssi_jwk::algorithm::AnyESKeccakK::ESKeccakKR
+                ssi_crypto::algorithm::AnyESKeccakK::ESKeccakKR
             }
         }
     }

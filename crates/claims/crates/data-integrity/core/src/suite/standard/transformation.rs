@@ -2,7 +2,10 @@ use linked_data::IntoQuadsError;
 use serde::Serialize;
 use ssi_claims_core::{ProofValidationError, SignatureError};
 
-use crate::{ConfigurationExpansionError, CryptographicSuite, ProofConfigurationRef};
+use crate::{
+    suite::TransformationOptions, ConfigurationExpansionError, CryptographicSuite,
+    ProofConfigurationRef,
+};
 
 use super::StandardCryptographicSuite;
 
@@ -37,6 +40,10 @@ impl TransformationError {
     pub fn internal(e: impl ToString) -> Self {
         Self::Internal(e.to_string())
     }
+
+    pub fn json_ld_expansion(e: impl ToString) -> Self {
+        Self::JsonLdExpansion(e.to_string())
+    }
 }
 
 impl From<TransformationError> for SignatureError {
@@ -64,7 +71,8 @@ pub trait TypedTransformationAlgorithm<S: CryptographicSuite, T, C>:
     async fn transform(
         context: &C,
         data: &T,
-        options: ProofConfigurationRef<S>,
+        proof_configuration: ProofConfigurationRef<S>,
+        transformation_options: TransformationOptions<S>,
     ) -> Result<Self::Output, TransformationError>;
 }
 
@@ -74,13 +82,14 @@ impl<S: CryptographicSuite> TransformationAlgorithm<S> for JsonObjectTransformat
     type Output = json_syntax::Object;
 }
 
-impl<S: CryptographicSuite, T: Serialize, C> TypedTransformationAlgorithm<S, T, C>
+impl<S: StandardCryptographicSuite, T: Serialize, C> TypedTransformationAlgorithm<S, T, C>
     for JsonObjectTransformation
 {
     async fn transform(
         _context: &C,
         data: &T,
         _options: ProofConfigurationRef<'_, S>,
+        _transformation_options: TransformationOptions<S>,
     ) -> Result<Self::Output, TransformationError> {
         json_syntax::to_value(data)
             .map_err(TransformationError::JsonSerialization)?

@@ -1,0 +1,49 @@
+{
+	"@context": [
+		"https://www.w3.org/ns/credentials/v2",
+		{
+			"@vocab": "https://windsurf.grotto-networking.com/selective#"
+		}
+	],
+	"type": [
+		"VerifiableCredential"
+	],
+	"issuer": "https://vc.example/windsurf/racecommittee",
+	"credentialSubject": {
+		"sailNumber": "Earth101",
+		"sails": [
+			{
+				"size": 5.5,
+				"sailName": "Kihei",
+				"year": 2023
+			},
+			{
+				"size": 6.1,
+				"sailName": "Lahaina",
+				"year": 2023
+			},
+			{
+				"size": 7.0,
+				"sailName": "Lahaina",
+				"year": 2020
+			},
+			{
+				"size": 7.8,
+				"sailName": "Lahaina",
+				"year": 2023
+			}
+		],
+		"boards": [
+			{
+				"boardName": "CompFoil170",
+				"brand": "Wailea",
+				"year": 2022
+			},
+			{
+				"boardName": "Kanaha Custom",
+				"brand": "Wailea",
+				"year": 2019
+			}
+		]
+	}
+}

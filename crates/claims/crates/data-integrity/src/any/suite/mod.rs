@@ -4,7 +4,7 @@ use ssi_eip712::Eip712TypesLoaderProvider;
 use ssi_json_ld::JsonLdLoaderProvider;
 pub use unknown::*;
 
-use crate::{macros, AnyResolver};
+use crate::{macros, AnyResolver, AnySignatureOptions};
 
 mod pick;
 
@@ -59,6 +59,9 @@ macros::crypto_suites! {
 
     #[cfg(all(feature = "w3c", feature = "eip712"))]
     ethereum_eip712_signature_2021_v0_1: EthereumEip712Signature2021v0_1,
+
+    #[cfg(all(feature = "w3c", feature = "bbs"))]
+    bbs_2023: Bbs2023,
 
     /// DIF Ecdsa Secp256k1 Recovery Signature 2020.
     ///
@@ -145,9 +148,9 @@ impl AnyProofOptions {
 }
 
 pub struct AnyVerifier<R, M, L1, L2> {
-    resolver: AnyResolver<R, M>,
-    json_ld_loader: L1,
-    eip712_loader: L2,
+    pub resolver: AnyResolver<R, M>,
+    pub json_ld_loader: L1,
+    pub eip712_loader: L2,
 }
 
 impl<R, M, L1, L2> ResolverProvider for AnyVerifier<R, M, L1, L2> {

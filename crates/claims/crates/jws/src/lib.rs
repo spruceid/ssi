@@ -893,10 +893,10 @@ pub fn recover(algorithm: Algorithm, data: &[u8], signature: &[u8]) -> Result<JW
                 .map_err(ssi_jwk::Error::from)?;
             use ssi_jwk::ECParams;
             let jwk = JWK {
-                params: JWKParams::EC(ECParams::try_from(
+                params: JWKParams::EC(ECParams::from(
                     &k256::PublicKey::from_sec1_bytes(&recovered_key.to_sec1_bytes())
                         .map_err(ssi_jwk::Error::from)?,
-                )?),
+                )),
                 public_key_use: None,
                 key_operations: None,
                 algorithm: None,
@@ -925,10 +925,10 @@ pub fn recover(algorithm: Algorithm, data: &[u8], signature: &[u8]) -> Result<JW
             )
             .map_err(ssi_jwk::Error::from)?;
             use ssi_jwk::ECParams;
-            let jwk = JWK::from(JWKParams::EC(ECParams::try_from(
+            let jwk = JWK::from(JWKParams::EC(ECParams::from(
                 &k256::PublicKey::from_sec1_bytes(&recovered_key.to_sec1_bytes())
                     .map_err(ssi_jwk::Error::from)?,
-            )?));
+            )));
             Ok(jwk)
         }
         _ => {
@@ -1142,7 +1142,7 @@ mod tests {
     #[test]
     #[cfg(feature = "secp256k1")]
     fn secp256k1_sign_verify() {
-        let key = JWK::generate_secp256k1().unwrap();
+        let key = JWK::generate_secp256k1();
         let data = b"asdf";
         let bad_data = b"no";
         let sig = sign_bytes(Algorithm::ES256K, data, &key).unwrap();
@@ -1163,14 +1163,14 @@ mod tests {
         verify_bytes(Algorithm::ES256KR, bad_data, &key, &sig).unwrap_err();
         let recovered_key = recover(Algorithm::ES256KR, data, &sig).unwrap();
         verify_bytes(Algorithm::ES256KR, data, &recovered_key, &sig).unwrap();
-        let other_key = JWK::generate_secp256k1().unwrap();
+        let other_key = JWK::generate_secp256k1();
         verify_bytes(Algorithm::ES256KR, data, &other_key, &sig).unwrap_err();
     }
 
     #[test]
     #[cfg(feature = "eip")]
     fn keccak_sign_verify() {
-        let key = JWK::generate_secp256k1().unwrap();
+        let key = JWK::generate_secp256k1();
         let data = b"asdf";
         let bad_data = b"no";
         // ESKeccakK-R
@@ -1180,7 +1180,7 @@ mod tests {
         };
 
         let sig = sign_bytes(Algorithm::ES256KR, data, &key).unwrap();
-        let other_key = JWK::generate_secp256k1().unwrap();
+        let other_key = JWK::generate_secp256k1();
         // TODO check the error type
         verify_bytes(Algorithm::ESKeccakKR, data, &key, &sig).unwrap_err();
         verify_bytes(Algorithm::ESKeccakKR, bad_data, &key, &sig).unwrap_err();
@@ -1217,7 +1217,7 @@ mod tests {
     #[test]
     #[cfg(feature = "secp384r1")]
     fn p384_sign_verify() {
-        let key = JWK::generate_p384().unwrap();
+        let key = JWK::generate_p384();
         let data = b"asdf";
         let bad_data = b"no";
         let sig = sign_bytes(Algorithm::ES384, data, &key).unwrap();
