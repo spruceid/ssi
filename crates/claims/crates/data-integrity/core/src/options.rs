@@ -13,7 +13,7 @@ pub struct ProofOptions<M, T> {
     pub context: Option<ssi_json_ld::syntax::Context>,
 
     /// Date a creation of the proof.
-    #[serde(default = "created_default", skip_serializing_if = "Option::is_none")]
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub created: Option<xsd_types::DateTime>,
 
     /// Verification method.
@@ -68,10 +68,6 @@ pub struct ProofOptions<M, T> {
     /// Extra properties.
     #[serde(flatten)]
     pub extra_properties: BTreeMap<String, json_syntax::Value>,
-}
-
-fn created_default() -> Option<xsd_types::DateTime> {
-    Some(xsd_types::DateTime::now())
 }
 
 impl<M, T: Default> Default for ProofOptions<M, T> {
