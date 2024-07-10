@@ -13,8 +13,8 @@ pub struct ProofOptions<M, T> {
     pub context: Option<ssi_json_ld::syntax::Context>,
 
     /// Date a creation of the proof.
-    #[serde(default = "xsd_types::DateTime::now")]
-    pub created: xsd_types::DateTime,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub created: Option<xsd_types::DateTime>,
 
     /// Verification method.
     pub verification_method: Option<ReferenceOrOwned<M>>,
@@ -74,7 +74,7 @@ impl<M, T: Default> Default for ProofOptions<M, T> {
     fn default() -> Self {
         Self {
             context: None,
-            created: xsd_types::DateTime::now_ms(),
+            created: Some(xsd_types::DateTime::now_ms()),
             verification_method: None,
             proof_purpose: ProofPurpose::default(),
             expires: None,
@@ -96,7 +96,7 @@ impl<M, T> ProofOptions<M, T> {
     ) -> Self {
         Self {
             context: None,
-            created,
+            created: Some(created),
             verification_method: Some(verification_method),
             proof_purpose,
             expires: None,
@@ -111,7 +111,7 @@ impl<M, T> ProofOptions<M, T> {
     pub fn from_method_and_options(verification_method: ReferenceOrOwned<M>, options: T) -> Self {
         Self {
             context: None,
-            created: xsd_types::DateTime::now_ms(),
+            created: Some(xsd_types::DateTime::now_ms()),
             verification_method: Some(verification_method),
             proof_purpose: ProofPurpose::default(),
             expires: None,

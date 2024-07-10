@@ -73,3 +73,59 @@ pub enum JsonPresentationOrJws<S: CryptographicSuite = data_integrity::AnySuite>
     /// JSON Web Signature.
     Jws(jws::CompactJWSString),
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn accept_proof_without_created_vcdm11_json_ecdsa() {
+        let _: DataIntegrity<vc::AnyJsonCredential, data_integrity::AnySuite> =
+            serde_json::from_value(serde_json::json!({
+              "@context": [
+                "https://www.w3.org/2018/credentials/v1"
+              ],
+              "id": "urn:uuid:36245ee9-9074-4b05-a777-febff2e69757",
+              "type": [
+                "VerifiableCredential",
+              ],
+              "issuer": "did:example:issuer",
+              "credentialSubject": {
+                "id": "urn:uuid:1a0e4ef5-091f-4060-842e-18e519ab9440"
+              },
+              "proof": {
+                "type": "DataIntegrityProof",
+                "verificationMethod": "did:example:issuer#key1",
+                "cryptosuite": "ecdsa-rdfc-2019",
+                "proofPurpose": "assertionMethod",
+                "proofValue": "sdfjlsdjflskdfj"
+              }
+            }))
+            .unwrap();
+    }
+
+    #[test]
+    fn accept_proof_without_created_vcdm2_json_or_jws_bbs() {
+        let _: JsonCredentialOrJws = serde_json::from_value(serde_json::json!({
+          "@context": [
+            "https://www.w3.org/ns/credentials/v2"
+          ],
+          "id": "urn:uuid:36245ee9-9074-4b05-a777-febff2e69757",
+          "type": [
+            "VerifiableCredential",
+          ],
+          "issuer": "did:example:issuer",
+          "credentialSubject": {
+            "id": "urn:uuid:1a0e4ef5-091f-4060-842e-18e519ab9440"
+          },
+          "proof": {
+            "type": "DataIntegrityProof",
+            "verificationMethod": "did:example:issuer#key1",
+            "cryptosuite": "bbs-2023",
+            "proofPurpose": "assertionMethod",
+            "proofValue": "sdfjlsdjflskdfj"
+          }
+        }))
+        .unwrap();
+    }
+}

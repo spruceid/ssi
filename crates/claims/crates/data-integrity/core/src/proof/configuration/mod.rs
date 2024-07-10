@@ -30,7 +30,8 @@ pub struct ProofConfiguration<S: CryptographicSuite> {
     pub type_: S,
 
     /// Date a creation of the proof.
-    pub created: xsd_types::DateTime,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub created: Option<xsd_types::DateTime>,
 
     /// Verification method.
     #[serde(serialize_with = "S::serialize_verification_method_ref")]
@@ -97,7 +98,7 @@ impl<S: CryptographicSuite> ProofConfiguration<S> {
         Self {
             context: None,
             type_,
-            created,
+            created: Some(created),
             verification_method,
             proof_purpose,
             expires: None,
@@ -117,7 +118,7 @@ impl<S: CryptographicSuite> ProofConfiguration<S> {
         Self {
             context: None,
             type_,
-            created: xsd_types::DateTime::now_ms(),
+            created: Some(xsd_types::DateTime::now_ms()),
             verification_method,
             proof_purpose: ProofPurpose::default(),
             expires: None,
