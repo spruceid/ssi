@@ -13,6 +13,12 @@ pub use unspecified::*;
 
 ssi_verification_methods_core::complete_verification_method_union! {
     pub enum AnyMethod, AnyMethodType, AnyMethodTypeRef {
+        /// `Multikey`.
+        Multikey,
+
+        /// `JsonWebKey2020`.
+        JsonWebKey2020,
+
         /// Deprecated verification method for the `RsaSignature2018` suite.
         #[cfg(feature = "rsa")]
         RsaVerificationKey2018,
@@ -33,12 +39,6 @@ ssi_verification_methods_core::complete_verification_method_union! {
 
         #[cfg(feature = "secp256r1")]
         EcdsaSecp256r1VerificationKey2019,
-
-        /// `JsonWebKey2020`.
-        JsonWebKey2020,
-
-        /// `Multikey`.
-        Multikey,
 
         #[cfg(all(feature = "tezos", feature = "ed25519"))]
         Ed25519PublicKeyBLAKE2BDigestSize20Base58CheckEncoded2021,
@@ -176,7 +176,9 @@ impl SigningMethod<JWK, ssi_crypto::Algorithm> for AnyMethod {
                 )),
             },
             Self::JsonWebKey2020(m) => m.sign_bytes(secret, Some(algorithm.try_into()?), bytes),
-            Self::Multikey(m) => m.sign_bytes(secret, algorithm, bytes),
+            Self::Multikey(m) => {
+                SigningMethod::<_, ssi_crypto::Algorithm>::sign_bytes(m, secret, algorithm, bytes)
+            }
             #[cfg(all(feature = "tezos", feature = "ed25519"))]
             Self::Ed25519PublicKeyBLAKE2BDigestSize20Base58CheckEncoded2021(m) => {
                 m.sign_bytes(secret, algorithm.try_into()?, bytes)
@@ -215,7 +217,9 @@ impl SigningMethod<JWK, ssi_crypto::Algorithm> for AnyMethod {
         messages: &[Vec<u8>],
     ) -> Result<Vec<u8>, MessageSignatureError> {
         match self {
-            Self::Multikey(m) => m.sign_bytes_multi(secret, algorithm, messages),
+            Self::Multikey(m) => SigningMethod::<_, ssi_crypto::Algorithm>::sign_bytes_multi(
+                m, secret, algorithm, messages,
+            ),
             m => Err(MessageSignatureError::UnsupportedVerificationMethod(
                 m.type_().name().to_owned(),
             )),
@@ -225,6 +229,9 @@ impl SigningMethod<JWK, ssi_crypto::Algorithm> for AnyMethod {
 
 ssi_verification_methods_core::verification_method_union! {
     pub enum AnyJwkMethod, AnyJwkMethodType {
+        /// `JsonWebKey2020`.
+        JsonWebKey2020,
+
         /// Deprecated verification method for the `RsaSignature2018` suite.
         #[cfg(feature = "rsa")]
         RsaVerificationKey2018,
@@ -243,9 +250,6 @@ ssi_verification_methods_core::verification_method_union! {
         #[cfg(feature = "secp256r1")]
         EcdsaSecp256r1VerificationKey2019,
 
-        /// `JsonWebKey2020`.
-        JsonWebKey2020,
-
         #[cfg(feature = "solana")]
         SolanaMethod2021
     }
@@ -257,6 +261,7 @@ impl AnyJwkMethod {
     /// Some methods don't have any the public key embedded.
     pub fn public_key_jwk(&self) -> Cow<JWK> {
         match self {
+            Self::JsonWebKey2020(m) => Cow::Borrowed(m.public_key_jwk()),
             #[cfg(feature = "rsa")]
             Self::RsaVerificationKey2018(m) => Cow::Borrowed(m.public_key_jwk()),
             #[cfg(feature = "ed25519")]
@@ -267,7 +272,6 @@ impl AnyJwkMethod {
             Self::EcdsaSecp256k1VerificationKey2019(m) => m.public_key_jwk(),
             #[cfg(feature = "secp256r1")]
             Self::EcdsaSecp256r1VerificationKey2019(m) => Cow::Owned(m.public_key_jwk()),
-            Self::JsonWebKey2020(m) => Cow::Borrowed(m.public_key_jwk()),
             #[cfg(feature = "solana")]
             Self::SolanaMethod2021(m) => Cow::Borrowed(m.public_key_jwk()),
         }

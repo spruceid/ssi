@@ -10,6 +10,7 @@ use serde::{Deserialize, Serialize};
 use ssi_claims_core::{
     InvalidProof, MessageSignatureError, ProofValidationError, ProofValidity, SignatureError,
 };
+use ssi_crypto::algorithm::SignatureAlgorithmType;
 use ssi_jwk::JWK;
 use ssi_multicodec::{MultiCodec, MultiEncodedBuf};
 use ssi_security::MultibaseBuf;
@@ -174,14 +175,17 @@ impl<A: Into<ssi_jwk::Algorithm>> VerifyBytes<A> for Multikey {
     }
 }
 
-impl SigningMethod<JWK, ssi_crypto::Algorithm> for Multikey {
+impl<A: SignatureAlgorithmType> SigningMethod<JWK, A> for Multikey
+where
+    A::Instance: Into<ssi_crypto::AlgorithmInstance>,
+{
     fn sign_bytes(
         &self,
         secret: &JWK,
-        algorithm: ssi_crypto::AlgorithmInstance,
+        algorithm: A::Instance,
         bytes: &[u8],
     ) -> Result<Vec<u8>, MessageSignatureError> {
-        ssi_jws::sign_bytes(algorithm.try_into()?, bytes, secret)
+        ssi_jws::sign_bytes(algorithm.into().try_into()?, bytes, secret)
             .map_err(MessageSignatureError::signature_failed)
     }
 
@@ -189,10 +193,10 @@ impl SigningMethod<JWK, ssi_crypto::Algorithm> for Multikey {
     fn sign_bytes_multi(
         &self,
         secret: &JWK,
-        algorithm: ssi_crypto::AlgorithmInstance,
+        algorithm: A::Instance,
         messages: &[Vec<u8>],
     ) -> Result<Vec<u8>, MessageSignatureError> {
-        match algorithm {
+        match algorithm.into() {
             #[cfg(feature = "bbs")]
             ssi_crypto::AlgorithmInstance::Bbs(bbs_algorithm) => {
                 let secret: ssi_bbs::BBSplusSecretKey = secret
