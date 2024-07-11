@@ -1,10 +1,13 @@
 use std::{borrow::Cow, collections::BTreeMap, hash::Hash};
 
 use super::{Context, InternationalString, RelatedResource};
-use crate::syntax::{
-    non_empty_value_or_array, not_null, value_or_array, IdOr, IdentifiedObject,
-    IdentifiedTypedObject, MaybeIdentifiedTypedObject, NonEmptyObject, NonEmptyVec,
-    RequiredContextList, RequiredTypeSet, TypedObject,
+use crate::{
+    syntax::{
+        non_empty_value_or_array, not_null, value_or_array, IdOr, IdentifiedObject,
+        IdentifiedTypedObject, MaybeIdentifiedTypedObject, NonEmptyObject, NonEmptyVec,
+        RequiredContextList, RequiredTypeSet, TypedObject,
+    },
+    Identified, MaybeIdentified, Typed,
 };
 use iref::{Uri, UriBuf};
 use rdf_types::VocabularyMut;
@@ -18,23 +21,35 @@ pub use crate::v1::syntax::{CredentialType, JsonCredentialTypes, VERIFIABLE_CRED
 
 /// JSON Credential, without required context nor type.
 ///
-/// If you care about required context and/or type, use the
-/// [`SpecializedJsonCredential`] type directly.
+/// If you care about required context and/or type, or want to customize other
+/// aspects of the credential, use the [`SpecializedJsonCredential`] type
+/// directly.
 pub type JsonCredential<S = NonEmptyObject> = SpecializedJsonCredential<S>;
 
-/// Specialized JSON Credential with custom required context and type.
+/// Specialized JSON Credential with custom types for each component.
 ///
-/// If you don't care about required context and/or type, you can use the
+/// If you don't care about the type of each component, you can use the
 /// [`JsonCredential`] type alias instead.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(bound(
-    serialize = "S: Serialize",
-    deserialize = "S: Deserialize<'de>, C: RequiredContextList, T: RequiredTypeSet"
+    serialize = "Subject: Serialize, Issuer: Serialize, Status: Serialize, Evidence: Serialize, Schema: Serialize, RefreshService: Serialize, TermsOfUse: Serialize, ExtraProperties: Serialize",
+    deserialize = "Subject: Deserialize<'de>, RequiredContext: RequiredContextList, RequiredType: RequiredTypeSet, Issuer: Deserialize<'de>, Status: Deserialize<'de>, Evidence: Deserialize<'de>, Schema: Deserialize<'de>, RefreshService: Deserialize<'de>, TermsOfUse: Deserialize<'de>, ExtraProperties: Deserialize<'de>"
 ))]
-pub struct SpecializedJsonCredential<S = NonEmptyObject, C = (), T = ()> {
+pub struct SpecializedJsonCredential<
+    Subject = NonEmptyObject,
+    RequiredContext = (),
+    RequiredType = (),
+    Issuer = IdOr<IdentifiedObject>,
+    Status = MaybeIdentifiedTypedObject,
+    Evidence = MaybeIdentifiedTypedObject,
+    Schema = IdentifiedTypedObject,
+    RefreshService = TypedObject,
+    TermsOfUse = MaybeIdentifiedTypedObject,
+    ExtraProperties = BTreeMap<String, json_syntax::Value>,
+> {
     /// JSON-LD context.
     #[serde(rename = "@context")]
-    pub context: Context<C>,
+    pub context: Context<RequiredContext>,
 
     /// Credential identifier.
     #[serde(
@@ -46,15 +61,15 @@ pub struct SpecializedJsonCredential<S = NonEmptyObject, C = (), T = ()> {
 
     /// Credential type.
     #[serde(rename = "type")]
-    pub types: JsonCredentialTypes<T>,
+    pub types: JsonCredentialTypes<RequiredType>,
 
     /// Credential subjects.
     #[serde(rename = "credentialSubject")]
     #[serde(with = "non_empty_value_or_array")]
-    pub credential_subjects: NonEmptyVec<S>,
+    pub credential_subjects: NonEmptyVec<Subject>,
 
     /// Issuer.
-    pub issuer: IdOr<IdentifiedObject>,
+    pub issuer: Issuer,
 
     /// Issuance date.
     #[serde(rename = "validFrom")]
@@ -73,7 +88,7 @@ pub struct SpecializedJsonCredential<S = NonEmptyObject, C = (), T = ()> {
         default,
         skip_serializing_if = "Vec::is_empty"
     )]
-    pub credential_status: Vec<MaybeIdentifiedTypedObject>,
+    pub credential_status: Vec<Status>,
 
     /// Terms of use.
     #[serde(rename = "termsOfUse")]
@@ -82,7 +97,7 @@ pub struct SpecializedJsonCredential<S = NonEmptyObject, C = (), T = ()> {
         default,
         skip_serializing_if = "Vec::is_empty"
     )]
-    pub terms_of_use: Vec<MaybeIdentifiedTypedObject>,
+    pub terms_of_use: Vec<TermsOfUse>,
 
     /// Evidence.
     #[serde(
@@ -90,7 +105,7 @@ pub struct SpecializedJsonCredential<S = NonEmptyObject, C = (), T = ()> {
         default,
         skip_serializing_if = "Vec::is_empty"
     )]
-    pub evidence: Vec<MaybeIdentifiedTypedObject>,
+    pub evidence: Vec<Evidence>,
 
     #[serde(rename = "credentialSchema")]
     #[serde(
@@ -98,7 +113,7 @@ pub struct SpecializedJsonCredential<S = NonEmptyObject, C = (), T = ()> {
         default,
         skip_serializing_if = "Vec::is_empty"
     )]
-    pub credential_schema: Vec<IdentifiedTypedObject>,
+    pub credential_schema: Vec<Schema>,
 
     #[serde(rename = "refreshService")]
     #[serde(
@@ -106,18 +121,46 @@ pub struct SpecializedJsonCredential<S = NonEmptyObject, C = (), T = ()> {
         default,
         skip_serializing_if = "Vec::is_empty"
     )]
-    pub refresh_services: Vec<TypedObject>,
+    pub refresh_services: Vec<RefreshService>,
 
     #[serde(flatten)]
-    pub extra_properties: BTreeMap<String, json_syntax::Value>,
+    pub extra_properties: ExtraProperties,
 }
 
-impl<S, C: RequiredContextList, T: RequiredTypeSet> SpecializedJsonCredential<S, C, T> {
+impl<
+        Subject,
+        RequiredContext,
+        RequiredType,
+        Issuer,
+        Status,
+        Evidence,
+        Schema,
+        RefreshService,
+        TermsOfUse,
+        ExtraProperties,
+    >
+    SpecializedJsonCredential<
+        Subject,
+        RequiredContext,
+        RequiredType,
+        Issuer,
+        Status,
+        Evidence,
+        Schema,
+        RefreshService,
+        TermsOfUse,
+        ExtraProperties,
+    >
+where
+    RequiredContext: RequiredContextList,
+    RequiredType: RequiredTypeSet,
+    ExtraProperties: Default,
+{
     /// Creates a new credential.
     pub fn new(
         id: Option<UriBuf>,
-        issuer: IdOr<IdentifiedObject>,
-        credential_subjects: NonEmptyVec<S>,
+        issuer: Issuer,
+        credential_subjects: NonEmptyVec<Subject>,
     ) -> Self {
         Self {
             context: Context::default(),
@@ -132,24 +175,97 @@ impl<S, C: RequiredContextList, T: RequiredTypeSet> SpecializedJsonCredential<S,
             evidence: Vec::new(),
             credential_schema: Vec::new(),
             refresh_services: Vec::new(),
-            extra_properties: BTreeMap::new(),
+            extra_properties: ExtraProperties::default(),
         }
     }
 }
 
-impl<S, C, T> JsonLdObject for SpecializedJsonCredential<S, C, T> {
+impl<
+        Subject,
+        RequiredContext,
+        RequiredType,
+        Issuer,
+        Status,
+        Evidence,
+        Schema,
+        RefreshService,
+        TermsOfUse,
+        ExtraProperties,
+    > JsonLdObject
+    for SpecializedJsonCredential<
+        Subject,
+        RequiredContext,
+        RequiredType,
+        Issuer,
+        Status,
+        Evidence,
+        Schema,
+        RefreshService,
+        TermsOfUse,
+        ExtraProperties,
+    >
+{
     fn json_ld_context(&self) -> Option<Cow<ssi_json_ld::syntax::Context>> {
         Some(Cow::Borrowed(self.context.as_ref()))
     }
 }
 
-impl<S, C, T> JsonLdNodeObject for SpecializedJsonCredential<S, C, T> {
+impl<
+        Subject,
+        RequiredContext,
+        RequiredType,
+        Issuer,
+        Status,
+        Evidence,
+        Schema,
+        RefreshService,
+        TermsOfUse,
+        ExtraProperties,
+    > JsonLdNodeObject
+    for SpecializedJsonCredential<
+        Subject,
+        RequiredContext,
+        RequiredType,
+        Issuer,
+        Status,
+        Evidence,
+        Schema,
+        RefreshService,
+        TermsOfUse,
+        ExtraProperties,
+    >
+{
     fn json_ld_type(&self) -> JsonLdTypes {
         self.types.to_json_ld_types()
     }
 }
 
-impl<S, C, T, E, P> ValidateClaims<E, P> for SpecializedJsonCredential<S, C, T>
+impl<
+        Subject,
+        RequiredContext,
+        RequiredType,
+        Issuer: Identified,
+        Status: MaybeIdentified + Typed,
+        Evidence: MaybeIdentified + Typed,
+        Schema: Identified + Typed,
+        RefreshService: Typed,
+        TermsOfUse: MaybeIdentified + Typed,
+        ExtraProperties,
+        E,
+        P,
+    > ValidateClaims<E, P>
+    for SpecializedJsonCredential<
+        Subject,
+        RequiredContext,
+        RequiredType,
+        Issuer,
+        Status,
+        Evidence,
+        Schema,
+        RefreshService,
+        TermsOfUse,
+        ExtraProperties,
+    >
 where
     E: DateTimeProvider,
 {
@@ -158,21 +274,69 @@ where
     }
 }
 
-impl<S, C, T> crate::MaybeIdentified for SpecializedJsonCredential<S, C, T> {
+impl<
+        Subject,
+        RequiredContext,
+        RequiredType,
+        Issuer,
+        Status,
+        Evidence,
+        Schema,
+        RefreshService,
+        TermsOfUse,
+        ExtraProperties,
+    > crate::MaybeIdentified
+    for SpecializedJsonCredential<
+        Subject,
+        RequiredContext,
+        RequiredType,
+        Issuer,
+        Status,
+        Evidence,
+        Schema,
+        RefreshService,
+        TermsOfUse,
+        ExtraProperties,
+    >
+{
     fn id(&self) -> Option<&Uri> {
         self.id.as_deref()
     }
 }
 
-impl<S, C, T> crate::v2::Credential for SpecializedJsonCredential<S, C, T> {
-    type Subject = S;
+impl<
+        Subject,
+        RequiredContext,
+        RequiredType,
+        Issuer: Identified,
+        Status: MaybeIdentified + Typed,
+        Evidence: MaybeIdentified + Typed,
+        Schema: Identified + Typed,
+        RefreshService: Typed,
+        TermsOfUse: MaybeIdentified + Typed,
+        ExtraProperties,
+    > crate::v2::Credential
+    for SpecializedJsonCredential<
+        Subject,
+        RequiredContext,
+        RequiredType,
+        Issuer,
+        Status,
+        Evidence,
+        Schema,
+        RefreshService,
+        TermsOfUse,
+        ExtraProperties,
+    >
+{
+    type Subject = Subject;
     type Description = InternationalString;
-    type Issuer = IdOr<IdentifiedObject>;
-    type Status = MaybeIdentifiedTypedObject;
-    type RefreshService = TypedObject;
-    type TermsOfUse = MaybeIdentifiedTypedObject;
-    type Evidence = MaybeIdentifiedTypedObject;
-    type Schema = IdentifiedTypedObject;
+    type Issuer = Issuer;
+    type Status = Status;
+    type RefreshService = RefreshService;
+    type TermsOfUse = TermsOfUse;
+    type Evidence = Evidence;
+    type Schema = Schema;
     type RelatedResource = RelatedResource;
 
     fn additional_types(&self) -> &[String] {
@@ -216,9 +380,39 @@ impl<S, C, T> crate::v2::Credential for SpecializedJsonCredential<S, C, T> {
     }
 }
 
-impl<S, C, T> ssi_json_ld::Expandable for SpecializedJsonCredential<S, C, T>
+impl<
+        Subject,
+        RequiredContext,
+        RequiredType,
+        Issuer,
+        Status,
+        Evidence,
+        Schema,
+        RefreshService,
+        TermsOfUse,
+        ExtraProperties,
+    > ssi_json_ld::Expandable
+    for SpecializedJsonCredential<
+        Subject,
+        RequiredContext,
+        RequiredType,
+        Issuer,
+        Status,
+        Evidence,
+        Schema,
+        RefreshService,
+        TermsOfUse,
+        ExtraProperties,
+    >
 where
-    S: Serialize,
+    Subject: Serialize,
+    Issuer: Serialize,
+    Status: Serialize,
+    Evidence: Serialize,
+    Schema: Serialize,
+    RefreshService: Serialize,
+    TermsOfUse: Serialize,
+    ExtraProperties: Serialize,
 {
     type Error = JsonLdError;
 
