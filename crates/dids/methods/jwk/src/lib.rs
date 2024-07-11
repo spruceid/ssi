@@ -264,11 +264,15 @@ mod tests {
     #[async_std::test]
     async fn from_x25519() {
         let did_url = DIDURL::new(b"did:jwk:eyJrdHkiOiJPS1AiLCJjcnYiOiJYMjU1MTkiLCJ1c2UiOiJlbmMiLCJ4IjoiM3A3YmZYdDl3YlRUVzJIQzdPUTFOei1EUThoYmVHZE5yZngtRkctSUswOCJ9#0").unwrap();
-        let resolved = DIDJWK.dereference(did_url).await.unwrap();
+
+        let mut options = resolution::Options::default();
+        options.parameters.public_key_format = Some("JsonWebKey2020".to_owned());
+
+        let resolved = DIDJWK.dereference_with(did_url, options).await.unwrap();
 
         let vm = resolved.content.as_verification_method().unwrap();
 
-        let public_key = vm.properties.get("publicKeyMultibase").unwrap();
+        let public_key = vm.properties.get("publicKeyJwk").unwrap();
 
         assert_eq!(vm.id, did_url);
         assert_eq!(vm.controller, did_url.did());
@@ -281,7 +285,7 @@ mod tests {
         }))
         .unwrap();
 
-        let expected_public_key = VerificationMethodType::Multikey
+        let expected_public_key = VerificationMethodType::JsonWebKey2020
             .encode_public_key(jwk)
             .unwrap()
             .into_json();
@@ -299,7 +303,7 @@ mod tests {
         }))
         .unwrap();
 
-        let expected_public_key = VerificationMethodType::Multikey
+        let expected_public_key = VerificationMethodType::JsonWebKey2020
             .encode_public_key(jwk.clone())
             .unwrap()
             .into_json();
@@ -308,14 +312,14 @@ mod tests {
         let did = DIDJWK::generate(&jwk);
         assert_eq!(did, expected);
 
-        let resolved = DIDJWK
-            .resolve_with(&did, resolution::Options::default())
-            .await
-            .unwrap();
+        let mut options = resolution::Options::default();
+        options.parameters.public_key_format = Some("JsonWebKey2020".to_owned());
+
+        let resolved = DIDJWK.resolve_with(&did, options).await.unwrap();
 
         let vm = resolved.document.verification_method.first().unwrap();
 
-        let public_key = vm.properties.get("publicKeyMultibase").unwrap();
+        let public_key = vm.properties.get("publicKeyJwk").unwrap();
 
         assert_eq!(*public_key, expected_public_key);
     }
