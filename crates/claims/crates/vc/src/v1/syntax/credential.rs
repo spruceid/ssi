@@ -46,8 +46,8 @@ pub type JsonCredential<S = json_syntax::Object> = SpecializedJsonCredential<S>;
 /// [`JsonCredential`] type alias instead.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(bound(
-    serialize = "Subject: Serialize, Issuer: Serialize, Status: Serialize, Evidence: Serialize, Schema: Serialize, RefreshService: Serialize, TermsOfUse: Serialize",
-    deserialize = "Subject: Deserialize<'de>, RequiredContext: RequiredContextList, RequiredType: RequiredTypeSet, Issuer: Deserialize<'de>, Status: Deserialize<'de>, Evidence: Deserialize<'de>, Schema: Deserialize<'de>, RefreshService: Deserialize<'de>, TermsOfUse: Deserialize<'de>"
+    serialize = "Subject: Serialize, Issuer: Serialize, Status: Serialize, Evidence: Serialize, Schema: Serialize, RefreshService: Serialize, TermsOfUse: Serialize, ExtraProperties: Serialize",
+    deserialize = "Subject: Deserialize<'de>, RequiredContext: RequiredContextList, RequiredType: RequiredTypeSet, Issuer: Deserialize<'de>, Status: Deserialize<'de>, Evidence: Deserialize<'de>, Schema: Deserialize<'de>, RefreshService: Deserialize<'de>, TermsOfUse: Deserialize<'de>, ExtraProperties: Deserialize<'de>"
 ))]
 pub struct SpecializedJsonCredential<
     Subject = json_syntax::Object,
@@ -59,6 +59,7 @@ pub struct SpecializedJsonCredential<
     Schema = IdentifiedTypedObject,
     RefreshService = IdentifiedTypedObject,
     TermsOfUse = MaybeIdentifiedTypedObject,
+    ExtraProperties = BTreeMap<String, json_syntax::Value>,
 > {
     /// JSON-LD context.
     #[serde(rename = "@context")]
@@ -142,7 +143,7 @@ pub struct SpecializedJsonCredential<
     pub refresh_services: Vec<RefreshService>,
 
     #[serde(flatten)]
-    pub additional_properties: BTreeMap<String, json_syntax::Value>,
+    pub additional_properties: ExtraProperties,
 }
 
 impl<
@@ -155,6 +156,7 @@ impl<
         Schema,
         RefreshService,
         TermsOfUse,
+        ExtraProperties,
     >
     SpecializedJsonCredential<
         Subject,
@@ -166,10 +168,12 @@ impl<
         Schema,
         RefreshService,
         TermsOfUse,
+        ExtraProperties,
     >
 where
     RequiredContext: RequiredContextList,
     RequiredType: RequiredTypeSet,
+    ExtraProperties: Default,
 {
     /// Creates a new credential.
     pub fn new(
@@ -191,7 +195,7 @@ where
             evidence: Vec::new(),
             credential_schema: Vec::new(),
             refresh_services: Vec::new(),
-            additional_properties: BTreeMap::new(),
+            additional_properties: ExtraProperties::default(),
         }
     }
 }
@@ -206,6 +210,7 @@ impl<
         Schema,
         RefreshService,
         TermsOfUse,
+        ExtraProperties,
     > JsonLdObject
     for SpecializedJsonCredential<
         Subject,
@@ -217,6 +222,7 @@ impl<
         Schema,
         RefreshService,
         TermsOfUse,
+        ExtraProperties,
     >
 {
     fn json_ld_context(&self) -> Option<Cow<ssi_json_ld::syntax::Context>> {
@@ -234,6 +240,7 @@ impl<
         Schema,
         RefreshService,
         TermsOfUse,
+        ExtraProperties,
     > JsonLdNodeObject
     for SpecializedJsonCredential<
         Subject,
@@ -245,6 +252,7 @@ impl<
         Schema,
         RefreshService,
         TermsOfUse,
+        ExtraProperties,
     >
 {
     fn json_ld_type(&self) -> JsonLdTypes {
@@ -262,6 +270,7 @@ impl<
         Schema: Identified + Typed,
         RefreshService: Identified + Typed,
         TermsOfUse: MaybeIdentified + Typed,
+        ExtraProperties,
         E,
         P,
     > ValidateClaims<E, P>
@@ -275,6 +284,7 @@ impl<
         Schema,
         RefreshService,
         TermsOfUse,
+        ExtraProperties,
     >
 where
     E: DateTimeProvider,
@@ -294,6 +304,7 @@ impl<
         Schema,
         RefreshService,
         TermsOfUse,
+        ExtraProperties,
     > crate::MaybeIdentified
     for SpecializedJsonCredential<
         Subject,
@@ -305,6 +316,7 @@ impl<
         Schema,
         RefreshService,
         TermsOfUse,
+        ExtraProperties,
     >
 {
     fn id(&self) -> Option<&Uri> {
@@ -322,6 +334,7 @@ impl<
         Schema: Identified + Typed,
         RefreshService: Identified + Typed,
         TermsOfUse: MaybeIdentified + Typed,
+        ExtraProperties,
     > crate::v1::Credential
     for SpecializedJsonCredential<
         Subject,
@@ -333,6 +346,7 @@ impl<
         Schema,
         RefreshService,
         TermsOfUse,
+        ExtraProperties,
     >
 {
     type Subject = Subject;
@@ -398,6 +412,7 @@ impl<
         Schema,
         RefreshService,
         TermsOfUse,
+        ExtraProperties,
     > ssi_json_ld::Expandable
     for SpecializedJsonCredential<
         Subject,
@@ -409,6 +424,7 @@ impl<
         Schema,
         RefreshService,
         TermsOfUse,
+        ExtraProperties,
     >
 where
     Subject: Serialize,
@@ -418,6 +434,7 @@ where
     Schema: Serialize,
     RefreshService: Serialize,
     TermsOfUse: Serialize,
+    ExtraProperties: Serialize,
 {
     type Error = JsonLdError;
 
