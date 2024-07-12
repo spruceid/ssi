@@ -29,8 +29,21 @@ pub trait TypeSerializationPolicy {
 /// [`RequiredType`], and more required types given by `T` implementing
 /// [`RequiredTypeSet`].
 #[derive(Educe)]
-#[educe(Debug, Default, Clone)]
+#[educe(Debug, Clone)]
 pub struct Types<B, T = ()>(Vec<String>, PhantomData<(B, T)>);
+
+impl<B, T: RequiredTypeSet> Default for Types<B, T> {
+    fn default() -> Self {
+        Self(
+            T::REQUIRED_TYPES
+                .iter()
+                .copied()
+                .map(ToOwned::to_owned)
+                .collect(),
+            PhantomData,
+        )
+    }
+}
 
 impl<B, T> Types<B, T> {
     pub fn additional_types(&self) -> &[String] {
