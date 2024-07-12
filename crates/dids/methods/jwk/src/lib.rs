@@ -1,5 +1,3 @@
-use std::borrow::Cow;
-
 use ssi_dids_core::{
     document::{
         self,
@@ -8,30 +6,37 @@ use ssi_dids_core::{
         VerificationRelationships,
     },
     resolution::{DIDMethodResolver, Error, Metadata, Options, Output},
-    ssi_json_ld::syntax::ContextEntry,
-    DIDBuf, DIDMethod, DIDURLBuf, Document, RelativeDIDURLBuf, DID, DIDURL,
+    DIDBuf, DIDMethod, DIDURLBuf, Document, RelativeDIDURLBuf,
 };
 use ssi_jwk::JWK;
 use ssi_verification_methods::ProofPurposes;
-use static_iref::iri_ref;
 
-pub const JSON_WEB_KEY_2020_TYPE: &str = "JsonWebKey2020";
+mod vm;
+pub use vm::*;
 
-/// DID version of the `JsonWebKey2020` verification method.
-pub struct DIDJsonWebKey2020 {
+/// Verification method returned by `did:jwk`.
+pub struct VerificationMethod {
+    pub type_: VerificationMethodType,
+
     /// Verification method identifier.
     pub id: DIDURLBuf,
 
     // Key controller.
     pub controller: DIDBuf,
 
-    /// Public key (`publicKeyJwk`).
-    pub public_key: JWK,
+    /// Public key.
+    pub public_key: PublicKey,
 }
 
-impl DIDJsonWebKey2020 {
-    pub fn new(id: DIDURLBuf, controller: DIDBuf, public_key: JWK) -> Self {
+impl VerificationMethod {
+    pub fn new(
+        type_: VerificationMethodType,
+        id: DIDURLBuf,
+        controller: DIDBuf,
+        public_key: PublicKey,
+    ) -> Self {
         Self {
+            type_,
             id,
             controller,
             public_key,
@@ -39,84 +44,19 @@ impl DIDJsonWebKey2020 {
     }
 }
 
-/// Error raised when the conversion to a [`DIDJsonWebKey2020`] failed.
-#[derive(Debug, thiserror::Error)]
-pub enum InvalidJsonWebKey2020 {
-    #[error("invalid type")]
-    InvalidType,
-
-    #[error("missing public key")]
-    MissingPublicKey,
-
-    #[error("invalid public key")]
-    InvalidPublicKey,
-
-    #[error("invalid private key")]
-    PrivateKey,
-}
-
-impl From<DIDJsonWebKey2020> for DIDVerificationMethod {
-    fn from(value: DIDJsonWebKey2020) -> Self {
-        let public_key = serde_json::to_value(&value.public_key).unwrap();
+impl From<VerificationMethod> for DIDVerificationMethod {
+    fn from(value: VerificationMethod) -> Self {
         DIDVerificationMethod::new(
             value.id,
-            JSON_WEB_KEY_2020_TYPE.to_string(),
+            value.type_.name().to_owned(),
             value.controller,
-            [("publicKeyJwk".to_string(), public_key)]
-                .into_iter()
-                .collect(),
+            [(
+                value.public_key.property().to_owned(),
+                value.public_key.into_json(),
+            )]
+            .into_iter()
+            .collect(),
         )
-    }
-}
-
-impl TryFrom<DIDVerificationMethod> for DIDJsonWebKey2020 {
-    type Error = InvalidJsonWebKey2020;
-
-    fn try_from(mut value: DIDVerificationMethod) -> Result<Self, Self::Error> {
-        if value.type_ == "JsonWebKey2020" {
-            match value.properties.remove("publicKeyJwk") {
-                Some(key_value) => match serde_json::from_value(key_value) {
-                    Ok(public_key) => Ok(Self {
-                        id: value.id,
-                        controller: value.controller,
-                        public_key,
-                    }),
-                    Err(_) => Err(InvalidJsonWebKey2020::InvalidPublicKey),
-                },
-                None => Err(InvalidJsonWebKey2020::MissingPublicKey),
-            }
-        } else {
-            Err(InvalidJsonWebKey2020::InvalidType)
-        }
-    }
-}
-
-/// Reference to a `JsonWebKey2020` verification method description.
-pub struct JsonWebKey2020Ref<'a> {
-    pub id: &'a DIDURL,
-    pub controller: &'a DID,
-    pub public_key: Cow<'a, JWK>,
-}
-
-impl<'a> TryFrom<&'a DIDVerificationMethod> for JsonWebKey2020Ref<'a> {
-    type Error = InvalidJsonWebKey2020;
-
-    fn try_from(value: &'a DIDVerificationMethod) -> Result<Self, Self::Error> {
-        if value.type_ == "JsonWebKey2020" {
-            match value.properties.get("publicKeyJwk") {
-                Some(key_value) => match serde_json::from_value(key_value.clone()) {
-                    Ok(public_key) => Ok(Self {
-                        id: &value.id,
-                        controller: &value.controller,
-                        public_key: Cow::Owned(public_key),
-                    }),
-                    Err(_) => Err(InvalidJsonWebKey2020::InvalidPublicKey),
-                },
-                None => Err(InvalidJsonWebKey2020::MissingPublicKey),
-            }
-        } else {
-            Err(InvalidJsonWebKey2020::InvalidType)
-        }
     }
 }
 
@@ -195,11 +135,23 @@ fn resolve_method_representation(
 
     let did = DIDBuf::new(format!("did:jwk:{method_specific_id}").into_bytes()).unwrap();
 
+    let vm_type = match options.parameters.public_key_format {
+        Some(name) => VerificationMethodType::from_name(&name).ok_or_else(|| {
+            Error::Internal(format!(
+                "verification method type `{name}` unsupported by did:jwk"
+            ))
+        })?,
+        None => VerificationMethodType::Multikey,
+    };
+
+    let public_key = vm_type.encode_public_key(jwk)?;
+
     let document = Document {
-        verification_method: vec![DIDJsonWebKey2020::new(
+        verification_method: vec![VerificationMethod::new(
+            vm_type,
             DIDURLBuf::new(format!("did:jwk:{method_specific_id}#0").into_bytes()).unwrap(),
             did.clone(),
-            jwk,
+            public_key,
         )
         .into()],
         verification_relationships: VerificationRelationships::from_reference(
@@ -214,9 +166,7 @@ fn resolve_method_representation(
         || representation::json_ld::Options {
             context: representation::json_ld::Context::array(
                 representation::json_ld::DIDContext::V1,
-                vec![ContextEntry::IriRef(
-                    iri_ref!("https://w3id.org/security/suites/jws-2020/v1").to_owned(),
-                )],
+                vec![vm_type.context_entry()],
             ),
         },
     ));
@@ -231,22 +181,25 @@ fn resolve_method_representation(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use ssi_dids_core::{resolution, DIDResolver};
+    use ssi_dids_core::{resolution, DIDResolver, DIDURL};
 
     #[async_std::test]
     async fn p256_roundtrip() {
         let jwk = JWK::generate_p256();
+
+        let expected_public_key = VerificationMethodType::Multikey
+            .encode_public_key(jwk.clone())
+            .unwrap()
+            .into_json();
+
         let did_url = DIDJWK::generate_url(&jwk);
         let resolved = DIDJWK.dereference(&did_url).await.unwrap();
 
-        let vm: JsonWebKey2020Ref = resolved
-            .content
-            .as_verification_method()
-            .unwrap()
-            .try_into()
-            .unwrap();
+        let vm = resolved.content.as_verification_method().unwrap();
 
-        assert_eq!(*vm.public_key, jwk.to_public());
+        let public_key = vm.properties.get("publicKeyMultibase").unwrap();
+
+        assert_eq!(*public_key, expected_public_key);
     }
 
     #[async_std::test]
@@ -254,12 +207,9 @@ mod tests {
         let did_url = DIDURL::new(b"did:jwk:eyJjcnYiOiJQLTI1NiIsImt0eSI6IkVDIiwieCI6ImFjYklRaXVNczNpOF91c3pFakoydHBUdFJNNEVVM3l6OTFQSDZDZEgyVjAiLCJ5IjoiX0tjeUxqOXZXTXB0bm1LdG00NkdxRHo4d2Y3NEk1TEtncmwyR3pIM25TRSJ9#0").unwrap();
         let resolved = DIDJWK.dereference(did_url).await.unwrap();
 
-        let vm: JsonWebKey2020Ref = resolved
-            .content
-            .as_verification_method()
-            .unwrap()
-            .try_into()
-            .unwrap();
+        let vm = resolved.content.as_verification_method().unwrap();
+
+        let public_key = vm.properties.get("publicKeyMultibase").unwrap();
 
         assert_eq!(vm.id, did_url);
         assert_eq!(vm.controller, did_url.did());
@@ -272,7 +222,12 @@ mod tests {
         }))
         .unwrap();
 
-        assert_eq!(vm.public_key, jwk);
+        let expected_public_key = VerificationMethodType::Multikey
+            .encode_public_key(jwk)
+            .unwrap()
+            .into_json();
+
+        assert_eq!(*public_key, expected_public_key);
     }
 
     #[async_std::test]
@@ -285,6 +240,11 @@ mod tests {
         }))
         .unwrap();
 
+        let expected_public_key = VerificationMethodType::Multikey
+            .encode_public_key(jwk.clone())
+            .unwrap()
+            .into_json();
+
         let expected = "did:jwk:eyJjcnYiOiJQLTI1NiIsImt0eSI6IkVDIiwieCI6ImFjYklRaXVNczNpOF91c3pFakoydHBUdFJNNEVVM3l6OTFQSDZDZEgyVjAiLCJ5IjoiX0tjeUxqOXZXTXB0bm1LdG00NkdxRHo4d2Y3NEk1TEtncmwyR3pIM25TRSJ9";
         let did = DIDJWK::generate(&jwk);
         assert_eq!(did, expected);
@@ -294,28 +254,25 @@ mod tests {
             .await
             .unwrap();
 
-        let vm_method: JsonWebKey2020Ref = resolved
-            .document
-            .verification_method
-            .first()
-            .unwrap()
-            .try_into()
-            .unwrap();
+        let vm = resolved.document.verification_method.first().unwrap();
 
-        assert_eq!(*vm_method.public_key, jwk);
+        let public_key = vm.properties.get("publicKeyMultibase").unwrap();
+
+        assert_eq!(*public_key, expected_public_key);
     }
 
     #[async_std::test]
     async fn from_x25519() {
         let did_url = DIDURL::new(b"did:jwk:eyJrdHkiOiJPS1AiLCJjcnYiOiJYMjU1MTkiLCJ1c2UiOiJlbmMiLCJ4IjoiM3A3YmZYdDl3YlRUVzJIQzdPUTFOei1EUThoYmVHZE5yZngtRkctSUswOCJ9#0").unwrap();
-        let resolved = DIDJWK.dereference(did_url).await.unwrap();
 
-        let vm: JsonWebKey2020Ref = resolved
-            .content
-            .as_verification_method()
-            .unwrap()
-            .try_into()
-            .unwrap();
+        let mut options = resolution::Options::default();
+        options.parameters.public_key_format = Some("JsonWebKey2020".to_owned());
+
+        let resolved = DIDJWK.dereference_with(did_url, options).await.unwrap();
+
+        let vm = resolved.content.as_verification_method().unwrap();
+
+        let public_key = vm.properties.get("publicKeyJwk").unwrap();
 
         assert_eq!(vm.id, did_url);
         assert_eq!(vm.controller, did_url.did());
@@ -327,37 +284,44 @@ mod tests {
             "x": "3p7bfXt9wbTTW2HC7OQ1Nz-DQ8hbeGdNrfx-FG-IK08"
         }))
         .unwrap();
-        assert_eq!(*vm.public_key, jwk);
+
+        let expected_public_key = VerificationMethodType::JsonWebKey2020
+            .encode_public_key(jwk)
+            .unwrap()
+            .into_json();
+
+        assert_eq!(*public_key, expected_public_key);
     }
 
     #[async_std::test]
     async fn to_x25519() {
-        let json = serde_json::json!({
+        let jwk: JWK = serde_json::from_value(serde_json::json!({
             "kty": "OKP",
             "crv": "X25519",
             "use": "enc",
             "x": "3p7bfXt9wbTTW2HC7OQ1Nz-DQ8hbeGdNrfx-FG-IK08"
-        });
+        }))
+        .unwrap();
 
-        let jwk: ssi_jwk::JWK = serde_json::from_value(json).unwrap();
+        let expected_public_key = VerificationMethodType::JsonWebKey2020
+            .encode_public_key(jwk.clone())
+            .unwrap()
+            .into_json();
+
         let expected = "did:jwk:eyJjcnYiOiJYMjU1MTkiLCJrdHkiOiJPS1AiLCJ1c2UiOiJlbmMiLCJ4IjoiM3A3YmZYdDl3YlRUVzJIQzdPUTFOei1EUThoYmVHZE5yZngtRkctSUswOCJ9";
         let did = DIDJWK::generate(&jwk);
         assert_eq!(did, expected);
 
-        let resolved = DIDJWK
-            .resolve_with(&did, resolution::Options::default())
-            .await
-            .unwrap();
+        let mut options = resolution::Options::default();
+        options.parameters.public_key_format = Some("JsonWebKey2020".to_owned());
 
-        let vm_method: JsonWebKey2020Ref = resolved
-            .document
-            .verification_method
-            .first()
-            .unwrap()
-            .try_into()
-            .unwrap();
+        let resolved = DIDJWK.resolve_with(&did, options).await.unwrap();
 
-        assert_eq!(*vm_method.public_key, jwk);
+        let vm = resolved.document.verification_method.first().unwrap();
+
+        let public_key = vm.properties.get("publicKeyJwk").unwrap();
+
+        assert_eq!(*public_key, expected_public_key);
     }
 
     #[async_std::test]

@@ -7,7 +7,7 @@ use ssi_jwk::{JWKResolver, JWK};
 use ssi_verification_methods_core::{
     ControllerError, ControllerProvider, GenericVerificationMethod, InvalidVerificationMethod,
     MaybeJwkVerificationMethod, ProofPurposes, ReferenceOrOwnedRef, VerificationMethod,
-    VerificationMethodResolutionError, VerificationMethodResolver,
+    VerificationMethodResolutionError, VerificationMethodResolver, VerificationMethodSet,
 };
 
 pub struct VerificationMethodDIDResolver<T, M> {
@@ -159,6 +159,7 @@ where
 impl<T: DIDResolver, M> JWKResolver for VerificationMethodDIDResolver<T, M>
 where
     M: MaybeJwkVerificationMethod
+        + VerificationMethodSet
         + TryFrom<GenericVerificationMethod, Error = InvalidVerificationMethod>,
 {
     async fn fetch_public_jwk(
@@ -173,7 +174,10 @@ where
             None => None,
         };
 
-        let options = ssi_verification_methods_core::ResolutionOptions::default();
+        let options = ssi_verification_methods_core::ResolutionOptions {
+            accept: Some(Box::new(M::type_set())),
+        };
+
         self.resolve_verification_method_with(None, vm, options)
             .await?
             .try_to_jwk()
