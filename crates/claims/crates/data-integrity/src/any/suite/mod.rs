@@ -27,11 +27,11 @@ macros::crypto_suites! {
     #[cfg(all(feature = "w3c", feature = "ed25519"))]
     ed25519_signature_2020: Ed25519Signature2020,
 
-    /// W3C EdDSA Cryptosuite v2022.
+    /// W3C `eddsa-rdfc-2022` cryptosuite.
     ///
-    /// See: <https://w3c.github.io/vc-di-eddsa/>
+    /// See: <https://w3c.github.io/vc-di-eddsa/#eddsa-rdfc-2022>
     #[cfg(all(feature = "w3c", feature = "ed25519"))]
-    ed_dsa_2022: EdDsa2022,
+    eddsa_rdfc_2022: EdDsaRdfc2022,
 
     /// W3C Ecdsa Secp256k1 Signature 2019.
     ///
