@@ -19,6 +19,11 @@ pub mod ed25519_signature_2020;
 pub use ed25519_signature_2020::Ed25519Signature2020;
 
 #[cfg(feature = "ed25519")]
+pub mod eddsa_2022;
+#[cfg(feature = "ed25519")]
+pub use eddsa_2022::EdDsa2022;
+
+#[cfg(feature = "ed25519")]
 pub mod eddsa_rdfc_2022;
 #[cfg(feature = "ed25519")]
 pub use eddsa_rdfc_2022::EdDsaRdfc2022;
