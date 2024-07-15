@@ -140,6 +140,10 @@ impl AsRef<[u8]> for ShaAnyBytes {
     }
 }
 
+#[derive(Debug, thiserror::Error)]
+#[error("invalid HMAC key")]
+pub struct InvalidHmacKey;
+
 pub type HmacSha256Key = [u8; 32];
 pub type HmacSha384Key = [u8; 48];
 
@@ -150,6 +154,14 @@ pub enum HmacShaAnyKey {
 }
 
 impl HmacShaAnyKey {
+    pub fn from_bytes(bytes: &[u8]) -> Result<Self, InvalidHmacKey> {
+        match bytes.len() {
+            32 => Ok(Self::Sha256(bytes.try_into().unwrap())),
+            48 => Ok(Self::Sha384(bytes.try_into().unwrap())),
+            _ => Err(InvalidHmacKey),
+        }
+    }
+
     pub fn as_slice(&self) -> &[u8] {
         match self {
             Self::Sha256(bytes) => bytes,

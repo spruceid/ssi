@@ -14,6 +14,9 @@ use crate::EcdsaSd2023;
 use super::HashData;
 
 mod base;
+mod derived;
+
+pub use base::*;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -51,9 +54,9 @@ where
     ) -> Result<Self::Signature, SignatureError> {
         match prepared_claims {
             HashData::Base(hash_data) => base::generate_proof(signer, hash_data).await,
-            HashData::Derived => {
-                todo!()
-            }
+            HashData::Derived(_) => Err(SignatureError::other(
+                "unable to sign derived claims without a base proof",
+            ))
         }
     }
 }

@@ -1,4 +1,5 @@
 use k256::sha2::{Digest, Sha256};
+use multibase::Base;
 use ssi_claims_core::SignatureError;
 use ssi_crypto::algorithm::ES256OrES384;
 use ssi_di_sd_primitives::{HmacShaAnyKey, JsonPointerBuf, ShaAny, ShaAnyBytes};
@@ -10,6 +11,10 @@ use ssi_verification_methods::MessageSigner;
 use crate::ecdsa_sd_2023::BaseHashData;
 
 use super::Signature;
+
+#[derive(Debug, thiserror::Error)]
+#[error("invalid base signature")]
+pub struct InvalidBaseSignature;
 
 pub async fn generate_proof<T>(
     signer: T,
@@ -55,7 +60,7 @@ where
 /// Serialize sign data.
 ///
 /// See: <https://www.w3.org/TR/vc-di-ecdsa/#serializesigndata>
-fn serialize_sign_data(
+pub(crate) fn serialize_sign_data(
     proof_hash: ShaAnyBytes,
     mandatory_hash: ShaAnyBytes,
     public_key: &MultiEncoded,
@@ -95,4 +100,92 @@ impl Signature {
             proof_value: MultibaseBuf::encode(multibase::Base::Base64Url, proof_value),
         }
     }
+
+    pub fn decode_base(&self) -> Result<DecodedBaseProof, InvalidBaseSignature> {
+        let (base, decoded_proof_value) = self
+            .proof_value
+            .decode()
+            .map_err(|_| InvalidBaseSignature)?;
+
+        if base != Base::Base64Url || decoded_proof_value.len() < 3 {
+            return Err(InvalidBaseSignature);
+        }
+
+        let header = [
+            decoded_proof_value[0],
+            decoded_proof_value[1],
+            decoded_proof_value[2],
+        ];
+
+        if header != [0xd9, 0x5d, 0x00] {
+            return Err(InvalidBaseSignature);
+        }
+
+        let mut components =
+            serde_cbor::from_slice::<Vec<serde_cbor::Value>>(&decoded_proof_value[3..])
+                .map_err(|_| InvalidBaseSignature)?
+                .into_iter();
+
+        let Some(serde_cbor::Value::Bytes(base_signature)) = components.next() else {
+            return Err(InvalidBaseSignature);
+        };
+
+        let Some(serde_cbor::Value::Bytes(public_key_bytes)) = components.next() else {
+            return Err(InvalidBaseSignature);
+        };
+
+        let public_key =
+            MultiEncodedBuf::new(public_key_bytes).map_err(|_| InvalidBaseSignature)?;
+
+        let Some(serde_cbor::Value::Bytes(hmac_key_bytes)) = components.next() else {
+            return Err(InvalidBaseSignature);
+        };
+
+        let hmac_key =
+            HmacShaAnyKey::from_bytes(&hmac_key_bytes).map_err(|_| InvalidBaseSignature)?;
+
+        let Some(serde_cbor::Value::Array(signatures_values)) = components.next() else {
+            return Err(InvalidBaseSignature);
+        };
+
+        let mut signatures = Vec::with_capacity(signatures_values.len());
+        for value in signatures_values {
+            let serde_cbor::Value::Bytes(bytes) = value else {
+                return Err(InvalidBaseSignature);
+            };
+
+            signatures.push(bytes)
+        }
+
+        let Some(serde_cbor::Value::Array(mandatory_pointers_values)) = components.next() else {
+            return Err(InvalidBaseSignature);
+        };
+
+        let mut mandatory_pointers = Vec::with_capacity(mandatory_pointers_values.len());
+        for value in mandatory_pointers_values {
+            let serde_cbor::Value::Bytes(bytes) = value else {
+                return Err(InvalidBaseSignature);
+            };
+
+            mandatory_pointers
+                .push(JsonPointerBuf::from_bytes(bytes).map_err(|_| InvalidBaseSignature)?)
+        }
+
+        Ok(DecodedBaseProof {
+            base_signature,
+            public_key,
+            hmac_key,
+            signatures,
+            mandatory_pointers,
+        })
+    }
+}
+
+#[derive(Clone)]
+pub struct DecodedBaseProof {
+    pub base_signature: Vec<u8>,
+    pub public_key: MultiEncodedBuf,
+    pub hmac_key: HmacShaAnyKey,
+    pub signatures: Vec<Vec<u8>>,
+    pub mandatory_pointers: Vec<JsonPointerBuf>,
 }

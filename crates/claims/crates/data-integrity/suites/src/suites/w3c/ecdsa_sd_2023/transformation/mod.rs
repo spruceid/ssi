@@ -10,8 +10,10 @@ use ssi_verification_methods::Multikey;
 use crate::EcdsaSd2023;
 
 mod base;
+mod derive;
 
 pub use base::TransformedBase;
+pub use derive::TransformedDerived;
 
 use super::SignatureOptions;
 
@@ -22,7 +24,7 @@ pub enum TransformationOptions {
 
 pub enum Transformed {
     Base(TransformedBase),
-    Derived,
+    Derived(TransformedDerived),
 }
 
 pub struct TransformationAlgorithm;
@@ -61,7 +63,12 @@ where
             .await
             .map(Transformed::Base),
             TransformationOptions::Derived => {
-                todo!()
+                derive::create_verify_data1(
+                    context.loader(),
+                    unsecured_document,
+                    canonical_configuration
+                ).await
+                .map(Transformed::Derived)
             }
         }
     }

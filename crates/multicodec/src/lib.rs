@@ -81,6 +81,7 @@ impl MultiEncoded {
     }
 }
 
+#[derive(Clone)]
 pub struct MultiEncodedBuf(Vec<u8>);
 
 impl MultiEncodedBuf {
