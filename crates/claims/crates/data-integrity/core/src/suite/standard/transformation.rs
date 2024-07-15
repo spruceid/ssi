@@ -32,6 +32,12 @@ pub enum TransformationError {
     #[error("invalid input")]
     InvalidInput,
 
+    #[error("invalid options")]
+    InvalidOptions,
+
+    #[error("invalid key")]
+    InvalidKey,
+
     #[error("{0}")]
     Internal(String),
 }
@@ -72,6 +78,7 @@ pub trait TypedTransformationAlgorithm<S: CryptographicSuite, T, C>:
         context: &C,
         data: &T,
         proof_configuration: ProofConfigurationRef<S>,
+        verification_method: &S::VerificationMethod,
         transformation_options: TransformationOptions<S>,
     ) -> Result<Self::Output, TransformationError>;
 }
@@ -89,6 +96,7 @@ impl<S: StandardCryptographicSuite, T: Serialize, C> TypedTransformationAlgorith
         _context: &C,
         data: &T,
         _options: ProofConfigurationRef<'_, S>,
+        _verification_method: &S::VerificationMethod,
         _transformation_options: TransformationOptions<S>,
     ) -> Result<Self::Output, TransformationError> {
         json_syntax::to_value(data)

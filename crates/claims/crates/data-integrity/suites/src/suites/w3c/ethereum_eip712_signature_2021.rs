@@ -274,6 +274,7 @@ where
         context: &C,
         data: &T,
         proof_configuration: ProofConfigurationRef<'_, S>,
+        _verification_method: &S::VerificationMethod,
         _transformation_options: TransformationOptions<S>,
     ) -> Result<Self::Output, ssi_data_integrity_core::suite::standard::TransformationError> {
         let types = match proof_configuration.options.types() {

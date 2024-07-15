@@ -21,6 +21,7 @@ digest.workspace = true
 serde = { workspace = true, features = ["derive"] }
 thiserror.workspace = true
 uuid = { workspace = true, features = ["v4"] }
+getrandom.workspace = true
 
 [dev-dependencies]
 async-std = { workspace = true, features = ["attributes"] }

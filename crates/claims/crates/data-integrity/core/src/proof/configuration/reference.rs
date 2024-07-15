@@ -1,6 +1,6 @@
 use educe::Educe;
 use serde::Serialize;
-use ssi_verification_methods_core::{ProofPurpose, ReferenceOrOwnedRef};
+use ssi_verification_methods::{ProofPurpose, ReferenceOrOwnedRef};
 use std::collections::BTreeMap;
 
 use crate::{

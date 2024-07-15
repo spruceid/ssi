@@ -10,7 +10,7 @@ use educe::Educe;
 use serde::{Deserialize, Serialize};
 use ssi_claims_core::{AttachProof, ProofValidationError, ProofValidity, ResourceProvider};
 use ssi_core::{one_or_many::OneOrManyRef, OneOrMany};
-use ssi_verification_methods_core::{ProofPurpose, ReferenceOrOwned};
+use ssi_verification_methods::{ProofPurpose, ReferenceOrOwned};
 use std::collections::BTreeMap;
 use std::{
     borrow::{Borrow, BorrowMut},

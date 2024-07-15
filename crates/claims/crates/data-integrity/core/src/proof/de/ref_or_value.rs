@@ -3,7 +3,7 @@ use std::marker::PhantomData;
 use iref::IriBuf;
 use serde::de::MapAccess;
 use ssi_core::de::DeserializeTyped;
-use ssi_verification_methods_core::ReferenceOrOwned;
+use ssi_verification_methods::ReferenceOrOwned;
 
 pub enum RefOrValue<T> {
     Ref(IriBuf),

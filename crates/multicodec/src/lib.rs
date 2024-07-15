@@ -49,6 +49,10 @@ impl MultiEncoded {
         unsafe { std::mem::transmute(bytes) }
     }
 
+    pub fn len(&self) -> usize {
+        self.0.len()
+    }
+
     #[inline(always)]
     pub fn parts(&self) -> (u64, &[u8]) {
         unsigned_varint::decode::u64(&self.0).unwrap()

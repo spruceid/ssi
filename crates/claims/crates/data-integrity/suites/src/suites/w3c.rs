@@ -33,6 +33,11 @@ pub mod ecdsa_rdfc_2019;
 #[cfg(any(feature = "secp256r1", feature = "secp384r1"))]
 pub use ecdsa_rdfc_2019::EcdsaRdfc2019;
 
+#[cfg(any(feature = "secp256r1", feature = "secp384r1"))]
+pub mod ecdsa_sd_2023;
+#[cfg(any(feature = "secp256r1", feature = "secp384r1"))]
+pub use ecdsa_sd_2023::EcdsaSd2023;
+
 #[cfg(feature = "eip712")]
 pub mod ethereum_eip712_signature_2021;
 #[cfg(feature = "eip712")]

@@ -1,6 +1,6 @@
 use iref::Iri;
 use serde::Serialize;
-use ssi_verification_methods_core::{ProofPurpose, ReferenceOrOwned};
+use ssi_verification_methods::{ProofPurpose, ReferenceOrOwned};
 use static_iref::iri;
 use std::collections::BTreeMap;
 

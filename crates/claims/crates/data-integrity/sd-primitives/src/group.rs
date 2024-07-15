@@ -129,7 +129,7 @@ mod tests {
     use ssi_json_ld::CompactJsonLd;
     use ssi_rdf::IntoNQuads;
 
-    use crate::{canonicalize::create_hmac_id_label_map_function, JsonPointerBuf};
+    use crate::{canonicalize::create_hmac_id_label_map_function, HmacShaAny, JsonPointerBuf};
 
     use super::canonicalize_and_group;
 
@@ -203,7 +203,7 @@ mod tests {
         let loader = ssi_json_ld::ContextLoader::default();
 
         let hmac_key = hex::decode(HMAC_KEY_STRING).unwrap();
-        let mut hmac = Hmac::new_from_slice(&hmac_key).unwrap();
+        let mut hmac = HmacShaAny::Sha256(Hmac::new_from_slice(&hmac_key).unwrap());
         let label_map_factory_function = create_hmac_id_label_map_function(&mut hmac);
 
         let mut group_definitions = HashMap::new();

@@ -1,7 +1,7 @@
 use core::fmt;
 use serde::{Deserialize, Serialize};
 use ssi_crypto::{
-    algorithm::{SignatureAlgorithmInstance, SignatureAlgorithmType},
+    algorithm::{ES256OrES384, SignatureAlgorithmInstance, SignatureAlgorithmType},
     UnsupportedAlgorithm,
 };
 
@@ -280,6 +280,15 @@ impl TryFrom<Algorithm> for ssi_crypto::algorithm::AnyBlake2b {
             Algorithm::ESBlake2bK => Ok(Self::ESBlake2bK),
             Algorithm::EdBlake2b => Ok(Self::EdBlake2b),
             other => Err(UnsupportedAlgorithm(other.into())),
+        }
+    }
+}
+
+impl From<ES256OrES384> for Algorithm {
+    fn from(value: ES256OrES384) -> Self {
+        match value {
+            ES256OrES384::ES256 => Self::ES256,
+            ES256OrES384::ES384 => Self::ES384,
         }
     }
 }

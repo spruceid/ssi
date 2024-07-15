@@ -3,7 +3,7 @@ use std::fmt::Debug;
 
 use serde::{Deserializer, Serialize, Serializer};
 use ssi_core::de::DeserializeTyped;
-use ssi_verification_methods_core::{ReferenceOrOwned, ReferenceOrOwnedRef};
+use ssi_verification_methods::{ReferenceOrOwned, ReferenceOrOwnedRef};
 
 use crate::Type;
 
