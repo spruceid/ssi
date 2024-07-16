@@ -8,10 +8,12 @@ use std::{
 mod keys;
 mod selection;
 mod signature;
+mod verification;
 
 pub use keys::*;
 pub use selection::*;
 pub use signature::*;
+pub use verification::*;
 
 #[derive(Deserialize)]
 #[serde(tag = "type")]
@@ -21,6 +23,9 @@ pub enum Test {
 
     #[serde(rename = "SelectionTest")]
     Selection(SelectionTest),
+
+    #[serde(rename = "VerificationTest")]
+    Verification(VerificationTest),
 }
 
 fn test_path(path: impl AsRef<Path>) -> PathBuf {
@@ -40,6 +45,7 @@ impl Test {
         match self {
             Self::Signature(test) => test.run().await,
             Self::Selection(test) => test.run().await,
+            Self::Verification(test) => test.run().await,
         }
     }
 }

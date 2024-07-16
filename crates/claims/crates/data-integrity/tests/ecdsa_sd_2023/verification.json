@@ -1,0 +1,59 @@
+{
+	"type": "VerificationTest",
+	"id": "https://www.w3.org/TR/vc-di-ecdsa/#derived-proof",
+	"verificationMethods": {
+		"did:key:zDnaepBuvsQ8cpsWrVKw8fbpGpvPeNSjVPTWoq6cRqaYzBKVP#zDnaepBuvsQ8cpsWrVKw8fbpGpvPeNSjVPTWoq6cRqaYzBKVP": {
+			"type": "Multikey",
+			"id": "did:key:zDnaepBuvsQ8cpsWrVKw8fbpGpvPeNSjVPTWoq6cRqaYzBKVP#zDnaepBuvsQ8cpsWrVKw8fbpGpvPeNSjVPTWoq6cRqaYzBKVP",
+			"controller": "did:key:zDnaepBuvsQ8cpsWrVKw8fbpGpvPeNSjVPTWoq6cRqaYzBKVP",
+			"publicKeyMultibase": "zDnaepBuvsQ8cpsWrVKw8fbpGpvPeNSjVPTWoq6cRqaYzBKVP"
+		}
+	},
+	"input": {
+		"@context": [
+			"https://www.w3.org/ns/credentials/v2",
+			{
+				"@vocab": "https://windsurf.grotto-networking.com/selective#"
+			}
+		],
+		"type": [
+			"VerifiableCredential"
+		],
+		"issuer": "https://vc.example/windsurf/racecommittee",
+		"credentialSubject": {
+			"sailNumber": "Earth101",
+			"sails": [
+				{
+					"size": 6.1,
+					"sailName": "Lahaina",
+					"year": 2023
+				},
+				{
+					"size": 7,
+					"sailName": "Lahaina",
+					"year": 2020
+				}
+			],
+			"boards": [
+				{
+					"year": 2022,
+					"boardName": "CompFoil170",
+					"brand": "Wailea"
+				},
+				{
+					"boardName": "Kanaha Custom",
+					"brand": "Wailea",
+					"year": 2019
+				}
+			]
+		},
+		"proof": {
+			"type": "DataIntegrityProof",
+			"cryptosuite": "ecdsa-sd-2023",
+			"created": "2023-08-15T23:36:38Z",
+			"verificationMethod": "did:key:zDnaepBuvsQ8cpsWrVKw8fbpGpvPeNSjVPTWoq6cRqaYzBKVP#zDnaepBuvsQ8cpsWrVKw8fbpGpvPeNSjVPTWoq6cRqaYzBKVP",
+			"proofPurpose": "assertionMethod",
+			"proofValue": "u2V0BhVhAkWKMO8zpRmfcUMksHUMtZM7cJt8PmNLsljKTYhSi8gZ7wAWnK4BrOZkrH3dZvxKWlnxGG_0xlFXmU5sa5-j71VgjgCQCKnLOGbY_FuM-ASpSkkOxsIR2E8n7Ml2q1UQ6tEwzi5OGWEBtAwxySlwwASjXlYLoLwyjdsIRYUa05OQzE0P4skx1-QJKi8HtGcJHtJfOTn7RhWKC0nkXODvUAChvnKDVY02TWEClAeVhEaVRWS_5ZfU6MlgnX07DuKm9XBS-b3RKfciM1Eu7L2mvkMebfBWVUw9WkuqNL4Tz-MkN4lXmljRt8r8DWEBqzbDH1twSPRKHu3zD0KP7YWlx4al1GFotnFizVkQbz6htSNvQIc7IfxLu7AO2fuhJbagJbZKlm-Vf7aNbXuuaWEA78ePS_Gy4lnOlUa2CgworZmUYq-Etff-9QK90v4xOWzNWvaILdcmkJs5zwH9b86f5yxos_NRK-VIO015zVlWTWEB2bYe3iy_95zezUdGp66X77IQbHhKunDI1BF0trlkrIkOCqviH4S1U3Nz4n5WWW8qsc3zAEq1Spquojg2mevHtWEA5EwtdjPeXn07NztIOTZ6PtyWt6v0Gfp5oFRAbvvcCpDnptz6gZd56Z6TBkI0eMUs4RI2g2rup607wVFuIUdvgpgBYIOGCDmZ9TBxEtWeCI9oVmRt0eHRGAaoOXx08gxL2IQt_AVggVkUuBrlOaELGVQWJD4M_qW5bcKEHWGNbOrPA_qAOKKwCWCBD6o5lQOWjNGwaTjq7H2Cn1-NPbwXLeDedy2YyiqL9TQNYIJEdvfdRibsv05I3pv8e6S1aUuAuBpGQHLhrYj4QX0knBFggk0AeXgJ4e6m1XsV5-xFud0L_1mUjZ9Mffhg5aZGTyDkFWCDYgT4e07o_IdCwae6qE7WZfpXtGRFESEXR3SxZmXE05o4AAQIFBggJCg4PEBESEw"
+		}
+	}
+}

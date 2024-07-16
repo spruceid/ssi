@@ -10,3 +10,8 @@ async fn ecdsa_sd_2023_signature() {
 async fn ecdsa_sd_2023_selection() {
     Test::load("ecdsa_sd_2023/selection.json").run().await
 }
+
+#[async_std::test]
+async fn ecdsa_sd_2023_verification() {
+    Test::load("ecdsa_sd_2023/verification.json").run().await
+}

@@ -1,4 +1,5 @@
 use ssi_claims_core::{InvalidProof, ProofValidationError, ProofValidity};
+use ssi_crypto::algorithm::ES256OrES384;
 use ssi_data_integrity_core::{suite::standard::VerificationAlgorithm, ProofRef};
 use ssi_di_sd_primitives::{
     canonicalize::{create_label_map_function, relabel_quads},
@@ -6,7 +7,7 @@ use ssi_di_sd_primitives::{
 };
 use ssi_multicodec::MultiEncodedBuf;
 use ssi_rdf::{urdna2015::NormalizingSubstitution, IntoNQuads, LexicalQuad};
-use ssi_verification_methods::Multikey;
+use ssi_verification_methods::{Multikey, VerifyBytes};
 
 use crate::{ecdsa_sd_2023::serialize_sign_data, EcdsaSd2023};
 
@@ -14,7 +15,7 @@ use super::{HashData, SignatureAlgorithm};
 
 impl VerificationAlgorithm<EcdsaSd2023> for SignatureAlgorithm {
     fn verify(
-        _method: &Multikey,
+        method: &Multikey,
         prepared_claims: HashData,
         proof: ProofRef<'_, EcdsaSd2023>,
     ) -> Result<ProofValidity, ProofValidationError> {
@@ -32,35 +33,42 @@ impl VerificationAlgorithm<EcdsaSd2023> for SignatureAlgorithm {
                     return Err(ProofValidationError::InvalidSignature);
                 }
 
+                let to_verify =
+                    serialize_sign_data(data.proof_hash, &data.mandatory_hash, &data.public_key);
+
+                let algorithm = match data.proof_hash {
+                    ShaAnyBytes::Sha256(_) => ES256OrES384::ES256,
+                    ShaAnyBytes::Sha384(_) => ES256OrES384::ES384,
+                };
+
+                if method
+                    .verify_bytes(algorithm, &to_verify, &data.base_signature)?
+                    .is_err()
+                {
+                    return Ok(ProofValidity::Err(InvalidProof::Signature));
+                }
+
                 let public_key: p256::PublicKey = data
                     .public_key
                     .decode()
                     .map_err(|_| ProofValidationError::InvalidSignature)?;
                 let verifying_key: p256::ecdsa::VerifyingKey = public_key.into();
 
-                let to_verify =
-                    serialize_sign_data(data.proof_hash, &data.mandatory_hash, &data.public_key);
-
-                let base_signature = p256::ecdsa::Signature::from_slice(&data.base_signature)
-                    .map_err(|_| ProofValidationError::InvalidSignature)?;
-
-                if verifying_key.verify(&to_verify, &base_signature).is_err() {
-                    return Ok(ProofValidity::Err(InvalidProof::Signature));
-                }
-
                 for (i, quad_signature) in data.signatures.into_iter().enumerate() {
                     let quad = data
                         .non_mandatory
                         .get(i)
-                        .ok_or(ProofValidationError::InvalidProof)?
-                        .to_string();
+                        .ok_or(ProofValidationError::InvalidProof)?;
+
+                    let quad_string = format!("{quad} .\n");
                     let quad_signature = p256::ecdsa::Signature::from_slice(&quad_signature)
                         .map_err(|_| ProofValidationError::InvalidProof)?;
 
                     if verifying_key
-                        .verify(quad.as_bytes(), &quad_signature)
+                        .verify(quad_string.as_bytes(), &quad_signature)
                         .is_err()
                     {
+                        eprintln!("quad proof is invalid");
                         return Ok(ProofValidity::Err(InvalidProof::Signature));
                     }
                 }
