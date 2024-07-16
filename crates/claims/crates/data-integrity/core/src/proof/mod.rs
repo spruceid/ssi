@@ -178,6 +178,29 @@ impl<T: CryptographicSuite> Proof<T> {
             extra_properties: &self.extra_properties,
         }
     }
+
+    pub fn map_type<U: CryptographicSuite>(
+        self,
+        type_: impl FnOnce(T) -> U,
+        verification_method: impl FnOnce(T::VerificationMethod) -> U::VerificationMethod,
+        options: impl FnOnce(T::ProofOptions) -> U::ProofOptions,
+        signature: impl FnOnce(T::Signature) -> U::Signature,
+    ) -> Proof<U> {
+        Proof {
+            context: self.context,
+            type_: type_(self.type_),
+            created: self.created,
+            verification_method: self.verification_method.map(verification_method),
+            proof_purpose: self.proof_purpose,
+            expires: self.expires,
+            domains: self.domains,
+            challenge: self.challenge,
+            nonce: self.nonce,
+            options: options(self.options),
+            signature: signature(self.signature),
+            extra_properties: self.extra_properties,
+        }
+    }
 }
 
 impl<S: CloneCryptographicSuite> Clone for Proof<S> {

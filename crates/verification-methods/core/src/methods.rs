@@ -217,6 +217,7 @@ macro_rules! complete_verification_method_union {
 		}
 	} => {
 		#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, linked_data::Serialize, linked_data::Deserialize)]
+		#[serde(untagged)]
 		$vis enum $name {
 			$(
 				$(#[$meta])*

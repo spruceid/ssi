@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use iref::IriBuf;
 use json_syntax::Print;
 use serde::Deserialize;
@@ -6,7 +8,7 @@ use ssi_data_integrity::{
     AnyDataIntegrity, AnySignatureOptions, AnySuite, CryptographicSuite, DataIntegrityDocument,
     ProofConfiguration,
 };
-use ssi_verification_methods::{multikey::MultikeyPair, LocalSigner};
+use ssi_verification_methods::{multikey::MultikeyPair, AnyMethod, LocalSigner};
 
 use super::MultikeyRing;
 
@@ -15,6 +17,7 @@ use super::MultikeyRing;
 pub struct SignatureTest {
     pub id: IriBuf,
     pub key_pair: MultikeyPair,
+    pub verification_methods: HashMap<IriBuf, AnyMethod>,
     pub configuration: ProofConfiguration<AnySuite>,
     pub options: AnySignatureOptions,
     pub input: DataIntegrityDocument,
@@ -32,7 +35,7 @@ impl SignatureTest {
             .sign_with(
                 SignatureEnvironment::default(),
                 self.input,
-                &keys,
+                &self.verification_methods,
                 LocalSigner(&keys),
                 options.cast(),
                 self.options,

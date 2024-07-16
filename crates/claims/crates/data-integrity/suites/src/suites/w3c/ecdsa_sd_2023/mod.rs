@@ -1,4 +1,3 @@
-use derive::DeriveOptions;
 use serde::Serialize;
 use ssi_data_integrity_core::{
     suite::{CryptographicSuiteSelect, SelectionError, SelectiveCryptographicSuite},
@@ -22,6 +21,7 @@ mod signature;
 pub use signature::*;
 
 mod derive;
+pub use derive::*;
 
 mod verification;
 

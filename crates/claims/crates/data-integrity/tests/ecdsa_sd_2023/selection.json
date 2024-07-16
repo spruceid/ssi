@@ -1,8 +1,16 @@
 {
-	"type": "Selection",
+	"type": "SelectionTest",
 	"id": "https://www.w3.org/TR/vc-di-ecdsa/#derived-proof",
 	"options": {
 		"selectivePointers": ["/credentialSubject/boards/0", "/credentialSubject/boards/1"]
+	},
+	"verificationMethods": {
+		"did:key:zDnaepBuvsQ8cpsWrVKw8fbpGpvPeNSjVPTWoq6cRqaYzBKVP#zDnaepBuvsQ8cpsWrVKw8fbpGpvPeNSjVPTWoq6cRqaYzBKVP": {
+			"type": "Multikey",
+			"id": "did:key:zDnaepBuvsQ8cpsWrVKw8fbpGpvPeNSjVPTWoq6cRqaYzBKVP#zDnaepBuvsQ8cpsWrVKw8fbpGpvPeNSjVPTWoq6cRqaYzBKVP",
+			"controller": "did:key:zDnaepBuvsQ8cpsWrVKw8fbpGpvPeNSjVPTWoq6cRqaYzBKVP",
+			"publicKeyMultibase": "zDnaepBuvsQ8cpsWrVKw8fbpGpvPeNSjVPTWoq6cRqaYzBKVP"
+		}
 	},
 	"input": {
 		"@context": [

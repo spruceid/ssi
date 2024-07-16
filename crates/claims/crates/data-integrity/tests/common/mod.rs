@@ -1,14 +1,16 @@
-mod keys;
-mod signature;
-
+use json_syntax::Parse;
+use serde::Deserialize;
 use std::{
     fs,
     path::{Path, PathBuf},
 };
 
-use json_syntax::Parse;
+mod keys;
+mod selection;
+mod signature;
+
 pub use keys::*;
-use serde::Deserialize;
+pub use selection::*;
 pub use signature::*;
 
 #[derive(Deserialize)]
@@ -16,6 +18,9 @@ pub use signature::*;
 pub enum Test {
     #[serde(rename = "SignatureTest")]
     Signature(SignatureTest),
+
+    #[serde(rename = "SelectionTest")]
+    Selection(SelectionTest),
 }
 
 fn test_path(path: impl AsRef<Path>) -> PathBuf {
@@ -34,6 +39,7 @@ impl Test {
     pub async fn run(self) {
         match self {
             Self::Signature(test) => test.run().await,
+            Self::Selection(test) => test.run().await,
         }
     }
 }

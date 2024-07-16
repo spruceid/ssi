@@ -133,7 +133,7 @@ fn compress_label_map(
     for (k, v) in label_map {
         let ki = k.strip_prefix("_:c14n").unwrap().parse().unwrap();
         let vb = Base::Base64Url
-            .decode(v.strip_prefix("_:b").unwrap())
+            .decode(v.strip_prefix("_:u").unwrap())
             .unwrap();
         map.insert(serde_cbor::Value::Integer(ki), serde_cbor::Value::Bytes(vb));
     }
@@ -156,7 +156,7 @@ fn decompress_label_map(
         };
 
         let k = BlankIdBuf::new(format!("_:c14n{ki}")).unwrap();
-        let v = BlankIdBuf::new(format!("_:b{}", Base::Base64Url.encode(vb))).unwrap();
+        let v = BlankIdBuf::new(format!("_:u{}", Base::Base64Url.encode(vb))).unwrap();
 
         map.insert(k, v);
     }
