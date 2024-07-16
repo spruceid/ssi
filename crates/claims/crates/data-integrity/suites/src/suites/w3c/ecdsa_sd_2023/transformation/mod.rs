@@ -62,14 +62,13 @@ where
             )
             .await
             .map(Transformed::Base),
-            TransformationOptions::Derived => {
-                derive::create_verify_data1(
-                    context.loader(),
-                    unsecured_document,
-                    canonical_configuration
-                ).await
-                .map(Transformed::Derived)
-            }
+            TransformationOptions::Derived => derive::create_verify_data1(
+                context.loader(),
+                unsecured_document,
+                canonical_configuration,
+            )
+            .await
+            .map(Transformed::Derived),
         }
     }
 }

@@ -123,16 +123,15 @@ enum PrivateKey {
     P384(p384::SecretKey),
 }
 
-#[cfg(all(feature = "w3c", any(feature = "secp256r1", feature = "secp384r1")))]
-impl MessageSigner<ssi_data_integrity_suites::ecdsa_rdfc_2019::ES256OrES384> for PrivateKey {
+impl MessageSigner<ssi_crypto::algorithm::ES256OrES384> for PrivateKey {
     async fn sign(
         self,
-        algorithm: ssi_data_integrity_suites::ecdsa_rdfc_2019::ES256OrES384,
+        algorithm: ssi_crypto::algorithm::ES256OrES384,
         message: &[u8],
     ) -> Result<Vec<u8>, MessageSignatureError> {
         match algorithm {
             #[cfg(feature = "secp256r1")]
-            ssi_data_integrity_suites::ecdsa_rdfc_2019::ES256OrES384::ES256 => {
+            ssi_crypto::algorithm::ES256OrES384::ES256 => {
                 #[allow(irrefutable_let_patterns)]
                 if let Self::P256(secret_key) = self {
                     use p256::ecdsa::{signature::Signer, Signature};
@@ -144,7 +143,7 @@ impl MessageSigner<ssi_data_integrity_suites::ecdsa_rdfc_2019::ES256OrES384> for
                 }
             }
             #[cfg(feature = "secp384r1")]
-            ssi_data_integrity_suites::ecdsa_rdfc_2019::ES256OrES384::ES384 => {
+            ssi_crypto::algorithm::ES256OrES384::ES384 => {
                 #[allow(irrefutable_let_patterns)]
                 if let Self::P384(secret_key) = self {
                     use p384::ecdsa::{signature::Signer, Signature};

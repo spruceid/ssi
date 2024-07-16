@@ -1,6 +1,9 @@
-use ssi_claims_core::{ProofValidationError, ProofValidity};
+use ssi_claims_core::{InvalidProof, ProofValidationError, ProofValidity};
 use ssi_data_integrity_core::{suite::standard::VerificationAlgorithm, ProofRef};
-use ssi_di_sd_primitives::{canonicalize::{create_label_map_function, relabel_quads}, ShaAny, ShaAnyBytes};
+use ssi_di_sd_primitives::{
+    canonicalize::{create_label_map_function, relabel_quads},
+    ShaAny, ShaAnyBytes,
+};
 use ssi_multicodec::MultiEncodedBuf;
 use ssi_rdf::{urdna2015::NormalizingSubstitution, IntoNQuads, LexicalQuad};
 use ssi_verification_methods::Multikey;
@@ -11,7 +14,7 @@ use super::{HashData, SignatureAlgorithm};
 
 impl VerificationAlgorithm<EcdsaSd2023> for SignatureAlgorithm {
     fn verify(
-        method: &Multikey,
+        _method: &Multikey,
         prepared_claims: HashData,
         proof: ProofRef<'_, EcdsaSd2023>,
     ) -> Result<ProofValidity, ProofValidationError> {
@@ -20,25 +23,49 @@ impl VerificationAlgorithm<EcdsaSd2023> for SignatureAlgorithm {
                 "selective disclosure base proof",
             )),
             HashData::Derived(t) => {
+                use p256::ecdsa::signature::Verifier;
+
                 let data =
                     create_verify_data3(&t.proof_hash, &t.canonical_id_map, &t.quads, proof)?;
 
                 if data.signatures.len() != data.non_mandatory.len() {
-                    return Err(ProofValidationError::InvalidSignature)
+                    return Err(ProofValidationError::InvalidSignature);
                 }
 
-                let to_verify = serialize_sign_data(
-                    t.proof_hash,
-                    data.mandatory_hash,
-                    &data.public_key
-                );
+                let public_key: p256::PublicKey = data
+                    .public_key
+                    .decode()
+                    .map_err(|_| ProofValidationError::InvalidSignature)?;
+                let verifying_key: p256::ecdsa::VerifyingKey = public_key.into();
 
-                // let public_key: p256::PublicKey = data
-                //     .public_key
-                //     .decode()
-                //     .map_err(|_| ProofValidationError::InvalidSignature)?;
+                let to_verify =
+                    serialize_sign_data(data.proof_hash, &data.mandatory_hash, &data.public_key);
 
-                todo!()
+                let base_signature = p256::ecdsa::Signature::from_slice(&data.base_signature)
+                    .map_err(|_| ProofValidationError::InvalidSignature)?;
+
+                if verifying_key.verify(&to_verify, &base_signature).is_err() {
+                    return Ok(ProofValidity::Err(InvalidProof::Signature));
+                }
+
+                for (i, quad_signature) in data.signatures.into_iter().enumerate() {
+                    let quad = data
+                        .non_mandatory
+                        .get(i)
+                        .ok_or(ProofValidationError::InvalidProof)?
+                        .to_string();
+                    let quad_signature = p256::ecdsa::Signature::from_slice(&quad_signature)
+                        .map_err(|_| ProofValidationError::InvalidProof)?;
+
+                    if verifying_key
+                        .verify(quad.as_bytes(), &quad_signature)
+                        .is_err()
+                    {
+                        return Ok(ProofValidity::Err(InvalidProof::Signature));
+                    }
+                }
+
+                Ok(ProofValidity::Ok(()))
             }
         }
     }
@@ -50,7 +77,7 @@ struct VerifyData<'a> {
     public_key: MultiEncodedBuf,
     signatures: Vec<Vec<u8>>,
     non_mandatory: Vec<LexicalQuad>,
-    mandatory_hash: ShaAnyBytes
+    mandatory_hash: ShaAnyBytes,
 }
 
 /// See: <https://www.w3.org/TR/vc-di-bbs/#createverifydata>
@@ -60,9 +87,7 @@ fn create_verify_data3<'a>(
     quads: &[LexicalQuad],
     proof: ProofRef<EcdsaSd2023>,
 ) -> Result<VerifyData<'a>, ProofValidationError> {
-    let decoded_signature = proof
-        .signature
-        .decode_derived()?;
+    let decoded_signature = proof.signature.decode_derived()?;
 
     let label_map_factory_function = create_label_map_function(&decoded_signature.label_map);
 
@@ -86,12 +111,7 @@ fn create_verify_data3<'a>(
         }
     }
 
-    let mandatory_hash: ShaAnyBytes = 
-        ShaAny::Sha256.hash_all(
-            mandatory
-                .iter()
-                .into_nquads_lines()
-        );
+    let mandatory_hash: ShaAnyBytes = ShaAny::Sha256.hash_all(mandatory.iter().into_nquads_lines());
 
     Ok(VerifyData {
         base_signature: decoded_signature.base_signature,
@@ -99,6 +119,6 @@ fn create_verify_data3<'a>(
         public_key: decoded_signature.public_key,
         signatures: decoded_signature.signatures,
         non_mandatory,
-        mandatory_hash
+        mandatory_hash,
     })
 }

@@ -63,7 +63,7 @@ impl Signature {
         ];
 
         if header != [0xd9, 0x5d, 0x01] {
-        	return Err(InvalidDerivedSignature)
+            return Err(InvalidDerivedSignature);
         }
 
         let mut components =
@@ -79,22 +79,21 @@ impl Signature {
             return Err(InvalidDerivedSignature);
         };
 
-		let public_key =
-            MultiEncodedBuf::new(public_key_bytes)
-			.map_err(|_| InvalidDerivedSignature)?;
+        let public_key =
+            MultiEncodedBuf::new(public_key_bytes).map_err(|_| InvalidDerivedSignature)?;
 
         let Some(serde_cbor::Value::Array(signatures_values)) = components.next() else {
             return Err(InvalidDerivedSignature);
         };
 
-		let mut signatures = Vec::with_capacity(signatures_values.len());
-		for value in signatures_values {
-			let serde_cbor::Value::Bytes(signature) = value else {
-				return Err(InvalidDerivedSignature)
-			};
+        let mut signatures = Vec::with_capacity(signatures_values.len());
+        for value in signatures_values {
+            let serde_cbor::Value::Bytes(signature) = value else {
+                return Err(InvalidDerivedSignature);
+            };
 
-			signatures.push(signature)
-		}
+            signatures.push(signature)
+        }
 
         let Some(serde_cbor::Value::Map(compressed_label_map)) = components.next() else {
             return Err(InvalidDerivedSignature);
@@ -109,11 +108,11 @@ impl Signature {
         let mandatory_indexes = decode_indexes(mandatory_indexes)?;
 
         Ok(DecodedDerivedProof {
-        	base_signature: signature_bytes,
-			public_key,
-			signatures,
-        	label_map,
-        	mandatory_indexes
+            base_signature: signature_bytes,
+            public_key,
+            signatures,
+            label_map,
+            mandatory_indexes,
         })
     }
 }

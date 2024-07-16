@@ -125,8 +125,7 @@ impl IntoAnySignatureAlgorithm for ssi_crypto::algorithm::ESBlake2b {
     }
 }
 
-#[cfg(all(feature = "w3c", any(feature = "secp256r1", feature = "secp384r1")))]
-impl IntoAnySignatureAlgorithm for ssi_data_integrity_suites::ecdsa_rdfc_2019::ES256OrES384 {
+impl IntoAnySignatureAlgorithm for ssi_crypto::algorithm::ES256OrES384 {
     fn into_any_signature_algorithm(self) -> AnySignatureAlgorithmInstance {
         WithProtocol(self.into(), AnyProtocol::None)
     }

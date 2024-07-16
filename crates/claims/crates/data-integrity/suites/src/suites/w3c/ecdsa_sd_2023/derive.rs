@@ -82,10 +82,10 @@ where
         options: *base_proof.options,
         signature: Signature::encode_derived(
             &data.base_signature,
-			&data.public_key,
+            &data.public_key,
             &data.signatures,
             &data.label_map,
-			&data.mandatory_indexes
+            &data.mandatory_indexes,
         ),
         extra_properties: base_proof.extra_properties.clone(),
     };

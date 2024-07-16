@@ -1,4 +1,7 @@
-use ssi_data_integrity_core::{suite::standard::{self, HashingError}, ProofConfigurationRef};
+use ssi_data_integrity_core::{
+    suite::standard::{self, HashingError},
+    ProofConfigurationRef,
+};
 use ssi_di_sd_primitives::{ShaAny, ShaAnyBytes};
 use ssi_rdf::{urdna2015::NormalizingSubstitution, IntoNQuads, LexicalQuad};
 use ssi_verification_methods::{multikey::DecodedMultikey, Multikey};
@@ -67,10 +70,7 @@ impl standard::HashingAlgorithm<EcdsaSd2023> for HashingAlgorithm {
     }
 }
 
-fn create_verify_data2(
-    t: TransformedDerived,
-    sha: ShaAny
-) -> DerivedHashData {
+fn create_verify_data2(t: TransformedDerived, sha: ShaAny) -> DerivedHashData {
     let proof_hash = sha.hash_all(&t.canonical_configuration);
 
     DerivedHashData {

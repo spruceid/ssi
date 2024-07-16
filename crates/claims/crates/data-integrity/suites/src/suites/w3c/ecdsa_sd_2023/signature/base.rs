@@ -39,7 +39,11 @@ where
 
     let public_key: MultiEncodedBuf = MultiEncodedBuf::encode(&proof_scoped_key_pair.public_key());
 
-    let to_sign = serialize_sign_data(hash_data.proof_hash, hash_data.mandatory_hash, &public_key);
+    let to_sign = serialize_sign_data(
+        &hash_data.proof_hash,
+        &hash_data.mandatory_hash,
+        &public_key,
+    );
 
     let algorithm = match hash_data.transformed_document.hmac_key.algorithm() {
         ShaAny::Sha256 => ES256OrES384::ES256,
@@ -61,8 +65,8 @@ where
 ///
 /// See: <https://www.w3.org/TR/vc-di-ecdsa/#serializesigndata>
 pub(crate) fn serialize_sign_data(
-    proof_hash: ShaAnyBytes,
-    mandatory_hash: ShaAnyBytes,
+    proof_hash: &ShaAnyBytes,
+    mandatory_hash: &ShaAnyBytes,
     public_key: &MultiEncoded,
 ) -> Vec<u8> {
     let mut bytes = Vec::with_capacity(proof_hash.len() + mandatory_hash.len() + public_key.len());

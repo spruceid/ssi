@@ -56,7 +56,7 @@ where
             HashData::Base(hash_data) => base::generate_proof(signer, hash_data).await,
             HashData::Derived(_) => Err(SignatureError::other(
                 "unable to sign derived claims without a base proof",
-            ))
+            )),
         }
     }
 }

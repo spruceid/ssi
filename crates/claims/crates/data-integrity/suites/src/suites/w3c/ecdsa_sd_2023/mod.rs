@@ -57,7 +57,7 @@ impl<T, P> CryptographicSuiteSelect<T, P> for EcdsaSd2023
 where
     T: Serialize + JsonLdNodeObject + Expandable,
     T::Expanded<LexicalInterpretation, ()>: Into<ExpandedDocument>,
-    P: JsonLdLoaderProvider
+    P: JsonLdLoaderProvider,
 {
     async fn select(
         &self,
@@ -66,14 +66,9 @@ where
         params: P,
         options: Self::SelectionOptions,
     ) -> Result<DataIntegrity<ssi_json_ld::syntax::Object, Self>, SelectionError> {
-        derive::add_derived_proof(
-            params.loader(),
-            unsecured_document,
-            options,
-            proof,
-        )
-        .await
-        .map_err(SelectionError::proof_derivation)
+        derive::add_derived_proof(params.loader(), unsecured_document, options, proof)
+            .await
+            .map_err(SelectionError::proof_derivation)
     }
 }
 
