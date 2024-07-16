@@ -8,6 +8,7 @@ use ssi_verification_methods::multikey::MultikeyPair;
 pub struct AnySignatureOptions {
     pub mandatory_pointers: Vec<JsonPointerBuf>,
 
+    #[serde(rename = "hmacKeyString")]
     pub hmac_key: Option<HmacShaAnyKey>,
 
     pub key_pair: Option<MultikeyPair>,

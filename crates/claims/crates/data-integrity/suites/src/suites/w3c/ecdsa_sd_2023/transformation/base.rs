@@ -59,17 +59,16 @@ where
         Cow::Borrowed(transform_options.mandatory_pointers.as_slice()),
     );
 
-    let mut groups = canonicalize_and_group(
+    let mut canonical = canonicalize_and_group(
         loader,
         label_map_factory_function,
         group_definitions,
         unsecured_document,
     )
     .await
-    .map_err(TransformationError::internal)?
-    .groups;
+    .map_err(TransformationError::internal)?;
 
-    let mandatory_group = groups.remove(&Mandatory).unwrap();
+    let mandatory_group = canonical.groups.remove(&Mandatory).unwrap();
     let mandatory = mandatory_group.matching.into_values().collect();
     let non_mandatory = mandatory_group.non_matching.into_values().collect();
 

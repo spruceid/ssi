@@ -1,4 +1,3 @@
-use k256::sha2::{Digest, Sha256};
 use multibase::Base;
 use ssi_claims_core::SignatureError;
 use ssi_crypto::algorithm::ES256OrES384;
@@ -39,20 +38,28 @@ where
         }
     };
 
-    let signatures: Vec<[u8; 32]> = hash_data
+    let public_key = proof_scoped_key_pair.public_key();
+    let signing_key: p256::ecdsa::SigningKey = proof_scoped_key_pair.into();
+
+    let signatures: Vec<[u8; 64]> = hash_data
         .transformed_document
         .non_mandatory
         .into_nquads_lines()
         .into_iter()
-        .map(|line| Sha256::digest(line).into())
+        .map(|line| {
+            use p256::ecdsa::{signature::Signer, Signature};
+            // Sha256::digest(line).into()
+            let signature: Signature = signing_key.sign(line.as_bytes());
+            signature.to_bytes().into()
+        })
         .collect();
 
-    let public_key: MultiEncodedBuf = MultiEncodedBuf::encode(&proof_scoped_key_pair.public_key());
+    let encoded_public_key: MultiEncodedBuf = MultiEncodedBuf::encode(&public_key);
 
     let to_sign = serialize_sign_data(
         &hash_data.proof_hash,
         &hash_data.mandatory_hash,
-        &public_key,
+        &encoded_public_key,
     );
 
     let algorithm = match hash_data.transformed_document.hmac_key.algorithm() {
@@ -64,7 +71,7 @@ where
 
     Ok(Signature::encode_base(
         &base_signature,
-        &public_key,
+        &encoded_public_key,
         hash_data.transformed_document.hmac_key,
         &signatures,
         &hash_data.transformed_document.options.mandatory_pointers,
@@ -91,7 +98,7 @@ impl Signature {
         base_signature: &[u8],
         public_key: &MultiEncoded,
         hmac_key: HmacShaAnyKey,
-        signatures: &[[u8; 32]],
+        signatures: &[[u8; 64]],
         mandatory_pointers: &[JsonPointerBuf],
     ) -> Self {
         let components = vec![
