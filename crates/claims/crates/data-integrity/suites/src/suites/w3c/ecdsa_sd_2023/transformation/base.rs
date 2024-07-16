@@ -39,7 +39,9 @@ where
         .map_err(|_| TransformationError::InvalidKey)?;
 
     let sha = match decoded_key {
+        #[cfg(feature = "secp256r1")]
         DecodedMultikey::P256(_) => ShaAny::Sha256,
+        #[cfg(feature = "secp384r1")]
         DecodedMultikey::P384(_) => ShaAny::Sha384,
         _ => return Err(TransformationError::InvalidKey),
     };

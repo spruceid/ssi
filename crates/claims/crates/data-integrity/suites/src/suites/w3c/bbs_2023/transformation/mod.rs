@@ -1,16 +1,17 @@
-use super::{Bbs2023SignatureOptions, HmacKey};
+use super::Bbs2023SignatureOptions;
 use crate::Bbs2023;
-use hmac::Hmac;
-use k256::sha2::Sha256;
 use rdf_types::{BlankIdBuf, LexicalQuad};
 use serde::Serialize;
 use ssi_data_integrity_core::{
     suite::standard::{TransformationAlgorithm, TransformationError, TypedTransformationAlgorithm},
     ProofConfigurationRef,
 };
-use ssi_di_sd_primitives::canonicalize::create_hmac_id_label_map_function;
+use ssi_di_sd_primitives::{
+    canonicalize::create_hmac_id_label_map_function, HmacSha256Key, HmacShaAny,
+};
 use ssi_json_ld::{Expandable, ExpandedDocument, JsonLdLoaderProvider, JsonLdNodeObject};
 use ssi_rdf::{urdna2015::NormalizingSubstitution, LexicalInterpretation};
+use ssi_verification_methods::Multikey;
 use std::collections::HashMap;
 
 mod base;
@@ -32,6 +33,7 @@ where
         context: &C,
         unsecured_document: &T,
         proof_configuration: ProofConfigurationRef<'_, Bbs2023>,
+        _verification_method: &Multikey,
         transformation_options: Bbs2023TransformationOptions,
     ) -> Result<Self::Output, TransformationError> {
         let canonical_configuration = proof_configuration
@@ -67,7 +69,7 @@ where
 ///
 /// See: <https://www.w3.org/TR/vc-di-bbs/#createshuffledidlabelmapfunction>
 pub fn create_shuffled_id_label_map_function(
-    hmac: &mut Hmac<Sha256>,
+    hmac: &mut HmacShaAny,
 ) -> impl '_ + FnMut(&NormalizingSubstitution) -> HashMap<BlankIdBuf, BlankIdBuf> {
     |canonical_map| {
         let mut map = create_hmac_id_label_map_function(hmac)(canonical_map);
@@ -109,7 +111,7 @@ pub struct TransformedBase {
     pub options: Bbs2023SignatureOptions,
     pub mandatory: Vec<LexicalQuad>,
     pub non_mandatory: Vec<LexicalQuad>,
-    pub hmac_key: HmacKey,
+    pub hmac_key: HmacSha256Key,
     pub canonical_configuration: Vec<String>,
 }
 

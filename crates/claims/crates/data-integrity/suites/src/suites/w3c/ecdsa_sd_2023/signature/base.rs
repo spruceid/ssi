@@ -23,11 +23,21 @@ pub async fn generate_proof<T>(
 where
     T: MessageSigner<ES256OrES384>,
 {
-    let mut rng = rand::thread_rng();
+    let proof_scoped_key_pair = match hash_data.transformed_document.options.key_pair {
+        Some(key_pair) => {
+            let (_, multi_encoded) = key_pair.secret.decode().map_err(SignatureError::other)?;
+            let multi_encoded =
+                MultiEncodedBuf::new(multi_encoded).map_err(SignatureError::other)?;
+            multi_encoded.decode().map_err(SignatureError::other)?
+        }
+        None => {
+            let mut rng = rand::thread_rng();
 
-    // Locally generated P-256 ECDSA key pair, scoped to the specific proof and
-    // destroyed with this algorithm terminates.
-    let proof_scoped_key_pair = p256::SecretKey::random(&mut rng);
+            // Locally generated P-256 ECDSA key pair, scoped to the specific proof and
+            // destroyed with this algorithm terminates.
+            p256::SecretKey::random(&mut rng)
+        }
+    };
 
     let signatures: Vec<[u8; 32]> = hash_data
         .transformed_document

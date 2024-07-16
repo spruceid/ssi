@@ -86,6 +86,7 @@ mod tests {
 
     use nquads_syntax::Parse;
     use ssi_data_integrity_core::{suite::standard::SignatureAlgorithm, ProofConfiguration};
+    use ssi_di_sd_primitives::HmacSha256Key;
     use ssi_verification_methods::{
         Multikey, ProofPurpose, ReferenceOrOwned, Signer, SingleSecretSigner,
     };
@@ -94,7 +95,7 @@ mod tests {
     use crate::{
         bbs_2023::{
             hashing::BaseHashData, transformation::TransformedBase, Bbs2023SignatureOptions,
-            FeatureOption, HashData, HmacKey,
+            FeatureOption, HashData,
         },
         Bbs2023,
     };
@@ -151,7 +152,7 @@ _:b5 <https://windsurf.grotto-networking.com/selective#year> \"2023\"^^<http://w
         )
         .unwrap();
 
-        let mut hmac_key = HmacKey::default();
+        let mut hmac_key = HmacSha256Key::default();
         hex::decode_to_slice(HMAC_KEY_STRING.as_bytes(), &mut hmac_key).unwrap();
 
         let mandatory = nquads_syntax::Document::parse_str(MANDATORY)

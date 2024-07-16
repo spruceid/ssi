@@ -3,6 +3,7 @@ use std::ops::Deref;
 use getrandom::getrandom;
 pub use hmac::Hmac;
 use hmac::Mac;
+use serde::{Deserialize, Serialize};
 use sha2::{Sha256, Sha384};
 
 pub type HmacSha256 = Hmac<Sha256>;
@@ -182,6 +183,13 @@ impl HmacShaAnyKey {
             Self::Sha384(_) => ShaAny::Sha384,
         }
     }
+
+    pub fn into_sha256(self) -> Result<HmacSha256Key, Self> {
+        match self {
+            Self::Sha256(k) => Ok(k),
+            other => Err(other),
+        }
+    }
 }
 
 impl Deref for HmacShaAnyKey {
@@ -189,6 +197,26 @@ impl Deref for HmacShaAnyKey {
 
     fn deref(&self) -> &Self::Target {
         self.as_slice()
+    }
+}
+
+impl Serialize for HmacShaAnyKey {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        hex::encode(self.as_slice()).serialize(serializer)
+    }
+}
+
+impl<'de> Deserialize<'de> for HmacShaAnyKey {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let hex_string = String::deserialize(deserializer)?;
+        let bytes = hex::decode(hex_string).map_err(serde::de::Error::custom)?;
+        HmacShaAnyKey::from_bytes(&bytes).map_err(serde::de::Error::custom)
     }
 }
 

@@ -514,3 +514,12 @@ impl MultiCodec for DecodedMultikey {
         }
     }
 }
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct MultikeyPair {
+    #[serde(rename = "publicKeyMultibase")]
+    pub public: MultibaseBuf,
+
+    #[serde(rename = "secretKeyMultibase")]
+    pub secret: MultibaseBuf,
+}

@@ -12,6 +12,7 @@ use super::{Transformed, TransformedBase, TransformedDerived};
 
 pub struct HashingAlgorithm;
 
+#[derive(Debug, Clone)]
 pub enum HashData {
     Base(BaseHashData),
     Derived(DerivedHashData),
@@ -24,6 +25,7 @@ pub struct BaseHashData {
     pub mandatory_hash: ShaAnyBytes,
 }
 
+#[derive(Debug, Clone)]
 pub struct DerivedHashData {
     pub canonical_configuration: Vec<String>,
     pub quads: Vec<LexicalQuad>,
@@ -59,7 +61,9 @@ impl standard::HashingAlgorithm<EcdsaSd2023> for HashingAlgorithm {
                     .map_err(|_| HashingError::InvalidKey)?;
 
                 let sha = match decoded_key {
+                    #[cfg(feature = "secp256r1")]
                     DecodedMultikey::P256(_) => ShaAny::Sha256,
+                    #[cfg(feature = "secp384r1")]
                     DecodedMultikey::P384(_) => ShaAny::Sha384,
                     _ => return Err(HashingError::InvalidKey),
                 };

@@ -1,7 +1,3 @@
-use std::{borrow::Cow, collections::HashMap, hash::Hash};
-
-use hmac::{digest::KeyInit, Hmac};
-use k256::sha2::Sha256;
 use rdf_types::{BlankIdBuf, Quad};
 use serde::{Deserialize, Serialize};
 use ssi_bbs::{proof_gen, ProofGenFailed};
@@ -9,7 +5,7 @@ use ssi_data_integrity_core::{DataIntegrity, Proof, ProofRef};
 use ssi_di_sd_primitives::{
     group::{canonicalize_and_group, GroupError},
     select::{select_json_ld, DanglingJsonPointer},
-    JsonPointerBuf,
+    HmacShaAnyKey, JsonPointerBuf,
 };
 use ssi_json_ld::{Expandable, ExpandedDocument, JsonLdNodeObject};
 use ssi_rdf::LexicalInterpretation;
@@ -17,6 +13,7 @@ use ssi_verification_methods::{
     multikey::{self, DecodedMultikey},
     Multikey,
 };
+use std::{borrow::Cow, collections::HashMap, hash::Hash};
 
 use crate::{bbs_2023::transformation::create_shuffled_id_label_map_function, Bbs2023};
 
@@ -185,7 +182,7 @@ where
 
     let decoded_base_proof = base_signature.decode_base()?;
 
-    let mut hmac = Hmac::<Sha256>::new_from_slice(&decoded_base_proof.hmac_key).unwrap();
+    let mut hmac = HmacShaAnyKey::Sha256(decoded_base_proof.hmac_key).to_hmac();
 
     let label_map_factory_function = create_shuffled_id_label_map_function(&mut hmac);
 

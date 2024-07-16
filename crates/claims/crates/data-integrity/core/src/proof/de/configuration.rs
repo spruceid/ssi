@@ -1,14 +1,6 @@
-//! Proof deserialization primitives.
-//!
-//! Deserializing a Data-Integrity proof while preserving type information can
-//! be tricky, in particular when the considered cryptographic suite type
-//! abstracts multiple actual cryptographic suite implementations.
-//! In this case, it may be necessary to know the proof `type`
-//! (and `cryptosuite`) field *before* deserializing the other fields of the
-//! proof.
 use crate::{
-    suite::bounds::{OptionsOf, SignatureOf, VerificationMethodOf},
-    CryptosuiteString, DeserializeCryptographicSuite, Proof, Type,
+    suite::bounds::{OptionsOf, VerificationMethodOf},
+    CryptosuiteString, DeserializeCryptographicSuite, ProofConfiguration, Type,
 };
 use serde::{
     de::{DeserializeSeed, MapAccess},
@@ -17,18 +9,9 @@ use serde::{
 use ssi_core::de::WithType;
 use std::{collections::BTreeMap, marker::PhantomData};
 
-mod field;
-pub use field::*;
+use super::{Field, RefOrValue, ReplayMap, TypeField};
 
-mod ref_or_value;
-pub use ref_or_value::*;
-
-mod replay_map;
-pub use replay_map::*;
-
-mod configuration;
-
-impl<'de, T: DeserializeCryptographicSuite<'de>> Proof<T> {
+impl<'de, T: DeserializeCryptographicSuite<'de>> ProofConfiguration<T> {
     fn deserialize_with_type<S>(type_: Type, mut deserializer: S) -> Result<Self, S::Error>
     where
         S: serde::de::MapAccess<'de>,
@@ -76,13 +59,6 @@ impl<'de, T: DeserializeCryptographicSuite<'de>> Proof<T> {
             ))?
             .0;
 
-        let signature = WithType::<T, SignatureOf<T>>::new(&suite)
-            .deserialize(serde::__private::de::FlatMapDeserializer(
-                &mut other,
-                PhantomData,
-            ))?
-            .0;
-
         Ok(Self {
             context,
             type_: suite,
@@ -97,7 +73,6 @@ impl<'de, T: DeserializeCryptographicSuite<'de>> Proof<T> {
             challenge,
             nonce,
             options,
-            signature,
             extra_properties: BTreeMap::deserialize(serde::__private::de::FlatMapDeserializer(
                 &mut other,
                 PhantomData,
@@ -106,19 +81,21 @@ impl<'de, T: DeserializeCryptographicSuite<'de>> Proof<T> {
     }
 }
 
-impl<'de, T: DeserializeCryptographicSuite<'de>> serde::Deserialize<'de> for Proof<T> {
+impl<'de, T: DeserializeCryptographicSuite<'de>> serde::Deserialize<'de> for ProofConfiguration<T> {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
         D: serde::Deserializer<'de>,
     {
-        deserializer.deserialize_map(ProofVisitor(PhantomData))
+        deserializer.deserialize_map(ProofConfigurationVisitor(PhantomData))
     }
 }
 
-struct ProofVisitor<T>(PhantomData<T>);
+struct ProofConfigurationVisitor<T>(PhantomData<T>);
 
-impl<'de, T: DeserializeCryptographicSuite<'de>> serde::de::Visitor<'de> for ProofVisitor<T> {
-    type Value = Proof<T>;
+impl<'de, T: DeserializeCryptographicSuite<'de>> serde::de::Visitor<'de>
+    for ProofConfigurationVisitor<T>
+{
+    type Value = ProofConfiguration<T>;
 
     fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
         write!(formatter, "Data-Integrity proof")
@@ -140,7 +117,7 @@ impl<'de, T: DeserializeCryptographicSuite<'de>> serde::de::Visitor<'de> for Pro
                     if name == "DataIntegrityProof" {
                         match cryptosuite.take() {
                             Some(c) => {
-                                return Proof::<T>::deserialize_with_type(
+                                return ProofConfiguration::<T>::deserialize_with_type(
                                     Type::DataIntegrityProof(c),
                                     ReplayMap::new(keep, map),
                                 );
@@ -150,7 +127,7 @@ impl<'de, T: DeserializeCryptographicSuite<'de>> serde::de::Visitor<'de> for Pro
                             }
                         }
                     } else {
-                        return Proof::<T>::deserialize_with_type(
+                        return ProofConfiguration::<T>::deserialize_with_type(
                             Type::Other(name),
                             ReplayMap::new(keep, map),
                         );
@@ -159,7 +136,7 @@ impl<'de, T: DeserializeCryptographicSuite<'de>> serde::de::Visitor<'de> for Pro
                 TypeField::Cryptosuite => {
                     let name = map.next_value::<CryptosuiteString>()?;
                     if data_integrity_proof {
-                        return Proof::<T>::deserialize_with_type(
+                        return ProofConfiguration::<T>::deserialize_with_type(
                             Type::DataIntegrityProof(name),
                             ReplayMap::new(keep, map),
                         );
