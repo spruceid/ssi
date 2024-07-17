@@ -1,3 +1,4 @@
+#![allow(unused)]
 use json_syntax::Parse;
 use serde::Deserialize;
 use std::{
