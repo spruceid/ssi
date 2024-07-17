@@ -72,7 +72,7 @@ assert!(jwt.verify(&vm_resolver).await.expect("verification failed").is_ok())
 
 Verifiable Credential are much more complex as they require interpreting
 the input claims and proofs, such as Data-Integrity proofs as Linked-Data
-using JSON-LD. This operation is highly configurable. SSI provide
+using JSON-LD. This operation is highly configurable. SSI provides
 functions exposing various levels of implementation details that you can
 tweak as needed. The simplest of them is `any_credential_from_json_str`
 that will simply load a VC from a string, assuming it is signed using
