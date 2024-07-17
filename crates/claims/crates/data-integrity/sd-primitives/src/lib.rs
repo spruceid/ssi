@@ -23,12 +23,12 @@ impl ShaAny {
             (_, Some(_)) => Err(IntoHmacError::IncompatibleKey),
             (Self::Sha256, None) => {
                 let mut key = HmacSha256Key::default();
-                getrandom(&mut key)?;
+                getrandom(&mut key).map_err(IntoHmacError::rng)?;
                 Ok(HmacShaAnyKey::Sha256(key))
             }
             (Self::Sha384, None) => {
                 let mut key = [0; 48];
-                getrandom(&mut key)?;
+                getrandom(&mut key).map_err(IntoHmacError::rng)?;
                 Ok(HmacShaAnyKey::Sha384(key))
             }
         }
@@ -45,14 +45,14 @@ impl ShaAny {
             (_, Some(_)) => Err(IntoHmacError::IncompatibleKey),
             (Self::Sha256, None) => {
                 let mut key = HmacSha256Key::default();
-                getrandom(&mut key)?;
+                getrandom(&mut key).map_err(IntoHmacError::rng)?;
                 Ok(HmacShaAny::Sha256(
                     HmacSha256::new_from_slice(&key).unwrap(),
                 ))
             }
             (Self::Sha384, None) => {
                 let mut key = [0; 48];
-                getrandom(&mut key)?;
+                getrandom(&mut key).map_err(IntoHmacError::rng)?;
                 Ok(HmacShaAny::Sha384(
                     HmacSha384::new_from_slice(&key).unwrap(),
                 ))
@@ -87,8 +87,14 @@ pub enum IntoHmacError {
     #[error("incompatible key")]
     IncompatibleKey,
 
-    #[error(transparent)]
-    RandomGenerationFailed(#[from] getrandom::Error),
+    #[error("random number generation failed: {0}")]
+    RandomGenerationFailed(String),
+}
+
+impl IntoHmacError {
+    fn rng(e: impl ToString) -> Self {
+        Self::RandomGenerationFailed(e.to_string())
+    }
 }
 
 pub enum HmacShaAny {
