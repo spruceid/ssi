@@ -68,7 +68,6 @@ impl VerificationAlgorithm<EcdsaSd2023> for SignatureAlgorithm {
                         .verify(quad_string.as_bytes(), &quad_signature)
                         .is_err()
                     {
-                        eprintln!("quad proof is invalid");
                         return Ok(ProofValidity::Err(InvalidProof::Signature));
                     }
                 }
