@@ -14,8 +14,8 @@ pub struct HashingAlgorithm;
 
 #[derive(Debug, Clone)]
 pub enum HashData {
-    Base(BaseHashData),
-    Derived(DerivedHashData),
+    Base(Box<BaseHashData>),
+    Derived(Box<DerivedHashData>),
 }
 
 #[derive(Debug, Clone)]
@@ -48,11 +48,11 @@ impl standard::HashingAlgorithm<EcdsaSd2023> for HashingAlgorithm {
                 let proof_hash = sha.hash_all(&t.canonical_configuration);
                 let mandatory_hash = sha.hash_all(t.mandatory.iter().into_nquads_lines());
 
-                Ok(HashData::Base(BaseHashData {
+                Ok(HashData::Base(Box::new(BaseHashData {
                     transformed_document: t,
                     proof_hash,
                     mandatory_hash,
-                }))
+                })))
             }
             Transformed::Derived(t) => {
                 let decoded_key = verification_method
@@ -68,7 +68,7 @@ impl standard::HashingAlgorithm<EcdsaSd2023> for HashingAlgorithm {
                     _ => return Err(HashingError::InvalidKey),
                 };
 
-                Ok(HashData::Derived(create_verify_data2(t, sha)))
+                Ok(HashData::Derived(Box::new(create_verify_data2(t, sha))))
             }
         }
     }

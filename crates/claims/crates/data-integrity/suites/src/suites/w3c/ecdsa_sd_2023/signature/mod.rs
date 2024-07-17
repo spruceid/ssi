@@ -53,7 +53,7 @@ where
         _proof_configuration: ProofConfigurationRef<'_, EcdsaSd2023>,
     ) -> Result<Self::Signature, SignatureError> {
         match prepared_claims {
-            HashData::Base(hash_data) => base::generate_proof(signer, hash_data).await,
+            HashData::Base(hash_data) => base::generate_proof(signer, *hash_data).await,
             HashData::Derived(_) => Err(SignatureError::other(
                 "unable to sign derived claims without a base proof",
             )),
