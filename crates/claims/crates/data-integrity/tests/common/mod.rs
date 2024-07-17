@@ -5,12 +5,10 @@ use std::{
     path::{Path, PathBuf},
 };
 
-mod keys;
 mod selection;
 mod signature;
 mod verification;
 
-pub use keys::*;
 pub use selection::*;
 pub use signature::*;
 pub use verification::*;

@@ -48,7 +48,7 @@ macros::crypto_suites! {
     #[cfg(all(feature = "w3c", any(feature = "secp256r1", feature = "secp384r1")))]
     ecdsa_rdfc_2019: EcdsaRdfc2019,
 
-    #[cfg(all(feature = "w3c", any(feature = "secp256r1", feature = "secp384r1")))]
+    #[cfg(all(feature = "w3c", feature = "secp256r1"))]
     ecdsa_sd_2023: EcdsaSd2023,
 
     /// W3C JSON Web Signature 2020.

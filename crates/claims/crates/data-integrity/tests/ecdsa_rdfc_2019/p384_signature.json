@@ -1,0 +1,66 @@
+{
+	"type": "SignatureTest",
+	"id": "https://www.w3.org/TR/vc-di-ecdsa/#representation-ecdsa-rdfc-2019-with-curve-p-384",
+	"keyPair": {
+		"publicKeyMultibase": "z82LkuBieyGShVBhvtE2zoiD6Kma4tJGFtkAhxR5pfkp5QPw4LutoYWhvQCnGjdVn14kujQ",
+		"secretKeyMultibase": "z2fanyY7zgwNpZGxX5fXXibvScNaUWNprHU9dKx7qpVj7mws9J8LLt4mDB5TyH2GLHWkUc"
+	},
+	"verificationMethods": {
+		"https://vc.example/issuers/5678#z82LkuBieyGShVBhvtE2zoiD6Kma4tJGFtkAhxR5pfkp5QPw4LutoYWhvQCnGjdVn14kujQ": {
+			"type": "Multikey",
+			"id": "https://vc.example/issuers/5678#z82LkuBieyGShVBhvtE2zoiD6Kma4tJGFtkAhxR5pfkp5QPw4LutoYWhvQCnGjdVn14kujQ",
+			"controller": "https://vc.example/issuers/5678",
+			"publicKeyMultibase": "z82LkuBieyGShVBhvtE2zoiD6Kma4tJGFtkAhxR5pfkp5QPw4LutoYWhvQCnGjdVn14kujQ"
+		}
+	},
+	"configuration": {
+		"type": "DataIntegrityProof",
+		"cryptosuite": "ecdsa-rdfc-2019",
+		"created": "2023-02-24T23:36:38Z",
+		"verificationMethod": "https://vc.example/issuers/5678#z82LkuBieyGShVBhvtE2zoiD6Kma4tJGFtkAhxR5pfkp5QPw4LutoYWhvQCnGjdVn14kujQ",
+		"proofPurpose": "assertionMethod"
+	},
+	"input": {
+		"@context": [
+			"https://www.w3.org/ns/credentials/v2",
+			"https://www.w3.org/ns/credentials/examples/v2"
+		],
+		"id": "urn:uuid:58172aac-d8ba-11ed-83dd-0b3aef56cc33",
+		"type": ["VerifiableCredential", "AlumniCredential"],
+		"name": "Alumni Credential",
+		"description": "A minimum viable example of an Alumni Credential.",
+		"issuer": "https://vc.example/issuers/5678",
+		"validFrom": "2023-01-01T00:00:00Z",
+		"credentialSubject": {
+			"id": "did:example:abcdefgh",
+			"alumniOf": "The School of Examples"
+		}
+	},
+	"expectedOutput": {
+		"@context": [
+			"https://www.w3.org/ns/credentials/v2",
+			"https://www.w3.org/ns/credentials/examples/v2"
+		],
+		"id": "urn:uuid:58172aac-d8ba-11ed-83dd-0b3aef56cc33",
+		"type": [
+			"VerifiableCredential",
+			"AlumniCredential"
+		],
+		"name": "Alumni Credential",
+		"description": "A minimum viable example of an Alumni Credential.",
+		"issuer": "https://vc.example/issuers/5678",
+		"validFrom": "2023-01-01T00:00:00Z",
+		"credentialSubject": {
+			"id": "did:example:abcdefgh",
+			"alumniOf": "The School of Examples"
+		},
+		"proof": {
+			"type": "DataIntegrityProof",
+			"cryptosuite": "ecdsa-rdfc-2019",
+			"created": "2023-02-24T23:36:38Z",
+			"verificationMethod": "https://vc.example/issuers/5678#z82LkuBieyGShVBhvtE2zoiD6Kma4tJGFtkAhxR5pfkp5QPw4LutoYWhvQCnGjdVn14kujQ",
+			"proofPurpose": "assertionMethod",
+			"proofValue": "zpuEu1cJ7Wpb453b4RiV3ex7SKGYm3fdAd4WUTVpR8Me3ZXkCCVUfd4M4TvHF9Wv1tRNWe5SkZhQTGYLUxdugFRGC2uyYRNTnimS6UMN6wkenTViRK1Mei7DooSBpumHHjYu"
+		}
+	}
+}

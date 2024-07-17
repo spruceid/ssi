@@ -64,7 +64,7 @@ impl From<ssi_data_integrity_suites::bbs_2023::Bbs2023SignatureOptions> for AnyS
     }
 }
 
-#[cfg(all(feature = "w3c", any(feature = "secp256r1", feature = "secp384r1")))]
+#[cfg(all(feature = "w3c", feature = "secp256r1"))]
 impl From<AnySignatureOptions> for ssi_data_integrity_suites::ecdsa_sd_2023::SignatureOptions {
     fn from(o: AnySignatureOptions) -> Self {
         Self {
@@ -75,7 +75,7 @@ impl From<AnySignatureOptions> for ssi_data_integrity_suites::ecdsa_sd_2023::Sig
     }
 }
 
-#[cfg(all(feature = "w3c", any(feature = "secp256r1", feature = "secp384r1")))]
+#[cfg(all(feature = "w3c", feature = "secp256r1"))]
 impl From<ssi_data_integrity_suites::ecdsa_sd_2023::SignatureOptions> for AnySignatureOptions {
     fn from(value: ssi_data_integrity_suites::ecdsa_sd_2023::SignatureOptions) -> Self {
         Self {

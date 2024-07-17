@@ -8,9 +8,7 @@ use ssi_data_integrity::{
     AnyDataIntegrity, AnySignatureOptions, AnySuite, CryptographicSuite, DataIntegrityDocument,
     ProofConfiguration,
 };
-use ssi_verification_methods::{multikey::MultikeyPair, AnyMethod, LocalSigner};
-
-use super::MultikeyRing;
+use ssi_verification_methods::{multikey::MultikeyPair, AnyMethod, SingleSecretSigner};
 
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -19,6 +17,7 @@ pub struct SignatureTest {
     pub key_pair: MultikeyPair,
     pub verification_methods: HashMap<IriBuf, AnyMethod>,
     pub configuration: ProofConfiguration<AnySuite>,
+    #[serde(default)]
     pub options: AnySignatureOptions,
     pub input: DataIntegrityDocument,
     pub expected_output: json_syntax::Value,
@@ -26,9 +25,6 @@ pub struct SignatureTest {
 
 impl SignatureTest {
     pub async fn run(mut self) {
-        let mut keys = MultikeyRing::default();
-        keys.insert(self.key_pair);
-
         let (suite, options) = self.configuration.into_suite_and_options();
 
         let vc: AnyDataIntegrity = suite
@@ -36,7 +32,7 @@ impl SignatureTest {
                 SignatureEnvironment::default(),
                 self.input,
                 &self.verification_methods,
-                LocalSigner(&keys),
+                SingleSecretSigner::new(self.key_pair.secret_jwk().unwrap()).into_local(),
                 options.cast(),
                 self.options,
             )

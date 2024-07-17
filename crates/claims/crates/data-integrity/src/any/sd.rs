@@ -30,7 +30,7 @@ impl From<AnySelectionOptions> for ssi_data_integrity_suites::bbs_2023::DeriveOp
     }
 }
 
-#[cfg(all(feature = "w3c", any(feature = "secp256r1", feature = "secp384r1")))]
+#[cfg(all(feature = "w3c", feature = "secp256r1"))]
 impl From<AnySelectionOptions> for ssi_data_integrity_suites::ecdsa_sd_2023::DeriveOptions {
     fn from(value: AnySelectionOptions) -> Self {
         Self {
@@ -67,7 +67,7 @@ where
         };
 
         match self {
-            #[cfg(all(feature = "w3c", any(feature = "secp256r1", feature = "secp384r1")))]
+            #[cfg(all(feature = "w3c", feature = "secp256r1"))]
             Self::EcdsaSd2023 => {
                 let DataIntegrity { claims, proofs } = ssi_data_integrity_suites::EcdsaSd2023
                     .select(

@@ -9,7 +9,6 @@ repository = "https://github.com/spruceid/ssi/"
 documentation = "https://docs.rs/ssi-data-integrity/"
 
 [features]
-default = ["w3c", "bbs"]
 ## Signature suites specified by the W3C.
 ##
 ## This includes:
@@ -49,13 +48,13 @@ secp256k1 = ["ssi-verification-methods/secp256k1", "k256"]
 ## This includes:
 ##   - `EcdsaSecp256r1Signature2019` (requires `w3c`)
 ##   - `EcdsaRdfc2019` (requires `w3c`)
-secp256r1 = ["ssi-verification-methods/secp256r1", "p256"]
+secp256r1 = ["ssi-data-integrity-core/secp256r1", "ssi-verification-methods/secp256r1", "p256"]
 
 ## Signature suites based on secp384r1.
 ##
 ## This includes:
 ##   - `EcdsaRdfc2019` (requires `w3c`)
-secp384r1 = ["ssi-verification-methods/secp384r1", "p384"]
+secp384r1 = ["ssi-data-integrity-core/secp384r1", "ssi-verification-methods/secp384r1", "p384"]
 
 ## Signature suites based on RSA.
 ##

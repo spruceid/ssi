@@ -133,9 +133,9 @@ impl<O> AlgorithmSelection<Multikey, O> for ES256OrES384 {
             .map_err(|_| AlgorithmSelectionError::InvalidKey)?
         {
             #[cfg(feature = "secp256r1")]
-            DecodedMultikey::P256(_) => Ok(Self::ES256),
+            ssi_verification_methods::multikey::DecodedMultikey::P256(_) => Ok(Self::ES256),
             #[cfg(feature = "secp384r1")]
-            DecodedMultikey::P384(_) => Ok(Self::ES384),
+            ssi_verification_methods::multikey::DecodedMultikey::P384(_) => Ok(Self::ES384),
             _ => Err(AlgorithmSelectionError::InvalidKey),
         }
     }
