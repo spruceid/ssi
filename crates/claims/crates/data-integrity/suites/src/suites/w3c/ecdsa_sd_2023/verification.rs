@@ -60,12 +60,11 @@ impl VerificationAlgorithm<EcdsaSd2023> for SignatureAlgorithm {
                         .get(i)
                         .ok_or(ProofValidationError::InvalidProof)?;
 
-                    let quad_string = format!("{quad} .\n");
                     let quad_signature = p256::ecdsa::Signature::from_slice(&quad_signature)
                         .map_err(|_| ProofValidationError::InvalidProof)?;
 
                     if verifying_key
-                        .verify(quad_string.as_bytes(), &quad_signature)
+                        .verify(quad.as_bytes(), &quad_signature)
                         .is_err()
                     {
                         return Ok(ProofValidity::Err(InvalidProof::Signature));
@@ -83,7 +82,7 @@ struct VerifyData<'a> {
     proof_hash: &'a ShaAnyBytes,
     public_key: MultiEncodedBuf,
     signatures: Vec<Vec<u8>>,
-    non_mandatory: Vec<LexicalQuad>,
+    non_mandatory: Vec<String>,
     mandatory_hash: ShaAnyBytes,
 }
 
@@ -99,7 +98,7 @@ fn create_verify_data3<'a>(
     let label_map_factory_function = create_label_map_function(&decoded_signature.label_map);
 
     let label_map = label_map_factory_function(canonical_id_map);
-    let mut canonical_quads = relabel_quads(&label_map, quads);
+    let mut canonical_quads = relabel_quads(&label_map, quads).into_nquads_lines();
     canonical_quads.sort_unstable();
     canonical_quads.dedup();
 
@@ -118,7 +117,7 @@ fn create_verify_data3<'a>(
         }
     }
 
-    let mandatory_hash: ShaAnyBytes = ShaAny::Sha256.hash_all(mandatory.iter().into_nquads_lines());
+    let mandatory_hash: ShaAnyBytes = ShaAny::Sha256.hash_all(&mandatory);
 
     Ok(VerifyData {
         base_signature: decoded_signature.base_signature,

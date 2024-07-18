@@ -11,7 +11,7 @@ use ssi_verification_methods::AnyMethod;
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct SelectionTest {
-    pub id: IriBuf,
+    pub id: Option<IriBuf>,
     pub verification_methods: HashMap<IriBuf, AnyMethod>,
     pub options: AnySelectionOptions,
     pub input: AnyDataIntegrity,
@@ -32,7 +32,10 @@ impl SelectionTest {
         if json != self.expected_output {
             eprintln!("expected: {}", self.expected_output.pretty_print());
             eprintln!("found: {}", json.pretty_print());
-            panic!("test <{}> failed", self.id);
+            match self.id {
+                Some(id) => panic!("test <{}> failed", id),
+                None => panic!("test failed"),
+            }
         }
     }
 }

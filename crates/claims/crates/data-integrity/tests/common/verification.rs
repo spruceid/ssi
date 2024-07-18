@@ -10,7 +10,7 @@ use ssi_verification_methods::AnyMethod;
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct VerificationTest {
-    pub id: IriBuf,
+    pub id: Option<IriBuf>,
     pub verification_methods: HashMap<IriBuf, AnyMethod>,
     pub input: AnyDataIntegrity,
 }
@@ -21,7 +21,10 @@ impl VerificationTest {
         let result = self.input.verify(params).await.unwrap();
 
         if let Err(e) = result {
-            panic!("<{}> verification failed: {e}", self.id);
+            match self.id {
+                Some(id) => panic!("<{}> verification failed: {e}", id),
+                None => panic!("verification failed: {e}"),
+            }
         }
     }
 }

@@ -18,6 +18,14 @@ async fn ecdsa_rdfc_2019_p256_verification() {
         .await
 }
 
+#[cfg(all(feature = "w3c", feature = "secp256r1"))]
+#[async_std::test]
+async fn ecdsa_rdfc_2019_verification_2() {
+    Test::load("ecdsa_rdfc_2019/verification_2.json")
+        .run()
+        .await
+}
+
 #[cfg(all(feature = "w3c", feature = "secp384r1"))]
 #[async_std::test]
 async fn ecdsa_rdfc_2019_p384_signature() {
@@ -42,4 +50,16 @@ async fn ecdsa_sd_2023_selection() {
 #[async_std::test]
 async fn ecdsa_sd_2023_verification() {
     Test::load("ecdsa_sd_2023/verification.json").run().await
+}
+
+#[cfg(all(feature = "w3c", feature = "secp256r1"))]
+#[async_std::test]
+async fn ecdsa_sd_2023_verification_2() {
+    Test::load("ecdsa_sd_2023/verification_2.json").run().await
+}
+
+#[cfg(all(feature = "w3c", feature = "secp256r1"))]
+#[async_std::test]
+async fn ecdsa_sd_2023_verification_3() {
+    Test::load("ecdsa_sd_2023/verification_3.json").run().await
 }
