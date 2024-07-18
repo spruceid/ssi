@@ -18,18 +18,18 @@ async fn ecdsa_rdfc_2019_p256_verification() {
         .await
 }
 
-#[cfg(all(feature = "w3c", feature = "secp256r1"))]
+#[cfg(all(feature = "w3c", feature = "secp384r1"))]
 #[async_std::test]
-async fn ecdsa_rdfc_2019_verification_2() {
-    Test::load("ecdsa_rdfc_2019/verification_2.json")
+async fn ecdsa_rdfc_2019_p384_signature() {
+    Test::load("ecdsa_rdfc_2019/p384_signature.json")
         .run()
         .await
 }
 
 #[cfg(all(feature = "w3c", feature = "secp384r1"))]
 #[async_std::test]
-async fn ecdsa_rdfc_2019_p384_signature() {
-    Test::load("ecdsa_rdfc_2019/p384_signature.json")
+async fn ecdsa_rdfc_2019_p384_verification() {
+    Test::load("ecdsa_rdfc_2019/p384_verification.json")
         .run()
         .await
 }
