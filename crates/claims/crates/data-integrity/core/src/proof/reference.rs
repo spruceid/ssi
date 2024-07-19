@@ -1,6 +1,6 @@
 use std::collections::BTreeMap;
 
-use ssi_verification_methods_core::{ProofPurpose, ReferenceOrOwnedRef};
+use ssi_verification_methods::{ProofPurpose, ReferenceOrOwnedRef};
 
 use crate::{CryptographicSuite, ProofConfigurationRef};
 

@@ -49,6 +49,11 @@ impl MultiEncoded {
         unsafe { std::mem::transmute(bytes) }
     }
 
+    #[allow(clippy::len_without_is_empty)]
+    pub fn len(&self) -> usize {
+        self.0.len()
+    }
+
     #[inline(always)]
     pub fn parts(&self) -> (u64, &[u8]) {
         unsigned_varint::decode::u64(&self.0).unwrap()
@@ -77,6 +82,7 @@ impl MultiEncoded {
     }
 }
 
+#[derive(Clone)]
 pub struct MultiEncodedBuf(Vec<u8>);
 
 impl MultiEncodedBuf {

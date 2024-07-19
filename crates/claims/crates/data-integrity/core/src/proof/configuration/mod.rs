@@ -1,6 +1,6 @@
 use iref::Iri;
 use serde::Serialize;
-use ssi_verification_methods_core::{ProofPurpose, ReferenceOrOwned};
+use ssi_verification_methods::{ProofPurpose, ReferenceOrOwned};
 use static_iref::iri;
 use std::collections::BTreeMap;
 
@@ -138,6 +138,26 @@ impl<S: CryptographicSuite> ProofConfiguration<S> {
         S::ProofOptions: Default,
     {
         Self::from_method_and_options(type_, verification_method, Default::default())
+    }
+
+    pub fn into_suite_and_options(
+        self,
+    ) -> (S, ProofOptions<S::VerificationMethod, S::ProofOptions>) {
+        (
+            self.type_,
+            ProofOptions {
+                context: self.context,
+                created: self.created,
+                verification_method: Some(self.verification_method),
+                proof_purpose: self.proof_purpose,
+                expires: self.expires,
+                domains: self.domains,
+                challenge: self.challenge,
+                nonce: self.nonce,
+                options: self.options,
+                extra_properties: self.extra_properties,
+            },
+        )
     }
 
     pub fn into_options(self) -> ProofOptions<S::VerificationMethod, S::ProofOptions> {

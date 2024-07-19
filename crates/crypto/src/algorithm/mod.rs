@@ -585,6 +585,57 @@ impl TryFrom<AlgorithmInstance> for AnyBlake2b {
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub enum ES256OrES384 {
+    ES256,
+    ES384,
+}
+
+impl ES256OrES384 {
+    pub fn name(&self) -> &'static str {
+        match self {
+            Self::ES256 => "ES256",
+            Self::ES384 => "ES384",
+        }
+    }
+}
+
+impl SignatureAlgorithmType for ES256OrES384 {
+    type Instance = Self;
+}
+
+impl SignatureAlgorithmInstance for ES256OrES384 {
+    type Algorithm = Self;
+
+    fn algorithm(&self) -> Self {
+        *self
+    }
+}
+
+impl fmt::Display for ES256OrES384 {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        self.name().fmt(f)
+    }
+}
+
+impl From<ES256OrES384> for Algorithm {
+    fn from(value: ES256OrES384) -> Self {
+        match value {
+            ES256OrES384::ES256 => Self::ES256,
+            ES256OrES384::ES384 => Self::ES384,
+        }
+    }
+}
+
+impl From<ES256OrES384> for AlgorithmInstance {
+    fn from(value: ES256OrES384) -> Self {
+        match value {
+            ES256OrES384::ES256 => Self::ES256,
+            ES256OrES384::ES384 => Self::ES384,
+        }
+    }
+}
+
 #[derive(Debug, Clone)]
 pub struct BbsInstance(pub Box<BbsParameters>);
 

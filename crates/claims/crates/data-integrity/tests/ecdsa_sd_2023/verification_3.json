@@ -1,0 +1,57 @@
+{
+	"type": "VerificationTest",
+	"verificationMethods": {
+		"did:key:zDnaepBuvsQ8cpsWrVKw8fbpGpvPeNSjVPTWoq6cRqaYzBKVP#zDnaepBuvsQ8cpsWrVKw8fbpGpvPeNSjVPTWoq6cRqaYzBKVP": {
+			"type": "Multikey",
+			"id": "did:key:zDnaepBuvsQ8cpsWrVKw8fbpGpvPeNSjVPTWoq6cRqaYzBKVP#zDnaepBuvsQ8cpsWrVKw8fbpGpvPeNSjVPTWoq6cRqaYzBKVP",
+			"controller": "did:key:zDnaepBuvsQ8cpsWrVKw8fbpGpvPeNSjVPTWoq6cRqaYzBKVP",
+			"publicKeyMultibase": "zDnaepBuvsQ8cpsWrVKw8fbpGpvPeNSjVPTWoq6cRqaYzBKVP"
+		}
+	},
+	"input": {
+		"@context": [
+			"https://www.w3.org/ns/credentials/v2",
+			{
+				"@protected": true,
+				"DriverLicenseCredential": "urn:example:DriverLicenseCredential",
+				"DriverLicense": {
+					"@id": "urn:example:DriverLicense",
+					"@context": {
+						"@protected": true,
+						"id": "@id",
+						"type": "@type",
+						"documentIdentifier": "urn:example:documentIdentifier",
+						"dateOfBirth": "urn:example:dateOfBirth",
+						"expirationDate": "urn:example:expiration",
+						"issuingAuthority": "urn:example:issuingAuthority"
+					}
+				},
+				"driverLicense": {
+					"@id": "urn:example:driverLicense",
+					"@type": "@id"
+				}
+			}
+		],
+		"type": [
+			"VerifiableCredential",
+			"DriverLicenseCredential"
+		],
+		"issuer": "did:key:zDnaepBuvsQ8cpsWrVKw8fbpGpvPeNSjVPTWoq6cRqaYzBKVP",
+		"credentialSubject": {
+			"id": "urn:uuid:1a0e4ef5-091f-4060-842e-18e519ab9440",
+			"driverLicense": {
+				"type": "DriverLicense",
+				"dateOfBirth": "01-01-1990",
+				"expirationDate": "01-01-2030"
+			}
+		},
+		"proof": {
+			"type": "DataIntegrityProof",
+			"created": "2024-07-18T14:38:51Z",
+			"verificationMethod": "did:key:zDnaepBuvsQ8cpsWrVKw8fbpGpvPeNSjVPTWoq6cRqaYzBKVP#zDnaepBuvsQ8cpsWrVKw8fbpGpvPeNSjVPTWoq6cRqaYzBKVP",
+			"cryptosuite": "ecdsa-sd-2023",
+			"proofPurpose": "assertionMethod",
+			"proofValue": "u2V0BhVhAhUknG_rovYoIggiW8fJHHRYrvMgbDNGybpKadJSZ2PV_AXQRCPbL1VgCUHjHzqhR_nEIcP93PxG1HkSQEj297FgjgCQCEvvVHxgENgJ3lU5xCzjBFceTegK-OvZ2A2bwMxbD-2OFWECmLX64z2QrVZwy2TfEAz14KQV6PiX8BeSu8ZfK_2VSszLZ5RxOwh6C_jY9y7pH1ABL6r6KWQbT4ieL30BoY-_OWEDXAiSjbb2pPDs7syt_17oNwOnHFNW7EqpHGGoqzETYRZt9RvL7VixPdRayYXSLyvZ8taBmzlT0DqZVdkj-GWSHWEBEUM8MkkSO7Ow578Z8wEnTCvDbUujdOUo26zi0iu-MUHJXVtw1DHL_ZDWX2TONE-haAiuxg1jUtnvskuh6G5cOWEBx2Lma_DoZzqClsjdTTc4iYFzbOD_dFnnfsViFTzzFh4bNTs4SXjab4u3HPVpkndOT6QH-XI8KqZ8GmszivY0zWEDkvrfhTZQxWYQ-FUXQPOFOszH-PWRUbSQQXc9vUeaaMYPk6pW0yGHPHjzhB-h8IvSaBKmGgIO1FMkpanrUR1N_ogBYIH3xohicTtcoVxCf_xJlY7EYQOTRjaq8lwFRY5EbhaOEAVggBBJO0DMRxBwOFvfQ_0KmA1hqdtf_Gemwe9FKC69MODGDBAUH"
+		}
+	}
+}

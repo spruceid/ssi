@@ -8,8 +8,12 @@ description = "Verifiable Credential Data Integrity 1.0 core implementation for 
 repository = "https://github.com/spruceid/ssi/"
 documentation = "https://docs.rs/ssi-data-integrity/"
 
+[features]
+secp256r1 = ["ssi-verification-methods/secp256r1"]
+secp384r1 = ["ssi-verification-methods/secp384r1"]
+
 [dependencies]
-ssi-verification-methods-core.workspace = true
+ssi-verification-methods.workspace = true
 rdf-types.workspace = true
 xsd-types = { workspace = true, features = ["serde"] }
 linked-data = { workspace = true, features = ["derive"] }

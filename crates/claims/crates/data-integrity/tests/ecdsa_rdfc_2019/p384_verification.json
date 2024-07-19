@@ -1,0 +1,61 @@
+{
+	"type": "VerificationTest",
+	"verificationMethods": {
+		"did:key:z82LkvutaARmY8poLhUnMCAhFbts88q4yDBmkqwRFYbxpFvmE1nbGUGLKf9fD66LGUbXDce#z82LkvutaARmY8poLhUnMCAhFbts88q4yDBmkqwRFYbxpFvmE1nbGUGLKf9fD66LGUbXDce": {
+			"type": "Multikey",
+			"id": "did:key:z82LkvutaARmY8poLhUnMCAhFbts88q4yDBmkqwRFYbxpFvmE1nbGUGLKf9fD66LGUbXDce#z82LkvutaARmY8poLhUnMCAhFbts88q4yDBmkqwRFYbxpFvmE1nbGUGLKf9fD66LGUbXDce",
+			"controller": "did:key:z82LkvutaARmY8poLhUnMCAhFbts88q4yDBmkqwRFYbxpFvmE1nbGUGLKf9fD66LGUbXDce",
+			"publicKeyMultibase": "z82LkvutaARmY8poLhUnMCAhFbts88q4yDBmkqwRFYbxpFvmE1nbGUGLKf9fD66LGUbXDce"
+		}
+	},
+	"input": {
+		"@context": [
+			"https://www.w3.org/2018/credentials/v1",
+			{
+				"@protected": true,
+				"DriverLicenseCredential": "urn:example:DriverLicenseCredential",
+				"DriverLicense": {
+					"@id": "urn:example:DriverLicense",
+					"@context": {
+						"@protected": true,
+						"id": "@id",
+						"type": "@type",
+						"documentIdentifier": "urn:example:documentIdentifier",
+						"dateOfBirth": "urn:example:dateOfBirth",
+						"expirationDate": "urn:example:expiration",
+						"issuingAuthority": "urn:example:issuingAuthority"
+					}
+				},
+				"driverLicense": {
+					"@id": "urn:example:driverLicense",
+					"@type": "@id"
+				}
+			},
+			"https://w3id.org/security/data-integrity/v2"
+		],
+		"id": "urn:uuid:5dce72cb-5b97-4ab0-8b4d-1617482e5505",
+		"type": [
+			"VerifiableCredential",
+			"DriverLicenseCredential"
+		],
+		"credentialSubject": {
+			"id": "urn:uuid:1a0e4ef5-091f-4060-842e-18e519ab9440",
+			"driverLicense": {
+				"type": "DriverLicense",
+				"documentIdentifier": "T21387yc328c7y32h23f23",
+				"dateOfBirth": "01-01-1990",
+				"expirationDate": "01-01-2030",
+				"issuingAuthority": "VA"
+			}
+		},
+		"issuer": "did:key:z82LkvutaARmY8poLhUnMCAhFbts88q4yDBmkqwRFYbxpFvmE1nbGUGLKf9fD66LGUbXDce",
+		"issuanceDate": "2024-07-18T14:02:26Z",
+		"proof": {
+			"type": "DataIntegrityProof",
+			"cryptosuite": "ecdsa-rdfc-2019",
+			"verificationMethod": "did:key:z82LkvutaARmY8poLhUnMCAhFbts88q4yDBmkqwRFYbxpFvmE1nbGUGLKf9fD66LGUbXDce#z82LkvutaARmY8poLhUnMCAhFbts88q4yDBmkqwRFYbxpFvmE1nbGUGLKf9fD66LGUbXDce",
+			"proofPurpose": "assertionMethod",
+			"proofValue": "z56QEeKyiawVpNmLKLiEV4jnxqWFaLg8McRLwxTQanPqx8iHxYEcWzpPAwKv6Mtoari6FiBzkrzZMTJg9MJdFqxL4oaNowupTM1e2GxsyGcnxhk9FD33EAfBWfFwA65A8Wso"
+		}
+	}
+}

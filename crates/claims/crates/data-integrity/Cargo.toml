@@ -9,7 +9,7 @@ repository = "https://github.com/spruceid/ssi/"
 documentation = "https://docs.rs/ssi-claims/"
 
 [features]
-# default = ["w3c", "ed25519", "rsa", "secp256k1", "secp256r1", "tezos", "ethereum", "eip712", "aleo", "solana"]
+default = ["w3c", "ed25519", "rsa", "secp256k1", "secp256r1"]
 
 ## Signature suites specified by the W3C.
 ##
@@ -119,3 +119,8 @@ serde_json.workspace = true
 json-syntax.workspace = true
 thiserror.workspace = true
 chrono.workspace = true
+
+[dev-dependencies]
+ssi-multicodec.workspace = true
+serde = { workspace = true, features = ["derive"] }
+async-std = { workspace = true, features = ["attributes"] }

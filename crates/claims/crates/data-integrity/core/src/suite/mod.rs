@@ -1,7 +1,7 @@
 use ssi_claims_core::{
     ProofPreparationError, ProofValidationError, SignatureEnvironment, SignatureError,
 };
-use ssi_verification_methods_core::VerificationMethod;
+use ssi_verification_methods::VerificationMethod;
 
 mod signature;
 pub use signature::*;

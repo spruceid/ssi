@@ -1,4 +1,4 @@
-use ssi_verification_methods_core::VerificationMethodResolutionError;
+use ssi_verification_methods::VerificationMethodResolutionError;
 
 use crate::{CryptographicSuite, DataIntegrity, ProofRef};
 

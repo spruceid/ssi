@@ -10,7 +10,7 @@ use educe::Educe;
 use serde::{Deserialize, Serialize};
 use ssi_claims_core::{AttachProof, ProofValidationError, ProofValidity, ResourceProvider};
 use ssi_core::{one_or_many::OneOrManyRef, OneOrMany};
-use ssi_verification_methods_core::{ProofPurpose, ReferenceOrOwned};
+use ssi_verification_methods::{ProofPurpose, ReferenceOrOwned};
 use std::collections::BTreeMap;
 use std::{
     borrow::{Borrow, BorrowMut},
@@ -176,6 +176,29 @@ impl<T: CryptographicSuite> Proof<T> {
             nonce: self.nonce.as_deref(),
             options: &self.options,
             extra_properties: &self.extra_properties,
+        }
+    }
+
+    pub fn map_type<U: CryptographicSuite>(
+        self,
+        type_: impl FnOnce(T) -> U,
+        verification_method: impl FnOnce(T::VerificationMethod) -> U::VerificationMethod,
+        options: impl FnOnce(T::ProofOptions) -> U::ProofOptions,
+        signature: impl FnOnce(T::Signature) -> U::Signature,
+    ) -> Proof<U> {
+        Proof {
+            context: self.context,
+            type_: type_(self.type_),
+            created: self.created,
+            verification_method: self.verification_method.map(verification_method),
+            proof_purpose: self.proof_purpose,
+            expires: self.expires,
+            domains: self.domains,
+            challenge: self.challenge,
+            nonce: self.nonce,
+            options: options(self.options),
+            signature: signature(self.signature),
+            extra_properties: self.extra_properties,
         }
     }
 }

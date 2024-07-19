@@ -1,7 +1,7 @@
 use core::fmt;
 use std::{borrow::Cow, ops::Deref, str::FromStr};
 
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Copy, thiserror::Error)]
 #[error("invalid JSON pointer `{0}`")]
@@ -158,9 +158,28 @@ impl FromStr for JsonPointerBuf {
     }
 }
 
+impl TryFrom<String> for JsonPointerBuf {
+    type Error = InvalidJsonPointer;
+
+    fn try_from(value: String) -> Result<Self, Self::Error> {
+        Self::new(value)
+    }
+}
+
 impl fmt::Display for JsonPointerBuf {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         self.0.fmt(f)
+    }
+}
+
+impl<'de> Deserialize<'de> for JsonPointerBuf {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        String::deserialize(deserializer)?
+            .parse()
+            .map_err(serde::de::Error::custom)
     }
 }
 

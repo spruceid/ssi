@@ -4,7 +4,7 @@ use ssi_claims_core::{ProofValidationError, SignatureError};
 use ssi_crypto::algorithm::{SignatureAlgorithmInstance, SignatureAlgorithmType};
 use ssi_jwk::{Algorithm, JWK};
 use ssi_jws::{CompactJWSString, JWSSignature, JWS};
-use ssi_verification_methods_core::{MessageSigner, VerifyBytes, VerifyBytesWithRecoveryJwk};
+use ssi_verification_methods::{MessageSigner, VerifyBytes, VerifyBytesWithRecoveryJwk};
 
 use crate::{
     suite::standard::{

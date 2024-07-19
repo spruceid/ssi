@@ -1,7 +1,7 @@
 //! Data Integrity BBS Cryptosuite 2023 (v1.0) implementation.
 //!
 //! See: <https://www.w3.org/TR/vc-di-bbs/#bbs-2023>
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use ssi_claims_core::ResolverProvider;
 use ssi_data_integrity_core::{
     suite::{
@@ -11,7 +11,7 @@ use ssi_data_integrity_core::{
     CryptosuiteStr, DataIntegrity, ProofConfiguration, ProofRef, StandardCryptographicSuite, Type,
     TypeRef, UnsupportedProofSuite,
 };
-use ssi_di_sd_primitives::{HmacKey, JsonPointerBuf};
+use ssi_di_sd_primitives::{HmacSha256Key, JsonPointerBuf};
 use ssi_json_ld::{Expandable, ExpandedDocument, JsonLdLoaderProvider, JsonLdNodeObject};
 use ssi_rdf::LexicalInterpretation;
 use ssi_verification_methods::{Multikey, VerificationMethodResolver};
@@ -109,10 +109,11 @@ pub struct Bbs2023SignatureOptions {
 
     pub commitment_with_proof: Option<Vec<u8>>,
 
-    pub hmac_key: Option<HmacKey>,
+    pub hmac_key: Option<HmacSha256Key>,
 }
 
-#[derive(Debug, Default, Clone, Copy)]
+#[derive(Debug, Default, Clone, Copy, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub enum FeatureOption {
     #[default]
     Baseline,

@@ -26,6 +26,8 @@ pub use ref_or_value::*;
 mod replay_map;
 pub use replay_map::*;
 
+mod configuration;
+
 impl<'de, T: DeserializeCryptographicSuite<'de>> Proof<T> {
     fn deserialize_with_type<S>(type_: Type, mut deserializer: S) -> Result<Self, S::Error>
     where

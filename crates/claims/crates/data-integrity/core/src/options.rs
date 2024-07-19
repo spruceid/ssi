@@ -1,7 +1,7 @@
 use std::collections::BTreeMap;
 
 use serde::{Deserialize, Serialize};
-use ssi_verification_methods_core::{ProofPurpose, ReferenceOrOwned};
+use ssi_verification_methods::{ProofPurpose, ReferenceOrOwned};
 
 use crate::{suite::ConfigurationError, CryptographicSuite, ProofConfiguration};
 

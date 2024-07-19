@@ -38,8 +38,8 @@ impl VerificationAlgorithm<Bbs2023> for Bbs2023SignatureAlgorithm {
 
                 let disclosed_messages: Vec<_> = data
                     .non_mandatory
-                    .iter()
-                    .map(|quad| format!("{quad} .\n").into_bytes())
+                    .into_iter()
+                    .map(String::into_bytes)
                     .collect();
 
                 match data.feature_option {
@@ -61,7 +61,7 @@ impl VerificationAlgorithm<Bbs2023> for Bbs2023SignatureAlgorithm {
 struct VerifyData<'a> {
     base_signature: Vec<u8>,
     proof_hash: &'a [u8; 32],
-    non_mandatory: Vec<LexicalQuad>,
+    non_mandatory: Vec<String>,
     mandatory_hash: [u8; 32],
     selective_indexes: Vec<usize>,
     feature_option: DerivedFeatureOption,
@@ -80,7 +80,7 @@ fn create_verify_data3<'a>(
     let label_map_factory_function = create_label_map_function(&decoded_signature.label_map);
 
     let label_map = label_map_factory_function(canonical_id_map);
-    let mut canonical_quads = relabel_quads(&label_map, quads);
+    let mut canonical_quads = relabel_quads(&label_map, quads).into_nquads_lines();
     canonical_quads.sort_unstable();
     canonical_quads.dedup();
 
@@ -101,8 +101,6 @@ fn create_verify_data3<'a>(
 
     let mandatory_hash: [u8; 32] = mandatory
         .iter()
-        .into_nquads_lines()
-        .into_iter()
         .fold(Sha256::new(), |h, line| h.chain_update(line.as_bytes()))
         .finalize()
         .into();

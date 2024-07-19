@@ -1,20 +1,19 @@
-use hmac::Mac;
 use iref::Iri;
 use rdf_types::{BlankId, BlankIdBuf, Id, LexicalQuad, LexicalQuadRef, Literal, Quad, Term};
 use ssi_rdf::urdna2015::NormalizingSubstitution;
 use std::collections::HashMap;
 
-use crate::HmacSha256;
+use crate::HmacShaAny;
 
 pub fn create_hmac_id_label_map_function(
-    hmac: &mut HmacSha256,
+    hmac: &mut HmacShaAny,
 ) -> impl '_ + FnMut(&NormalizingSubstitution) -> HashMap<BlankIdBuf, BlankIdBuf> {
     move |canonical_map| {
         canonical_map
             .iter()
             .map(|(key, value)| {
                 hmac.update(value.suffix().as_bytes());
-                let digest = hmac.finalize_reset().into_bytes();
+                let digest = hmac.finalize_reset();
                 let b64_url_digest = BlankIdBuf::new(format!(
                     "_:u{}",
                     base64::encode_config(digest, base64::URL_SAFE_NO_PAD)

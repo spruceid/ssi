@@ -3,7 +3,7 @@ use std::marker::PhantomData;
 use multibase::Base;
 use ssi_claims_core::{ProofValidationError, ProofValidity, SignatureError};
 use ssi_crypto::algorithm::SignatureAlgorithmInstance;
-use ssi_verification_methods_core::{MessageSigner, VerifyBytes};
+use ssi_verification_methods::{MessageSigner, VerifyBytes};
 
 use crate::{
     suite::standard::{

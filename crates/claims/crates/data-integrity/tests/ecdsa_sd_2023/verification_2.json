@@ -1,0 +1,97 @@
+{
+	"type": "VerificationTest",
+	"verificationMethods": {
+		"did:key:zDnaepBuvsQ8cpsWrVKw8fbpGpvPeNSjVPTWoq6cRqaYzBKVP#zDnaepBuvsQ8cpsWrVKw8fbpGpvPeNSjVPTWoq6cRqaYzBKVP": {
+			"type": "Multikey",
+			"id": "did:key:zDnaepBuvsQ8cpsWrVKw8fbpGpvPeNSjVPTWoq6cRqaYzBKVP#zDnaepBuvsQ8cpsWrVKw8fbpGpvPeNSjVPTWoq6cRqaYzBKVP",
+			"controller": "did:key:zDnaepBuvsQ8cpsWrVKw8fbpGpvPeNSjVPTWoq6cRqaYzBKVP",
+			"publicKeyMultibase": "zDnaepBuvsQ8cpsWrVKw8fbpGpvPeNSjVPTWoq6cRqaYzBKVP"
+		}
+	},
+	"input": {
+		"@context": [
+			"https://www.w3.org/ns/credentials/v2",
+			{
+				"@protected":true,
+				"ExampleAchievementCredential": "urn:example:ExampleAchievementCredential",
+				"WindsailingAchievement": {
+					"@id":"urn:example:WindsailingAchievement",
+					"@context": {
+						"@protected": true,
+						"id": "@id",
+						"type": "@type",
+						"sailNumber": "urn:example:sailNumber",
+						"sails":{
+							"@id": "urn:example:sails",
+							"@context": {
+								"@protected": true,
+								"sailName": "urn:example:sailName",
+								"size": "urn:example:size",
+								"year": "urn:example:year"
+							}
+						},
+						"boards": {
+							"@id": "urn:example:boards",
+							"@context": {
+								"@protected": true,
+								"boardName": "urn:example:boardName",
+								"brand": "urn:example:brand",
+								"year": "urn:example:year"
+							}
+						}
+					}
+				},
+				"achievements": {
+					"@id": "urn:example:achievements",
+					"@type": "@id"
+				}
+			}
+		],
+		"type": ["VerifiableCredential","ExampleAchievementCredential"],
+		"issuer": "did:key:zDnaepBuvsQ8cpsWrVKw8fbpGpvPeNSjVPTWoq6cRqaYzBKVP",
+		"credentialSubject": {
+			"achievements": [
+				{
+					"type": "WindsailingAchievement",
+					"sails": [
+						{
+							"size": 6.1,
+							"sailName": "Eagle-FR",
+							"year": 2023
+						},
+						{
+							"size": 7,
+							"sailName": "Eagle-FR",
+							"year": 2020
+						},
+						{
+							"size": 7.8,
+							"sailName": "Eagle-FR",
+							"year": 2023
+						}
+					],
+					"boards":[
+						{"boardName":"CompFoil170","brand":"Tillo","year":2022},
+						{"boardName":"Tillo Custom","brand":"Tillo","year":2019}
+					]
+				},
+				{
+					"type":"WindsailingAchievement",
+					"sailNumber":"Mars101",
+					"sails": [
+						{"size":5.9,"sailName":"Chicken","year":2022},
+						{"size":4.9,"sailName":"Vulture-FR","year":2023}
+					]
+				}
+			]
+		},
+		"proof":{
+			"type":"DataIntegrityProof",
+			"created":"2024-07-18T14:02:31Z",
+			"verificationMethod":"did:key:zDnaepBuvsQ8cpsWrVKw8fbpGpvPeNSjVPTWoq6cRqaYzBKVP#zDnaepBuvsQ8cpsWrVKw8fbpGpvPeNSjVPTWoq6cRqaYzBKVP",
+			"cryptosuite":"ecdsa-sd-2023",
+			"proofPurpose":"assertionMethod",
+			"proofValue":"u2V0BhVhATjCU5xPjKFYvaAagQfzr18jP5_f_wOi0u1r6BcZ4Wd7cTYuESQqC_WX-HjW-viaEEZeKpJuF8HjjxuG1czaOxlgjgCQCElBZxYIVrcZlMqRQuTo08AeYA1oLmqWorFUihOxENTuYIlhAwsTMNS-BuZsd44u7B8zutJbSrbzUgVoIekuwcLSWz4enhAjCiQ1uLh8nD3J6lBpw2C85OMDFuJpy2stvPopBaVhAckAM-L7tMuii3OaeKs8fwTRN29zDjP_Yqs7MsPyuoeK4WhQ49eM0xIhYr2viIC1dXcshbMqGoKlyEBzoJBcRQVhAAcej6x3pkg9KIJMA9syISoOD8KPZS1XokUYGp9lcCwpph4h0FV41xAaN-loFmgO5TJgILoFa89Nm-rn3QRMkB1hAI6K5uhFBwxRgo8hdBooxP2QSEFPYMxh9OiBnKwD2NxgeSinb_I7N-l72QGzELdbFZIqVh0glHYF0WnaUa1cKkFhA91UFT7TW9hos5H8RUB-wDttEP0hU0jtas_RK4CI825TdECZYMZ6W436xjt-zqA9Ns0TG9y7DrdlIrkUFRhoSL1hALJkFyJyLSxiJCk1uOrZ7jzujrrP6epTASTkHwxGYADA0q7KaqWfVd2qwobRxJWNfVLirKyPm_sJ7-_iYdUNiNFhAfXIDFzOOugs6AdCJkjJtKEPAcZzHGZC0TT3D9I8Vk-co3hUznecjvQchPpp_5CerWsFBmI9nQt9y5OQ9CcWPAFhAcgpQxRf-ZutVIrgRXyvbeGLOo7vWKG6mPsMcq4saH66iV4Y1QF76NCRcbdbHmXZ7uABrTCXmgYWqU8AjPhbCMFhAX8V6Xiup6zvK91PtBJAAmMZXdIjwDrr75ZDOEoxsGhVrcwy0cib867B6IgujxcJMfvUCQdM2VH9xoqpkTuKfW1hA8ZwnYGB8MfqDW2ouZwGg3ovO1etIUBeY1eHvMenqbkWXyCHerNR6ROP2zYISpg4L5783c4uQcD6p9zdj-fiBflhAQy1ebIkt9Sd8xkd_tnPOOp-JDAfix57kxuuAw5G-wjMuYi1noZEB2aj8bD41C_K4nrSMAGiBL2Sm-1z9It3LyFhAehX5KSbDSS9zkiS3ZOKLzagHIBQ0ZXIpDWUSI9oz6KhqOHKcZcETLT0jTcjpGbwQA55sZirmuh2_riI9b2-n01hANpTkhPWfL3xQASTQ4mMiJzVWeTgeFm266OIQCAQd8Iip4ykjwYo5y_fh2cvpgnb9HCHy3FIW8aNIkouRwba9E1hAI4U5oYA9Uzla58Q_pocLa7xPIRicJPJkwo-2waJB_9nZiUsLGJ-ROw0ZtblJY0A84ooEEWbdpgcH7SAsGFHn6lhANsuaqjotPJZXld6FbhigXjUUZK4Bxohj-BMzhebrYBNOv667ssJrrSOnjwkDwYnX3QAN-rDqq-CJv_iYT-1jVVhAwl_Tghgv9wmQvo6HdZMXTXx47oVmoHtfu86sasz0pWt-OEiAxaOQkzVFvoUBmfh9QN77dyg03cz_DPm4Z3SkMVhApQydLvzGjiJY6-7CPWHy-YUJrF3liKDqCkjSB0rF5IvPC-fOydnXUgeZuE64YCVF6a1_XuQrhcw3XqiFbdzC_lhAxTdwwv5FA0fXrpLXdSOKUcUu-Sw6xPHpQ642rHYsrG9ivhNMRcFrJuURXB0JgmXvnwMeP7g90d5soIHHrHeHaFhAyp93XLgwvb1CyAV6W41X7qVe2_tPVfq9TJ19VYdHs5S1nUibnbpTYs3INe69e6jgmvwg8vXuWmVq5qhciyoMT1hAILiI2_YqaZKBDNFURXp_dpyzhxqsR47v-vqct3d8l_--JNn3BpILnZtoxT-u2uEugd2zGvYSk6ag5a2QXXxXdFhAmwoNJ6_nJBAX72VOZiwQBDnIb4PTXVBGhgmLCXZY1NUviNbhAJVTpqDd1k_lncNNaJvpqaNJYIwUUCjov1AoNlhAW1llVpyXZ5uAKufTRfhy3LlqjShD9cOeuoR5fX9cH1RpQkdupWs8n-dshfxuVd0c7nWNzq8PH4sP2IHWfxa-9lhAQy6WNFRuRXIwuv7kgOpSusBIRZ5iAy9tRR10zw17ofw88XBkF6xHdbfwiy3d5DedBTz3myqu_9s_Scrr_OMwGlhASp9t7cPQXXirUDPZOCV_leukSvb2KutdUxzKONJDumuyPuFaIJ2-DP_BqQKQyKmfYF5SZGEHjhw_ihhTXJuqjlhAZELTnSn-xhw9HqvjV5K-Pu5zC6QPdA-TQlPY0pI2CDZ2K772fpqELKWdbFGj66o7HWUjbYNxpr5qaX9VpEeldlhAAz7sFxpT_3W-YezehTTMRB65tobqizAHkEcoB5o9EZV_SXnNZvUbDXPBgZfsU8xBx1YGjWRkEu8UzLNzxRAy4lhANeyAhcLKm171JAZxHQjEDM3xYmP6kqPkfDfghehQK_i6g_O2RFU-5KWg18BvmH7QbYKg0QMK6Is5TQiwFYSOh1hAMX_7RlMMQUx8v9pzy1Vnh-_Sp0bOyyaY9l6v9UlD-54S4d5qkAV_l-mnqCwGm4TB0MM8mlLL_DaIl71YatAel1hABRfGIAm-fCaEsbF9QXfZRX3zMjgTMj-7A1ZlCt1jFVyY-aqF3D4U25cZywhxmOUAQBV-Fv1iKKmO2FfkDw5VflhA9RGL9H6NyizwLjs0HPkqYXh67jUyGzGlMmeUvGafw6aGNxdGDRF1p43DteOxfYUF7Rq4DgUb0Krbc0qY0rGL2lhAZcVJgwEcDjavmBc_KwKeKx2Pm5f2BPCI3pwdqeLAi7fzrztueGVpt_JDW0Zh6qYQNAW9YGGZCYTZuz6g2MOCDVhAmexJ2c25tDR-sCYaDpDyLW29N5osEkpP_U0AIuNDtzcEac6wbrQVlfYKbsb8C93WmixQ29sGlwaKpcm7WZtvOlhAg6IAG5VfwJYUUWO46k6iT22dc3t3JkFNFuMsL1wHWwzjy6DtKwVe4Xo2hVtsY57d77GU1lxODXEbH7gmnvu9B1hAa624k561MBdKF8M8TEJKUtoq-C8_GsbwxgBETQZ31egbYN6jfoOZamUkGHCKmrm8kPaAm5aYNRcZtLGfM9KBoasAWCDEsuOsTpogGxgW4AIkONPOwaoDlXnhhyLCk3FJXJ6srwFYIJ98Njsm2rjA0kjkDRmHYoAMOHaIJsOjc_ZnMDMkvUQDAlggFiR_Ln1SE_MlGSrJUShlA05lxmwzsbxYlHs7II3Wtb4DWCByDlkIF5Rs2bl6vYsiuyJ5CWmhqCcZ9WXHY5laZAPz4wRYILywufXNFMHWeaH65ReSI-jeqVz1lKhpvMqVz5XBrJN5BVggkjO8Pq2dQplzdr0I84c4O5UIlktsGYY9c3IN5LLTIIwGWCCBqpuXQO6WzGNTLbvZslCdIHKH_ZhdR2kaWKtKw_jZEgdYIPvIeHZCCAJxFbxyRZW2bFWOEj5PGoSdOB__fx_qDHT0CFggX9H9fl_XP0ZuxhuhdB_1N96tYtp1IXCr-K9YUl2NlOMJWCBdBHiVzJuLTWYUv_FaUl_CSnFowhTfX-GiyKzrzghP2gpYIIS9RZGOYuP0Byt5_aB-8O04NJU6QQUIIVjb21uMxh1EgxghGCIYJA"
+		}
+	}
+}

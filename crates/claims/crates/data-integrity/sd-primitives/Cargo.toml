@@ -21,9 +21,10 @@ digest.workspace = true
 serde = { workspace = true, features = ["derive"] }
 thiserror.workspace = true
 uuid = { workspace = true, features = ["v4"] }
+getrandom.workspace = true
+hex.workspace = true
 
 [dev-dependencies]
 async-std = { workspace = true, features = ["attributes"] }
 lazy_static.workspace = true
 json-syntax.workspace = true
-hex.workspace = true

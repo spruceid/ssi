@@ -4,7 +4,7 @@ use std::borrow::Cow;
 use ssi_claims_core::{
     ProofValidationError, ProofValidity, ResolverProvider, ResourceProvider, SignatureError,
 };
-use ssi_verification_methods_core::{Signer, VerificationMethodResolver, VerificationMethodSet};
+use ssi_verification_methods::{Signer, VerificationMethodResolver, VerificationMethodSet};
 
 use crate::{CryptographicSuite, ProofConfigurationRef, ProofRef, TypeRef};
 
@@ -61,6 +61,7 @@ pub trait StandardCryptographicSuite: Clone {
         context: &C,
         unsecured_document: &T,
         proof_configuration: ProofConfigurationRef<'_, Self>,
+        verification_method: &Self::VerificationMethod,
         transformation_options: TransformationOptions<Self>,
     ) -> Result<TransformedData<Self>, TransformationError>
     where
@@ -70,6 +71,7 @@ pub trait StandardCryptographicSuite: Clone {
             context,
             unsecured_document,
             proof_configuration,
+            verification_method,
             transformation_options,
         )
         .await
@@ -131,7 +133,7 @@ where
         proof_configuration: ProofConfigurationRef<'_, Self>,
         transformation_options: TransformationOptions<Self>,
     ) -> Result<Self::Signature, SignatureError> {
-        let options = ssi_verification_methods_core::ResolutionOptions {
+        let options = ssi_verification_methods::ResolutionOptions {
             accept: Some(Box::new(Self::VerificationMethod::type_set())),
         };
 
@@ -145,7 +147,13 @@ where
             .await?;
 
         let transformed = self
-            .transform(context, claims, proof_configuration, transformation_options)
+            .transform(
+                context,
+                claims,
+                proof_configuration,
+                &method,
+                transformation_options,
+            )
             .await?;
 
         let hashed = self.hash(transformed, proof_configuration, &method)?;
@@ -174,7 +182,7 @@ where
         proof: ProofRef<'_, Self>,
         transformation_options: TransformationOptions<S>,
     ) -> Result<ProofValidity, ProofValidationError> {
-        let options = ssi_verification_methods_core::ResolutionOptions {
+        let options = ssi_verification_methods::ResolutionOptions {
             accept: Some(Box::new(Self::VerificationMethod::type_set())),
         };
 
@@ -191,6 +199,7 @@ where
                 verifier,
                 claims,
                 proof_configuration,
+                &method,
                 transformation_options,
             )
             .await?;

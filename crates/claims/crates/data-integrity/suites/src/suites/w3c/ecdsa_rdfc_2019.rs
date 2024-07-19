@@ -1,14 +1,13 @@
 //! `ecdsa-rdfc-2019` cryptosuite implementation.
 //!
 //! See: <https://www.w3.org/TR/vc-di-ecdsa/#ecdsa-rdfc-2019>
-use core::fmt;
-use ssi_crypto::algorithm::{SignatureAlgorithmInstance, SignatureAlgorithmType};
+use ssi_crypto::algorithm::ES256OrES384;
 use ssi_data_integrity_core::{
     canonicalization::{
         CanonicalClaimsAndConfiguration, CanonicalizeClaimsAndConfiguration,
         HashCanonicalClaimsAndConfiguration,
     },
-    signing::{AlgorithmSelection, AlgorithmSelectionError, Base58Btc, MultibaseSigning},
+    signing::{Base58Btc, MultibaseSigning},
     suite::{
         standard::{HashingAlgorithm, HashingError},
         NoConfiguration,
@@ -97,85 +96,6 @@ impl AsRef<[u8]> for EcdsaRdfc2019Hash {
         match self {
             Self::Sha256(b) => b.as_ref(),
             Self::Sha384(b) => b.as_ref(),
-        }
-    }
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub enum ES256OrES384 {
-    ES256,
-    ES384,
-}
-
-impl ES256OrES384 {
-    pub fn name(&self) -> &'static str {
-        match self {
-            Self::ES256 => "ES256",
-            Self::ES384 => "ES384",
-        }
-    }
-}
-
-impl SignatureAlgorithmType for ES256OrES384 {
-    type Instance = Self;
-}
-
-impl SignatureAlgorithmInstance for ES256OrES384 {
-    type Algorithm = Self;
-
-    fn algorithm(&self) -> Self {
-        *self
-    }
-}
-
-impl fmt::Display for ES256OrES384 {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        self.name().fmt(f)
-    }
-}
-
-impl<O> AlgorithmSelection<Multikey, O> for ES256OrES384 {
-    fn select_algorithm(
-        verification_method: &Multikey,
-        _options: &O,
-    ) -> Result<Self, AlgorithmSelectionError> {
-        match verification_method
-            .public_key
-            .decode()
-            .map_err(|_| AlgorithmSelectionError::InvalidKey)?
-        {
-            #[cfg(feature = "secp256r1")]
-            DecodedMultikey::P256(_) => Ok(Self::ES256),
-            #[cfg(feature = "secp384r1")]
-            DecodedMultikey::P384(_) => Ok(Self::ES384),
-            _ => Err(AlgorithmSelectionError::InvalidKey),
-        }
-    }
-}
-
-impl From<ES256OrES384> for ssi_jwk::Algorithm {
-    fn from(value: ES256OrES384) -> Self {
-        match value {
-            ES256OrES384::ES256 => Self::ES256,
-            ES256OrES384::ES384 => Self::ES384,
-        }
-    }
-}
-
-impl From<ES256OrES384> for ssi_crypto::Algorithm {
-    fn from(value: ES256OrES384) -> Self {
-        match value {
-            ES256OrES384::ES256 => Self::ES256,
-            ES256OrES384::ES384 => Self::ES384,
-        }
-    }
-}
-
-impl From<ES256OrES384> for ssi_crypto::AlgorithmInstance {
-    fn from(value: ES256OrES384) -> Self {
-        match value {
-            ES256OrES384::ES256 => Self::ES256,
-            ES256OrES384::ES384 => Self::ES384,
         }
     }
 }

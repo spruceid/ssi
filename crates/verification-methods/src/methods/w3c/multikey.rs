@@ -514,3 +514,38 @@ impl MultiCodec for DecodedMultikey {
         }
     }
 }
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct MultikeyPair {
+    #[serde(rename = "publicKeyMultibase")]
+    pub public: MultibaseBuf,
+
+    #[serde(rename = "secretKeyMultibase")]
+    pub secret: MultibaseBuf,
+}
+
+impl MultikeyPair {
+    pub fn public_jwk(&self) -> Result<JWK, ToJWKError> {
+        let (_, decoded) = self.public.decode()?;
+        let multi_encoded = MultiEncodedBuf::new(decoded)?;
+        JWK::from_multicodec(&multi_encoded).map_err(Into::into)
+    }
+
+    pub fn secret_jwk(&self) -> Result<JWK, ToJWKError> {
+        let (_, decoded) = self.secret.decode()?;
+        let multi_encoded = MultiEncodedBuf::new(decoded)?;
+        JWK::from_multicodec(&multi_encoded).map_err(Into::into)
+    }
+}
+
+#[derive(Debug, thiserror::Error)]
+pub enum ToJWKError {
+    #[error(transparent)]
+    Multibase(#[from] multibase::Error),
+
+    #[error(transparent)]
+    MultiCodec(#[from] ssi_multicodec::Error),
+
+    #[error(transparent)]
+    JWK(#[from] ssi_jwk::FromMulticodecError),
+}

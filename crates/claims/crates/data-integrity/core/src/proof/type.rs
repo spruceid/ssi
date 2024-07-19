@@ -47,6 +47,14 @@ impl Type {
     }
 }
 
+impl TryFrom<CompactType> for Type {
+    type Error = MissingCryptosuite;
+
+    fn try_from(value: CompactType) -> Result<Self, MissingCryptosuite> {
+        Self::new(value.name, value.cryptosuite)
+    }
+}
+
 impl fmt::Display for Type {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
@@ -65,6 +73,17 @@ impl<'a> PartialEq<TypeRef<'a>> for Type {
             (Self::Other(a), TypeRef::Other(b)) => a == b,
             _ => false,
         }
+    }
+}
+
+impl<'de> Deserialize<'de> for Type {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        CompactType::deserialize(deserializer)?
+            .try_into()
+            .map_err(serde::de::Error::custom)
     }
 }
 

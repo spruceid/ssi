@@ -1,6 +1,6 @@
 use ssi_claims_core::{ProofValidationError, SignatureError};
 use ssi_crypto::{
-    algorithm::{self, Algorithm, SignatureAlgorithmType},
+    algorithm::{self, Algorithm, ES256OrES384, SignatureAlgorithmType},
     AlgorithmInstance,
 };
 
@@ -9,6 +9,7 @@ pub use jws::*;
 
 mod multibase;
 pub use multibase::*;
+use ssi_verification_methods::Multikey;
 
 pub enum AlgorithmSelectionError {
     MissingAlgorithm,
@@ -40,9 +41,7 @@ pub trait AlgorithmSelection<M, O>: SignatureAlgorithmType {
     ) -> Result<Self::Instance, AlgorithmSelectionError>;
 }
 
-impl<M: ssi_verification_methods_core::JwkVerificationMethod, O> AlgorithmSelection<M, O>
-    for Algorithm
-{
+impl<M: ssi_verification_methods::JwkVerificationMethod, O> AlgorithmSelection<M, O> for Algorithm {
     fn select_algorithm(
         verification_method: &M,
         _options: &O,
@@ -55,7 +54,7 @@ impl<M: ssi_verification_methods_core::JwkVerificationMethod, O> AlgorithmSelect
     }
 }
 
-impl<M: ssi_verification_methods_core::JwkVerificationMethod, O> AlgorithmSelection<M, O>
+impl<M: ssi_verification_methods::JwkVerificationMethod, O> AlgorithmSelection<M, O>
     for ssi_jwk::Algorithm
 {
     fn select_algorithm(
@@ -120,6 +119,25 @@ impl<M, O> AlgorithmSelection<M, O> for algorithm::ESBlake2b {
         _options: &O,
     ) -> Result<Self, AlgorithmSelectionError> {
         Ok(Self)
+    }
+}
+
+impl<O> AlgorithmSelection<Multikey, O> for ES256OrES384 {
+    fn select_algorithm(
+        verification_method: &Multikey,
+        _options: &O,
+    ) -> Result<Self, AlgorithmSelectionError> {
+        match verification_method
+            .public_key
+            .decode()
+            .map_err(|_| AlgorithmSelectionError::InvalidKey)?
+        {
+            #[cfg(feature = "secp256r1")]
+            ssi_verification_methods::multikey::DecodedMultikey::P256(_) => Ok(Self::ES256),
+            #[cfg(feature = "secp384r1")]
+            ssi_verification_methods::multikey::DecodedMultikey::P384(_) => Ok(Self::ES384),
+            _ => Err(AlgorithmSelectionError::InvalidKey),
+        }
     }
 }
 

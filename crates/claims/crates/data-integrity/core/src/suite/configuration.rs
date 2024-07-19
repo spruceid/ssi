@@ -29,6 +29,9 @@ pub enum ConfigurationError {
     #[error("missing option `{0}`")]
     MissingOption(String),
 
+    #[error("invalid option `{0}`")]
+    InvalidOption(String),
+
     #[error("{0}")]
     Other(String),
 }
@@ -40,6 +43,10 @@ impl From<std::convert::Infallible> for ConfigurationError {
 }
 
 impl ConfigurationError {
+    pub fn invalid_option(e: impl ToString) -> Self {
+        Self::InvalidOption(e.to_string())
+    }
+
     pub fn other(e: impl ToString) -> Self {
         Self::Other(e.to_string())
     }
