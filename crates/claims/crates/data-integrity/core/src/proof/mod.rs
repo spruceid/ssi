@@ -48,8 +48,11 @@ pub struct Proof<S: CryptographicSuite> {
     pub type_: S,
 
     /// Date a creation of the proof.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub created: Option<xsd_types::DateTime>,
+    #[serde(
+        deserialize_with = "de::deserialize_datetime_utc",
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub created: Option<xsd_types::DateTimeStamp>,
 
     /// Verification method.
     #[serde(serialize_with = "S::serialize_verification_method_ref")]
@@ -59,7 +62,10 @@ pub struct Proof<S: CryptographicSuite> {
     pub proof_purpose: ProofPurpose,
 
     /// Specifies when the proof expires.
-    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(
+        deserialize_with = "de::deserialize_datetime_utc",
+        skip_serializing_if = "Option::is_none"
+    )]
     pub expires: Option<xsd_types::DateTimeStamp>,
 
     #[allow(rustdoc::bare_urls)]
@@ -113,7 +119,7 @@ impl<T: CryptographicSuite> Proof<T> {
     /// Creates a new proof.
     pub fn new(
         type_: T,
-        created: xsd_types::DateTime,
+        created: xsd_types::DateTimeStamp,
         verification_method: ReferenceOrOwned<T::VerificationMethod>,
         proof_purpose: ProofPurpose,
         options: T::ProofOptions,

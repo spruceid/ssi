@@ -336,8 +336,11 @@ async fn credential_prove_verify_did_tz2() {
     let params = VerificationParameters::from_resolver(&didtz);
     let signer = SingleSecretSigner::new(key.clone()).into_local();
 
+    let issuance_date = cred.issuance_date.clone().unwrap();
+    let created_date =
+        xsd_types::DateTimeStamp::new(issuance_date.date_time, issuance_date.offset.unwrap());
     let vc_issue_options = SuiteOptions::new(
-        cred.issuance_date.clone().unwrap(),
+        created_date,
         IriBuf::new(format!("{did}#blockchainAccountId"))
             .unwrap()
             .into(),
@@ -431,8 +434,11 @@ async fn credential_prove_verify_did_tz3() {
     let params = VerificationParameters::from_resolver(&didtz);
     let signer = SingleSecretSigner::new(key.clone()).into_local();
 
+    let issuance_date = cred.issuance_date.clone().unwrap();
+    let created_date =
+        xsd_types::DateTimeStamp::new(issuance_date.date_time, issuance_date.offset.unwrap());
     let vc_issue_options = SuiteOptions::new(
-        cred.issuance_date.clone().unwrap(),
+        created_date,
         IriBuf::new(format!("{did}#blockchainAccountId"))
             .unwrap()
             .into(),

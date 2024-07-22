@@ -28,6 +28,18 @@ pub use replay_map::*;
 
 mod configuration;
 
+fn datetime_to_utc_datetimestamp(
+    d: Option<xsd_types::DateTime>,
+) -> Option<xsd_types::DateTimeStamp> {
+    d.map(|d| {
+        xsd_types::DateTimeStamp::new(
+            d.date_time,
+            d.offset
+                .unwrap_or(chrono::FixedOffset::east_opt(0).unwrap()),
+        )
+    })
+}
+
 impl<'de, T: DeserializeCryptographicSuite<'de>> Proof<T> {
     fn deserialize_with_type<S>(type_: Type, mut deserializer: S) -> Result<Self, S::Error>
     where
@@ -38,10 +50,10 @@ impl<'de, T: DeserializeCryptographicSuite<'de>> Proof<T> {
             .map_err(|_| serde::de::Error::custom("unexpected cryptosuite"))?;
 
         let mut context = None;
-        let mut created = None;
+        let mut created: Option<xsd_types::DateTime> = None;
         let mut verification_method = None;
         let mut proof_purpose = None;
-        let mut expires = None;
+        let mut expires: Option<xsd_types::DateTime> = None;
         let mut domains = None;
         let mut challenge = None;
         let mut nonce = None;
@@ -86,13 +98,13 @@ impl<'de, T: DeserializeCryptographicSuite<'de>> Proof<T> {
         Ok(Self {
             context,
             type_: suite,
-            created,
+            created: datetime_to_utc_datetimestamp(created),
             verification_method: verification_method
                 .map(|v| v.map(VerificationMethodOf::unwrap).into())
                 .ok_or_else(|| serde::de::Error::custom("missing `verificationMethod` property"))?,
             proof_purpose: proof_purpose
                 .ok_or_else(|| serde::de::Error::custom("missing `proofPurpose` property"))?,
-            expires,
+            expires: datetime_to_utc_datetimestamp(expires),
             domains: domains.unwrap_or_default(),
             challenge,
             nonce,

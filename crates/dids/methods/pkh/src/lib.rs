@@ -977,8 +977,11 @@ mod tests {
             })],
         );
 
+        let issuance_date = cred.issuance_date.clone().unwrap();
+        let created_date =
+            xsd_types::DateTimeStamp::new(issuance_date.date_time, issuance_date.offset.unwrap());
         let issue_options = ProofOptions::new(
-            cred.issuance_date.clone().unwrap(),
+            created_date,
             IriBuf::new(did.to_string() + vm_relative_url)
                 .unwrap()
                 .into(),
@@ -1104,8 +1107,11 @@ mod tests {
                 "id": "did:example:foo"
             })],
         );
+        let issuance_date = cred.issuance_date.clone().unwrap();
+        let created_date =
+            xsd_types::DateTimeStamp::new(issuance_date.date_time, issuance_date.offset.unwrap());
         let issue_options = ProofOptions::new(
-            cred.issuance_date.clone().unwrap(),
+            created_date,
             IriBuf::new(did.to_string() + vm_relative_url)
                 .unwrap()
                 .into(),
