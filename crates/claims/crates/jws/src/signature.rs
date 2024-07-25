@@ -11,7 +11,14 @@ pub trait JWSPayload {
     /// JWS type.
     ///
     /// Value of the `typ` field in the JWS header.
-    fn typ(&self) -> Option<&'static str>;
+    fn typ(&self) -> Option<&str> {
+        None
+    }
+
+    /// JWS cty header value.
+    fn cty(&self) -> Option<&str> {
+        None
+    }
 
     fn payload_bytes(&self) -> Cow<[u8]>;
 
@@ -23,40 +30,24 @@ pub trait JWSPayload {
 }
 
 impl JWSPayload for [u8] {
-    fn typ(&self) -> Option<&'static str> {
-        None
-    }
-
     fn payload_bytes(&self) -> Cow<[u8]> {
         Cow::Borrowed(self)
     }
 }
 
 impl JWSPayload for Vec<u8> {
-    fn typ(&self) -> Option<&'static str> {
-        None
-    }
-
     fn payload_bytes(&self) -> Cow<[u8]> {
         Cow::Borrowed(self)
     }
 }
 
 impl JWSPayload for str {
-    fn typ(&self) -> Option<&'static str> {
-        None
-    }
-
     fn payload_bytes(&self) -> Cow<[u8]> {
         Cow::Borrowed(self.as_bytes())
     }
 }
 
 impl JWSPayload for String {
-    fn typ(&self) -> Option<&'static str> {
-        None
-    }
-
     fn payload_bytes(&self) -> Cow<[u8]> {
         Cow::Borrowed(self.as_bytes())
     }
@@ -89,6 +80,7 @@ pub trait JWSSigner {
         let header = Header {
             algorithm: info.algorithm,
             key_id: info.key_id,
+            content_type: payload.cty().map(ToOwned::to_owned),
             type_: payload.typ().map(ToOwned::to_owned),
             ..Default::default()
         };

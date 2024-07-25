@@ -12,7 +12,7 @@ documentation = "https://docs.rs/ssi-claims/"
 eip712 = ["ssi-data-integrity/eip712"]
 
 [dependencies]
-iref.workspace = true
+iref = { workspace = true, features = ["data"] }
 rdf-types.workspace = true
 xsd-types.workspace = true
 static-iref.workspace = true
