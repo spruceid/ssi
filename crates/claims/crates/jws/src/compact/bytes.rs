@@ -9,9 +9,13 @@ use std::{borrow::Cow, ops::Deref};
 pub struct CompactJWS([u8]);
 
 impl CompactJWS {
-    pub fn new(data: &[u8]) -> Result<&Self, InvalidCompactJWS<&[u8]>> {
-        if Self::check(data) {
-            Ok(unsafe { Self::new_unchecked(data) })
+    pub fn new<T>(data: &T) -> Result<&Self, InvalidCompactJWS<&T>>
+    where
+        T: ?Sized + AsRef<[u8]>,
+    {
+        let bytes = data.as_ref();
+        if Self::check(bytes) {
+            Ok(unsafe { Self::new_unchecked(bytes) })
         } else {
             Err(InvalidCompactJWS(data))
         }

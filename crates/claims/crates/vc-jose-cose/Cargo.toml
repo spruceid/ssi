@@ -17,3 +17,8 @@ xsd-types.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 thiserror.workspace = true
+
+[dev-dependencies]
+ssi-jws = { workspace = true, features = ["secp256r1"] }
+ssi-jwk.workspace = true
+async-std.workspace = true
