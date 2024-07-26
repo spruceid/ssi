@@ -8,6 +8,7 @@ mod typed;
 pub use typed::*;
 
 pub mod datatype;
+pub mod enveloped;
 pub mod syntax;
 pub mod v1;
 pub mod v2;

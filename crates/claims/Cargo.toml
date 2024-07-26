@@ -69,6 +69,7 @@ ssi-jws.workspace = true
 ssi-jwt.workspace = true
 ssi-sd-jwt.workspace = true
 ssi-vc.workspace = true
+ssi-vc-jose-cose.workspace = true
 ssi-data-integrity.workspace = true
 ssi-dids-core.workspace = true
 ssi-eip712 = { workspace = true, optional = true }

@@ -1,0 +1,24 @@
+[package]
+name = "ssi-vc-jose-cose"
+version = "0.1.0"
+edition = "2021"
+authors = ["Spruce Systems, Inc."]
+license = "Apache-2.0"
+description = "Securing Verifiable Credentials using JOSE and COSE with the `ssi` library."
+repository = "https://github.com/spruceid/ssi/"
+documentation = "https://docs.rs/vc-jose-cose/"
+
+[dependencies]
+ssi-claims-core.workspace = true
+ssi-jws.workspace = true
+ssi-vc.workspace = true
+ssi-json-ld.workspace = true
+xsd-types.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+thiserror.workspace = true
+
+[dev-dependencies]
+ssi-jws = { workspace = true, features = ["secp256r1"] }
+ssi-jwk.workspace = true
+async-std.workspace = true

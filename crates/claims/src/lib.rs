@@ -31,6 +31,11 @@ pub use ssi_sd_jwt as sd_jwt;
 /// See: <https://www.w3.org/TR/vc-data-model>
 pub use ssi_vc as vc;
 
+/// Securing Verifiable Credentials using JOSE and COSE.
+///
+/// See: <https://www.w3.org/TR/vc-jose-cose>
+pub use ssi_vc_jose_cose as vc_jose_cose;
+
 /// Data-Integrity Proofs.
 ///
 /// See: <https://www.w3.org/TR/vc-data-integrity>
