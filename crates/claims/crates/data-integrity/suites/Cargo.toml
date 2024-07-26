@@ -161,7 +161,6 @@ serde_json = { workspace = true, features = ["arbitrary_precision"] }
 static-iref.workspace = true
 hashbrown = "0.13.0"
 iref = { workspace = true, features = ["hashbrown"] }
-ssi-vc.workspace = true
 nquads-syntax.workspace = true
 
 [package.metadata.docs.rs]
