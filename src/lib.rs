@@ -78,7 +78,7 @@
 //! that will simply load a VC from a string, assuming it is signed using
 //! any Data-Integrity proof supported by SSI.
 //!
-//! [`any_credential_from_json_str`]: crate::claims::vc::any_credential_from_json_str
+//! [`any_credential_from_json_str`]: crate::claims::vc::v1::data_integrity::any_credential_from_json_str
 //!
 //! ```
 //! # use ssi_dids::example::ExampleDIDResolver;
@@ -163,7 +163,7 @@
 //! implementation of the VC data-model where you can set the credential type
 //! yourself.
 //!
-//! [`SpecializedJsonCredential`]: crate::claims::SpecializedJsonCredential
+//! [`SpecializedJsonCredential`]: crate::claims::vc::v1::SpecializedJsonCredential
 //!
 //! ```
 //! # #[async_std::main]
@@ -228,7 +228,7 @@
 //! [`SpecializedJsonCredential`]'s [`context`] field or leveraging its context type
 //! parameter.
 //!
-//! [`context`]: crate::claims::SpecializedJsonCredential::context
+//! [`context`]: crate::claims::vc::v1::SpecializedJsonCredential::context
 //!
 //! # Features
 #![doc = document_features::document_features!()]
