@@ -18,7 +18,7 @@ use static_iref::iri;
 
 /// Aleo Signature 2021
 ///
-/// Linked data signature suite using [Aleo](crate::aleo).
+/// Linked data signature suite using Aleo.
 ///
 /// Only verification is supported.
 ///

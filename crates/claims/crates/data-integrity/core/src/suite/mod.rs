@@ -54,7 +54,7 @@ pub trait CryptographicSuite: Clone {
     /// Signature type.
     ///
     /// For cryptographic suites conforming to the most recent iteration of
-    /// the Data-Integrity specification, this will be [`ProofValue`].
+    /// the Data-Integrity specification, this will be `proofValue`.
     type Signature: AsRef<str>;
 
     /// Returns the cryptographic suite type.

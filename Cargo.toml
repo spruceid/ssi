@@ -1,6 +1,6 @@
 [package]
 name = "ssi"
-version = "0.8.0"
+version = "0.8.1"
 authors = ["Spruce Systems, Inc."]
 edition = "2021"
 license = "Apache-2.0"
@@ -19,7 +19,7 @@ members = [
   "crates/claims/core",
   "crates/claims/crates/*",
   "crates/claims/crates/data-integrity/core",
-  "crates/claims/crates/data-integrity/suites"
+  "crates/claims/crates/data-integrity/suites",
 ]
 
 [workspace.dependencies]
@@ -76,7 +76,7 @@ blake2 = "0.10"
 sha2 = "0.10.0"
 sha3 = "0.10.8"
 rsa = "0.6"
-zkryptium = "0.2.2" # BBS
+zkryptium = "0.2.2"   # BBS
 
 # other common dependencies
 log = "0.4.21"
@@ -112,7 +112,15 @@ indexmap = "2.0.0"
 uuid = "1.9"
 
 [features]
-default = ["w3c", "rsa", "ed25519", "secp256k1", "secp256r1", "ripemd-160", "eip712"]
+default = [
+  "w3c",
+  "rsa",
+  "ed25519",
+  "secp256k1",
+  "secp256r1",
+  "ripemd-160",
+  "eip712",
+]
 
 ## Signature suites specified by the W3C.
 ## 
@@ -233,7 +241,7 @@ ssi-zcap-ld.workspace = true
 ssi-multicodec.workspace = true
 ssi-ssh.workspace = true
 ssi-bbs = { workspace = true, optional = true }
-xsd-types.workspace = true # public reexport
+xsd-types.workspace = true                      # public reexport
 document-features = "0.2"
 
 [dev-dependencies]
@@ -256,3 +264,4 @@ sign-tag = true
 tag-prefix = "{{crate_name}}/"
 tag-message = "Release {{crate_name}} version {{version}}."
 pre-release-commit-message = "Release"
+

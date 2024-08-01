@@ -18,6 +18,8 @@ use ssi_json_ld::JsonLdLoaderProvider;
 ///
 /// This type provides this subset of parameters. In most cases, this will be
 /// sufficient to verify all your secured claims.
+///
+/// [`VerifiableClaims::verify`]: super::VerifiableClaims::verify
 #[derive(Debug, Default, Clone, Copy)]
 pub struct VerificationParameters<R, L1 = ssi_json_ld::ContextLoader, L2 = ()> {
     /// Public key resolver.

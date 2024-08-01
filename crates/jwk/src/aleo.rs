@@ -5,7 +5,7 @@
 //! [Aleo]: https://developer.aleo.org/testnet/getting_started/overview#the-network
 //!
 //! This module provides [sign] and [verify] functions for Aleo signatures
-//! using static parameters ([COM_PARAMS], [ENC_PARAMS], [SIG_PARAMS])
+//! using static parameters ([struct@COM_PARAMS], [struct@ENC_PARAMS], [struct@SIG_PARAMS])
 //! and a [JWK-based keypair representation](OKP_CURVE).
 
 use crate::{Base64urlUInt, OctetParams, Params, JWK};
@@ -150,16 +150,16 @@ lazy_static::lazy_static! {
 ///
 /// An Aleo private key JWK is expected to contain an account address in the public key ("x")
 /// parameter that corresponds to the private key ("d") parameter,
-/// using [SIG_PARAMS], [COM_PARAMS] and [ENC_PARAMS].
+/// using [struct@SIG_PARAMS], [struct@COM_PARAMS] and [struct@ENC_PARAMS].
 ///
 /// An Aleo public key JWK contains the public key ("x") parameter and MUST not contain a private
 /// key ("d") parameter. An Aleo public key JWK is usable for verification of signatures using
-/// [ENC_PARAMS].
+/// [struct@ENC_PARAMS].
 pub const OKP_CURVE: &str = "AleoTestnet1Key";
 
 /// Generate an Aleo private key in [unofficial JWK format][OKP_CURVE]. **CPU-intensive (slow)**.
 ///
-/// Uses [SIG_PARAMS], [COM_PARAMS], and [ENC_PARAMS].
+/// Uses [struct@SIG_PARAMS], [struct@COM_PARAMS], and [struct@ENC_PARAMS].
 pub fn generate_private_key_jwk() -> Result<JWK, AleoGeneratePrivateKeyError> {
     let mut rng = rand::rngs::OsRng {};
     let sig_params = SIG_PARAMS.clone();
@@ -185,7 +185,7 @@ pub fn generate_private_key_jwk() -> Result<JWK, AleoGeneratePrivateKeyError> {
 
 /// Convert JWK private key to Aleo private key
 ///
-/// Uses [SIG_PARAMS], [COM_PARAMS], and [ENC_PARAMS] to compute the account address.
+/// Uses [struct@SIG_PARAMS], [struct@COM_PARAMS], and [struct@ENC_PARAMS] to compute the account address.
 fn aleo_jwk_to_private_key(jwk: &JWK) -> Result<PrivateKey<Components>, ParsePrivateKeyError> {
     let params = match &jwk.params {
         Params::OKP(ref okp_params) => {
@@ -242,7 +242,7 @@ fn aleo_jwk_to_address(jwk: &JWK) -> Result<Address<Components>, ParseAddressErr
 
 /// Create an Aleo signature.
 ///
-/// The message is signed using [ENC_PARAMS] and a View Key derived from the given JWK private key with [SIG_PARAMS] and [COM_PARAMS].
+/// The message is signed using [struct@ENC_PARAMS] and a View Key derived from the given JWK private key with [struct@SIG_PARAMS] and [struct@COM_PARAMS].
 ///
 /// The JWK private key `key` is expected to use key type `OKP` with curve according to
 /// [OKP_CURVE].
@@ -265,7 +265,7 @@ pub fn sign(msg: &[u8], key: &JWK) -> Result<Vec<u8>, AleoSignError> {
 
 /// Verify an Aleo signature by an Aleo address as a string.
 ///
-/// Verification uses [ENC_PARAMS].
+/// Verification uses [struct@ENC_PARAMS].
 pub fn verify(msg: &[u8], address: &str, sig: &[u8]) -> Result<(), AleoVerifyError> {
     let address =
         Address::<Components>::from_str(address).map_err(AleoVerifyError::AddressFromStr)?;

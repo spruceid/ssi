@@ -15,6 +15,7 @@ jobs:
     runs-on: ubuntu-latest
     env:
       RUSTFLAGS: "-Dwarnings"
+      RUSTDOCFLAGS: "-Dwarnings"
     steps:
     - name: Checkout SSI Library
       uses: actions/checkout@v4
@@ -52,6 +53,9 @@ jobs:
     - name: Test examples
       run: |
         cargo test --examples
+
+    - name: Doc
+      run: cargo doc --no-deps --workspace --all-features
 
   test-each-feature:
     if: ${{ !github.event.pull_request.draft }}
