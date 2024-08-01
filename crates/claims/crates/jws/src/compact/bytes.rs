@@ -165,9 +165,8 @@ impl CompactJWS {
     /// payload. For instance if the payload is a set of JWT claims, those
     /// claims will not be validated.
     ///
-    /// To perform a more precise verification, first decode the JWS with]
-    /// [`Self::to_decoded`], then parse the payload manually before using
-    /// [`ssi_claims_core::Verifiable`] to actually perform the verification.
+    /// To perform a more precise verification, specify use a specialized `T`
+    /// instead of the default [`Vec<u8>`]
     ///
     /// The `params` argument provides all the verification parameters required
     /// to validate the claims and proof.

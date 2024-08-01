@@ -33,11 +33,9 @@
 //! ```
 //!
 //! Internally [`CompactJWS::verify`] uses [`CompactJWS::to_decoded`] to decode
-//! the JWS, [`VerifiableClaims::into_verifiable`] to separate the payload from
-//! the signature then [`Verifiable::verify`] to validate the signature.
+//! the JWS, then [`DecodedJWS::verify`] to validate the signature.
 //!
-//! [`VerifiableClaims::into_verifiable`]: ssi_claims_core::VerifiableClaims::into_verifiable
-//! [`Verifiable::verify`]: ssi_claims_core::Verifiable::verify
+//! [`DecodedJWS::verify`]: DecodedJWS::verify
 //!
 //! ```ignore
 //! let decoded_jws = jws.to_decoded().unwrap();
@@ -206,7 +204,7 @@ impl<T> DecodedJWS<T> {
     /// - [`VerificationParameters`](ssi_claims_core::VerificationParameters):
     /// A good default providing many other common verification parameters that
     /// are not necessary here.
-    /// - [`JWK`](ssi_jwk::JWK): allows you to put a JWK as `params`, which
+    /// - [`JWK`]: allows you to put a JWK as `params`, which
     /// will resolve into itself. Can be useful if you don't need key resolution
     /// because you know in advance what key was used to sign the JWS.
     ///

@@ -30,12 +30,10 @@
 //!
 //! Internally [`ToDecodedJWT::verify_jwt`] uses
 //! [`ToDecodedJWT::to_decoded_jwt`] to decode the JWT,
-//! [`VerifiableClaims::into_verifiable`] to separate the payload from the
-//! signature then [`Verifiable::verify`] to validate the signature and
+//! then [`DecodedJWS::verify`] to validate the signature and
 //! registered claims.
 //!
-//! [`VerifiableClaims::into_verifiable`]: ssi_claims_core::VerifiableClaims::into_verifiable
-//! [`Verifiable::verify`]: ssi_claims_core::Verifiable::verify
+//! [`DecodedJWS::verify`]: ssi_jws::DecodedJWS::verify
 //!
 //! ## Signature
 //!
