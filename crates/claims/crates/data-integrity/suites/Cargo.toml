@@ -1,6 +1,6 @@
 [package]
 name = "ssi-data-integrity-suites"
-version = "0.1.0"
+version = "0.1.1"
 edition = "2021"
 authors = ["Spruce Systems, Inc."]
 license = "Apache-2.0"
@@ -48,13 +48,21 @@ secp256k1 = ["ssi-verification-methods/secp256k1", "k256"]
 ## This includes:
 ##   - `EcdsaSecp256r1Signature2019` (requires `w3c`)
 ##   - `EcdsaRdfc2019` (requires `w3c`)
-secp256r1 = ["ssi-data-integrity-core/secp256r1", "ssi-verification-methods/secp256r1", "p256"]
+secp256r1 = [
+    "ssi-data-integrity-core/secp256r1",
+    "ssi-verification-methods/secp256r1",
+    "p256",
+]
 
 ## Signature suites based on secp384r1.
 ##
 ## This includes:
 ##   - `EcdsaRdfc2019` (requires `w3c`)
-secp384r1 = ["ssi-data-integrity-core/secp384r1", "ssi-verification-methods/secp384r1", "p384"]
+secp384r1 = [
+    "ssi-data-integrity-core/secp384r1",
+    "ssi-verification-methods/secp384r1",
+    "p384",
+]
 
 ## Signature suites based on RSA.
 ##
@@ -69,7 +77,13 @@ rsa = ["ssi-verification-methods/rsa"]
 ##   - `TezosSignature2021`
 ##   - `Ed25519BLAKE2BDigestSize20Base58CheckEncodedSignature2021` (requires `ed25519`)
 ##   - `P256BLAKE2BDigestSize20Base58CheckEncodedSignature2021` (requires `secp256r1`)
-tezos = ["serde_json", "serde_jcs", "ssi-tzkey", "bs58", "ssi-verification-methods/tezos"]
+tezos = [
+    "serde_json",
+    "serde_jcs",
+    "ssi-tzkey",
+    "bs58",
+    "ssi-verification-methods/tezos",
+]
 
 ## Enables `AleoSignature2021`.
 aleo = ["ssi-jwk/aleo", "ssi-verification-methods/aleo", "k256"]

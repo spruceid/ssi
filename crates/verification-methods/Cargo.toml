@@ -1,6 +1,6 @@
 [package]
 name = "ssi-verification-methods"
-version = "0.1.0"
+version = "0.1.1"
 edition = "2021"
 authors = ["Spruce Systems, Inc."]
 license = "Apache-2.0"
@@ -9,13 +9,27 @@ repository = "https://github.com/spruceid/ssi/"
 documentation = "https://docs.rs/ssi-verification-methods/"
 
 [features]
-default = ["ed25519", "rsa", "secp256k1", "secp256r1", "secp384r1", "tezos", "eip712", "solana"]
+default = [
+    "ed25519",
+    "rsa",
+    "secp256k1",
+    "secp256r1",
+    "secp384r1",
+    "tezos",
+    "eip712",
+    "solana",
+]
 
 ## enable RSA keys
 rsa = []
 
 ## enable ed25519 keys
-ed25519 = ["ed25519-dalek", "rand_core", "ssi-jws/ed25519", "ssi-multicodec/ed25519"]
+ed25519 = [
+    "ed25519-dalek",
+    "rand_core",
+    "ssi-jws/ed25519",
+    "ssi-multicodec/ed25519",
+]
 
 ## enable secp256k1 keys
 secp256k1 = ["k256", "sha2", "ssi-jws/secp256k1", "ssi-multicodec/k256"]
@@ -37,7 +51,12 @@ aleo = ["ssi-caips/aleo"]
 
 solana = []
 
-bbs = ["ssi-multicodec/bls12-381", "ssi-jwk/bbs", "ssi-bbs", "ssi-verification-methods-core/bbs"]
+bbs = [
+    "ssi-multicodec/bls12-381",
+    "ssi-jwk/bbs",
+    "ssi-bbs",
+    "ssi-verification-methods-core/bbs",
+]
 
 [dependencies]
 ssi-core.workspace = true
@@ -77,3 +96,4 @@ p384 = { workspace = true, optional = true, features = ["ecdsa"] }
 
 # rand_core_0_5 = { version = "0.5", optional = true, package = "rand_core" }
 rand_core = { version = "0.6.4", optional = true }
+

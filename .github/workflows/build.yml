@@ -55,7 +55,7 @@ jobs:
         cargo test --examples
 
     - name: Doc
-      run: cargo doc --no-deps --workspace
+      run: cargo doc --no-deps --workspace --all-features
 
   test-each-feature:
     if: ${{ !github.event.pull_request.draft }}

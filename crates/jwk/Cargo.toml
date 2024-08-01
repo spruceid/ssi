@@ -1,6 +1,6 @@
 [package]
 name = "ssi-jwk"
-version = "0.2.0"
+version = "0.2.1"
 edition = "2021"
 authors = ["Spruce Systems, Inc."]
 license = "Apache-2.0"
@@ -29,7 +29,16 @@ rsa = ["dep:rsa"]
 ## Enable aleo ecosystem keys.
 ## 
 ## Not compatible with WASM targets.
-aleo = ["rand", "blake2", "snarkvm-dpc",  "snarkvm-algorithms", "snarkvm-curves", "snarkvm-utilities", "snarkvm-parameters", "bs58"]
+aleo = [
+    "rand",
+    "blake2",
+    "snarkvm-dpc",
+    "snarkvm-algorithms",
+    "snarkvm-curves",
+    "snarkvm-utilities",
+    "snarkvm-parameters",
+    "bs58",
+]
 
 ## enable ripemd-160 hashing for keys, e.g. for bitcoin.
 ripemd-160 = ["ssi-crypto/ripemd-160", "secp256k1"]

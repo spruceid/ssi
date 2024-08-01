@@ -40,7 +40,7 @@ use static_iref::iri;
 ///
 /// # Signature protocol
 ///
-/// The [`SolanaWallet`] protocol is used.
+/// The [`SolanaSignatureAlgorithm`] protocol is used.
 #[derive(Debug, Default, Clone, Copy)]
 pub struct SolanaSignature2021;
 
