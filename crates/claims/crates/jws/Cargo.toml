@@ -1,6 +1,6 @@
 [package]
 name = "ssi-jws"
-version = "0.2.0"
+version = "0.2.1"
 edition = "2021"
 authors = ["Spruce Systems, Inc."]
 license = "Apache-2.0"
@@ -12,7 +12,14 @@ documentation = "https://docs.rs/ssi-jws/"
 default = ["secp256k1", "secp256r1", "ed25519", "rsa"]
 
 ## Enable secp256k1 signatures.
-secp256k1 = ["ssi-jwk/secp256k1", "k256", "ssi-crypto/secp256k1", "blake2", "dep:sha2", "dep:sha3"]
+secp256k1 = [
+    "ssi-jwk/secp256k1",
+    "k256",
+    "ssi-crypto/secp256k1",
+    "blake2",
+    "dep:sha2",
+    "dep:sha3",
+]
 
 ## Enable secp256r1 (p256) signatures.
 secp256r1 = ["ssi-jwk/secp256r1", "p256", "blake2"]
@@ -73,3 +80,4 @@ clear_on_drop = { version = "0.2.4", features = ["no_cc"] }
 [package.metadata.docs.rs]
 all-features = true
 rustdoc-args = ["--cfg", "docsrs"]
+
