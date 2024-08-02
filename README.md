@@ -246,9 +246,3 @@ a git submodule.
 $ git submodule update --init
 $ cargo test --workspace
 ```
-
-## Contribution
-
-We are setting up a process to accept contributions. Please feel free to open
-issues or PRs in the interim, but we cannot merge external changes until this
-process is in place.
