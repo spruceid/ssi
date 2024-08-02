@@ -28,6 +28,7 @@ This library supports the two main families of verifiable claims:
 [dids]: <https://www.w3.org/TR/did-core/>
 [didkit]: <https://github.com/spruceid/didkit>
 [vc-data-model]: <https://www.w3.org/TR/vc-data-model/>
+[linked-data]: <https://www.w3.org/DesignIssues/LinkedData.html>
 [jwt]: <https://www.rfc-editor.org/rfc/rfc7519>
 [jws]: <https://www.rfc-editor.org/rfc/rfc7515>
 [jwt-vc]: <https://www.w3.org/TR/vc-data-model/#json-web-token>
@@ -64,15 +65,18 @@ let jwt = CompactJWSString::from_string(
 // `example` feature.
 let vm_resolver = ExampleDIDResolver::default().into_vm_resolver::<AnyJwkMethod>();
 
+// Setup the verification parameters.
+let params = VerificationParameters::from_resolver(vm_resolver);
+
 // Verify the JWT.
-assert!(jwt.verify(&vm_resolver).await.expect("verification failed").is_ok())
+assert!(jwt.verify(&params).await.expect("verification failed").is_ok())
 ```
 
 #### Verifiable Credentials
 
 Verifiable Credential are much more complex as they require interpreting
 the input claims and proofs, such as Data-Integrity proofs as Linked-Data
-using JSON-LD. This operation is highly configurable. SSI provides
+using JSON-LD. This operation is highly configurable. SSI provide
 functions exposing various levels of implementation details that you can
 tweak as needed. The simplest of them is `any_credential_from_json_str`
 that will simply load a VC from a string, assuming it is signed using
@@ -85,13 +89,16 @@ use ssi::prelude::*;
 let vc = ssi::claims::vc::v1::data_integrity::any_credential_from_json_str(
   &std::fs::read_to_string("examples/files/vc.jsonld")
   .expect("unable to load VC")
-).await.expect("invalid VC");
+).expect("invalid VC");
 
 // Setup a verification method resolver, in charge of retrieving the
 // public key used to sign the JWT.
 let vm_resolver = ExampleDIDResolver::default().into_vm_resolver();
 
-assert!(vc.verify(&vm_resolver).await.expect("verification failed").is_ok());
+// Setup the verification parameters.
+let params = VerificationParameters::from_resolver(vm_resolver);
+
+assert!(vc.verify(&params).await.expect("verification failed").is_ok());
 ```
 
 ### Signature & Custom Claims
@@ -135,8 +142,11 @@ let jwt = claims.sign(&key).await.expect("signature failed");
 // decoding the DID back into a public key.
 let vm_resolver = DIDJWK.into_vm_resolver::<AnyJwkMethod>();
 
+// Setup the verification parameters.
+let params = VerificationParameters::from_resolver(vm_resolver);
+
 // Verify the JWT.
-assert!(jwt.verify(&vm_resolver).await.expect("verification failed").is_ok());
+assert!(jwt.verify(&params).await.expect("verification failed").is_ok());
 
 // Print the JWT.
 println!("{jwt}")
@@ -146,7 +156,7 @@ println!("{jwt}")
 
 We can use a similar technique to sign a VC with custom claims.
 The `SpecializedJsonCredential` type provides a customizable
-implementation of the VC data-model where you can set the credential type
+implementation of the VC data-model 1.1 where you can set the credential type
 yourself.
 
 
@@ -186,7 +196,7 @@ let vm_resolver = DIDJWK.into_vm_resolver();
 // Create a signer from the secret key.
 // Here we use the simple `SingleSecretSigner` signer type which always uses
 // the same provided secret key to sign messages.
-let signer = SingleSecretSigner::new(key.clone());
+let signer = SingleSecretSigner::new(key.clone()).into_local();
 
 // Turn the DID URL into a verification method reference.
 let verification_method = did.into_iri().into();
@@ -197,10 +207,9 @@ let cryptosuite = AnySuite::pick(&key, Some(&verification_method))
 
 let vc = cryptosuite.sign(
   credential,
-  AnyInputContext::default(),
   &vm_resolver,
   &signer,
-  ProofConfiguration::from_method(verification_method)
+  ProofOptions::from_method(verification_method)
 ).await.expect("signature failed");
 ```
  
@@ -210,6 +219,13 @@ field of `MyCredentialSubject`. This can also be done by creating a custom
 JSON-LD context and embed it to `credential` using either
 `SpecializedJsonCredential`'s `context` field or leveraging its context type
 parameter.
+
+
+## Data-Models
+
+The examples above are using the VC data-model 1.1, but you ssi also has support for:
+- `VC data-model 2.0`
+- `A wrapper type to accept both`
 
 
 ## Features

@@ -35,6 +35,9 @@ jobs:
     - uses: Swatinem/rust-cache@v2
       with:
         cache-on-failure: "true"
+    - uses: taiki-e/install-action@v2
+      with:
+        tool: cargo-rdme
 
     - name: Fmt
       run: cargo fmt -- --check
@@ -56,6 +59,8 @@ jobs:
 
     - name: Doc
       run: cargo doc --no-deps --workspace --all-features
+    - name: cargo-rdme
+      run: cargo rdme --check --no-fail-on-warnings
 
   test-each-feature:
     if: ${{ !github.event.pull_request.draft }}
