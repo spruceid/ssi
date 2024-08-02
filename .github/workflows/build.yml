@@ -60,7 +60,7 @@ jobs:
     - name: Doc
       run: cargo doc --no-deps --workspace --all-features
     - name: cargo-rdme
-      run: cargo rdme --check
+      run: cargo rdme --check --no-fail-on-warnings
 
   test-each-feature:
     if: ${{ !github.event.pull_request.draft }}

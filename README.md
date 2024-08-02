@@ -28,6 +28,7 @@ This library supports the two main families of verifiable claims:
 [dids]: <https://www.w3.org/TR/did-core/>
 [didkit]: <https://github.com/spruceid/didkit>
 [vc-data-model]: <https://www.w3.org/TR/vc-data-model/>
+[linked-data]: <https://www.w3.org/DesignIssues/LinkedData.html>
 [jwt]: <https://www.rfc-editor.org/rfc/rfc7519>
 [jws]: <https://www.rfc-editor.org/rfc/rfc7515>
 [jwt-vc]: <https://www.w3.org/TR/vc-data-model/#json-web-token>
