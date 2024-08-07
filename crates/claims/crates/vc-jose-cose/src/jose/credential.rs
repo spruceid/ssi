@@ -32,7 +32,7 @@ impl<T: Serialize> JoseVc<T> {
 impl<T: DeserializeOwned> JoseVc<T> {
     /// Decode a JOSE VC.
     pub fn decode(jws: &CompactJWS) -> Result<DecodedJWS<Self>, JoseDecodeError> {
-        jws.to_decoded()?
+        jws.decode()?
             .try_map(|payload| serde_json::from_slice(&payload).map(Self))
             .map_err(Into::into)
     }

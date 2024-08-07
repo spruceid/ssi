@@ -223,7 +223,7 @@ where
             "application/vc+ld+json+jwt" => {
                 let jws = CompactJWS::new(bytes)
                     .map_err(InvalidCompactJWS::into_owned)?
-                    .to_decoded()?
+                    .decode()?
                     .try_map::<Self, _>(|bytes| serde_json::from_slice(&bytes))?;
                 jws.verify(params).await??;
                 Ok(jws.signing_bytes.payload)

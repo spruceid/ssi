@@ -1,6 +1,33 @@
 use crate::DecodeError;
 use base64::{prelude::BASE64_URL_SAFE_NO_PAD, Engine};
 
+/// Encoded disclosure.
+#[derive(Debug, PartialEq)]
+pub struct Disclosure(str);
+
+impl Disclosure {
+    pub unsafe fn new_unchecked(bytes: &[u8]) -> &Self {
+        std::mem::transmute(bytes)
+    }
+
+    /// Decode this disclosure.
+    pub fn decode(&self) -> Result<DecodedDisclosure, DecodeError> {
+        let bytes = base64::decode_config(&self.0, URL_SAFE_NO_PAD)
+            .map_err(|_| DecodeError::DisclosureMalformed)?;
+        let json: serde_json::Value = serde_json::from_slice(&bytes)?;
+
+        match json {
+            serde_json::Value::Array(values) => match values.as_slice() {
+                [salt, name, value] => validate_property_disclosure(salt, name, value),
+                [salt, value] => validate_array_item_disclosure(salt, value),
+                _ => Err(DecodeError::DisclosureMalformed),
+            },
+            _ => Err(DecodeError::DisclosureMalformed),
+        }
+    }
+}
+
+/// Decoded disclosure.
 #[derive(Debug, PartialEq)]
 pub struct DecodedDisclosure {
     pub salt: String,

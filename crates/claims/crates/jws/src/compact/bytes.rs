@@ -1,4 +1,4 @@
-use crate::{DecodeError, DecodedJWS, DecodedSigningBytes, Header, InvalidHeader, JWS};
+use crate::{DecodeError, DecodedJWS, DecodedJWSRef, DecodedSigningBytesRef, Header, InvalidHeader, JWSSignature};
 pub use base64::DecodeError as Base64DecodeError;
 use base64::Engine;
 use ssi_claims_core::{ProofValidationError, ResolverProvider, Verification};
@@ -6,6 +6,7 @@ use ssi_jwk::JWKResolver;
 use std::{borrow::Cow, ops::Deref};
 
 /// JWS in compact serialized form.
+#[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
 #[repr(transparent)]
 pub struct CompactJWS([u8]);
 
@@ -71,6 +72,10 @@ impl CompactJWS {
         false
     }
 
+    pub fn len(&self) -> usize {
+        self.0.len()
+    }
+
     fn header_end(&self) -> usize {
         self.0.iter().position(|b| *b == b'.').unwrap()
     }
@@ -119,31 +124,24 @@ impl CompactJWS {
         unsafe { std::str::from_utf8_unchecked(&self.0[self.signature_start()..]) }
     }
 
-    pub fn decode_signature(&self) -> Result<Vec<u8>, Base64DecodeError> {
-        base64::prelude::BASE64_URL_SAFE_NO_PAD.decode(self.signature())
+    pub fn decode_signature(&self) -> Result<JWSSignature, Base64DecodeError> {
+        base64::prelude::BASE64_URL_SAFE_NO_PAD.decode(self.signature()).map(JWSSignature::new)
     }
 
     /// Decodes the entire JWS.
-    pub fn decode(&self) -> Result<JWS<Cow<[u8]>>, DecodeError> {
+    pub fn decode(&self) -> Result<DecodedJWSRef<Cow<[u8]>>, DecodeError> {
         let header = self.decode_header().map_err(DecodeError::Header)?;
         let payload = self.decode_payload(&header).map_err(DecodeError::Payload)?;
         let signature = self.decode_signature().map_err(DecodeError::Signature)?;
-        Ok(JWS::new(header, payload, signature.into()))
-    }
+        let signing_bytes = self.signing_bytes();
 
-    /// Decodes the entire JWS while preserving the signing bytes so they can
-    /// be verified.
-    pub fn to_decoded(&self) -> Result<DecodedJWS<Cow<[u8]>>, DecodeError> {
-        let signing_bytes = self.signing_bytes().to_owned();
-        let jws = self.decode()?;
-
-        Ok(DecodedJWS::new(
-            DecodedSigningBytes {
+        Ok(DecodedJWSRef::new(
+            DecodedSigningBytesRef {
                 bytes: signing_bytes,
-                header: jws.header,
-                payload: jws.payload,
+                header: header,
+                payload: payload,
             },
-            jws.signature,
+            signature,
         ))
     }
 
@@ -192,7 +190,7 @@ impl CompactJWS {
         V: ResolverProvider,
         V::Resolver: JWKResolver,
     {
-        let jws = self.to_decoded().unwrap();
+        let jws = self.decode().unwrap();
         jws.verify(params).await
     }
 }
@@ -262,12 +260,7 @@ impl CompactJWSBuf {
     /// Decodes the entire JWS while preserving the signing bytes so they can
     /// be verified.
     pub fn into_decoded(self) -> Result<DecodedJWS<Vec<u8>>, DecodeError> {
-        let decoded = self.decode()?.into_owned();
-        let signing_bytes = self.into_signing_bytes();
-        Ok(DecodedJWS::new(
-            DecodedSigningBytes::new(signing_bytes, decoded.header, decoded.payload),
-            decoded.signature,
-        ))
+        Ok(self.decode()?.into_owned().map(Cow::into_owned))
     }
 }
 

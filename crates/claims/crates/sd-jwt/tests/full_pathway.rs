@@ -45,7 +45,7 @@ fn full_pathway_regular_claim() {
     .unwrap();
 
     let full_jwt_claims = decode_verify_disclosure_array::<BaseClaims>(
-        Deserialized {
+        PartsRef {
             jwt: &jwt,
             disclosures: vec![&disclosures[0].encoded, &disclosures[1].encoded],
         },
@@ -63,7 +63,7 @@ fn full_pathway_regular_claim() {
     );
 
     let one_sd_claim = decode_verify_disclosure_array::<BaseClaims>(
-        Deserialized {
+        PartsRef {
             jwt: &jwt,
             disclosures: vec![&disclosures[1].encoded],
         },
@@ -107,7 +107,7 @@ fn full_pathway_array() {
     .unwrap();
 
     let full_jwt_claims = decode_verify_disclosure_array::<BaseClaims>(
-        Deserialized {
+        PartsRef {
             jwt: &jwt,
             disclosures: vec![&disclosures[0].encoded, &disclosures[1].encoded],
         },
@@ -179,7 +179,7 @@ fn nested_claims() {
 
     // No claims provided
     let no_sd_claims = decode_verify_disclosure_array::<Claims>(
-        Deserialized {
+        PartsRef {
             jwt: &jwt,
             disclosures: vec![],
         },
@@ -196,7 +196,7 @@ fn nested_claims() {
 
     // Outer provided
     let outer_provided = decode_verify_disclosure_array::<Claims>(
-        Deserialized {
+        PartsRef {
             jwt: &jwt,
             disclosures: vec![&outer_disclosure.encoded],
         },
@@ -214,7 +214,7 @@ fn nested_claims() {
 
     // Inner and outer provided
     let inner_and_outer_provided = decode_verify_disclosure_array::<Claims>(
-        Deserialized {
+        PartsRef {
             jwt: &jwt,
             disclosures: vec![&outer_disclosure.encoded, &inner_disclosure.encoded],
         },
@@ -236,7 +236,7 @@ fn nested_claims() {
 
     // Inner without outer errors
     let result = decode_verify_disclosure_array::<Claims>(
-        Deserialized {
+        PartsRef {
             jwt: &jwt,
             disclosures: vec![&inner_disclosure.encoded],
         },

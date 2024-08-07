@@ -3,7 +3,7 @@ use ssi_claims_core::{DateTimeProvider, ProofValidationError, ResolverProvider, 
 use ssi_jwk::JWKResolver;
 use ssi_jws::{
     CompactJWS, CompactJWSBuf, CompactJWSStr, CompactJWSString, DecodeError as JWSDecodeError,
-    DecodedJWS,
+    DecodedJWS, DecodedJWSRef,
 };
 
 use crate::{AnyClaims, JWTClaims};
@@ -23,6 +23,11 @@ impl From<DecodeError> for ProofValidationError {
     }
 }
 
+/// Decoded JWT with borrowed components.
+///
+/// By definition this is a decoded JWS with JWT claims as payload.
+pub type DecodedJWTRef<'a, T = AnyClaims> = DecodedJWSRef<'a, JWTClaims<T>>;
+
 /// Decoded JWT.
 ///
 /// By definition this is a decoded JWS with JWT claims as payload.
@@ -31,10 +36,10 @@ pub type DecodedJWT<T = AnyClaims> = DecodedJWS<JWTClaims<T>>;
 /// JWT borrowing decoding.
 pub trait ToDecodedJWT {
     /// Decodes a JWT with custom claims.
-    fn to_decoded_custom_jwt<C: DeserializeOwned>(&self) -> Result<DecodedJWT<C>, DecodeError>;
+    fn to_decoded_custom_jwt<C: DeserializeOwned>(&self) -> Result<DecodedJWTRef<C>, DecodeError>;
 
     /// Decodes a JWT.
-    fn to_decoded_jwt(&self) -> Result<DecodedJWT, DecodeError> {
+    fn to_decoded_jwt(&self) -> Result<DecodedJWTRef, DecodeError> {
         self.to_decoded_custom_jwt::<AnyClaims>()
     }
 
@@ -62,20 +67,20 @@ pub trait IntoDecodedJWT: Sized {
 }
 
 impl ToDecodedJWT for CompactJWS {
-    fn to_decoded_custom_jwt<C: DeserializeOwned>(&self) -> Result<DecodedJWT<C>, DecodeError> {
-        self.to_decoded()?
+    fn to_decoded_custom_jwt<C: DeserializeOwned>(&self) -> Result<DecodedJWTRef<C>, DecodeError> {
+        self.decode()?
             .try_map(|bytes| serde_json::from_slice(&bytes).map_err(Into::into))
     }
 }
 
 impl ToDecodedJWT for CompactJWSStr {
-    fn to_decoded_custom_jwt<C: DeserializeOwned>(&self) -> Result<DecodedJWT<C>, DecodeError> {
+    fn to_decoded_custom_jwt<C: DeserializeOwned>(&self) -> Result<DecodedJWTRef<C>, DecodeError> {
         CompactJWS::to_decoded_custom_jwt(self)
     }
 }
 
 impl ToDecodedJWT for CompactJWSBuf {
-    fn to_decoded_custom_jwt<C: DeserializeOwned>(&self) -> Result<DecodedJWT<C>, DecodeError> {
+    fn to_decoded_custom_jwt<C: DeserializeOwned>(&self) -> Result<DecodedJWTRef<C>, DecodeError> {
         CompactJWS::to_decoded_custom_jwt(self)
     }
 }
@@ -88,7 +93,7 @@ impl IntoDecodedJWT for CompactJWSBuf {
 }
 
 impl ToDecodedJWT for CompactJWSString {
-    fn to_decoded_custom_jwt<C: DeserializeOwned>(&self) -> Result<DecodedJWT<C>, DecodeError> {
+    fn to_decoded_custom_jwt<C: DeserializeOwned>(&self) -> Result<DecodedJWTRef<C>, DecodeError> {
         CompactJWS::to_decoded_custom_jwt(self)
     }
 }

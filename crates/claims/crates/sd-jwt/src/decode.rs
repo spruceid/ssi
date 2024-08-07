@@ -21,7 +21,7 @@ pub fn decode_verify<Claims: DeserializeOwned>(
 /// Lower level API to decode an SD-JWT that has already been split into its
 /// JWT and disclosure components
 pub fn decode_verify_disclosure_array<Claims: DeserializeOwned>(
-    deserialized: Deserialized<'_>,
+    deserialized: PartsRef<'_>,
     key: &JWK,
 ) -> Result<Claims, DecodeError> {
     let mut payload_claims: serde_json::Value = ssi_jwt::decode_verify(deserialized.jwt, key)?;
@@ -74,6 +74,11 @@ fn translate_to_in_progress_disclosures(
     }
 
     Ok(disclosure_map)
+}
+
+pub struct SdJwtPayload {
+    /// Hash algorithm used by the Issuer to generate the digests.
+    sd_alg: SdAlg
 }
 
 #[derive(Debug)]

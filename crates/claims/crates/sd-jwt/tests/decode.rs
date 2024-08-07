@@ -1,7 +1,7 @@
 use serde::{Deserialize, Serialize};
 use ssi_jwk::{Algorithm, JWK};
 use ssi_jwt::NumericDate;
-use ssi_sd_jwt::{decode_verify_disclosure_array, Deserialized};
+use ssi_sd_jwt::{decode_verify_disclosure_array, PartsRef};
 
 #[derive(Debug, Default, Deserialize, Serialize, PartialEq)]
 struct ExampleClaims {
@@ -86,7 +86,7 @@ const NATIONALITY_DE_DISCLOSURE: &'static str = "WyJuUHVvUW5rUkZxM0JJZUFtN0FuWEZ
 #[test]
 fn decode_single() {
     let claims = decode_verify_disclosure_array::<ExampleClaims>(
-        Deserialized {
+        PartsRef {
             jwt: &test_standard_sd_jwt(),
             disclosures: vec![EMAIL_DISCLOSURE],
         },
@@ -108,7 +108,7 @@ fn decode_single() {
 #[test]
 fn decode_single_array_item() {
     let claims = decode_verify_disclosure_array::<ExampleClaims>(
-        Deserialized {
+        PartsRef {
             jwt: &test_standard_sd_jwt(),
             disclosures: vec![NATIONALITY_DE_DISCLOSURE],
         },

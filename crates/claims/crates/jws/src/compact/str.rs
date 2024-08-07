@@ -1,5 +1,5 @@
 use core::fmt;
-use std::{ops::Deref, str::FromStr};
+use std::{borrow::Cow, ops::Deref, str::FromStr};
 
 use base64::Engine;
 
@@ -10,6 +10,7 @@ use crate::{CompactJWS, DecodeError, DecodedJWS, DecodedSigningBytes, Header, In
 /// Contrarily to [`CompactJWS`], this type guarantees that the payload is
 /// a valid UTF-8 string, meaning the whole compact JWS is an UTF-8 string.
 /// This does not necessarily mean the payload is base64 encoded.
+#[derive(PartialEq, Eq, PartialOrd, Ord, Hash)]
 #[repr(transparent)]
 pub struct CompactJWSStr(CompactJWS);
 
@@ -218,16 +219,11 @@ impl CompactJWSString {
     pub fn into_string(self) -> String {
         self.0
     }
-
+    
     /// Decodes the entire JWS while preserving the signing bytes so they can
     /// be verified.
     pub fn into_decoded(self) -> Result<DecodedJWS<Vec<u8>>, DecodeError> {
-        let decoded = self.decode()?.into_owned();
-        let signing_bytes = self.into_signing_bytes().into_bytes();
-        Ok(DecodedJWS::new(
-            DecodedSigningBytes::new(signing_bytes, decoded.header, decoded.payload),
-            decoded.signature,
-        ))
+        Ok(self.decode()?.into_owned().map(Cow::into_owned))
     }
 }
 

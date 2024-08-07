@@ -1,6 +1,9 @@
 /// Errors in the decode pathway
 #[derive(thiserror::Error, Debug)]
 pub enum DecodeError {
+    #[error("Unable to decode JWT: {0}")]
+    JWT(#[from] ssi_jwt::DecodeError),
+
     /// Unable to deserialize string format of concatenated tildes
     #[error("Unable to deserialize string format of concatenated tildes")]
     UnableToDeserializeStringFormat,

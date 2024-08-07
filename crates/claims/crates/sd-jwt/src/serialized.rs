@@ -1,4 +1,4 @@
-use crate::Deserialized;
+use crate::PartsRef;
 
 /// Lower level API to encode a fully encoded SD-JWT given a JWT and disclosure array
 /// already fully encoded into their string representations
@@ -14,7 +14,7 @@ pub fn serialize_string_format(jwt: &str, disclosures: &[&str]) -> String {
 
 /// Lower level API to seserialize a fully encoded SD-JWT into it's JWT and disclosure
 /// components
-pub fn deserialize_string_format(serialized: &str) -> Option<Deserialized<'_>> {
+pub fn deserialize_string_format(serialized: &str) -> Option<PartsRef<'_>> {
     if !serialized.contains('~') {
         return None;
     }
@@ -28,7 +28,7 @@ pub fn deserialize_string_format(serialized: &str) -> Option<Deserialized<'_>> {
         disclosures.pop();
     }
 
-    Some(Deserialized { jwt, disclosures })
+    Some(PartsRef { jwt, disclosures })
 }
 
 #[cfg(test)]
@@ -97,7 +97,7 @@ mod tests {
     fn deserialize() {
         assert_eq!(
             deserialize_string_format(ENCODED),
-            Some(Deserialized {
+            Some(PartsRef {
                 jwt: JWT,
                 disclosures: vec![DISCLOSURE_0, DISCLOSURE_1],
             })

@@ -1,5 +1,5 @@
 use serde::{Deserialize, Serialize};
-use ssi_sd_jwt::{decode_verify_disclosure_array, Deserialized};
+use ssi_sd_jwt::{decode_verify_disclosure_array, PartsRef};
 
 fn rfc_a_5_key() -> ssi_jwk::JWK {
     serde_json::from_value(serde_json::json!({
@@ -80,7 +80,7 @@ fn rfc_a_1_example_2_verification() {
 
     // Raw with no disclosures
     let no_disclosures = decode_verify_disclosure_array::<Example2Claims>(
-        Deserialized {
+        PartsRef {
             jwt: EXAMPLE_2_JWT,
             disclosures: vec![],
         },
@@ -101,7 +101,7 @@ fn rfc_a_1_example_2_verification() {
 
     // Top level claim disclosed
     let sub_claim_disclosed = decode_verify_disclosure_array::<Example2Claims>(
-        Deserialized {
+        PartsRef {
             jwt: EXAMPLE_2_JWT,
             disclosures: vec![SUB_CLAIM_DISCLOSURE],
         },
@@ -123,7 +123,7 @@ fn rfc_a_1_example_2_verification() {
 
     // Address claim disclosed
     let address_country_disclosed = decode_verify_disclosure_array::<Example2Claims>(
-        Deserialized {
+        PartsRef {
             jwt: EXAMPLE_2_JWT,
             disclosures: vec![ADDRESS_COUNTRY_DISCLOSURE],
         },
@@ -147,7 +147,7 @@ fn rfc_a_1_example_2_verification() {
 
     // All claims disclosed
     let all_claims = decode_verify_disclosure_array::<Example2Claims>(
-        Deserialized {
+        PartsRef {
             jwt: EXAMPLE_2_JWT,
             disclosures: vec![
                 SUB_CLAIM_DISCLOSURE,
@@ -320,7 +320,7 @@ fn rfc_a_2_example_3_verification() {
 
     // All Claims
     let all_claims = decode_verify_disclosure_array::<Example3Claims>(
-        Deserialized {
+        PartsRef {
             jwt: EXAMPLE_3_JWT,
             disclosures: vec![
                 VERIFIED_CLAIMS_TIME_DISCLOSURE,
