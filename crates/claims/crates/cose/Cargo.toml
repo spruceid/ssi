@@ -1,0 +1,20 @@
+[package]
+name = "ssi-cose"
+version = "0.1.0"
+edition = "2021"
+authors = ["Spruce Systems, Inc."]
+license = "Apache-2.0"
+description = "CBOR Object Signing and Encryption for the `ssi` library."
+repository = "https://github.com/spruceid/ssi/"
+documentation = "https://docs.rs/ssi-cose/"
+
+[features]
+default = ["secp256r1"]
+secp256r1 = ["ssi-crypto/secp256r1"]
+
+[dependencies]
+ssi-crypto.workspace = true
+ssi-claims-core.workspace = true
+thiserror.workspace = true
+ciborium.workspace = true
+coset = { version = "0.3.8", features = ["std"] }

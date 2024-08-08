@@ -3,5 +3,7 @@
 //!
 //! [1]: <https://www.w3.org/TR/vc-jose-cose>
 mod jose;
-
 pub use jose::*;
+
+mod cose;
+pub use cose::*;

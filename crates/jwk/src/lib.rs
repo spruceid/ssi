@@ -1,5 +1,6 @@
 #![cfg_attr(docsrs, feature(doc_auto_cfg))]
 
+use base64::Engine;
 use core::fmt;
 use num_bigint::{BigInt, Sign};
 use simple_asn1::{ASN1Block, ASN1Class, ToASN1};
@@ -1287,16 +1288,15 @@ impl From<&p384::SecretKey> for ECParams {
 impl TryFrom<String> for Base64urlUInt {
     type Error = base64::DecodeError;
     fn try_from(data: String) -> Result<Self, Self::Error> {
-        Ok(Base64urlUInt(base64::decode_config(
-            data,
-            base64::URL_SAFE,
-        )?))
+        Ok(Base64urlUInt(
+            base64::prelude::BASE64_URL_SAFE.decode(data)?,
+        ))
     }
 }
 
 impl From<&Base64urlUInt> for String {
     fn from(data: &Base64urlUInt) -> String {
-        base64::encode_config(&data.0, base64::URL_SAFE_NO_PAD)
+        base64::prelude::BASE64_URL_SAFE_NO_PAD.encode(&data.0)
     }
 }
 
