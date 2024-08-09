@@ -1,7 +1,7 @@
 use base64::Engine;
 use serde::{de::DeserializeOwned, Serialize};
 use ssi_claims_core::{ClaimsValidity, DateTimeProvider, SignatureError, ValidateClaims};
-use ssi_cose::{CompactCoseSign1, CosePayload, CoseSigner, DecodedCose, ValidateCoseHeader};
+use ssi_cose::{CompactCoseSign1, CosePayload, CoseSigner, DecodedCoseSign1, ValidateCoseHeader};
 use ssi_json_ld::{iref::Uri, syntax::Context};
 use ssi_vc::{
     enveloped::EnvelopedVerifiableCredential,
@@ -23,7 +23,7 @@ impl<T: Serialize> CoseVc<T> {
         &self,
         signer: impl CoseSigner,
     ) -> Result<EnvelopedVerifiableCredential, SignatureError> {
-        let cose = CosePayload::sign(self, signer).await?;
+        let cose = CosePayload::sign(self, signer, true).await?;
         let base64_cose = base64::prelude::BASE64_STANDARD.encode(&cose);
         Ok(EnvelopedVerifiableCredential {
             context: Context::iri_ref(ssi_vc::v2::CREDENTIALS_V2_CONTEXT_IRI.to_owned().into()),
@@ -39,7 +39,7 @@ impl<T: DeserializeOwned> CoseVc<T> {
     pub fn decode(
         cose: &CompactCoseSign1,
         tagged: bool,
-    ) -> Result<DecodedCose<Self>, CoseDecodeError> {
+    ) -> Result<DecodedCoseSign1<Self>, CoseDecodeError> {
         cose.decode(tagged)?
             .try_map(|_, payload| serde_json::from_slice(payload).map(Self))
             .map_err(Into::into)
@@ -51,14 +51,16 @@ impl CoseVc {
     pub fn decode_any(
         cose: &CompactCoseSign1,
         tagged: bool,
-    ) -> Result<DecodedCose<Self>, CoseDecodeError> {
+    ) -> Result<DecodedCoseSign1<Self>, CoseDecodeError> {
         Self::decode(cose, tagged)
     }
 }
 
 impl<T: Serialize> CosePayload for CoseVc<T> {
-    fn typ(&self) -> Option<ssi_cose::Type> {
-        Some(ssi_cose::Type::Text("application/vc-ld+cose".to_owned()))
+    fn typ(&self) -> Option<ssi_cose::CosePayloadType> {
+        Some(ssi_cose::CosePayloadType::Text(
+            "application/vc-ld+cose".to_owned(),
+        ))
     }
 
     fn content_type(&self) -> Option<ssi_cose::ContentType> {
@@ -182,7 +184,7 @@ mod tests {
     use super::CoseVc;
 
     async fn verify(input: &CompactCoseSign1, key: &CoseKey) {
-        let vc = CoseVc::decode_any(input, false).unwrap();
+        let vc = CoseVc::decode_any(input, true).unwrap();
         let params = VerificationParameters::from_resolver(key);
         let result = vc.verify(params).await.unwrap();
         assert_eq!(result, Ok(()))

@@ -1,14 +1,20 @@
-use coset::{Algorithm, AsCborValue, CoseSign1, Header, ProtectedHeader};
+use coset::{
+    Algorithm, CborSerializable, CoseSign1, Header, ProtectedHeader, TaggedCborSerializable,
+};
 use ssi_claims_core::SignatureError;
 
 use crate::{CompactCoseSign1Buf, CosePayload, TYP_LABEL};
 
+/// COSE signer information.
 pub struct CoseSignerInfo {
+    /// Signature algorithm.
     pub algorithm: Option<Algorithm>,
+
+    /// Signing key identifier.
     pub key_id: Vec<u8>,
 }
 
-/// COSE Signer.
+/// COSE signer.
 pub trait CoseSigner {
     #[allow(async_fn_in_trait)]
     async fn fetch_info(&self) -> Result<CoseSignerInfo, SignatureError>;
@@ -21,6 +27,7 @@ pub trait CoseSigner {
         &self,
         payload: &(impl ?Sized + CosePayload),
         additional_data: Option<&[u8]>,
+        tagged: bool,
     ) -> Result<CompactCoseSign1Buf, SignatureError> {
         let info = self.fetch_info().await?;
 
@@ -46,7 +53,12 @@ pub trait CoseSigner {
         let tbs = result.tbs_data(additional_data.unwrap_or_default());
 
         result.signature = self.sign_bytes(&tbs).await?;
-        Ok(result.to_cbor_value().unwrap().into())
+
+        Ok(if tagged {
+            result.to_tagged_vec().unwrap().into()
+        } else {
+            result.to_vec().unwrap().into()
+        })
     }
 }
 
@@ -63,7 +75,8 @@ impl<'a, T: CoseSigner> CoseSigner for &'a T {
         &self,
         payload: &(impl ?Sized + CosePayload),
         additional_data: Option<&[u8]>,
+        tagged: bool,
     ) -> Result<CompactCoseSign1Buf, SignatureError> {
-        T::sign(*self, payload, additional_data).await
+        T::sign(*self, payload, additional_data, tagged).await
     }
 }

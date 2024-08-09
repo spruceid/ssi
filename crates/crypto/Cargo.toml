@@ -10,9 +10,10 @@ documentation = "https://docs.rs/ssi-crypto/"
 
 [features]
 default = ["secp256k1", "secp256r1", "ripemd-160"]
-secp256k1 = ["k256", "rand", "getrandom", "keccak"]
-secp256r1 = ["p256", "rand"]
-secp384r1 = ["p384", "rand"]
+ed25519 = ["ed25519-dalek"]
+secp256k1 = ["k256", "getrandom", "keccak"]
+secp256r1 = ["p256"]
+secp384r1 = ["p384"]
 bbs = ["dep:bbs", "pairing-plus", "rand_old", "getrandom", "sha2_old", "hkdf"]
 ripemd-160 = ["ripemd160", "secp256k1"]
 keccak = ["keccak-hash"]
@@ -26,7 +27,7 @@ k256 = { workspace = true, optional = true, features = ["ecdsa"] }
 p256 = { workspace = true, optional = true, features = ["ecdsa"] }
 p384 = { workspace = true, optional = true, features = ["ecdsa"] }
 hkdf = { version = "0.8", optional = true }
-rand = { workspace = true, optional = true }
+rand.workspace = true
 rand_old = { package = "rand", version = "0.7", optional = true }
 getrandom = { workspace = true, optional = true } # Required for wasm targets.
 sha2_old = { package = "sha2", version = "0.8", optional = true }

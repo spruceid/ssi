@@ -2,7 +2,7 @@ use super::CoseDecodeError;
 use base64::Engine;
 use serde::{de::DeserializeOwned, Serialize};
 use ssi_claims_core::{ClaimsValidity, SignatureError, ValidateClaims};
-use ssi_cose::{CompactCoseSign1, CosePayload, CoseSigner, DecodedCose, ValidateCoseHeader};
+use ssi_cose::{CompactCoseSign1, CosePayload, CoseSigner, DecodedCoseSign1, ValidateCoseHeader};
 use ssi_json_ld::{iref::Uri, syntax::Context};
 use ssi_vc::{
     enveloped::{EnvelopedVerifiableCredential, EnvelopedVerifiablePresentation},
@@ -16,8 +16,10 @@ use std::borrow::Cow;
 pub struct CoseVp<T = JsonPresentation<EnvelopedVerifiableCredential>>(pub T);
 
 impl<T: Serialize> CosePayload for CoseVp<T> {
-    fn typ(&self) -> Option<ssi_cose::Type> {
-        Some(ssi_cose::Type::Text("application/vp-ld+cose".to_owned()))
+    fn typ(&self) -> Option<ssi_cose::CosePayloadType> {
+        Some(ssi_cose::CosePayloadType::Text(
+            "application/vp-ld+cose".to_owned(),
+        ))
     }
 
     fn content_type(&self) -> Option<ssi_cose::ContentType> {
@@ -46,7 +48,7 @@ impl<T: Serialize> CoseVp<T> {
         &self,
         signer: &impl CoseSigner,
     ) -> Result<EnvelopedVerifiablePresentation, SignatureError> {
-        let cose = CosePayload::sign(self, signer).await?;
+        let cose = CosePayload::sign(self, signer, true).await?;
         let base64_cose = base64::prelude::BASE64_STANDARD.encode(&cose);
         Ok(EnvelopedVerifiablePresentation {
             context: Context::iri_ref(ssi_vc::v2::CREDENTIALS_V2_CONTEXT_IRI.to_owned().into()),
@@ -62,7 +64,7 @@ impl<T: DeserializeOwned> CoseVp<T> {
     pub fn decode(
         cose: &CompactCoseSign1,
         tagged: bool,
-    ) -> Result<DecodedCose<Self>, CoseDecodeError> {
+    ) -> Result<DecodedCoseSign1<Self>, CoseDecodeError> {
         cose.decode(tagged)?
             .try_map(|_, payload| serde_json::from_slice(payload).map(Self))
             .map_err(Into::into)
@@ -74,7 +76,7 @@ impl CoseVp {
     pub fn decode_any(
         jws: &CompactCoseSign1,
         tagged: bool,
-    ) -> Result<DecodedCose<Self>, CoseDecodeError> {
+    ) -> Result<DecodedCoseSign1<Self>, CoseDecodeError> {
         Self::decode(jws, tagged)
     }
 }
@@ -125,7 +127,7 @@ mod tests {
     use ssi_vc::{enveloped::EnvelopedVerifiableCredential, v2::syntax::JsonPresentation};
 
     async fn verify(input: &CompactCoseSign1, key: &CoseKey) {
-        let vp = CoseVp::decode_any(input, false).unwrap();
+        let vp = CoseVp::decode_any(input, true).unwrap();
         let params = VerificationParameters::from_resolver(key);
         let result = vp.verify(params).await.unwrap();
         assert_eq!(result, Ok(()))

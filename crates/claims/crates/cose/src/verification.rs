@@ -8,10 +8,10 @@ use ssi_crypto::VerificationError;
 use crate::{
     algorithm::instantiate_algorithm,
     key::{CoseKeyDecode, CoseKeyResolver, KeyDecodingError},
-    CoseSignatureBytes, DecodedCose, DecodedUnsignedCose,
+    CoseSignatureBytes, DecodedCoseSign1, UnsignedCoseSign1,
 };
 
-impl<T> DecodedCose<T> {
+impl<T> DecodedCoseSign1<T> {
     /// Verify.
     pub async fn verify<P>(&self, params: P) -> Result<Verification, ProofValidationError>
     where
@@ -22,8 +22,8 @@ impl<T> DecodedCose<T> {
     }
 }
 
-impl<T> VerifiableClaims for DecodedCose<T> {
-    type Claims = DecodedUnsignedCose<T>;
+impl<T> VerifiableClaims for DecodedCoseSign1<T> {
+    type Claims = UnsignedCoseSign1<T>;
     type Proof = CoseSignatureBytes;
 
     fn claims(&self) -> &Self::Claims {
@@ -44,39 +44,35 @@ pub trait ValidateCoseHeader<P> {
     ) -> ClaimsValidity;
 }
 
-impl<E, T> ValidateClaims<E, CoseSignatureBytes> for DecodedUnsignedCose<T>
+impl<E, T> ValidateClaims<E, CoseSignatureBytes> for UnsignedCoseSign1<T>
 where
     T: ValidateClaims<E, CoseSignatureBytes> + ValidateCoseHeader<E>,
 {
     fn validate_claims(&self, params: &E, signature: &CoseSignatureBytes) -> ClaimsValidity {
-        self.payload.validate_cose_headers(
-            params,
-            &self.unsigned.protected,
-            &self.unsigned.unprotected,
-        )?;
+        self.payload
+            .validate_cose_headers(params, &self.protected, &self.unprotected)?;
         self.payload.validate_claims(params, signature)
     }
 }
 
-impl<P, T> ValidateProof<P, DecodedUnsignedCose<T>> for CoseSignatureBytes
+impl<P, T> ValidateProof<P, UnsignedCoseSign1<T>> for CoseSignatureBytes
 where
     P: ResolverProvider<Resolver: CoseKeyResolver>,
 {
     async fn validate_proof<'a>(
         &'a self,
         params: &'a P,
-        claims: &'a DecodedUnsignedCose<T>,
+        claims: &'a UnsignedCoseSign1<T>,
     ) -> Result<ProofValidity, ProofValidationError> {
         let key = params
             .resolver()
-            .fetch_public_cose_key(Some(&claims.unsigned.protected.header.key_id))
+            .fetch_public_cose_key(Some(&claims.protected.header.key_id))
             .await?;
 
-        let signing_bytes = claims.unsigned.tbs_data(&[]);
+        let signing_bytes = claims.tbs_data(&[]);
 
         verify_bytes(
             claims
-                .unsigned
                 .protected
                 .header
                 .alg
@@ -118,6 +114,7 @@ impl From<CoseVerificationError> for ProofValidationError {
     }
 }
 
+/// Verify a signature using a COSE key and algorithm.
 pub fn verify_bytes(
     algorithm: &coset::Algorithm,
     key: &CoseKey,

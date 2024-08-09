@@ -8,6 +8,7 @@ use ssi_crypto::AlgorithmInstance;
 
 use crate::key::{CoseKeyDecode, EC2_CRV};
 
+/// Converts a COSE algorithm into an SSI algorithm instance.
 pub fn instantiate_algorithm(algorithm: &Algorithm) -> Option<AlgorithmInstance> {
     match algorithm {
         Algorithm::Assigned(iana::Algorithm::ES256) => Some(AlgorithmInstance::ES256),
@@ -15,6 +16,7 @@ pub fn instantiate_algorithm(algorithm: &Algorithm) -> Option<AlgorithmInstance>
     }
 }
 
+/// Computes a proper display name for the give COSE algorithm.
 pub fn algorithm_name(algorithm: &Algorithm) -> String {
     match algorithm {
         Algorithm::Assigned(iana::Algorithm::ES256) => "ES256".to_owned(),
@@ -24,11 +26,29 @@ pub fn algorithm_name(algorithm: &Algorithm) -> String {
     }
 }
 
+/// Returns the preferred signature algorithm for the give COSE key.
 pub fn preferred_algorithm(key: &CoseKey) -> Option<Cow<Algorithm>> {
     key.alg
         .as_ref()
         .map(Cow::Borrowed)
         .or_else(|| match key.kty {
+            KeyType::Assigned(iana::KeyType::RSA) => {
+                Some(Cow::Owned(Algorithm::Assigned(iana::Algorithm::PS256)))
+            }
+            KeyType::Assigned(iana::KeyType::OKP) => {
+                let crv = key
+                    .parse_required_param(&EC2_CRV, |v| {
+                        v.as_integer().and_then(|i| i64::try_from(i).ok())
+                    })
+                    .ok()?;
+
+                match iana::EllipticCurve::from_i64(crv)? {
+                    iana::EllipticCurve::Ed25519 => {
+                        Some(Cow::Owned(Algorithm::Assigned(iana::Algorithm::EdDSA)))
+                    }
+                    _ => None,
+                }
+            }
             KeyType::Assigned(iana::KeyType::EC2) => {
                 let crv = key
                     .parse_required_param(&EC2_CRV, |v| {
@@ -37,6 +57,9 @@ pub fn preferred_algorithm(key: &CoseKey) -> Option<Cow<Algorithm>> {
                     .ok()?;
 
                 match iana::EllipticCurve::from_i64(crv)? {
+                    iana::EllipticCurve::Secp256k1 => {
+                        Some(Cow::Owned(Algorithm::Assigned(iana::Algorithm::ES256K)))
+                    }
                     iana::EllipticCurve::P_256 => {
                         Some(Cow::Owned(Algorithm::Assigned(iana::Algorithm::ES256)))
                     }

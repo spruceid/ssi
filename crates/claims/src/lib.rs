@@ -26,6 +26,11 @@ pub use jwt::JWTClaims;
 /// See: <https://www.ietf.org/archive/id/draft-ietf-oauth-selective-disclosure-jwt-08.html>
 pub use ssi_sd_jwt as sd_jwt;
 
+/// CBOR Object Signing and Encryption (COSE).
+///
+/// See: <https://www.rfc-editor.org/rfc/rfc8152.html>
+pub use ssi_cose as cose;
+
 /// W3C Verifiable Credentials (VC).
 ///
 /// See: <https://www.w3.org/TR/vc-data-model>

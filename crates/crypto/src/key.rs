@@ -2,11 +2,16 @@ use zeroize::ZeroizeOnDrop;
 
 use crate::{AlgorithmInstance, SignatureError, VerificationError};
 
+#[derive(Debug, thiserror::Error)]
+#[error("invalid public key")]
 pub struct InvalidPublicKey;
 
 /// Public key.
 #[non_exhaustive]
 pub enum PublicKey {
+    #[cfg(feature = "ed25519")]
+    Ed25519(ed25519_dalek::VerifyingKey),
+
     #[cfg(feature = "secp256k1")]
     Secp256k1(k256::PublicKey),
 
@@ -18,6 +23,14 @@ pub enum PublicKey {
 }
 
 impl PublicKey {
+    #[cfg(feature = "ed25519")]
+    pub fn new_ed25519(bytes: &[u8]) -> Result<Self, InvalidPublicKey> {
+        bytes
+            .try_into()
+            .map(Self::Ed25519)
+            .map_err(|_| InvalidPublicKey)
+    }
+
     #[cfg(feature = "secp256k1")]
     pub fn new_secp256k1(x: &[u8], y: &[u8]) -> Result<Self, InvalidPublicKey> {
         let mut bytes = Vec::new();
@@ -64,10 +77,17 @@ impl PublicKey {
     }
 }
 
+#[derive(Debug, thiserror::Error)]
+#[error("invalid secret key")]
+pub struct InvalidSecretKey;
+
 /// Secret key.
 #[derive(ZeroizeOnDrop)]
 #[non_exhaustive]
 pub enum SecretKey {
+    #[cfg(feature = "ed25519")]
+    Ed25519(ed25519_dalek::SigningKey),
+
     #[cfg(feature = "secp256k1")]
     Secp256k1(k256::SecretKey),
 
@@ -79,11 +99,30 @@ pub enum SecretKey {
 }
 
 impl SecretKey {
+    #[cfg(feature = "ed25519")]
+    pub fn new_ed25519(bytes: &[u8]) -> Result<Self, InvalidSecretKey> {
+        bytes
+            .try_into()
+            .map(Self::Ed25519)
+            .map_err(|_| InvalidSecretKey)
+    }
+
+    #[cfg(feature = "ed25519")]
+    pub fn generate_ed25519() -> Self {
+        let mut rng = rand::rngs::OsRng {};
+        Self::generate_ed25519_from(&mut rng)
+    }
+
+    #[cfg(feature = "ed25519")]
+    pub fn generate_ed25519_from(rng: &mut (impl rand::CryptoRng + rand::RngCore)) -> Self {
+        Self::Ed25519(ed25519_dalek::SigningKey::generate(rng))
+    }
+
     #[cfg(feature = "secp256k1")]
-    pub fn new_secp256k1(d: &[u8]) -> Result<Self, InvalidPublicKey> {
+    pub fn new_secp256k1(d: &[u8]) -> Result<Self, InvalidSecretKey> {
         k256::SecretKey::from_bytes(d.into())
             .map(Self::Secp256k1)
-            .map_err(|_| InvalidPublicKey)
+            .map_err(|_| InvalidSecretKey)
     }
 
     #[cfg(feature = "secp256k1")]
@@ -98,10 +137,10 @@ impl SecretKey {
     }
 
     #[cfg(feature = "secp256r1")]
-    pub fn new_p256(d: &[u8]) -> Result<Self, InvalidPublicKey> {
+    pub fn new_p256(d: &[u8]) -> Result<Self, InvalidSecretKey> {
         p256::SecretKey::from_bytes(d.into())
             .map(Self::P256)
-            .map_err(|_| InvalidPublicKey)
+            .map_err(|_| InvalidSecretKey)
     }
 
     #[cfg(feature = "secp256r1")]
@@ -116,10 +155,10 @@ impl SecretKey {
     }
 
     #[cfg(feature = "secp384r1")]
-    pub fn new_p384(d: &[u8]) -> Result<Self, InvalidPublicKey> {
+    pub fn new_p384(d: &[u8]) -> Result<Self, InvalidSecretKey> {
         p384::SecretKey::from_bytes(d.into())
             .map(Self::P384)
-            .map_err(|_| InvalidPublicKey)
+            .map_err(|_| InvalidSecretKey)
     }
 
     #[cfg(feature = "secp384r1")]
