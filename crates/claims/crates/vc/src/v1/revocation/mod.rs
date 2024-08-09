@@ -147,7 +147,7 @@ impl TryFrom<&EncodedList> for List {
     type Error = DecodeListError;
     fn try_from(encoded_list: &EncodedList) -> Result<Self, Self::Error> {
         let string = &encoded_list.0;
-        let bytes = base64::prelude::BASE64_URL_SAFE.decode(string)?;
+        let bytes = base64::prelude::BASE64_URL_SAFE_NO_PAD.decode(string)?;
         let mut data = Vec::new();
         use flate2::bufread::GzDecoder;
         use std::io::Read;
@@ -165,7 +165,7 @@ impl TryFrom<&List> for EncodedList {
         let mut e = GzEncoder::new(Vec::new(), Compression::default());
         e.write_all(&list.0)?;
         let bytes = e.finish()?;
-        let string = base64::prelude::BASE64_URL_SAFE.encode(bytes);
+        let string = base64::prelude::BASE64_URL_SAFE_NO_PAD.encode(bytes);
         Ok(EncodedList(string))
     }
 }

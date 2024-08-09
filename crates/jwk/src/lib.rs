@@ -1285,12 +1285,17 @@ impl From<&p384::SecretKey> for ECParams {
     }
 }
 
+const BASE64_URL_SAFE_INDIFFERENT_PAD: base64::engine::GeneralPurpose =
+    base64::engine::GeneralPurpose::new(
+        &base64::alphabet::URL_SAFE,
+        base64::engine::GeneralPurposeConfig::new()
+            .with_decode_padding_mode(base64::engine::DecodePaddingMode::Indifferent),
+    );
+
 impl TryFrom<String> for Base64urlUInt {
     type Error = base64::DecodeError;
     fn try_from(data: String) -> Result<Self, Self::Error> {
-        Ok(Base64urlUInt(
-            base64::prelude::BASE64_URL_SAFE.decode(data)?,
-        ))
+        Ok(Base64urlUInt(BASE64_URL_SAFE_INDIFFERENT_PAD.decode(data)?))
     }
 }
 
