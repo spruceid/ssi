@@ -1,7 +1,7 @@
-//! CBOR Object Signing and Encryption ([COSE][1]) implementation based on
+//! CBOR Object Signing and Encryption ([COSE]) implementation based on
 //! [`coset`].
 //!
-//! [1]: <https://datatracker.ietf.org/doc/html/rfc8152>,
+//! [COSE]: <https://datatracker.ietf.org/doc/html/rfc8152>
 //! [`coset`]: <https://crates.io/crates/coset>
 use coset::sig_structure_data;
 use ssi_claims_core::SignatureError;
