@@ -1,6 +1,7 @@
 //! JWT encoding of a Status Lists.
 use std::borrow::Cow;
 
+use base64::prelude::{Engine, BASE64_URL_SAFE};
 use flate2::Compression;
 use iref::UriBuf;
 use serde::{Deserialize, Serialize};
@@ -185,12 +186,12 @@ impl JsonStatusList {
         let bytes = bit_string.to_compressed_bytes(compression);
         Self {
             bits: bit_string.status_size(),
-            lst: base64::encode_config(bytes, base64::URL_SAFE),
+            lst: BASE64_URL_SAFE.encode(bytes),
         }
     }
 
     pub fn decode(&self, limit: Option<u64>) -> Result<BitString, DecodeError> {
-        let bytes = base64::decode_config(&self.lst, base64::URL_SAFE)?;
+        let bytes = BASE64_URL_SAFE.decode(&self.lst)?;
         Ok(BitString::from_compressed_bytes(self.bits, &bytes, limit)?)
     }
 }

@@ -1,6 +1,8 @@
 use core::fmt;
 use std::{ops::Deref, str::FromStr};
 
+use base64::Engine;
+
 use crate::{CompactJWS, DecodeError, DecodedJWS, DecodedSigningBytes, Header, InvalidCompactJWS};
 
 /// JWS in UTF-8 compact serialized form.
@@ -164,7 +166,7 @@ impl CompactJWSString {
     ///
     /// Detached means the payload will not appear in the JWS.
     pub fn encode_detached(header: Header, signature: &[u8]) -> Self {
-        let b64_signature = base64::encode_config(signature, base64::URL_SAFE_NO_PAD);
+        let b64_signature = base64::prelude::BASE64_URL_SAFE_NO_PAD.encode(signature);
         Self::new_detached(header, b64_signature.as_bytes()).unwrap()
     }
 
@@ -173,7 +175,7 @@ impl CompactJWSString {
         signing_bytes: Vec<u8>,
         signature: &[u8],
     ) -> Result<Self, InvalidCompactJWS<Vec<u8>>> {
-        let b64_signature = base64::encode_config(signature, base64::URL_SAFE_NO_PAD);
+        let b64_signature = base64::prelude::BASE64_URL_SAFE_NO_PAD.encode(signature);
         let mut bytes = signing_bytes;
         bytes.push(b'.');
         bytes.extend_from_slice(b64_signature.as_bytes());

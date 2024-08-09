@@ -1,6 +1,5 @@
-use base64::URL_SAFE_NO_PAD;
-
 use crate::DecodeError;
+use base64::{prelude::BASE64_URL_SAFE_NO_PAD, Engine};
 
 #[derive(Debug, PartialEq)]
 pub struct DecodedDisclosure {
@@ -19,7 +18,8 @@ pub enum DisclosureKind {
 
 impl DecodedDisclosure {
     pub fn new(encoded: &str) -> Result<Self, DecodeError> {
-        let bytes = base64::decode_config(encoded, URL_SAFE_NO_PAD)
+        let bytes = BASE64_URL_SAFE_NO_PAD
+            .decode(encoded)
             .map_err(|_| DecodeError::DisclosureMalformed)?;
         let json: serde_json::Value = serde_json::from_slice(&bytes)?;
 

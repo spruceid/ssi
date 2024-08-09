@@ -1,4 +1,5 @@
 pub mod error;
+use base64::{prelude::BASE64_URL_SAFE_NO_PAD, Engine};
 pub use error::Error;
 use iref::UriBuf;
 use libipld::{
@@ -157,12 +158,10 @@ impl<F, A> Ucan<F, A> {
         Ok(match &self.codec {
             UcanCodec::Raw(r) => r.clone(),
             UcanCodec::DagJson => [
-                base64::encode_config(
-                    DagJsonCodec.encode(&to_ipld(&self.header).map_err(IpldError::new)?)?,
-                    base64::URL_SAFE_NO_PAD,
-                ),
-                base64::encode_config(DagJsonCodec.encode(&self.payload)?, base64::URL_SAFE_NO_PAD),
-                base64::encode_config(&self.signature, base64::URL_SAFE_NO_PAD),
+                BASE64_URL_SAFE_NO_PAD
+                    .encode(DagJsonCodec.encode(&to_ipld(&self.header).map_err(IpldError::new)?)?),
+                BASE64_URL_SAFE_NO_PAD.encode(DagJsonCodec.encode(&self.payload)?),
+                BASE64_URL_SAFE_NO_PAD.encode(&self.signature),
             ]
             .join("."),
         })
@@ -304,11 +303,9 @@ impl<F, A> Payload<F, A> {
         let signature = sign_bytes(
             algorithm,
             [
-                base64::encode_config(
-                    DagJsonCodec.encode(&to_ipld(&header).map_err(IpldError::new)?)?,
-                    base64::URL_SAFE_NO_PAD,
-                ),
-                base64::encode_config(DagJsonCodec.encode(&self)?, base64::URL_SAFE_NO_PAD),
+                BASE64_URL_SAFE_NO_PAD
+                    .encode(DagJsonCodec.encode(&to_ipld(&header).map_err(IpldError::new)?)?),
+                BASE64_URL_SAFE_NO_PAD.encode(DagJsonCodec.encode(&self)?),
             ]
             .join(".")
             .as_bytes(),
