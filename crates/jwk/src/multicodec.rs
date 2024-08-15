@@ -47,9 +47,6 @@ impl JWK {
             ssi_multicodec::BLS12_381_G2_PUB => {
                 crate::bls12381g2_parse(k).map_err(FromMulticodecError::Bls12381G2Pub)
             }
-            ssi_multicodec::JWK_JCS_PUB => {
-                crate::from_bytes(k).map_err(FromMulticodecError::JwkJcsPub)
-            }
             _ => Err(FromMulticodecError::UnsupportedCodec(codec)),
         }
     }
@@ -167,9 +164,6 @@ pub enum FromMulticodecError {
     #[cfg(feature = "bbs")]
     #[error(transparent)]
     Bls12381G2Pub(ssi_bbs::Error),
-
-    #[error(transparent)]
-    JwkJcsPub(serde_json::Error),
 
     /// Unexpected multibase (multicodec) key prefix multicodec
     #[error("Unsupported multicodec key type 0x{0:x}")]
