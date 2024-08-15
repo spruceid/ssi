@@ -102,6 +102,10 @@ impl FromStr for JWK {
     }
 }
 
+pub fn from_bytes(bytes: &[u8]) -> Result<JWK, serde_json::Error> {
+    serde_json::from_slice(bytes)
+}
+
 impl TryFrom<serde_json::Value> for JWK {
     type Error = serde_json::Error;
 
@@ -1314,6 +1318,7 @@ mod tests {
     const RSA_DER: &[u8] = include_bytes!("../../../tests/rsa2048-2020-08-25.der");
     const RSA_PK_DER: &[u8] = include_bytes!("../../../tests/rsa2048-2020-08-25-pk.der");
     const ED25519_JSON: &str = include_str!("../../../tests/ed25519-2020-10-18.json");
+    const JWK_JCS_JSON: &[u8] = include_bytes!("../../../tests/jwk_jcs-pub.json");
 
     #[test]
     fn jwk_to_from_der_rsa() {
@@ -1323,6 +1328,17 @@ mod tests {
         let rsa_pk: RSAPublicKey = simple_asn1::der_decode(RSA_PK_DER).unwrap();
         let rsa_params = RSAParams::try_from(&rsa_pk).unwrap();
         assert_eq!(key.to_public().params, Params::RSA(rsa_params));
+    }
+
+    #[test]
+    fn jwk_from_bytes() {
+        let actual_jwk: JWK = from_bytes(JWK_JCS_JSON).unwrap();
+        let actual_params: Params = actual_jwk.params;
+        if let Params::EC(ref ec_params) = actual_params {
+            assert_eq!(ec_params.curve.as_deref(), Some("P-256"));
+        } else {
+            panic!("actual_params is not of type Params::EC");
+        }
     }
 
     #[test]
@@ -1369,7 +1385,7 @@ mod tests {
             "alg": "RS256",
             "kid": "2011-04-29"
         }))
-        .unwrap();
+            .unwrap();
         let thumbprint = key.thumbprint().unwrap();
         assert_eq!(thumbprint, "NzbLsXh8uDCcd-6MNwXF4W_7noWXFZAfHkxZsRGC9Xs");
 
