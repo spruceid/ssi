@@ -106,7 +106,7 @@ solana = ["ssi-verification-methods/solana", "k256"]
 ethereum = ["serde_json"]
 
 ## BBS cryptographic suites.
-bbs = ["ssi-verification-methods/bbs"]
+bbs = ["ssi-bbs", "ssi-verification-methods/bbs"] 
 
 [dependencies]
 ssi-data-integrity-core.workspace = true
@@ -165,7 +165,7 @@ serde_jcs = { workspace = true, optional = true }
 ssi-di-sd-primitives.workspace = true
 
 # BBS
-ssi-bbs.workspace = true
+ssi-bbs = { workspace = true, optional = true }
 serde_cbor = "0.11.2"
 # rand_chacha.workspace = true
 
