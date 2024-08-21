@@ -21,3 +21,9 @@ ssi-claims-core.workspace = true
 thiserror.workspace = true
 ciborium.workspace = true
 coset = { version = "0.3.8", features = ["std"] }
+serde = { workspace = true, features = ["derive"] }
+
+[dev-dependencies]
+serde_json.workspace = true
+hex.workspace = true
+async-std = { workspace = true, features = ["attributes"] }

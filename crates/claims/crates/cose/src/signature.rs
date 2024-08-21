@@ -15,13 +15,23 @@ pub struct CoseSignerInfo {
 }
 
 /// COSE signer.
+///
+/// Any type with the ability to sign a COSE payload.
 pub trait CoseSigner {
+    /// Fetches the information about the signing key.
+    ///
+    /// This information will be included in the COSE header.
     #[allow(async_fn_in_trait)]
     async fn fetch_info(&self) -> Result<CoseSignerInfo, SignatureError>;
 
+    /// Signs the given bytes.
     #[allow(async_fn_in_trait)]
     async fn sign_bytes(&self, signing_bytes: &[u8]) -> Result<Vec<u8>, SignatureError>;
 
+    /// Signs the given payload.
+    ///
+    /// Returns a serialized `COSE_Sign1` object, tagged or not according to
+    /// `tagged`.
     #[allow(async_fn_in_trait)]
     async fn sign(
         &self,

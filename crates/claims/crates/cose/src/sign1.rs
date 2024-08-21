@@ -3,13 +3,19 @@ use coset::{
     sig_structure_data, CborSerializable, CoseError, CoseSign1, Header, ProtectedHeader,
     TaggedCborSerializable,
 };
+use serde::{Deserialize, Serialize};
 use std::{borrow::Borrow, ops::Deref};
 
 /// CBOR-encoded `COSE_Sign1` object.
 ///
+/// This represents the raw CBOR bytes encoding a [`CoseSign1`] object. The
+/// [`Self::decode`] method can be used to decode into a [`DecodedCoseSign1`]
+/// (similar to `CoseSign1` but with extra information about the payload).
+///
 /// This is the borrowed equivalent of [`CompactCoseSign1Buf`].
-#[derive(Debug)]
+#[derive(Debug, Serialize, PartialEq, Eq, PartialOrd, Ord, Hash)]
 #[repr(transparent)]
+#[serde(transparent)]
 pub struct CompactCoseSign1([u8]);
 
 impl CompactCoseSign1 {
@@ -17,11 +23,12 @@ impl CompactCoseSign1 {
     ///
     /// The bytes are not actually checked. If the bytes are not describing
     /// a CBOR-encoded `COSE_Sign1` object it will be detected when the
-    /// `decode` method is called.
+    /// [`Self::decode`] method is called.
     pub fn new(bytes: &[u8]) -> &Self {
         unsafe { std::mem::transmute(bytes) }
     }
 
+    /// Decodes the CBOR bytes into a [`DecodedCoseSign1`].
     pub fn decode(&self, tagged: bool) -> Result<DecodedCoseSign1, CoseError> {
         let cose = if tagged {
             CoseSign1::from_tagged_slice(&self.0)?
@@ -32,6 +39,7 @@ impl CompactCoseSign1 {
         Ok(cose.into())
     }
 
+    /// Returns the raw CBOR bytes.
     pub fn as_bytes(&self) -> &[u8] {
         &self.0
     }
@@ -53,14 +61,30 @@ impl ToOwned for CompactCoseSign1 {
 
 /// CBOR-encoded `COSE_Sign1` object buffer.
 ///
+/// This represents the raw CBOR bytes encoding a [`CoseSign1`] object. The
+/// [`CompactCoseSign1::decode`] method can be used to decode into a
+/// [`DecodedCoseSign1`] (similar to `CoseSign1` but with extra information
+/// about the payload).
+///
 /// This is the owned equivalent of [`CompactCoseSign1`].
+#[derive(Debug, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[serde(transparent)]
 pub struct CompactCoseSign1Buf(Vec<u8>);
 
 impl CompactCoseSign1Buf {
+    /// Creates a new CBOR-encoded `COSE_Sign1` object from a byte buffer.
+    ///
+    /// The bytes are not actually checked. If the bytes are not describing
+    /// a CBOR-encoded `COSE_Sign1` object it will be detected when the
+    /// [`CompactCoseSign1::decode`] method is called.
     pub fn new(bytes: Vec<u8>) -> Self {
         Self(bytes)
     }
 
+    /// Creates a new CBOR-encoded `COSE_Sign1` object by encoding the give
+    /// [`CoseSign1`] value.
+    ///
+    /// If `tagged` is set to `true`, the CBOR value will be tagged.
     pub fn encode(object: impl Into<CoseSign1>, tagged: bool) -> Self {
         if tagged {
             Self(TaggedCborSerializable::to_tagged_vec(object.into()).unwrap())
@@ -69,6 +93,7 @@ impl CompactCoseSign1Buf {
         }
     }
 
+    /// Borrows the value as a [`CompactCoseSign1`].
     pub fn as_compact(&self) -> &CompactCoseSign1 {
         CompactCoseSign1::new(self.0.as_slice())
     }
@@ -118,6 +143,10 @@ pub struct DecodedCoseSign1<T = ()> {
 }
 
 impl<T> DecodedCoseSign1<T> {
+    /// Maps the payload interpretation.
+    ///
+    /// This function can be used to decode the raw payload bytes into a
+    /// proper typed value the application can work with.
     pub fn map<U>(self, f: impl FnOnce(T, &[u8]) -> U) -> DecodedCoseSign1<U> {
         DecodedCoseSign1 {
             signing_bytes: self.signing_bytes.map(f),
@@ -125,6 +154,10 @@ impl<T> DecodedCoseSign1<T> {
         }
     }
 
+    /// Tries to map the payload interpretation.
+    ///
+    /// This function can be used to decode the raw payload bytes into a
+    /// proper typed value the application can work with.
     pub fn try_map<U, E>(
         self,
         f: impl FnOnce(T, &[u8]) -> Result<U, E>,
@@ -164,19 +197,31 @@ impl<T> From<DecodedCoseSign1<T>> for CoseSign1 {
 ///
 /// Stores the payload value as interpreted by the application (type `T`) and
 /// the original payload bytes.
+///
+/// The original payload bytes are always preserved since they can not always
+/// be deterministically (or cheaply) reconstructed from the typed payload
+/// value.
 #[derive(Clone, PartialEq)]
 pub struct PayloadBytes<T = ()> {
+    /// Original payload bytes.
     bytes: Vec<u8>,
+
+    /// Interpretation of the payload bytes.
     value: T,
 }
 
 impl PayloadBytes {
+    /// Creates a new `PayloadBytes` from the bytes.
+    ///
+    /// The interpretation of the bytes will be unit `()`.
     pub fn from_bytes(bytes: Vec<u8>) -> Self {
         Self { bytes, value: () }
     }
 }
 
 impl<T: CosePayload> PayloadBytes<T> {
+    /// Creates a new `PayloadBytes` from the payload, using
+    /// [`CosePayload::payload_bytes`] to reconstruct the payload bytes.
     pub fn new(value: T) -> Self {
         Self {
             bytes: value.payload_bytes().into_owned(),
@@ -186,10 +231,15 @@ impl<T: CosePayload> PayloadBytes<T> {
 }
 
 impl<T> PayloadBytes<T> {
+    /// Returns the bytes as a slice.
     pub fn as_bytes(&self) -> &[u8] {
         &self.bytes
     }
 
+    /// Maps the payload interpretation.
+    ///
+    /// This function can be used to decode the raw payload bytes into a
+    /// proper typed value the application can work with.
     pub fn map<U>(self, f: impl FnOnce(T, &[u8]) -> U) -> PayloadBytes<U> {
         let value = f(self.value, &self.bytes);
         PayloadBytes {
@@ -198,6 +248,10 @@ impl<T> PayloadBytes<T> {
         }
     }
 
+    /// Tries to map the payload interpretation.
+    ///
+    /// This function can be used to decode the raw payload bytes into a
+    /// proper typed value the application can work with.
     pub fn try_map<U, E>(
         self,
         f: impl FnOnce(T, &[u8]) -> Result<U, E>,
@@ -209,6 +263,7 @@ impl<T> PayloadBytes<T> {
         })
     }
 
+    /// Forgets about the payload interpretation and returns the raw bytes.
     pub fn into_bytes(self) -> Vec<u8> {
         self.bytes
     }
@@ -253,6 +308,7 @@ impl<T> UnsignedCoseSign1<T> {
         )
     }
 
+    /// Maps the payload interpretation.
     pub fn map<U>(self, f: impl FnOnce(T, &[u8]) -> U) -> UnsignedCoseSign1<U> {
         UnsignedCoseSign1 {
             protected: self.protected,
@@ -261,6 +317,7 @@ impl<T> UnsignedCoseSign1<T> {
         }
     }
 
+    /// Tries to map the payload interpretation.
     pub fn try_map<U, E>(
         self,
         f: impl FnOnce(T, &[u8]) -> Result<U, E>,

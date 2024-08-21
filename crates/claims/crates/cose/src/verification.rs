@@ -38,10 +38,12 @@ impl<T> VerifiableClaims for DecodedCoseSign1<T> {
 pub trait ValidateCoseHeader<P> {
     fn validate_cose_headers(
         &self,
-        params: &P,
-        protected: &ProtectedHeader,
-        unprotected: &Header,
-    ) -> ClaimsValidity;
+        _params: &P,
+        _protected: &ProtectedHeader,
+        _unprotected: &Header,
+    ) -> ClaimsValidity {
+        Ok(())
+    }
 }
 
 impl<E, T> ValidateClaims<E, CoseSignatureBytes> for UnsignedCoseSign1<T>

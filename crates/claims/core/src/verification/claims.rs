@@ -49,29 +49,15 @@ pub type ClaimsValidity = Result<(), InvalidClaims>;
 /// The `validate` function is also provided with the proof, as some claim type
 /// require information from the proof to be validated.
 pub trait ValidateClaims<E, P = ()> {
-    fn validate_claims(&self, environment: &E, proof: &P) -> ClaimsValidity;
-}
-
-impl<E, P> ValidateClaims<E, P> for () {
-    fn validate_claims(&self, _env: &E, _proof: &P) -> ClaimsValidity {
+    fn validate_claims(&self, _environment: &E, _proof: &P) -> ClaimsValidity {
         Ok(())
     }
 }
 
-impl<E, P> ValidateClaims<E, P> for [u8] {
-    fn validate_claims(&self, _env: &E, _proof: &P) -> ClaimsValidity {
-        Ok(())
-    }
-}
+impl<E, P> ValidateClaims<E, P> for () {}
 
-impl<E, P> ValidateClaims<E, P> for Vec<u8> {
-    fn validate_claims(&self, _env: &E, _proof: &P) -> ClaimsValidity {
-        Ok(())
-    }
-}
+impl<E, P> ValidateClaims<E, P> for [u8] {}
 
-impl<'a, E, P, T: ?Sized + ToOwned + ValidateClaims<E, P>> ValidateClaims<E, P> for Cow<'a, T> {
-    fn validate_claims(&self, _env: &E, _proof: &P) -> ClaimsValidity {
-        Ok(())
-    }
-}
+impl<E, P> ValidateClaims<E, P> for Vec<u8> {}
+
+impl<'a, E, P, T: ?Sized + ToOwned + ValidateClaims<E, P>> ValidateClaims<E, P> for Cow<'a, T> {}
