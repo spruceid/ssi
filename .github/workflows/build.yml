@@ -38,6 +38,9 @@ jobs:
     - uses: taiki-e/install-action@v2
       with:
         tool: cargo-rdme
+    - uses: taiki-e/install-action@v2
+      with:
+        tool: cargo-deny
 
     - name: Fmt
       run: cargo fmt -- --check
@@ -61,6 +64,9 @@ jobs:
       run: cargo doc --no-deps --workspace --all-features
     - name: cargo-rdme
       run: cargo rdme --check --no-fail-on-warnings
+
+    - run: cargo deny check bans
+    - run: cargo deny check licenses
 
   test-each-feature:
     if: ${{ !github.event.pull_request.draft }}
