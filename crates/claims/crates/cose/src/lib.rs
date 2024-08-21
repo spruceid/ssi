@@ -7,9 +7,9 @@
 //! # Usage
 //!
 //! ```
-//! # #[cfg(feature = "secp256r1")]
 //! # #[async_std::main]
 //! # async fn main() {
+//! # #[cfg(feature = "secp256r1")] {
 //! use std::borrow::Cow;
 //! use serde::{Serialize, Deserialize};
 //! use ssi_claims_core::{VerifiableClaims, ValidateClaims, VerificationParameters};
@@ -61,7 +61,7 @@
 //! // Verify the signature.
 //! let params = VerificationParameters::from_resolver(&key);
 //! decoded.verify(&params).await.unwrap();
-//! # }
+//! # } }
 //! ```
 use ssi_claims_core::SignatureError;
 use std::borrow::Cow;

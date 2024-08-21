@@ -672,7 +672,7 @@ mod tests {
     /// See: <https://www.rfc-editor.org/rfc/rfc9052.html#appendix-C.7.2>
     #[cfg(feature = "secp256r1")]
     #[test]
-    fn secret_256_3() {
+    fn secret_p256_3() {
         let input = hex::decode("a601022001025821706572656772696e2e746f6f6b407475636b626f726f7567682e6578616d706c6521582098f50a4ff6c05861c8860d13a638ea56c3f5ad7590bbfbf054e1c7b4d91d6280225820f01400b089867804b8e9fc96c3932161f1934f4223069170d924b7e03bf822bb23582002d1f7e6f26c43d4868d87ceb2353161740aacf1f7163647984b522a848df1c3").unwrap();
         let cose_key = CoseKey::from_slice(&input).unwrap();
         let key = cose_key.decode_secret().unwrap();
