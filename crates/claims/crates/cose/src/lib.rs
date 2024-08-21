@@ -7,7 +7,9 @@
 //! # Usage
 //!
 //! ```
-//! # #[async_std::main] async fn main() {
+//! # #[cfg(feature = "secp256r1")]
+//! # #[async_std::main]
+//! # async fn main() {
 //! use std::borrow::Cow;
 //! use serde::{Serialize, Deserialize};
 //! use ssi_claims_core::{VerifiableClaims, ValidateClaims, VerificationParameters};
