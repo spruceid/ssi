@@ -13,6 +13,28 @@ impl AlgorithmInstance {
     #[allow(unused)]
     pub fn sign(&self, key: &SecretKey, signing_bytes: &[u8]) -> Result<Vec<u8>, SignatureError> {
         match self {
+            #[cfg(feature = "ed25519")]
+            Self::EdDSA => match key {
+                SecretKey::Ed25519(key) => {
+                    use ed25519_dalek::Signer;
+                    Ok(key.sign(signing_bytes).to_bytes().to_vec())
+                }
+                #[allow(unreachable_patterns)]
+                _ => Err(SignatureError::IncompatibleKey),
+            },
+            #[cfg(feature = "secp256k1")]
+            Self::ES256K => {
+                match key {
+                    SecretKey::Secp256k1(key) => {
+                        use k256::ecdsa::{signature::Signer, Signature};
+                        let signing_key = k256::ecdsa::SigningKey::from(key);
+                        let signature: Signature = signing_key.try_sign(signing_bytes).unwrap(); // Uses SHA-256 by default.
+                        Ok(signature.to_bytes().to_vec())
+                    }
+                    #[allow(unreachable_patterns)]
+                    _ => Err(SignatureError::IncompatibleKey),
+                }
+            }
             #[cfg(feature = "secp256r1")]
             Self::ES256 => {
                 match key {

@@ -90,3 +90,68 @@ impl<'a, T: CoseSigner> CoseSigner for &'a T {
         T::sign(*self, payload, additional_data, tagged).await
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use crate::{key::CoseKeyGenerate, CosePayload, DecodedCoseSign1};
+    use coset::CoseKey;
+    use ssi_claims_core::VerificationParameters;
+
+    async fn sign_with(key: &CoseKey, tagged: bool) {
+        let bytes = b"PAYLOAD".sign(key, tagged).await.unwrap();
+        let decoded: DecodedCoseSign1 = bytes.decode(tagged).unwrap();
+
+        assert_eq!(decoded.signing_bytes.payload.as_bytes(), b"PAYLOAD");
+
+        let params = VerificationParameters::from_resolver(key);
+        assert_eq!(decoded.verify(params).await.unwrap(), Ok(()));
+    }
+
+    #[cfg(feature = "ed25519")]
+    #[async_std::test]
+    async fn sign_ed25519() {
+        sign_with(&CoseKey::generate_ed25519(), false).await
+    }
+
+    #[cfg(feature = "ed25519")]
+    #[async_std::test]
+    async fn sign_ed25519_tagged() {
+        sign_with(&CoseKey::generate_ed25519(), true).await
+    }
+
+    #[cfg(feature = "secp256k1")]
+    #[async_std::test]
+    async fn sign_secp256k1() {
+        sign_with(&CoseKey::generate_secp256k1(), false).await
+    }
+
+    #[cfg(feature = "secp256k1")]
+    #[async_std::test]
+    async fn sign_secp256k1_tagged() {
+        sign_with(&CoseKey::generate_secp256k1(), true).await
+    }
+
+    #[cfg(feature = "secp256r1")]
+    #[async_std::test]
+    async fn sign_p256() {
+        sign_with(&CoseKey::generate_p256(), false).await
+    }
+
+    #[cfg(feature = "secp256r1")]
+    #[async_std::test]
+    async fn sign_p256_tagged() {
+        sign_with(&CoseKey::generate_p256(), true).await
+    }
+
+    #[cfg(feature = "secp384r1")]
+    #[async_std::test]
+    async fn sign_p384() {
+        sign_with(&CoseKey::generate_p384(), false).await
+    }
+
+    #[cfg(feature = "secp384r1")]
+    #[async_std::test]
+    async fn sign_p384_tagged() {
+        sign_with(&CoseKey::generate_p384(), true).await
+    }
+}

@@ -152,6 +152,12 @@ pub trait CosePayload {
     }
 }
 
+impl CosePayload for [u8] {
+    fn payload_bytes(&self) -> Cow<[u8]> {
+        Cow::Borrowed(self)
+    }
+}
+
 pub const TYP_LABEL: Label = Label::Int(16);
 
 /// COSE payload type.

@@ -46,6 +46,8 @@ pub trait ValidateCoseHeader<P> {
     }
 }
 
+impl<P> ValidateCoseHeader<P> for () {}
+
 impl<E, T> ValidateClaims<E, CoseSignatureBytes> for UnsignedCoseSign1<T>
 where
     T: ValidateClaims<E, CoseSignatureBytes> + ValidateCoseHeader<E>,
