@@ -19,7 +19,7 @@ use ssi_verification_methods::{Multikey, VerificationMethodResolver};
 pub(crate) mod transformation;
 pub use transformation::{Bbs2023Transformation, Bbs2023TransformationOptions, Transformed};
 
-mod hashing;
+pub mod hashing;
 pub use hashing::{Bbs2023Hashing, HashData};
 
 mod signature;
