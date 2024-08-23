@@ -12,6 +12,8 @@ use ssi_data_integrity_core::{
 use ssi_verification_methods::{MessageSigner, RsaVerificationKey2018};
 use static_iref::iri;
 
+use crate::try_from_type;
+
 /// RSA Signature Suite 2018.
 ///
 /// See: <https://w3c-ccg.github.io/lds-rsa2018/>
@@ -41,6 +43,8 @@ impl StandardCryptographicSuite for RsaSignature2018 {
         TypeRef::Other(Self::NAME)
     }
 }
+
+try_from_type!(RsaSignature2018);
 
 /// Signature type.
 #[derive(Debug, Clone, Serialize, Deserialize)]

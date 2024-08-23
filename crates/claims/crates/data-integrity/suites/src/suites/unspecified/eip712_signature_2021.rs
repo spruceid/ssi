@@ -1,5 +1,8 @@
 //! EIP-712 Signature 2021 implementation.
-use crate::eip712::{Eip712Hashing, Eip712Signature};
+use crate::{
+    eip712::{Eip712Hashing, Eip712Signature},
+    try_from_type,
+};
 use rdf_types::{LexicalQuad, Quad};
 use ssi_claims_core::{ProofValidationError, ProofValidity, SignatureError};
 use ssi_data_integrity_core::{
@@ -96,6 +99,8 @@ impl StandardCryptographicSuite for Eip712Signature2021 {
         TypeRef::Other(Self::NAME)
     }
 }
+
+try_from_type!(Eip712Signature2021);
 
 pub struct Eip712Transformation;
 

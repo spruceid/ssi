@@ -9,6 +9,8 @@ use ssi_data_integrity_core::{
 use ssi_verification_methods::JsonWebKey2020;
 use static_iref::{iri, iri_ref};
 
+use crate::try_from_type;
+
 lazy_static! {
     static ref W3ID_JWS2020_V1_CONTEXT: ssi_json_ld::syntax::ContextEntry = {
         ssi_json_ld::syntax::ContextEntry::IriRef(
@@ -55,3 +57,5 @@ impl StandardCryptographicSuite for JsonWebSignature2020 {
         TypeRef::Other(Self::NAME)
     }
 }
+
+try_from_type!(JsonWebSignature2020);

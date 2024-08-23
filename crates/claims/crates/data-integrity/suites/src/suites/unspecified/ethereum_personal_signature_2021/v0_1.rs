@@ -6,6 +6,8 @@ use ssi_data_integrity_core::{
 };
 use static_iref::iri;
 
+use crate::try_from_type;
+
 #[derive(Debug, Default, Clone, Copy)]
 pub struct EthereumPersonalSignature2021v0_1;
 
@@ -33,6 +35,8 @@ impl StandardCryptographicSuite for EthereumPersonalSignature2021v0_1 {
         TypeRef::Other(Self::NAME)
     }
 }
+
+try_from_type!(EthereumPersonalSignature2021v0_1);
 
 #[derive(Default)]
 pub struct EthereumPersonalSignature2021v0_1Context;

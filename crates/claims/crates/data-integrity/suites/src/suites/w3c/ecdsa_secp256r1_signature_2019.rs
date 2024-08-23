@@ -8,6 +8,8 @@ use ssi_data_integrity_core::{
 use ssi_verification_methods::EcdsaSecp256r1VerificationKey2019;
 use static_iref::iri;
 
+use crate::try_from_type;
+
 /// ECDSA Cryptosuite v2019 `EcdsaSecp256r1Signature2019`.
 ///
 /// See: <https://www.w3.org/community/reports/credentials/CG-FINAL-di-ecdsa-2019-20220724/#ecdsasecp256r1signature2019>
@@ -38,3 +40,5 @@ impl StandardCryptographicSuite for EcdsaSecp256r1Signature2019 {
         TypeRef::Other(Self::NAME)
     }
 }
+
+try_from_type!(EcdsaSecp256r1Signature2019);

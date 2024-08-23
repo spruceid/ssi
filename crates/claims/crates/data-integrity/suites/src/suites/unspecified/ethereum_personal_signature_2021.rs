@@ -18,6 +18,8 @@ use ssi_verification_methods::{
 };
 use static_iref::iri;
 
+use crate::try_from_type;
+
 mod v0_1;
 pub use v0_1::*;
 
@@ -58,6 +60,8 @@ impl StandardCryptographicSuite for EthereumPersonalSignature2021 {
         TypeRef::Other(Self::NAME)
     }
 }
+
+try_from_type!(EthereumPersonalSignature2021);
 
 #[derive(Default)]
 pub struct EthereumPersonalSignature2021Context;

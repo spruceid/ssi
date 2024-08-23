@@ -3,7 +3,10 @@ use ssi_data_integrity_core::{suite::AddProofContext, StandardCryptographicSuite
 use ssi_eip712::Value;
 use static_iref::{iri, iri_ref};
 
-use crate::eip712::{Eip712Hashing, TypesOrURI};
+use crate::{
+    eip712::{Eip712Hashing, TypesOrURI},
+    try_from_type,
+};
 
 use super::{
     AnyEip712Options, EthereumEip712SignatureAlgorithm, EthereumEip712Transformation,
@@ -132,3 +135,5 @@ impl StandardCryptographicSuite for EthereumEip712Signature2021v0_1 {
         TypeRef::Other(Self::NAME)
     }
 }
+
+try_from_type!(EthereumEip712Signature2021v0_1);
