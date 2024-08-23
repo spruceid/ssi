@@ -1029,7 +1029,7 @@ pub fn serialize_p256(params: &ECParams) -> Result<Vec<u8>, Error> {
     Ok(pk_compressed_bytes.to_vec())
 }
 
-/// Serialize a P-384 public key as a 33-byte string with point compression.
+/// Serialize a P-384 public key as a 49-byte string with point compression.
 #[cfg(feature = "secp384r1")]
 pub fn serialize_p384(params: &ECParams) -> Result<Vec<u8>, Error> {
     // TODO: check that curve is P-384
