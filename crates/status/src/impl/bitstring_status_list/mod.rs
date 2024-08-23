@@ -570,7 +570,7 @@ mod prefixed_hexadecimal {
         let number = string
             .strip_prefix("0x")
             .ok_or_else(|| serde::de::Error::custom("missing `0x` prefix"))?;
-        u8::from_str_radix(&number, 16).map_err(serde::de::Error::custom)
+        u8::from_str_radix(number, 16).map_err(serde::de::Error::custom)
     }
 }
 
