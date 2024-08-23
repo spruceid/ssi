@@ -14,7 +14,7 @@ use ssi_verification_methods::{
 };
 use static_iref::{iri, uri};
 use std::{borrow::Cow, collections::HashMap, sync::Arc};
-use xsd_types::DateTime;
+use xsd_types::{DateTime, DateTimeStamp};
 
 #[derive(Clone, linked_data::Serialize, serde::Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -159,7 +159,7 @@ async fn main() {
     // Signature options, defining the crypto suite, signature date,
     // signing key and proof purpose.
     let proof_options = ProofOptions::new(
-        DateTime::now(),
+        DateTimeStamp::now(),
         iri!("https://example.com/controller#key").to_owned().into(),
         ProofPurpose::Assertion,
         (),

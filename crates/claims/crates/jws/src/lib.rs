@@ -94,9 +94,6 @@ pub use signature::*;
 mod verification;
 pub use verification::*;
 
-#[cfg(feature = "linked-data")]
-mod linked_data;
-
 /// Decoded JWS.
 #[derive(Clone, PartialEq, Eq)]
 pub struct JWS<T = Vec<u8>> {
