@@ -8,6 +8,8 @@ use ssi_data_integrity_core::{
 use ssi_verification_methods::Multikey;
 use static_iref::iri;
 
+use crate::try_from_type;
+
 /// The `eddsa-2022` cryptosuite, a draft version of the `eddsa-rdfc-2022`
 /// cryptosuite.
 ///
@@ -41,3 +43,5 @@ impl StandardCryptographicSuite for EdDsa2022 {
         TypeRef::DataIntegrityProof(CryptosuiteStr::new("eddsa-2022").unwrap())
     }
 }
+
+try_from_type!(EdDsa2022);

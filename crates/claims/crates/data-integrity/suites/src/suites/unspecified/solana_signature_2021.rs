@@ -15,6 +15,8 @@ use ssi_verification_methods::{
 };
 use static_iref::iri;
 
+use crate::try_from_type;
+
 /// Solana Signature 2021
 ///
 /// Linked data signature suite using Solana.
@@ -67,6 +69,8 @@ impl StandardCryptographicSuite for SolanaSignature2021 {
         TypeRef::Other(Self::NAME)
     }
 }
+
+try_from_type!(SolanaSignature2021);
 
 // pub fn wallet_sign(message: &[u8], key: &JWK) -> Result<Vec<u8>, MessageSignatureError> {
 //     let tx = LocalSolanaTransaction::with_message(message);

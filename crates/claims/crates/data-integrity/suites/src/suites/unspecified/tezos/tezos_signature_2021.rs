@@ -1,4 +1,4 @@
-use crate::TezosWallet;
+use crate::{try_from_type, TezosWallet};
 use ssi_claims_core::{ProofValidationError, ProofValidity, SignatureError};
 use ssi_crypto::algorithm::AnyBlake2b;
 use ssi_data_integrity_core::{
@@ -68,6 +68,8 @@ impl StandardCryptographicSuite for TezosSignature2021 {
         TypeRef::Other(Self::NAME)
     }
 }
+
+try_from_type!(TezosSignature2021);
 
 pub struct EncodeTezosMessage;
 

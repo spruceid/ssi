@@ -16,6 +16,8 @@ use ssi_verification_methods::{
 };
 use static_iref::iri;
 
+use crate::try_from_type;
+
 /// Aleo Signature 2021
 ///
 /// Linked data signature suite using Aleo.
@@ -85,6 +87,8 @@ impl StandardCryptographicSuite for AleoSignature2021 {
         TypeRef::Other(Self::NAME)
     }
 }
+
+try_from_type!(AleoSignature2021);
 
 pub struct AleoSignatureAlgorithm;
 

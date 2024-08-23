@@ -15,6 +15,8 @@ use ssi_data_integrity_core::{
 use ssi_verification_methods::Ed25519VerificationKey2020;
 use static_iref::{iri, iri_ref};
 
+use crate::try_from_type;
+
 lazy_static! {
     static ref PROOF_CONTEXT: ssi_json_ld::syntax::ContextEntry = {
         ssi_json_ld::syntax::ContextEntry::IriRef(
@@ -64,3 +66,5 @@ impl StandardCryptographicSuite for Ed25519Signature2020 {
         TypeRef::Other(Self::NAME)
     }
 }
+
+try_from_type!(Ed25519Signature2020);

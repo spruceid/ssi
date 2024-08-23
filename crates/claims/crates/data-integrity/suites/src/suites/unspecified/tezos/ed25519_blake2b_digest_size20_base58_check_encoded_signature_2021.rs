@@ -10,6 +10,8 @@ use ssi_data_integrity_core::{
 use ssi_verification_methods::Ed25519PublicKeyBLAKE2BDigestSize20Base58CheckEncoded2021;
 use static_iref::iri;
 
+use crate::try_from_type;
+
 /// Proof type used with [did:tz](https://github.com/spruceid/did-tezos/) `tz1` addresses.
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct Ed25519BLAKE2BDigestSize20Base58CheckEncodedSignature2021;
@@ -38,3 +40,5 @@ impl StandardCryptographicSuite for Ed25519BLAKE2BDigestSize20Base58CheckEncoded
         TypeRef::Other(Self::NAME)
     }
 }
+
+try_from_type!(Ed25519BLAKE2BDigestSize20Base58CheckEncodedSignature2021);

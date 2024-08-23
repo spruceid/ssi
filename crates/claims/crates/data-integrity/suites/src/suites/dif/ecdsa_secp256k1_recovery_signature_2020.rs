@@ -9,6 +9,8 @@ use ssi_data_integrity_core::{
 use ssi_verification_methods::EcdsaSecp256k1RecoveryMethod2020;
 use static_iref::iri;
 
+use crate::try_from_type;
+
 /// `EcdsaSecp256k1RecoverySignature2020`.
 ///
 /// See: <https://identity.foundation/EcdsaSecp256k1RecoverySignature2020/>
@@ -38,6 +40,8 @@ impl StandardCryptographicSuite for EcdsaSecp256k1RecoverySignature2020 {
         TypeRef::Other(Self::NAME)
     }
 }
+
+try_from_type!(EcdsaSecp256k1RecoverySignature2020);
 
 #[derive(Default)]
 pub struct Secp256k1Recovery2020v2Context;

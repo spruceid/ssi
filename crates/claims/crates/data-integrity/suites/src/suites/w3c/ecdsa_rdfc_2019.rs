@@ -17,6 +17,8 @@ use ssi_data_integrity_core::{
 use ssi_verification_methods::{multikey::DecodedMultikey, Multikey};
 use static_iref::iri;
 
+use crate::try_from_type;
+
 /// The `ecdsa-rdfc-2019` cryptosuite.
 ///
 /// See: <https://www.w3.org/TR/vc-di-ecdsa/#ecdsa-rdfc-2019>
@@ -46,6 +48,8 @@ impl StandardCryptographicSuite for EcdsaRdfc2019 {
         TypeRef::DataIntegrityProof(CryptosuiteStr::new("ecdsa-rdfc-2019").unwrap())
     }
 }
+
+try_from_type!(EcdsaRdfc2019);
 
 pub struct EcdsaRdfc2019HashingAlgorithm;
 
