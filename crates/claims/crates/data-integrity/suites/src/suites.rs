@@ -26,6 +26,7 @@ mod unspecified;
 #[allow(unused_imports)]
 pub use unspecified::*;
 
+#[allow(unused_macros)]
 macro_rules! try_from_type {
     {
         $(
@@ -52,4 +53,5 @@ macro_rules! try_from_type {
     };
 }
 
+#[allow(unused_imports)]
 pub(crate) use try_from_type;
