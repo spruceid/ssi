@@ -176,11 +176,11 @@ impl CompactJWS {
     /// Any type that providing a `JWKResolver` through the `ResolverProvider`
     /// trait will be fine. Notable implementors are:
     /// - [`VerificationParameters`](ssi_claims_core::VerificationParameters):
-    /// A good default providing many other common verification parameters that
-    /// are not necessary here.
+    ///   A good default providing many other common verification parameters that
+    ///   are not necessary here.
     /// - [`JWK`](ssi_jwk::JWK): allows you to put a JWK as `params`, which
-    /// will resolve into itself. Can be useful if you don't need key resolution
-    /// because you know in advance what key was used to sign the JWS.
+    ///   will resolve into itself. Can be useful if you don't need key resolution
+    ///   because you know in advance what key was used to sign the JWS.
     ///
     /// # Passing the parameters by reference
     ///
