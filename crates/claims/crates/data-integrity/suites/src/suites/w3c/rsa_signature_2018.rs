@@ -1,3 +1,4 @@
+use base64::Engine;
 use k256::sha2::Sha256;
 use serde::{Deserialize, Serialize};
 use ssi_claims_core::{ProofValidationError, ProofValidity, SignatureError};
@@ -87,7 +88,7 @@ where
             .await?;
 
         Ok(Signature {
-            signature_value: base64::encode(signature),
+            signature_value: base64::prelude::BASE64_STANDARD.encode(signature),
         })
     }
 }
@@ -98,7 +99,8 @@ impl VerificationAlgorithm<RsaSignature2018> for RsaSignatureAlgorithm {
         prepared_claims: [u8; 64],
         proof: ProofRef<RsaSignature2018>,
     ) -> Result<ProofValidity, ProofValidationError> {
-        let signature = base64::decode(&proof.signature.signature_value)
+        let signature = base64::prelude::BASE64_STANDARD
+            .decode(&proof.signature.signature_value)
             .map_err(|_| ProofValidationError::InvalidSignature)?;
         method
             .verify_bytes(&prepared_claims, &signature)

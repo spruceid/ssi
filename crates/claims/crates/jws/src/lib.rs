@@ -75,6 +75,7 @@
 #![cfg_attr(docsrs, feature(doc_auto_cfg))]
 pub mod error;
 pub use base64::DecodeError as Base64DecodeError;
+use base64::Engine;
 pub use error::Error;
 use serde::{Deserialize, Serialize};
 use ssi_claims_core::{
@@ -381,7 +382,7 @@ impl Header {
 
     /// Decode a JWS Protected Header.
     pub fn decode(base_64: &[u8]) -> Result<Self, InvalidHeader> {
-        let header_json = base64::decode_config(base_64, base64::URL_SAFE_NO_PAD)?;
+        let header_json = base64::prelude::BASE64_URL_SAFE_NO_PAD.decode(base_64)?;
         Ok(serde_json::from_slice(&header_json)?)
     }
 
@@ -390,7 +391,7 @@ impl Header {
     }
 
     pub fn encode(&self) -> String {
-        base64::encode_config(self.to_json_string(), base64::URL_SAFE_NO_PAD)
+        base64::prelude::BASE64_URL_SAFE_NO_PAD.encode(self.to_json_string())
     }
 
     pub fn encode_signing_bytes(&self, payload: &[u8]) -> Vec<u8> {
@@ -398,7 +399,7 @@ impl Header {
         result.push(b'.');
 
         if self.base64urlencode_payload.unwrap_or(true) {
-            let encoded_payload = base64::encode_config(payload, base64::URL_SAFE_NO_PAD);
+            let encoded_payload = base64::prelude::BASE64_URL_SAFE_NO_PAD.encode(payload);
             result.extend(encoded_payload.into_bytes())
         } else {
             result.extend(payload)
@@ -410,7 +411,7 @@ impl Header {
 
 fn base64_encode_json<T: Serialize>(object: &T) -> Result<String, Error> {
     let json = serde_json::to_string(&object)?;
-    Ok(base64::encode_config(json, base64::URL_SAFE_NO_PAD))
+    Ok(base64::prelude::BASE64_URL_SAFE_NO_PAD.encode(json))
 }
 
 #[allow(unreachable_code, unused_variables)]
@@ -599,7 +600,7 @@ pub fn sign_bytes(algorithm: Algorithm, data: &[u8], key: &JWK) -> Result<Vec<u8
 
 pub fn sign_bytes_b64(algorithm: Algorithm, data: &[u8], key: &JWK) -> Result<String, Error> {
     let signature = sign_bytes(algorithm, data, key)?;
-    let sig_b64 = base64::encode_config(signature, base64::URL_SAFE_NO_PAD);
+    let sig_b64 = base64::prelude::BASE64_URL_SAFE_NO_PAD.encode(signature);
     Ok(sig_b64)
 }
 
@@ -715,7 +716,7 @@ pub fn verify_bytes_warnable(
                 let normalized_sig = if let Some(s) = sig.normalize_s() {
                     // For user convenience, output the normalized signature.
                     let sig_normalized_b64 =
-                        base64::encode_config(s.to_bytes(), base64::URL_SAFE_NO_PAD);
+                        base64::prelude::BASE64_URL_SAFE_NO_PAD.encode(s.to_bytes());
                     warnings.push(format!(
                         "Non-normalized ES256K signature. Normalized: {sig_normalized_b64}"
                     ));
@@ -989,7 +990,7 @@ pub fn encode_sign_custom_header(
     header: &Header,
 ) -> Result<String, Error> {
     let header_b64 = base64_encode_json(header)?;
-    let payload_b64 = base64::encode_config(payload, base64::URL_SAFE_NO_PAD);
+    let payload_b64 = base64::prelude::BASE64_URL_SAFE_NO_PAD.encode(payload);
     let signing_input = header_b64 + "." + &payload_b64;
     let sig_b64 = sign_bytes_b64(header.algorithm, signing_input.as_bytes(), key)?;
     let jws = [signing_input, sig_b64].join(".");
@@ -1002,7 +1003,7 @@ pub fn encode_unsigned(payload: &str) -> Result<String, Error> {
         ..Default::default()
     };
     let header_b64 = base64_encode_json(&header)?;
-    let payload_b64 = base64::encode_config(payload, base64::URL_SAFE_NO_PAD);
+    let payload_b64 = base64::prelude::BASE64_URL_SAFE_NO_PAD.encode(payload);
     Ok(header_b64 + "." + &payload_b64 + ".")
 }
 
@@ -1032,10 +1033,10 @@ pub fn decode_jws_parts(
     payload_enc: &[u8],
     signature_b64: &str,
 ) -> Result<DecodedJWS, Error> {
-    let signature = base64::decode_config(signature_b64, base64::URL_SAFE_NO_PAD)?;
+    let signature = base64::prelude::BASE64_URL_SAFE_NO_PAD.decode(signature_b64)?;
     let header = Header::decode(header_b64.as_bytes())?;
     let payload = if header.base64urlencode_payload.unwrap_or(true) {
-        base64::decode_config(payload_enc, base64::URL_SAFE_NO_PAD)?
+        base64::prelude::BASE64_URL_SAFE_NO_PAD.decode(payload_enc)?
     } else {
         payload_enc.to_vec()
     };

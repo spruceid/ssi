@@ -2,6 +2,7 @@
 //! Credentials.
 //!
 //! See: <https://w3c-ccg.github.io/vc-status-rl-2020/>
+use base64::Engine;
 use bitvec::prelude::Lsb0;
 use bitvec::slice::BitSlice;
 use core::convert::TryFrom;
@@ -146,7 +147,7 @@ impl TryFrom<&EncodedList> for List {
     type Error = DecodeListError;
     fn try_from(encoded_list: &EncodedList) -> Result<Self, Self::Error> {
         let string = &encoded_list.0;
-        let bytes = base64::decode_config(string, base64::URL_SAFE)?;
+        let bytes = base64::prelude::BASE64_URL_SAFE_NO_PAD.decode(string)?;
         let mut data = Vec::new();
         use flate2::bufread::GzDecoder;
         use std::io::Read;
@@ -164,7 +165,7 @@ impl TryFrom<&List> for EncodedList {
         let mut e = GzEncoder::new(Vec::new(), Compression::default());
         e.write_all(&list.0)?;
         let bytes = e.finish()?;
-        let string = base64::encode_config(bytes, base64::URL_SAFE_NO_PAD);
+        let string = base64::prelude::BASE64_URL_SAFE_NO_PAD.encode(bytes);
         Ok(EncodedList(string))
     }
 }

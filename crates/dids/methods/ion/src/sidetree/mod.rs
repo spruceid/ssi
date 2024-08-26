@@ -1,6 +1,7 @@
 use core::fmt;
 use std::borrow::Cow;
 
+use base64::Engine;
 use json_patch::Patch;
 use serde::{Deserialize, Serialize};
 use ssi_dids_core::{
@@ -197,7 +198,7 @@ pub trait Sidetree {
 
     /// [`DATA_ENCODING_SCHEME`](https://identity.foundation/sidetree/spec/v1.0.0/#data-encoding-scheme)
     fn data_encoding_scheme(data: &[u8]) -> String {
-        base64::encode_config(data, base64::URL_SAFE_NO_PAD)
+        base64::prelude::BASE64_URL_SAFE_NO_PAD.encode(data)
     }
 
     /// Generate a new keypair ([KEY_ALGORITHM][ka])
@@ -522,7 +523,8 @@ pub trait Sidetree {
 
     /// Check that a DID Suffix looks valid
     fn validate_did_suffix(suffix: &DIDSuffix) -> Result<(), InvalidSidetreeDIDSuffix> {
-        let bytes = base64::decode_config(&suffix.0, base64::URL_SAFE_NO_PAD)
+        let bytes = base64::prelude::BASE64_URL_SAFE_NO_PAD
+            .decode(&suffix.0)
             .map_err(|_| InvalidSidetreeDIDSuffix::Base64)?;
 
         if bytes.len() != 34 {
@@ -827,7 +829,7 @@ impl TryFrom<PublicKeyJwk> for JWK {
 }
 
 fn b64len(s: &str) -> usize {
-    base64::encode_config(s, base64::URL_SAFE_NO_PAD).len()
+    base64::prelude::BASE64_URL_SAFE_NO_PAD.encode(s).len()
 }
 
 impl DIDStatePatch {

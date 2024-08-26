@@ -1,5 +1,6 @@
 use crate::{DecodeError, DecodedJWS, DecodedSigningBytes, Header, InvalidHeader, JWS};
 pub use base64::DecodeError as Base64DecodeError;
+use base64::Engine;
 use ssi_claims_core::{ProofValidationError, ResolverProvider, Verification};
 use ssi_jwk::JWKResolver;
 use std::{borrow::Cow, ops::Deref};
@@ -105,10 +106,9 @@ impl CompactJWS {
     /// The header is necessary to know how the payload is encoded.
     pub fn decode_payload(&self, header: &Header) -> Result<Cow<[u8]>, Base64DecodeError> {
         if header.base64urlencode_payload.unwrap_or(true) {
-            Ok(Cow::Owned(base64::decode_config(
-                self.payload(),
-                base64::URL_SAFE_NO_PAD,
-            )?))
+            Ok(Cow::Owned(
+                base64::prelude::BASE64_URL_SAFE_NO_PAD.decode(self.payload())?,
+            ))
         } else {
             Ok(Cow::Borrowed(self.payload()))
         }
@@ -120,7 +120,7 @@ impl CompactJWS {
     }
 
     pub fn decode_signature(&self) -> Result<Vec<u8>, Base64DecodeError> {
-        base64::decode_config(self.signature(), base64::URL_SAFE_NO_PAD)
+        base64::prelude::BASE64_URL_SAFE_NO_PAD.decode(self.signature())
     }
 
     /// Decodes the entire JWS.
