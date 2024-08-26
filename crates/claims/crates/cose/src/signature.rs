@@ -3,7 +3,7 @@ use coset::{
 };
 use ssi_claims_core::SignatureError;
 
-use crate::{CompactCoseSign1Buf, CosePayload, TYP_LABEL};
+use crate::{CosePayload, CoseSign1BytesBuf, TYP_LABEL};
 
 /// COSE signer information.
 pub struct CoseSignerInfo {
@@ -38,7 +38,7 @@ pub trait CoseSigner {
         payload: &(impl ?Sized + CosePayload),
         additional_data: Option<&[u8]>,
         tagged: bool,
-    ) -> Result<CompactCoseSign1Buf, SignatureError> {
+    ) -> Result<CoseSign1BytesBuf, SignatureError> {
         let info = self.fetch_info().await?;
 
         let mut result = CoseSign1 {
@@ -86,7 +86,7 @@ impl<'a, T: CoseSigner> CoseSigner for &'a T {
         payload: &(impl ?Sized + CosePayload),
         additional_data: Option<&[u8]>,
         tagged: bool,
-    ) -> Result<CompactCoseSign1Buf, SignatureError> {
+    ) -> Result<CoseSign1BytesBuf, SignatureError> {
         T::sign(*self, payload, additional_data, tagged).await
     }
 }

@@ -12,13 +12,13 @@ use std::{borrow::Borrow, ops::Deref};
 /// [`Self::decode`] method can be used to decode into a [`DecodedCoseSign1`]
 /// (similar to `CoseSign1` but with extra information about the payload).
 ///
-/// This is the borrowed equivalent of [`CompactCoseSign1Buf`].
+/// This is the borrowed equivalent of [`CoseSign1BytesBuf`].
 #[derive(Debug, Serialize, PartialEq, Eq, PartialOrd, Ord, Hash)]
 #[repr(transparent)]
 #[serde(transparent)]
-pub struct CompactCoseSign1([u8]);
+pub struct CoseSign1Bytes([u8]);
 
-impl CompactCoseSign1 {
+impl CoseSign1Bytes {
     /// Creates a new CBOR-encoded `COSE_Sign1` object from a byte slice.
     ///
     /// The bytes are not actually checked. If the bytes are not describing
@@ -45,38 +45,38 @@ impl CompactCoseSign1 {
     }
 }
 
-impl AsRef<[u8]> for CompactCoseSign1 {
+impl AsRef<[u8]> for CoseSign1Bytes {
     fn as_ref(&self) -> &[u8] {
         self.as_bytes()
     }
 }
 
-impl ToOwned for CompactCoseSign1 {
-    type Owned = CompactCoseSign1Buf;
+impl ToOwned for CoseSign1Bytes {
+    type Owned = CoseSign1BytesBuf;
 
     fn to_owned(&self) -> Self::Owned {
-        CompactCoseSign1Buf(self.0.to_owned())
+        CoseSign1BytesBuf(self.0.to_owned())
     }
 }
 
 /// CBOR-encoded `COSE_Sign1` object buffer.
 ///
 /// This represents the raw CBOR bytes encoding a [`CoseSign1`] object. The
-/// [`CompactCoseSign1::decode`] method can be used to decode into a
+/// [`CoseSign1Bytes::decode`] method can be used to decode into a
 /// [`DecodedCoseSign1`] (similar to `CoseSign1` but with extra information
 /// about the payload).
 ///
-/// This is the owned equivalent of [`CompactCoseSign1`].
+/// This is the owned equivalent of [`CoseSign1Bytes`].
 #[derive(Debug, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord, Hash)]
 #[serde(transparent)]
-pub struct CompactCoseSign1Buf(Vec<u8>);
+pub struct CoseSign1BytesBuf(Vec<u8>);
 
-impl CompactCoseSign1Buf {
+impl CoseSign1BytesBuf {
     /// Creates a new CBOR-encoded `COSE_Sign1` object from a byte buffer.
     ///
     /// The bytes are not actually checked. If the bytes are not describing
     /// a CBOR-encoded `COSE_Sign1` object it will be detected when the
-    /// [`CompactCoseSign1::decode`] method is called.
+    /// [`CoseSign1Bytes::decode`] method is called.
     pub fn new(bytes: Vec<u8>) -> Self {
         Self(bytes)
     }
@@ -93,27 +93,27 @@ impl CompactCoseSign1Buf {
         }
     }
 
-    /// Borrows the value as a [`CompactCoseSign1`].
-    pub fn as_compact(&self) -> &CompactCoseSign1 {
-        CompactCoseSign1::new(self.0.as_slice())
+    /// Borrows the value as a [`CoseSign1Bytes`].
+    pub fn as_compact(&self) -> &CoseSign1Bytes {
+        CoseSign1Bytes::new(self.0.as_slice())
     }
 }
 
-impl Deref for CompactCoseSign1Buf {
-    type Target = CompactCoseSign1;
+impl Deref for CoseSign1BytesBuf {
+    type Target = CoseSign1Bytes;
 
     fn deref(&self) -> &Self::Target {
         self.as_compact()
     }
 }
 
-impl Borrow<CompactCoseSign1> for CompactCoseSign1Buf {
-    fn borrow(&self) -> &CompactCoseSign1 {
+impl Borrow<CoseSign1Bytes> for CoseSign1BytesBuf {
+    fn borrow(&self) -> &CoseSign1Bytes {
         self.as_compact()
     }
 }
 
-impl From<CborValue> for CompactCoseSign1Buf {
+impl From<CborValue> for CoseSign1BytesBuf {
     fn from(value: CborValue) -> Self {
         let mut buffer = Vec::new();
         ciborium::into_writer(&value, &mut buffer).unwrap();
@@ -121,13 +121,13 @@ impl From<CborValue> for CompactCoseSign1Buf {
     }
 }
 
-impl AsRef<[u8]> for CompactCoseSign1Buf {
+impl AsRef<[u8]> for CoseSign1BytesBuf {
     fn as_ref(&self) -> &[u8] {
         self.as_bytes()
     }
 }
 
-impl From<Vec<u8>> for CompactCoseSign1Buf {
+impl From<Vec<u8>> for CoseSign1BytesBuf {
     fn from(value: Vec<u8>) -> Self {
         Self(value)
     }

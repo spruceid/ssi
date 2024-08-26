@@ -1,7 +1,7 @@
 use base64::Engine;
 use serde::{de::DeserializeOwned, Serialize};
 use ssi_claims_core::{ClaimsValidity, DateTimeProvider, SignatureError, ValidateClaims};
-use ssi_cose::{CompactCoseSign1, CosePayload, CoseSigner, DecodedCoseSign1, ValidateCoseHeader};
+use ssi_cose::{CosePayload, CoseSign1Bytes, CoseSigner, DecodedCoseSign1, ValidateCoseHeader};
 use ssi_json_ld::{iref::Uri, syntax::Context};
 use ssi_vc::{
     enveloped::EnvelopedVerifiableCredential,
@@ -37,7 +37,7 @@ impl<T: Serialize> CoseVc<T> {
 impl<T: DeserializeOwned> CoseVc<T> {
     /// Decode a COSE VC.
     pub fn decode(
-        cose: &CompactCoseSign1,
+        cose: &CoseSign1Bytes,
         tagged: bool,
     ) -> Result<DecodedCoseSign1<Self>, CoseDecodeError> {
         cose.decode(tagged)?
@@ -49,7 +49,7 @@ impl<T: DeserializeOwned> CoseVc<T> {
 impl CoseVc {
     /// Decode a JOSE VC with an arbitrary credential type.
     pub fn decode_any(
-        cose: &CompactCoseSign1,
+        cose: &CoseSign1Bytes,
         tagged: bool,
     ) -> Result<DecodedCoseSign1<Self>, CoseDecodeError> {
         Self::decode(cose, tagged)
@@ -178,12 +178,12 @@ impl<E, P, T: ValidateClaims<E, P>> ValidateClaims<E, P> for CoseVc<T> {
 mod tests {
     use serde_json::json;
     use ssi_claims_core::VerificationParameters;
-    use ssi_cose::{coset::CoseKey, key::CoseKeyGenerate, CompactCoseSign1, CompactCoseSign1Buf};
+    use ssi_cose::{coset::CoseKey, key::CoseKeyGenerate, CoseSign1Bytes, CoseSign1BytesBuf};
     use ssi_vc::v2::JsonCredential;
 
     use super::CoseVc;
 
-    async fn verify(input: &CompactCoseSign1, key: &CoseKey) {
+    async fn verify(input: &CoseSign1Bytes, key: &CoseKey) {
         let vc = CoseVc::decode_any(input, true).unwrap();
         let params = VerificationParameters::from_resolver(key);
         let result = vc.verify(params).await.unwrap();
@@ -220,14 +220,14 @@ mod tests {
 
         let key = CoseKey::generate_p256();
         let enveloped = CoseVc(vc).sign_into_enveloped(&key).await.unwrap();
-        let jws = CompactCoseSign1Buf::new(enveloped.id.decoded_data().unwrap().into_owned());
+        let jws = CoseSign1BytesBuf::new(enveloped.id.decoded_data().unwrap().into_owned());
         verify(&jws, &key).await
     }
 
     #[test]
     fn example7() {
         let input_hex = "d28444a1013822a05901f87b2240636f6e74657874223a5b2268747470733a2f2f7777772e77332e6f72672f6e732f63726564656e7469616c732f7632222c2268747470733a2f2f7777772e77332e6f72672f6e732f63726564656e7469616c732f6578616d706c65732f7632225d2c226964223a22687474703a2f2f756e69766572736974792e6578616d706c652f63726564656e7469616c732f31383732222c2274797065223a5b2256657269666961626c6543726564656e7469616c222c224578616d706c65416c756d6e6943726564656e7469616c225d2c22697373756572223a2268747470733a2f2f756e69766572736974792e6578616d706c652f697373756572732f353635303439222c2276616c696446726f6d223a22323031302d30312d30315431393a32333a32345a222c2263726564656e7469616c536368656d61223a7b226964223a2268747470733a2f2f6578616d706c652e6f72672f6578616d706c65732f6465677265652e6a736f6e222c2274797065223a224a736f6e536368656d61227d2c2263726564656e7469616c5375626a656374223a7b226964223a226469643a6578616d706c653a313233222c22646567726565223a7b2274797065223a2242616368656c6f72446567726565222c226e616d65223a2242616368656c6f72206f6620536369656e636520616e642041727473227d7d7d58405731e67b84ce95105ea78d49b97f90f962c7e247ebaf4c057b2d8ef16b11882cea11170fcf7b566fd7d8932a597885599d7e010b15d1aa639bcceaf114325a01";
-        let input = CompactCoseSign1Buf::new(hex::decode(input_hex).unwrap());
+        let input = CoseSign1BytesBuf::new(hex::decode(input_hex).unwrap());
         let _ = CoseVc::decode_any(&input, true).unwrap();
     }
 }

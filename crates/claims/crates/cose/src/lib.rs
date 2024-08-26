@@ -147,7 +147,7 @@ pub trait CosePayload {
         &self,
         signer: impl CoseSigner,
         tagged: bool,
-    ) -> Result<CompactCoseSign1Buf, SignatureError> {
+    ) -> Result<CoseSign1BytesBuf, SignatureError> {
         signer.sign(self, None, tagged).await
     }
 }
