@@ -36,14 +36,15 @@ impl DIDURL {
     ///
     /// Fails if the data is not a DID URL according to the
     /// [DID Syntax](https://w3c.github.io/did-core/#did-url-syntax).
-    pub fn new(data: &[u8]) -> Result<&Self, InvalidDIDURL<&[u8]>> {
+    pub fn new<T: ?Sized + AsRef<[u8]>>(did_url: &T) -> Result<&Self, InvalidDIDURL<&T>> {
+        let data = did_url.as_ref();
         match Self::validate(data) {
             Ok(()) => Ok(unsafe {
                 // SAFETY: DID is a transparent wrapper over `[u8]`,
                 //         and we just checked that `data` is a DID URL.
                 std::mem::transmute::<&[u8], &Self>(data)
             }),
-            Err(e) => Err(InvalidDIDURL(data, e)),
+            Err(e) => Err(InvalidDIDURL(did_url, e)),
         }
     }
 

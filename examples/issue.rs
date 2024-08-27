@@ -25,7 +25,7 @@ async fn issue(proof_format: &str) {
         "@context": ["https://www.w3.org/2018/credentials/v1"],
         "type": "VerifiableCredential",
         "issuer": "did:example:foo",
-        "issuanceDate": ssi::xsd_types::DateTime::now(),
+        "issuanceDate": ssi::xsd::DateTime::now(),
         "credentialSubject": {
             "id": uuid::Uuid::new_v4().urn().to_string()
         }
