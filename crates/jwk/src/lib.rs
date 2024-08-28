@@ -103,8 +103,12 @@ impl FromStr for JWK {
     }
 }
 
-pub fn from_bytes(bytes: &[u8]) -> Result<JWK, serde_json::Error> {
-    serde_json::from_slice(bytes)
+impl TryFrom<&[u8]> for JWK {
+    type Error = serde_json::Error;
+
+    fn try_from(bytes: &[u8]) -> Result<Self, Self::Error> {
+        serde_json::from_slice(bytes)
+    }
 }
 
 impl TryFrom<serde_json::Value> for JWK {
@@ -306,6 +310,10 @@ impl JWK {
         }
     }
 
+    pub fn from_bytes(bytes: &[u8]) -> Result<JWK, serde_json::Error> {
+        serde_json::from_slice(bytes)
+    }
+
     #[cfg(feature = "ed25519")]
     pub fn generate_ed25519_from(
         rng: &mut (impl rand::CryptoRng + rand::RngCore),
@@ -423,40 +431,40 @@ impl JWK {
         match (&self.params, &other.params) {
             (
                 Params::RSA(RSAParams {
-                                modulus: Some(n1),
-                                exponent: Some(e1),
-                                ..
-                            }),
+                    modulus: Some(n1),
+                    exponent: Some(e1),
+                    ..
+                }),
                 Params::RSA(RSAParams {
-                                modulus: Some(n2),
-                                exponent: Some(e2),
-                                ..
-                            }),
+                    modulus: Some(n2),
+                    exponent: Some(e2),
+                    ..
+                }),
             ) => n1 == n2 && e1 == e2,
             (Params::OKP(okp1), Params::OKP(okp2)) => {
                 okp1.curve == okp2.curve && okp1.public_key == okp2.public_key
             }
             (
                 Params::EC(ECParams {
-                               curve: Some(crv1),
-                               x_coordinate: Some(x1),
-                               y_coordinate: Some(y1),
-                               ..
-                           }),
+                    curve: Some(crv1),
+                    x_coordinate: Some(x1),
+                    y_coordinate: Some(y1),
+                    ..
+                }),
                 Params::EC(ECParams {
-                               curve: Some(crv2),
-                               x_coordinate: Some(x2),
-                               y_coordinate: Some(y2),
-                               ..
-                           }),
+                    curve: Some(crv2),
+                    x_coordinate: Some(x2),
+                    y_coordinate: Some(y2),
+                    ..
+                }),
             ) => crv1 == crv2 && x1 == x2 && y1 == y2,
             (
                 Params::Symmetric(SymmetricParams {
-                                      key_value: Some(kv1),
-                                  }),
+                    key_value: Some(kv1),
+                }),
                 Params::Symmetric(SymmetricParams {
-                                      key_value: Some(kv2),
-                                  }),
+                    key_value: Some(kv2),
+                }),
             ) => kv1 == kv2,
             _ => false,
         }
@@ -1337,7 +1345,18 @@ mod tests {
 
     #[test]
     fn jwk_from_bytes() {
-        let actual_jwk: JWK = from_bytes(JWK_JCS_JSON).unwrap();
+        let actual_jwk: JWK = JWK::from_bytes(JWK_JCS_JSON).unwrap();
+        let actual_params: Params = actual_jwk.params;
+        if let Params::EC(ref ec_params) = actual_params {
+            assert_eq!(ec_params.curve.as_deref(), Some("P-256"));
+        } else {
+            panic!("actual_params is not of type Params::EC");
+        }
+    }
+
+    #[test]
+    fn jwk_try_from_bytes() {
+        let actual_jwk: JWK = JWK::try_from(JWK_JCS_JSON).unwrap();
         let actual_params: Params = actual_jwk.params;
         if let Params::EC(ref ec_params) = actual_params {
             assert_eq!(ec_params.curve.as_deref(), Some("P-256"));
@@ -1400,7 +1419,7 @@ mod tests {
             "kty": "OKP",
             "x":"11qYAYKxCrfVS_7TyWQHOg7hcvPapiMlrwIaaPcHURo"
         }))
-            .unwrap();
+        .unwrap();
         let thumbprint = key.thumbprint().unwrap();
         assert_eq!(thumbprint, "kPrK_qmxVWaYVA9wwBF6Iuo3vVzz7TxHCTwXBygrS4k");
 
@@ -1412,7 +1431,7 @@ mod tests {
             "x": "weNJy2HscCSM6AEDTDg04biOvhFhyyWvOHQfeF_PxMQ",
             "y": "e8lnCO-AlStT-NJVX-crhB7QRYhiix03illJOVAOyck",
         }))
-            .unwrap();
+        .unwrap();
         let thumbprint = key.thumbprint().unwrap();
         assert_eq!(thumbprint, "Vy57XrArUrW0NbpI12tEzDHABxMwrTh6HHXRenSpnCo");
 
@@ -1421,7 +1440,7 @@ mod tests {
             "kty": "oct",
             "k": "11qYAYKxCrfVS_7TyWQHOg7hcvPapiMlrwIaaPcHURo"
         }))
-            .unwrap();
+        .unwrap();
         let thumbprint = key.thumbprint().unwrap();
         assert_eq!(thumbprint, "kcfv_I8tB4KY_ljAlRa1ip-y7jzbPdH0sUlCGb-1Jx8");
     }

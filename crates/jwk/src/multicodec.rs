@@ -48,7 +48,7 @@ impl JWK {
                 crate::bls12381g2_parse(k).map_err(FromMulticodecError::Bls12381G2Pub)
             }
             ssi_multicodec::JWK_JCS_PUB => {
-                crate::from_bytes(k).map_err(FromMulticodecError::JwkJcsPub)
+                JWK::from_bytes(k).map_err(FromMulticodecError::JwkJcsPub)
             }
             _ => Err(FromMulticodecError::UnsupportedCodec(codec)),
         }
