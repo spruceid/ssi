@@ -261,6 +261,8 @@ impl ToASN1 for OtherPrimeInfo {
 
 #[cfg(test)]
 mod tests {
+    use base64::Engine;
+
     use super::*;
 
     #[test]
@@ -293,7 +295,9 @@ mod tests {
             ]),
         };
         let expected_b64 = "MC4CAQAwBQYDK2VwBCIEINTuctv5E1hK1bbY8fdp+K06/nwoy/HU++CXqI9EdVhC";
-        let expected_key = base64::decode(expected_b64).unwrap();
+        let expected_key = base64::prelude::BASE64_STANDARD
+            .decode(expected_b64)
+            .unwrap();
         let key_der = der_encode(&key).unwrap();
         assert_eq!(key_der, expected_key);
     }

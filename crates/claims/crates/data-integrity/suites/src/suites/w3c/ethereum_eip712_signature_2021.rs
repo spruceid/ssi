@@ -27,7 +27,10 @@ use static_iref::{iri, iri_ref};
 pub mod v0_1;
 pub use v0_1::EthereumEip712Signature2021v0_1;
 
-use crate::eip712::{Eip712Hashing, Eip712Signature, Input, TypesOrURI};
+use crate::{
+    eip712::{Eip712Hashing, Eip712Signature, Input, TypesOrURI},
+    try_from_type,
+};
 
 lazy_static! {
     static ref PROOF_CONTEXT: ssi_json_ld::syntax::ContextEntry = {
@@ -112,6 +115,8 @@ impl StandardCryptographicSuite for EthereumEip712Signature2021 {
         TypeRef::Other(Self::NAME)
     }
 }
+
+try_from_type!(EthereumEip712Signature2021);
 
 #[derive(
     Debug,

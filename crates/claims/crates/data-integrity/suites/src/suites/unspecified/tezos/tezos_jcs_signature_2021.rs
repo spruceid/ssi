@@ -18,7 +18,7 @@ use ssi_tzkey::EncodeTezosSignedMessageError;
 use ssi_verification_methods::{protocol::WithProtocol, MessageSigner, TezosMethod2021};
 use static_iref::iri;
 
-use crate::{TezosJcsVmV1Context, TezosWallet};
+use crate::{try_from_type, TezosJcsVmV1Context, TezosWallet};
 
 use super::decode_jwk_from_multibase;
 pub use super::{Signature, TZJCSVM_CONTEXT};
@@ -84,6 +84,8 @@ impl StandardCryptographicSuite for TezosJcsSignature2021 {
         TypeRef::Other(Self::NAME)
     }
 }
+
+try_from_type!(TezosJcsSignature2021);
 
 #[derive(
     Debug,

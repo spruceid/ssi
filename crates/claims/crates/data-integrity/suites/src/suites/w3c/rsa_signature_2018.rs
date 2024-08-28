@@ -1,3 +1,4 @@
+use base64::Engine;
 use k256::sha2::Sha256;
 use serde::{Deserialize, Serialize};
 use ssi_claims_core::{ProofValidationError, ProofValidity, SignatureError};
@@ -11,6 +12,8 @@ use ssi_data_integrity_core::{
 };
 use ssi_verification_methods::{MessageSigner, RsaVerificationKey2018};
 use static_iref::iri;
+
+use crate::try_from_type;
 
 /// RSA Signature Suite 2018.
 ///
@@ -41,6 +44,8 @@ impl StandardCryptographicSuite for RsaSignature2018 {
         TypeRef::Other(Self::NAME)
     }
 }
+
+try_from_type!(RsaSignature2018);
 
 /// Signature type.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -83,7 +88,7 @@ where
             .await?;
 
         Ok(Signature {
-            signature_value: base64::encode(signature),
+            signature_value: base64::prelude::BASE64_STANDARD.encode(signature),
         })
     }
 }
@@ -94,7 +99,8 @@ impl VerificationAlgorithm<RsaSignature2018> for RsaSignatureAlgorithm {
         prepared_claims: [u8; 64],
         proof: ProofRef<RsaSignature2018>,
     ) -> Result<ProofValidity, ProofValidationError> {
-        let signature = base64::decode(&proof.signature.signature_value)
+        let signature = base64::prelude::BASE64_STANDARD
+            .decode(&proof.signature.signature_value)
             .map_err(|_| ProofValidationError::InvalidSignature)?;
         method
             .verify_bytes(&prepared_claims, &signature)

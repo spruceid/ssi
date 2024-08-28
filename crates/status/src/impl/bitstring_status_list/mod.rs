@@ -1,4 +1,4 @@
-//! W3C Bitstring Status List v1.0
+//! W3C Bitstring Status List v1.0 (Working Draft 06 April 2024)
 //!
 //! A privacy-preserving, space-efficient, and high-performance mechanism for
 //! publishing status information such as suspension or revocation of Verifiable
@@ -17,8 +17,15 @@ pub use syntax::*;
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct StatusMessage {
+    #[serde(with = "prefixed_hexadecimal")]
     pub status: u8,
     pub message: String,
+}
+
+impl StatusMessage {
+    pub fn new(status: u8, message: String) -> Self {
+        Self { status, message }
+    }
 }
 
 #[derive(Debug, thiserror::Error)]
@@ -542,6 +549,28 @@ impl StatusMap for StatusList {
 
     fn get_by_key(&self, key: Self::Key) -> Option<u8> {
         self.bit_string.get(key).map(Into::into)
+    }
+}
+
+mod prefixed_hexadecimal {
+    use serde::{Deserialize, Deserializer, Serialize, Serializer};
+
+    pub fn serialize<S>(value: &u8, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        format!("{value:#x}").serialize(serializer)
+    }
+
+    pub fn deserialize<'de, D>(deserializer: D) -> Result<u8, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let string = String::deserialize(deserializer)?;
+        let number = string
+            .strip_prefix("0x")
+            .ok_or_else(|| serde::de::Error::custom("missing `0x` prefix"))?;
+        u8::from_str_radix(number, 16).map_err(serde::de::Error::custom)
     }
 }
 

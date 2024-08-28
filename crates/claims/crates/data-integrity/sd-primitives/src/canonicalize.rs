@@ -1,3 +1,4 @@
+use base64::Engine;
 use iref::Iri;
 use rdf_types::{BlankId, BlankIdBuf, Id, LexicalQuad, LexicalQuadRef, Literal, Quad, Term};
 use ssi_rdf::urdna2015::NormalizingSubstitution;
@@ -16,7 +17,7 @@ pub fn create_hmac_id_label_map_function(
                 let digest = hmac.finalize_reset();
                 let b64_url_digest = BlankIdBuf::new(format!(
                     "_:u{}",
-                    base64::encode_config(digest, base64::URL_SAFE_NO_PAD)
+                    base64::prelude::BASE64_URL_SAFE_NO_PAD.encode(digest)
                 ))
                 .unwrap();
                 (key.clone(), b64_url_digest)

@@ -10,6 +10,8 @@ use ssi_data_integrity_core::{
 use ssi_verification_methods::P256PublicKeyBLAKE2BDigestSize20Base58CheckEncoded2021;
 use static_iref::iri;
 
+use crate::try_from_type;
+
 /// Proof type used with [did:tz](https://github.com/spruceid/did-tezos/) `tz3` addresses.
 #[derive(Debug, Default, Clone, Copy)]
 pub struct P256BLAKE2BDigestSize20Base58CheckEncodedSignature2021;
@@ -38,3 +40,5 @@ impl StandardCryptographicSuite for P256BLAKE2BDigestSize20Base58CheckEncodedSig
         TypeRef::Other(Self::NAME)
     }
 }
+
+try_from_type!(P256BLAKE2BDigestSize20Base58CheckEncodedSignature2021);

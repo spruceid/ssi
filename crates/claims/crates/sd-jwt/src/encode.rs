@@ -1,4 +1,4 @@
-use base64::URL_SAFE_NO_PAD;
+use base64::{prelude::BASE64_URL_SAFE_NO_PAD, Engine};
 use rand::{CryptoRng, Rng};
 use serde::Serialize;
 use ssi_jwk::{Algorithm, JWK};
@@ -27,7 +27,7 @@ fn encode_disclosure_with_salt<ClaimValue: Serialize>(
 
     let json_string = serde_json::to_string(&disclosure)?;
 
-    Ok(base64::encode_config(json_string, URL_SAFE_NO_PAD))
+    Ok(BASE64_URL_SAFE_NO_PAD.encode(json_string))
 }
 
 pub fn encode_disclosure_with_rng<ClaimValue: Serialize, Rand: Rng + CryptoRng>(
@@ -42,7 +42,7 @@ pub fn encode_disclosure_with_rng<ClaimValue: Serialize, Rand: Rng + CryptoRng>(
 
     rng.fill_bytes(&mut salt_bytes);
 
-    let salt = base64::encode_config(salt_bytes, URL_SAFE_NO_PAD);
+    let salt = BASE64_URL_SAFE_NO_PAD.encode(salt_bytes);
 
     encode_disclosure_with_salt(&salt, claim_name, claim_value)
 }

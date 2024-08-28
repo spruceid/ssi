@@ -26,6 +26,10 @@ impl EncodedList {
     /// 16MB.
     pub const DEFAULT_LIMIT: u64 = 16 * 1024 * 1024;
 
+    pub fn new(value: String) -> Self {
+        Self(value)
+    }
+
     pub fn encode(bytes: &[u8]) -> Self {
         let mut encoder = GzEncoder::new(Vec::new(), Compression::default());
         encoder.write_all(bytes).unwrap();

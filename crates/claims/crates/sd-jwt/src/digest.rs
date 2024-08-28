@@ -1,4 +1,4 @@
-use base64::URL_SAFE_NO_PAD;
+use base64::{prelude::BASE64_URL_SAFE_NO_PAD, Engine};
 use sha2::Digest;
 
 use crate::DecodeError;
@@ -47,7 +47,7 @@ pub fn hash_encoded_disclosure(digest_algo: SdAlg, disclosure: &str) -> String {
     match digest_algo {
         SdAlg::Sha256 => {
             let digest = sha2::Sha256::digest(disclosure.as_bytes());
-            base64::encode_config(digest, URL_SAFE_NO_PAD)
+            BASE64_URL_SAFE_NO_PAD.encode(digest)
         }
     }
 }

@@ -8,7 +8,7 @@ description = "Core library for Verifiable Credentials and Decentralized Identif
 repository = "https://github.com/spruceid/ssi/"
 documentation = "https://docs.rs/ssi/"
 keywords = ["ssi", "did", "vc", "vp", "jsonld"]
-rust-version = "1.77"
+rust-version = "1.80"
 
 [workspace]
 members = [
@@ -47,6 +47,7 @@ ssi-claims-core = { path = "./crates/claims/core", version = "0.1", default-feat
 ssi-jws = { path = "./crates/claims/crates/jws", version = "0.2", default-features = false }
 ssi-jwt = { path = "./crates/claims/crates/jwt", version = "0.2", default-features = false }
 ssi-sd-jwt = { path = "./crates/claims/crates/sd-jwt", version = "0.2", default-features = false }
+ssi-cose = { path = "./crates/claims/crates/cose", version = "0.1", default-features = false }
 ssi-vc = { path = "./crates/claims/crates/vc", version = "0.3", default-features = false }
 ssi-vc-jose-cose = { path = "./crates/claims/crates/vc-jose-cose", version = "0.1", default-features = false }
 ssi-data-integrity-core = { path = "./crates/claims/crates/data-integrity/core", version = "0.1", default-features = false }
@@ -95,8 +96,9 @@ multibase = "0.9.1"
 serde = "1.0"
 serde_json = { version = "1.0", features = ["arbitrary_precision"] }
 serde_jcs = "0.1.0"
+ciborium = "0.2.2"
 bs58 = "0.4"
-base64 = "0.12"
+base64 = "0.22"
 hex = "0.4.3"
 derivative = "2.2.0"
 educe = "0.4.22"

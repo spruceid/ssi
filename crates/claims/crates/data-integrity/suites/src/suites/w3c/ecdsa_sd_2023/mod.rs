@@ -1,9 +1,10 @@
 use serde::Serialize;
 use ssi_data_integrity_core::{
     suite::{CryptographicSuiteSelect, SelectionError, SelectiveCryptographicSuite},
-    CryptosuiteStr, DataIntegrity, ProofRef, StandardCryptographicSuite, Type, TypeRef,
-    UnsupportedProofSuite,
+    CryptosuiteStr, DataIntegrity, ProofRef, StandardCryptographicSuite, TypeRef,
 };
+
+use crate::try_from_type;
 
 mod configuration;
 pub use configuration::*;
@@ -72,13 +73,4 @@ where
     }
 }
 
-impl TryFrom<Type> for EcdsaSd2023 {
-    type Error = UnsupportedProofSuite;
-
-    fn try_from(value: Type) -> Result<Self, Self::Error> {
-        match value {
-            Type::DataIntegrityProof(c) if c == "ecdsa-sd-2023" => Ok(Self),
-            ty => Err(UnsupportedProofSuite::Compact(ty)),
-        }
-    }
-}
+try_from_type!(EcdsaSd2023);
