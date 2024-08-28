@@ -1409,7 +1409,7 @@ mod tests {
             "alg": "RS256",
             "kid": "2011-04-29"
         }))
-            .unwrap();
+        .unwrap();
         let thumbprint = key.thumbprint().unwrap();
         assert_eq!(thumbprint, "NzbLsXh8uDCcd-6MNwXF4W_7noWXFZAfHkxZsRGC9Xs");
 
