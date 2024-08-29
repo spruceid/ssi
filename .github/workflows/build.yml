@@ -100,7 +100,11 @@ jobs:
       - name: Upload code coverage results
         uses: codecov/codecov-action@v3
         with:
-          token: ${{ secrets.CODECOV_TOKEN }}
+          # Uncomment this after creating a CodeCov token. See
+          # https://docs.codecov.com/docs/quick-start#step-2-get-the-repository-upload-token.
+          # It will "sort of" work without a token, but is far more
+          # reliable once you add one.
+          # token: ${{ secrets.CODECOV_TOKEN }}
           fail_ci_if_error: true
           verbose: true
 
