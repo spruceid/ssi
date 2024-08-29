@@ -68,6 +68,152 @@ jobs:
     - run: cargo deny check bans
     - run: cargo deny check licenses
 
+  code-coverage:
+    name: Unit tests with code coverage
+    runs-on: ${{ matrix.os }}
+
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, macos-latest, ubuntu-latest]
+        rust_version: [stable, 1.77.0]
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+      
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: ${{ matrix.rust_version }}
+          components: llvm-tools-preview
+
+      - name: Cache Rust dependencies
+        uses: Swatinem/rust-cache@v2
+
+      - name: Install cargo-llvm-cov
+        uses: taiki-e/install-action@cargo-llvm-cov
+
+      - name: Generate code coverage
+        run: cargo llvm-cov --all-features --lcov --ignore-filename-regex tests --output-path lcov.info
+
+      - name: Upload code coverage results
+        uses: codecov/codecov-action@v3
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          fail_ci_if_error: true
+          verbose: true
+
+  # Uncomment this part after merging https://github.com/spruceid/ssi/pull/544.
+  # tests-wasm:
+  #   name: Unit tests (WASM, stable)
+  #   runs-on: ubuntu-latest
+
+  #   steps:
+  #     - name: Checkout repository
+  #       uses: actions/checkout@v3
+
+  #     - name: Install Rust toolchain
+  #       uses: dtolnay/rust-toolchain@stable
+
+  #     - name: Install wasm-pack
+  #       run: curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh
+
+  #     - name: Run Wasm tests
+  #       run: wasm-pack test --chrome --headless
+
+  # wasm-coverage:
+  #   name: Unit tests (WASM, nightly, code coverage)
+  #   runs-on: ubuntu-24.04
+
+  #   steps:
+  #     - name: Checkout repository
+  #       uses: actions/checkout@v3
+
+  #     - name: Install `wasm-bindgen-cli`
+  #       uses: taiki-e/install-action@v2
+  #       with:
+  #         tool: wasm-bindgen-cli
+
+  #     - name: Install Clang v18 & jq
+  #       run: |
+  #         sudo apt-get install clang-18 jq
+  #         which jq
+
+  #     - name: Install Rust nightly
+  #       run: |
+  #         rustup toolchain install nightly --profile minimal --target wasm32-unknown-unknown
+  #         rustup default nightly
+  #         rustc --version --verbose
+
+  #     - name: Run tests
+  #       env:
+  #         CHROMEDRIVER: chromedriver
+  #         CARGO_HOST_RUSTFLAGS: --cfg=wasm_bindgen_unstable_test_coverage
+  #         RUSTFLAGS:
+  #           -Cinstrument-coverage -Zcoverage-options=condition -Zno-profiler-runtime --emit=llvm-ir
+  #           --cfg=wasm_bindgen_unstable_test_coverage
+  #         WASM_BINDGEN_UNSTABLE_TEST_PROFRAW_OUT: coverage-output
+  #       run: |
+  #         mkdir coverage-output
+  #         cargo test --target wasm32-unknown-unknown -Ztarget-applies-to-host -Zhost-config --tests
+
+  #     - name: Prepare object files
+  #       env:
+  #         CARGO_HOST_RUSTFLAGS: --cfg=wasm_bindgen_unstable_test_coverage
+  #         RUSTFLAGS:
+  #           -Cinstrument-coverage -Zcoverage-options=condition -Zno-profiler-runtime --emit=llvm-ir
+  #           --cfg=wasm_bindgen_unstable_test_coverage
+  #       run: |
+  #         mkdir coverage-input
+  #         crate_name=identity_core
+  #         IFS=$'\n'
+  #         for file in $(
+  #           cargo test --target wasm32-unknown-unknown -Ztarget-applies-to-host -Zhost-config --tests --no-run --message-format=json | \
+  #           jq -r "select(.reason == \"compiler-artifact\") | (select(.target.kind == [\"lib\"] and .target.name == \"$crate_name\")) | .filenames[0]"
+  #         )
+  #         do
+  #           if [[ ${file##*.} == "rlib" ]]; then
+  #               base=$(basename $file .rlib)
+  #               file=$(dirname $file)/${base#"lib"}.ll
+  #           else
+  #               file=$(dirname $file)/$(basename $file .wasm).ll
+  #           fi
+
+  #           input=coverage-input/$(basename $file)
+  #           cp $file $input
+
+  #           perl -i -p0e 's/(^define.*?$).*?^}/$1\nstart:\n  unreachable\n}/gms' $input
+  #           counter=1
+  #           while (( counter != 0 )); do
+  #               counter=$(perl -i -p0e '$c+= s/(^(define|declare)(,? [^\n ]+)*),? range\(.*?\)/$1/gm; END{print "$c"}' $input)
+  #           done
+
+  #           clang-18 $input -Wno-override-module -c -o coverage-output/$(basename $input .ll).o
+  #         done
+
+  #     - name: Merge profile data
+  #       run:
+  #         llvm-profdata-18 merge -sparse coverage-output/*.profraw -o
+  #         coverage-output/coverage.profdata
+
+  #     - name: Generate coverage report
+  #       run: |
+  #         objects=()
+  #         for file in $(ls coverage-output/*.o)
+  #         do
+  #           objects+=(-object $file)
+  #         done
+  #         llvm-cov-18 show -show-instantiations=false -output-dir coverage-output -format=html -instr-profile=coverage-output/coverage.profdata ${objects[@]} -sources src
+  #         llvm-cov-18 export -format=lcov -instr-profile=coverage-output/coverage.profdata -ignore-filename-regex='\/tests\/' ${objects[@]} -sources src > lcov.info
+
+  #     - name: Upload code coverage results
+  #       uses: codecov/codecov-action@v3
+  #       with:
+  #         token: ${{ secrets.CODECOV_TOKEN }}
+  #         fail_ci_if_error: true
+  #         verbose: true
+
   test-each-feature:
     if: ${{ !github.event.pull_request.draft }}
     runs-on: ubuntu-latest
