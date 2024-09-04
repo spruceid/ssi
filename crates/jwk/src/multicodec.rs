@@ -1,4 +1,5 @@
-use ssi_multicodec::{MultiEncoded, MultiEncodedBuf};
+use ssi_multicodec::{Codec, MultiEncoded, MultiEncodedBuf};
+use std::borrow::Cow;
 
 use crate::{Error, Params, JWK};
 
@@ -126,6 +127,18 @@ impl JWK {
     }
 }
 
+impl Codec for JWK {
+    const CODEC: u64 = ssi_multicodec::JWK_JCS_PUB;
+
+    fn to_bytes(&self) -> Cow<[u8]> {
+        Cow::Owned(serde_jcs::to_vec(self).unwrap())
+    }
+
+    fn from_bytes(bytes: &[u8]) -> Result<Self, ssi_multicodec::Error> {
+        Self::try_from(bytes).map_err(|_| ssi_multicodec::Error::InvalidData)
+    }
+}
+
 #[derive(Debug, thiserror::Error)]
 pub enum FromMulticodecError {
     #[cfg(feature = "rsa")]
@@ -169,7 +182,7 @@ pub enum FromMulticodecError {
     Bls12381G2Pub(ssi_bbs::Error),
 
     #[error(transparent)]
-    JwkJcsPub(serde_json::Error),
+    JwkJcsPub(ssi_multicodec::Error),
 
     /// Unexpected multibase (multicodec) key prefix multicodec
     #[error("Unsupported multicodec key type 0x{0:x}")]
@@ -189,4 +202,25 @@ pub enum ToMulticodecError {
 
     #[error("invalid input key: {0}")]
     InvalidInputKey(Error),
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_multicodec_jwk_jcs_pub() {
+        let jwk = JWK::generate_p256();
+        let jwk_str = serde_jcs::to_string(&jwk).unwrap();
+        // Note: can't use JWK::to_multicodec() because it's based on the particular key within the JWK
+        // it will see the P256 key and assign a multicodec of 0x1200.
+        // For jwk_jcs_pub multicodecs, we can only decode them
+        let jwk_buf =
+            MultiEncodedBuf::encode_bytes(ssi_multicodec::JWK_JCS_PUB, jwk_str.as_bytes());
+        let (codec, data) = jwk_buf.parts();
+        assert_eq!(codec, ssi_multicodec::JWK_JCS_PUB);
+        assert_eq!(*data, jwk.to_bytes().into_owned());
+        let jwk2 = JWK::from_multicodec(&jwk_buf).unwrap();
+        assert_eq!(jwk, jwk2);
+    }
 }

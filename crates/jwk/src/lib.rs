@@ -310,10 +310,6 @@ impl JWK {
         }
     }
 
-    pub fn from_bytes(bytes: &[u8]) -> Result<JWK, serde_json::Error> {
-        serde_json::from_slice(bytes)
-    }
-
     #[cfg(feature = "ed25519")]
     pub fn generate_ed25519_from(
         rng: &mut (impl rand::CryptoRng + rand::RngCore),
@@ -1326,6 +1322,7 @@ impl From<Base64urlUInt> for Base64urlUIntString {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use ssi_multicodec::Codec;
 
     const RSA_JSON: &str = include_str!("../../../tests/rsa2048-2020-08-25.json");
     const RSA_DER: &[u8] = include_bytes!("../../../tests/rsa2048-2020-08-25.der");
@@ -1341,17 +1338,6 @@ mod tests {
         let rsa_pk: RSAPublicKey = simple_asn1::der_decode(RSA_PK_DER).unwrap();
         let rsa_params = RSAParams::try_from(&rsa_pk).unwrap();
         assert_eq!(key.to_public().params, Params::RSA(rsa_params));
-    }
-
-    #[test]
-    fn jwk_from_bytes() {
-        let actual_jwk: JWK = JWK::from_bytes(JWK_JCS_JSON).unwrap();
-        let actual_params: Params = actual_jwk.params;
-        if let Params::EC(ref ec_params) = actual_params {
-            assert_eq!(ec_params.curve.as_deref(), Some("P-256"));
-        } else {
-            panic!("actual_params is not of type Params::EC");
-        }
     }
 
     #[test]
