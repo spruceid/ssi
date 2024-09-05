@@ -11,6 +11,7 @@ use crate::{
     },
     token_status_list::{self, StatusListToken},
     EncodedStatusMap, FromBytes, FromBytesOptions, StatusMap, StatusMapEntry, StatusMapEntrySet,
+    StatusSizeError,
 };
 
 pub enum AnyStatusMap {
@@ -108,16 +109,22 @@ pub enum AnyDecodedStatusMap {
 }
 
 impl AnyDecodedStatusMap {
-    pub fn iter(&self) -> AnyDecodedStatusMapIter {
+    pub fn iter(
+        &self,
+        status_size: Option<u8>,
+    ) -> Result<AnyDecodedStatusMapIter, StatusSizeError> {
         match self {
-            Self::BitstringStatusList(m) => AnyDecodedStatusMapIter::BitstringStatusList(m.iter()),
-            Self::TokenStatusList(m) => AnyDecodedStatusMapIter::TokenStatusList(m.iter()),
+            Self::BitstringStatusList(m) => Ok(AnyDecodedStatusMapIter::BitstringStatusList(
+                m.iter(status_size.ok_or(StatusSizeError::Missing)?.try_into()?),
+            )),
+            Self::TokenStatusList(m) => Ok(AnyDecodedStatusMapIter::TokenStatusList(m.iter())),
         }
     }
 }
 
 impl StatusMap for AnyDecodedStatusMap {
     type Key = usize;
+    type StatusSize = u8;
     type Status = u8;
 
     fn time_to_live(&self) -> Option<std::time::Duration> {
@@ -127,20 +134,19 @@ impl StatusMap for AnyDecodedStatusMap {
         }
     }
 
-    fn get_by_key(&self, key: Self::Key) -> Option<Self::Status> {
+    fn get_by_key(
+        &self,
+        status_size: Option<u8>,
+        key: Self::Key,
+    ) -> Result<Option<Self::Status>, StatusSizeError> {
         match self {
-            Self::BitstringStatusList(m) => m.get_by_key(key),
-            Self::TokenStatusList(m) => m.get_by_key(key),
+            Self::BitstringStatusList(m) => {
+                m.get_by_key(status_size.map(TryInto::try_into).transpose()?, key)
+            }
+            Self::TokenStatusList(m) => {
+                m.get_by_key(status_size.map(TryInto::try_into).transpose()?, key)
+            }
         }
-    }
-}
-
-impl<'a> IntoIterator for &'a AnyDecodedStatusMap {
-    type IntoIter = AnyDecodedStatusMapIter<'a>;
-    type Item = u8;
-
-    fn into_iter(self) -> Self::IntoIter {
-        self.iter()
     }
 }
 
@@ -239,6 +245,7 @@ pub enum AnyStatusMapEntryRef<'a> {
 
 impl<'a> StatusMapEntry for AnyStatusMapEntryRef<'a> {
     type Key = usize;
+    type StatusSize = u8;
 
     fn status_list_url(&self) -> &Uri {
         match self {
@@ -251,6 +258,13 @@ impl<'a> StatusMapEntry for AnyStatusMapEntryRef<'a> {
         match self {
             Self::BitstringStatusList(e) => e.key(),
             Self::TokenStatusList(e) => e.key(),
+        }
+    }
+
+    fn status_size(&self) -> Option<Self::StatusSize> {
+        match self {
+            Self::BitstringStatusList(e) => e.status_size().map(Into::into),
+            Self::TokenStatusList(e) => e.status_size().map(Into::into),
         }
     }
 }

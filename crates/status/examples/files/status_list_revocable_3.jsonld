@@ -16,5 +16,13 @@
   "credentialSubject": {
     "id": "did:example:6789",
     "type": "Person"
+  },
+  "proof": {
+    "@context": "https://w3id.org/security/suites/jws-2020/v1",
+    "type": "JsonWebSignature2020",
+    "created": "2024-09-05T12:30:26.917Z",
+    "verificationMethod": "did:jwk:eyJhbGciOiJFUzI1NiIsImNydiI6IlAtMjU2Iiwia3R5IjoiRUMiLCJ1c2UiOiJzaWciLCJ4IjoiRnlHbnZLcXJ5cWlzX3gwWHJTbENTbnpFeGlrSk5XLUgzY0hQWnRfZjBmUSIsInkiOiJKZGJUM1BJWllIdHdzNVprZUlLakM5RnhJaGZwYV9rbHVJZms5ekZwczZzIn0#0",
+    "proofPurpose": "assertionMethod",
+    "jws": "eyJhbGciOiJFUzI1NiIsImNyaXQiOlsiYjY0Il0sImI2NCI6ZmFsc2V9..XElrILKSLhlRVpzIw_06OxLP4JN-CJKOrHKECr4wOmro8QpmDad9jeSeIvbU9zrt49nIel3c9ztzmBJgfeOv9g"
   }
 }

@@ -27,7 +27,7 @@ use ssi_jwt::{ClaimSet, InvalidClaimValue, JWTClaims, ToDecodedJwt};
 
 use crate::{
     EncodedStatusMap, FromBytes, FromBytesOptions, Overflow, StatusMap, StatusMapEntry,
-    StatusMapEntrySet,
+    StatusMapEntrySet, StatusSizeError,
 };
 
 /// Status value describing a Token that is valid, correct or legal.
@@ -175,6 +175,12 @@ pub const JWT_TYPE: &str = "statuslist+jwt";
 #[error("invalid status size {0}")]
 pub struct InvalidStatusSize(u8);
 
+impl From<InvalidStatusSize> for StatusSizeError {
+    fn from(_value: InvalidStatusSize) -> Self {
+        Self::Invalid
+    }
+}
+
 /// Number of bits per Referenced Token in a Status List.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize)]
 #[serde(transparent)]
@@ -216,6 +222,12 @@ impl TryFrom<u8> for StatusSize {
     }
 }
 
+impl From<StatusSize> for u8 {
+    fn from(value: StatusSize) -> Self {
+        value.0
+    }
+}
+
 impl<'de> serde::Deserialize<'de> for StatusSize {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
@@ -245,14 +257,19 @@ impl StatusList {
 
 impl StatusMap for StatusList {
     type Key = usize;
+    type StatusSize = StatusSize;
     type Status = u8;
 
     fn time_to_live(&self) -> Option<Duration> {
         self.ttl.map(Duration::from_secs)
     }
 
-    fn get_by_key(&self, key: Self::Key) -> Option<Self::Status> {
-        self.bit_string.get(key)
+    fn get_by_key(
+        &self,
+        _status_size: Option<StatusSize>,
+        key: Self::Key,
+    ) -> Result<Option<Self::Status>, StatusSizeError> {
+        Ok(self.bit_string.get(key))
     }
 }
 
@@ -591,6 +608,7 @@ pub enum AnyStatusListReference<'a> {
 
 impl<'a> StatusMapEntry for AnyStatusListReference<'a> {
     type Key = usize;
+    type StatusSize = StatusSize;
 
     fn key(&self) -> Self::Key {
         match self {
@@ -601,6 +619,12 @@ impl<'a> StatusMapEntry for AnyStatusListReference<'a> {
     fn status_list_url(&self) -> &Uri {
         match self {
             Self::Json(e) => e.status_list_url(),
+        }
+    }
+
+    fn status_size(&self) -> Option<Self::StatusSize> {
+        match self {
+            Self::Json(e) => e.status_size(),
         }
     }
 }

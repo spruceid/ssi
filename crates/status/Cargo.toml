@@ -31,7 +31,7 @@ parking_lot = "0.12.1"
 flate2 = "1.0.28"
 
 [dev-dependencies]
-ssi-jwk = { workspace = true, features = ["secp256r1"] }
+ssi-jws = { workspace = true, features = ["secp256r1"] }
 ssi-dids.workspace = true
 ssi-data-integrity = { workspace = true, features = ["w3c"] }
 tokio = { version = "1.0", features = ["macros", "rt"] }

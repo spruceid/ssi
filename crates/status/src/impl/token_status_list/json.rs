@@ -232,6 +232,7 @@ pub struct StatusListReference {
 
 impl StatusMapEntry for StatusListReference {
     type Key = usize;
+    type StatusSize = StatusSize;
 
     fn key(&self) -> Self::Key {
         self.idx
@@ -239,6 +240,10 @@ impl StatusMapEntry for StatusListReference {
 
     fn status_list_url(&self) -> &iref::Uri {
         &self.uri
+    }
+
+    fn status_size(&self) -> Option<Self::StatusSize> {
+        None
     }
 }
 

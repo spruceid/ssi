@@ -41,8 +41,18 @@ pub trait FromBytes<V>: Sized {
     }
 }
 
+#[derive(Debug, thiserror::Error)]
+pub enum StatusSizeError {
+    #[error("missing status size")]
+    Missing,
+
+    #[error("invalid status size")]
+    Invalid,
+}
+
 pub trait StatusMap: Clone {
     type Key;
+    type StatusSize;
     type Status;
 
     /// Maximum duration an implementer is allowed to cache a
@@ -51,10 +61,17 @@ pub trait StatusMap: Clone {
         None
     }
 
-    fn get_by_key(&self, key: Self::Key) -> Option<Self::Status>;
+    fn get_by_key(
+        &self,
+        status_size: Option<Self::StatusSize>,
+        key: Self::Key,
+    ) -> Result<Option<Self::Status>, StatusSizeError>;
 
-    fn get_entry<E: StatusMapEntry<Key = Self::Key>>(&self, entry: &E) -> Option<Self::Status> {
-        self.get_by_key(entry.key())
+    fn get_entry<E: StatusMapEntry<Key = Self::Key, StatusSize = Self::StatusSize>>(
+        &self,
+        entry: &E,
+    ) -> Result<Option<Self::Status>, StatusSizeError> {
+        self.get_by_key(entry.status_size(), entry.key())
     }
 }
 
@@ -68,17 +85,25 @@ pub trait StatusMapEntrySet {
 
 pub trait StatusMapEntry {
     type Key;
+    type StatusSize;
 
     fn status_list_url(&self) -> &Uri;
+
+    fn status_size(&self) -> Option<Self::StatusSize>;
 
     fn key(&self) -> Self::Key;
 }
 
 impl<'a, E: StatusMapEntry> StatusMapEntry for &'a E {
     type Key = E::Key;
+    type StatusSize = E::StatusSize;
 
     fn status_list_url(&self) -> &Uri {
         E::status_list_url(*self)
+    }
+
+    fn status_size(&self) -> Option<Self::StatusSize> {
+        E::status_size(*self)
     }
 
     fn key(&self) -> Self::Key {

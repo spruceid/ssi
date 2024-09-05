@@ -22,6 +22,7 @@ use ssi_dids::{VerificationMethodDIDResolver, DIDJWK};
 use ssi_jwk::JWK;
 use ssi_status::{
     any::AnyStatusMap, bitstring_status_list, EncodedStatusMap, FromBytes, FromBytesOptions,
+    StatusSizeError,
 };
 use ssi_verification_methods::{ReferenceOrOwned, SingleSecretSigner};
 use std::{
@@ -62,6 +63,9 @@ enum Command {
         /// Input media type.
         #[clap(short = 't', long)]
         media_type: String,
+
+        /// Status size in bits.
+        status_size: Option<u8>,
     },
 
     /// Create a new status list.
@@ -112,6 +116,7 @@ impl Command {
             Self::Read {
                 filename,
                 media_type,
+                status_size,
             } => {
                 let source = filename.map(Source::File).unwrap_or_default();
                 let bytes = match source.read() {
@@ -133,7 +138,7 @@ impl Command {
                 .decode()
                 .map_err(|e| Error::Decode(source, e))?;
 
-                let list: Vec<_> = status_list.iter().collect();
+                let list: Vec<_> = status_list.iter(status_size)?.collect();
 
                 println!("{}", serde_json::to_string_pretty(&list).unwrap());
                 Ok(())
@@ -152,7 +157,7 @@ async fn create_bitstring_status_list(
     list: Vec<StatusValue>,
     key: Option<PathBuf>,
 ) -> Result<Vec<u8>, Error> {
-    let mut status_list = bitstring_status_list::StatusList::new(
+    let mut status_list = bitstring_status_list::SizedStatusList::new(
         bitstring_status_list::StatusSize::default(),
         bitstring_status_list::TimeToLive::default(),
         // list.into_iter().map(|v| v.0).collect(),
@@ -164,11 +169,7 @@ async fn create_bitstring_status_list(
 
     let credential = bitstring_status_list::BitstringStatusListCredential::new(
         Some(id),
-        status_list.to_credential_subject(
-            None,
-            bitstring_status_list::StatusPurpose::Revocation,
-            Vec::new(),
-        ),
+        status_list.to_credential_subject(None, bitstring_status_list::StatusPurpose::Revocation),
     );
 
     match key {
@@ -212,6 +213,9 @@ enum Error {
 
     #[error("unable to read key: {0}")]
     Key(#[from] KeyError),
+
+    #[error(transparent)]
+    StatusSize(#[from] StatusSizeError),
 }
 
 #[derive(Debug, thiserror::Error)]
