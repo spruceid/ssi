@@ -171,8 +171,8 @@ pub enum StatusPurpose {
     /// Convey an arbitrary message related to the status of the verifiable
     /// credential.
     ///
-    /// The actual message is stored in the status list credential, in
-    /// [`BitstringStatusList::status_message`].
+    /// The actual message is stored in the status list entry, in
+    /// [`BitstringStatusListEntry::status_messages`].
     Message,
 }
 
