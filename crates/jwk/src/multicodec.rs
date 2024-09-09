@@ -211,12 +211,10 @@ mod tests {
     #[test]
     fn test_multicodec_jwk_jcs_pub() {
         let jwk = JWK::generate_p256();
-        let jwk_str = serde_jcs::to_string(&jwk).unwrap();
         // Note: can't use JWK::to_multicodec() because it's based on the particular key within the JWK
         // it will see the P256 key and assign a multicodec of 0x1200.
         // For jwk_jcs_pub multicodecs, we can only decode them
-        let jwk_buf =
-            MultiEncodedBuf::encode_bytes(ssi_multicodec::JWK_JCS_PUB, jwk_str.as_bytes());
+        let jwk_buf = MultiEncodedBuf::encode(&jwk);
         let (codec, data) = jwk_buf.parts();
         assert_eq!(codec, ssi_multicodec::JWK_JCS_PUB);
         assert_eq!(*data, jwk.to_bytes().into_owned());
