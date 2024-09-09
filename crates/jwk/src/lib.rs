@@ -1322,7 +1322,6 @@ impl From<Base64urlUInt> for Base64urlUIntString {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use ssi_multicodec::Codec;
 
     const RSA_JSON: &str = include_str!("../../../tests/rsa2048-2020-08-25.json");
     const RSA_DER: &[u8] = include_bytes!("../../../tests/rsa2048-2020-08-25.der");
