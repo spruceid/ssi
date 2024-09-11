@@ -150,13 +150,10 @@ pub struct DecodedJWSRef<'a, T = &'a [u8]> {
 }
 
 impl<'a, T> DecodedJWSRef<'a, T> {
-    pub fn new(
-        signing_bytes: DecodedSigningBytesRef<'a, T>,
-        signature: JWSSignature
-    ) -> Self {
+    pub fn new(signing_bytes: DecodedSigningBytesRef<'a, T>, signature: JWSSignature) -> Self {
         Self {
             signing_bytes,
-            signature
+            signature,
         }
     }
 
@@ -164,7 +161,10 @@ impl<'a, T> DecodedJWSRef<'a, T> {
         DecodedJWSRef::new(self.signing_bytes.map(f), self.signature)
     }
 
-    pub fn try_map<U, E>(self, f: impl FnOnce(T) -> Result<U, E>) -> Result<DecodedJWSRef<'a, U>, E> {
+    pub fn try_map<U, E>(
+        self,
+        f: impl FnOnce(T) -> Result<U, E>,
+    ) -> Result<DecodedJWSRef<'a, U>, E> {
         Ok(DecodedJWSRef::new(
             self.signing_bytes.try_map(f)?,
             self.signature,
@@ -174,7 +174,7 @@ impl<'a, T> DecodedJWSRef<'a, T> {
     pub fn into_owned(self) -> DecodedJWS<T> {
         DecodedJWS {
             signing_bytes: self.signing_bytes.into_owned(),
-            signature: self.signature.to_owned()
+            signature: self.signature.to_owned(),
         }
     }
 
@@ -216,7 +216,7 @@ impl<'a, T: ?Sized + ToOwned> DecodedJWSRef<'a, &'a T> {
     pub fn to_owned(&self) -> DecodedJWS<T::Owned> {
         DecodedJWS {
             signing_bytes: self.signing_bytes.to_owned(),
-            signature: self.signature.to_owned()
+            signature: self.signature.to_owned(),
         }
     }
 }
@@ -345,7 +345,7 @@ impl<'a, T> DecodedSigningBytesRef<'a, T> {
         DecodedSigningBytes {
             bytes: self.bytes.to_owned(),
             header: self.header.clone(),
-            payload: self.payload
+            payload: self.payload,
         }
     }
 }
@@ -355,7 +355,7 @@ impl<'a, T: ?Sized + ToOwned> DecodedSigningBytesRef<'a, &'a T> {
         DecodedSigningBytes {
             bytes: self.bytes.to_owned(),
             header: self.header.clone(),
-            payload: self.payload.to_owned()
+            payload: self.payload.to_owned(),
         }
     }
 }
@@ -1193,7 +1193,12 @@ pub fn detached_verify(jws: &str, payload_enc: &[u8], key: &JWK) -> Result<Heade
     let (header_b64, signature_b64) = split_detached_jws(jws)?;
     let (jws, signing_bytes) =
         decode_jws_parts(header_b64, payload_enc, signature_b64)?.into_jws_and_signing_bytes();
-    verify_bytes(jws.header.algorithm, &signing_bytes, key, jws.signature.as_bytes())?;
+    verify_bytes(
+        jws.header.algorithm,
+        &signing_bytes,
+        key,
+        jws.signature.as_bytes(),
+    )?;
     Ok(jws.header)
 }
 
@@ -1202,7 +1207,11 @@ pub fn detached_recover(jws: &str, payload_enc: &[u8]) -> Result<(Header, JWK), 
     let (header_b64, signature_b64) = split_detached_jws(jws)?;
     let (jws, signing_bytes) =
         decode_jws_parts(header_b64, payload_enc, signature_b64)?.into_jws_and_signing_bytes();
-    let key = recover(jws.header.algorithm, &signing_bytes, jws.signature.as_bytes())?;
+    let key = recover(
+        jws.header.algorithm,
+        &signing_bytes,
+        jws.signature.as_bytes(),
+    )?;
     Ok((jws.header, key))
 }
 
@@ -1218,7 +1227,11 @@ pub fn detached_recover_legacy_keccak_es256kr(
         return Err(Error::AlgorithmMismatch);
     }
     jws.header.algorithm = Algorithm::ESKeccakKR;
-    let key = recover(jws.header.algorithm, &signing_bytes, jws.signature.as_bytes())?;
+    let key = recover(
+        jws.header.algorithm,
+        &signing_bytes,
+        jws.signature.as_bytes(),
+    )?;
     Ok((jws.header, key))
 }
 
@@ -1226,7 +1239,12 @@ pub fn decode_verify(jws: &str, key: &JWK) -> Result<(Header, Vec<u8>), Error> {
     let (header_b64, payload_enc, signature_b64) = split_jws(jws)?;
     let (jws, signing_bytes) = decode_jws_parts(header_b64, payload_enc.as_bytes(), signature_b64)?
         .into_jws_and_signing_bytes();
-    verify_bytes(jws.header.algorithm, &signing_bytes, key, jws.signature.as_bytes())?;
+    verify_bytes(
+        jws.header.algorithm,
+        &signing_bytes,
+        key,
+        jws.signature.as_bytes(),
+    )?;
     Ok((jws.header, jws.payload))
 }
 

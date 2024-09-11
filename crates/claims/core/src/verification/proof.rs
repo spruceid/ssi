@@ -75,6 +75,10 @@ pub enum ProofValidationError {
 }
 
 impl ProofValidationError {
+    pub fn input_data(e: impl ToString) -> Self {
+        Self::InvalidInputData(e.to_string())
+    }
+
     pub fn other(e: impl ToString) -> Self {
         Self::Other(e.to_string())
     }

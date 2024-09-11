@@ -1,4 +1,7 @@
-use crate::{verify_bytes, DecodedJWS, DecodedJWSRef, DecodedSigningBytes, DecodedSigningBytesRef, Error, Header};
+use crate::{
+    verify_bytes, DecodedJWS, DecodedJWSRef, DecodedSigningBytes, DecodedSigningBytesRef, Error,
+    Header,
+};
 use ssi_claims_core::{
     ClaimsValidity, InvalidProof, ProofValidationError, ProofValidity, ResolverProvider,
     ValidateClaims, ValidateProof, VerifiableClaims,
@@ -25,8 +28,8 @@ impl<'a, E, T: ?Sized + ToOwned + ValidateJWSHeader<E>> ValidateJWSHeader<E> for
     }
 }
 
-impl<'a, E, T: ValidateClaims<E, JWSSignature> + ValidateJWSHeader<E>> ValidateClaims<E, JWSSignature>
-    for DecodedSigningBytesRef<'a, T>
+impl<'a, E, T: ValidateClaims<E, JWSSignature> + ValidateJWSHeader<E>>
+    ValidateClaims<E, JWSSignature> for DecodedSigningBytesRef<'a, T>
 {
     fn validate_claims(&self, env: &E, signature: &JWSSignature) -> ClaimsValidity {
         self.payload.validate_jws_header(env, &self.header)?;

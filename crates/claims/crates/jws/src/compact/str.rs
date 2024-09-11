@@ -3,7 +3,7 @@ use std::{borrow::Cow, ops::Deref, str::FromStr};
 
 use base64::Engine;
 
-use crate::{CompactJWS, DecodeError, DecodedJWS, DecodedSigningBytes, Header, InvalidCompactJWS};
+use crate::{CompactJWS, DecodeError, DecodedJWS, Header, InvalidCompactJWS};
 
 /// JWS in UTF-8 compact serialized form.
 ///
@@ -15,16 +15,15 @@ use crate::{CompactJWS, DecodeError, DecodedJWS, DecodedSigningBytes, Header, In
 pub struct CompactJWSStr(CompactJWS);
 
 impl CompactJWSStr {
-    pub fn new(data: &[u8]) -> Result<&Self, InvalidCompactJWS<&[u8]>> {
-        match std::str::from_utf8(data) {
-            Ok(s) => Self::from_string(s).map_err(|_| InvalidCompactJWS(data)),
+    pub fn new<T: ?Sized + AsRef<[u8]>>(data: &T) -> Result<&Self, InvalidCompactJWS<&T>> {
+        let bytes = data.as_ref();
+        match std::str::from_utf8(bytes) {
+            Ok(_) => {
+                let _ = CompactJWS::new(bytes).map_err(|_| InvalidCompactJWS(data))?;
+                Ok(unsafe { Self::new_unchecked(bytes) })
+            }
             Err(_) => Err(InvalidCompactJWS(data)),
         }
-    }
-
-    pub fn from_string(data: &str) -> Result<&Self, InvalidCompactJWS<&str>> {
-        let inner = CompactJWS::new(data.as_bytes()).map_err(|_| InvalidCompactJWS(data))?;
-        Ok(unsafe { std::mem::transmute::<&CompactJWS, &Self>(inner) })
     }
 
     /// Creates a new compact JWS without checking the data.
@@ -219,7 +218,7 @@ impl CompactJWSString {
     pub fn into_string(self) -> String {
         self.0
     }
-    
+
     /// Decodes the entire JWS while preserving the signing bytes so they can
     /// be verified.
     pub fn into_decoded(self) -> Result<DecodedJWS<Vec<u8>>, DecodeError> {

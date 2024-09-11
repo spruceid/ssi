@@ -1,37 +1,195 @@
-use crate::DecodeError;
+use crate::{utils::is_url_safe_base64_char, DecodeError};
 use base64::{prelude::BASE64_URL_SAFE_NO_PAD, Engine};
+use serde_json::Value;
+use std::{
+    borrow::{Borrow, Cow},
+    fmt,
+};
+
+/// Invalid SD-JWT disclosure.
+#[derive(Debug, thiserror::Error)]
+#[error("invalid SD-JWT disclosure: `{0}`")]
+pub struct InvalidDisclosure<T>(pub T);
 
 /// Encoded disclosure.
-#[derive(Debug, PartialEq)]
-pub struct Disclosure(str);
+///
+/// An encoded disclosure is a url-safe base-64 string encoding (without
+/// padding) an array containing the disclosure's parameters.
+///
+/// See: <https://www.ietf.org/archive/id/draft-ietf-oauth-selective-disclosure-jwt-12.html#section-5>
+#[derive(PartialEq)]
+pub struct Disclosure([u8]);
 
 impl Disclosure {
+    /// Parses the given `disclosure` bytes.
+    ///
+    /// Returns an error if the input value is not a valid url-safe base64
+    /// string without padding.
+    pub fn new<T: ?Sized + AsRef<[u8]>>(disclosure: &T) -> Result<&Self, InvalidDisclosure<&T>> {
+        let bytes = disclosure.as_ref();
+        if bytes.iter().copied().all(is_url_safe_base64_char) {
+            Ok(unsafe { Self::new_unchecked(bytes) })
+        } else {
+            Err(InvalidDisclosure(disclosure))
+        }
+    }
+
+    /// Creates a new disclosure out of the given `bytes` without validation.
+    ///
+    /// # Safety
+    ///
+    /// The input bytes **must** be a valid url-safe base64 string without
+    /// padding.
     pub unsafe fn new_unchecked(bytes: &[u8]) -> &Self {
         std::mem::transmute(bytes)
     }
 
+    pub fn as_bytes(&self) -> &[u8] {
+        &self.0
+    }
+
+    pub fn as_str(&self) -> &str {
+        unsafe {
+            // SAFETY: disclosures are url-safe base-64 strings.
+            std::str::from_utf8_unchecked(&self.0)
+        }
+    }
+
     /// Decode this disclosure.
     pub fn decode(&self) -> Result<DecodedDisclosure, DecodeError> {
-        let bytes = base64::decode_config(&self.0, URL_SAFE_NO_PAD)
-            .map_err(|_| DecodeError::DisclosureMalformed)?;
-        let json: serde_json::Value = serde_json::from_slice(&bytes)?;
+        DecodedDisclosure::new(self)
+    }
+}
 
-        match json {
-            serde_json::Value::Array(values) => match values.as_slice() {
-                [salt, name, value] => validate_property_disclosure(salt, name, value),
-                [salt, value] => validate_array_item_disclosure(salt, value),
-                _ => Err(DecodeError::DisclosureMalformed),
-            },
-            _ => Err(DecodeError::DisclosureMalformed),
+impl AsRef<[u8]> for Disclosure {
+    fn as_ref(&self) -> &[u8] {
+        self.as_bytes()
+    }
+}
+
+impl AsRef<str> for Disclosure {
+    fn as_ref(&self) -> &str {
+        self.as_str()
+    }
+}
+
+impl fmt::Display for Disclosure {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        self.as_str().fmt(f)
+    }
+}
+
+impl fmt::Debug for Disclosure {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        self.as_str().fmt(f)
+    }
+}
+
+impl ToOwned for Disclosure {
+    type Owned = DisclosureBuf;
+
+    fn to_owned(&self) -> Self::Owned {
+        DisclosureBuf(self.as_bytes().to_owned())
+    }
+}
+
+pub struct DisclosureBuf(Vec<u8>);
+
+impl DisclosureBuf {
+    pub fn encode_from_parts(salt: &str, kind: &DisclosureKind) -> Self {
+        Self(
+            BASE64_URL_SAFE_NO_PAD
+                .encode(kind.to_value(salt).to_string())
+                .into_bytes(),
+        )
+    }
+
+    pub fn as_disclosure(&self) -> &Disclosure {
+        unsafe {
+            // SAFETY: `self.0` is a disclosure by construction.
+            Disclosure::new_unchecked(&self.0)
         }
+    }
+}
+
+impl Borrow<Disclosure> for DisclosureBuf {
+    fn borrow(&self) -> &Disclosure {
+        self.as_disclosure()
+    }
+}
+
+impl fmt::Display for DisclosureBuf {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        self.as_disclosure().fmt(f)
+    }
+}
+
+impl fmt::Debug for DisclosureBuf {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        self.as_disclosure().fmt(f)
     }
 }
 
 /// Decoded disclosure.
 #[derive(Debug, PartialEq)]
-pub struct DecodedDisclosure {
+pub struct DecodedDisclosure<'a> {
+    /// Encoded disclosure.
+    pub encoded: Cow<'a, Disclosure>,
     pub salt: String,
     pub kind: DisclosureKind,
+}
+
+impl<'a> DecodedDisclosure<'a> {
+    pub fn new(encoded: &'a (impl ?Sized + AsRef<[u8]>)) -> Result<Self, DecodeError> {
+        let base64 = encoded.as_ref();
+        let bytes = BASE64_URL_SAFE_NO_PAD
+            .decode(base64)
+            .map_err(|_| DecodeError::DisclosureMalformed)?;
+
+        let encoded = unsafe {
+            // SAFETY: by decoding `base64` we validated the disclosure.
+            Disclosure::new_unchecked(base64)
+        };
+
+        let json: serde_json::Value = serde_json::from_slice(&bytes)?;
+
+        match json {
+            serde_json::Value::Array(values) => match values.as_slice() {
+                [salt, name, value] => Ok(DecodedDisclosure {
+                    encoded: Cow::Borrowed(encoded),
+                    salt: salt
+                        .as_str()
+                        .ok_or(DecodeError::DisclosureMalformed)?
+                        .to_owned(),
+                    kind: DisclosureKind::Property {
+                        name: name
+                            .as_str()
+                            .ok_or(DecodeError::DisclosureMalformed)?
+                            .to_owned(),
+                        value: value.clone(),
+                    },
+                }),
+                [salt, value] => Ok(DecodedDisclosure {
+                    encoded: Cow::Borrowed(encoded),
+                    salt: salt
+                        .as_str()
+                        .ok_or(DecodeError::DisclosureMalformed)?
+                        .to_owned(),
+                    kind: DisclosureKind::ArrayItem(value.clone()),
+                }),
+                _ => Err(DecodeError::DisclosureMalformed),
+            },
+            _ => Err(DecodeError::DisclosureMalformed),
+        }
+    }
+
+    pub fn from_parts(salt: String, kind: DisclosureKind) -> Self {
+        Self {
+            encoded: Cow::Owned(DisclosureBuf::encode_from_parts(&salt, &kind)),
+            salt,
+            kind,
+        }
+    }
 }
 
 #[derive(Debug, PartialEq)]
@@ -43,52 +201,15 @@ pub enum DisclosureKind {
     ArrayItem(serde_json::Value),
 }
 
-impl DecodedDisclosure {
-    pub fn new(encoded: &str) -> Result<Self, DecodeError> {
-        let bytes = BASE64_URL_SAFE_NO_PAD
-            .decode(encoded)
-            .map_err(|_| DecodeError::DisclosureMalformed)?;
-        let json: serde_json::Value = serde_json::from_slice(&bytes)?;
-
-        match json {
-            serde_json::Value::Array(values) => match values.as_slice() {
-                [salt, name, value] => validate_property_disclosure(salt, name, value),
-                [salt, value] => validate_array_item_disclosure(salt, value),
-                _ => Err(DecodeError::DisclosureMalformed),
-            },
-            _ => Err(DecodeError::DisclosureMalformed),
+impl DisclosureKind {
+    pub fn to_value(&self, salt: &str) -> Value {
+        match self {
+            Self::Property { name, value } => {
+                Value::Array(vec![salt.into(), name.to_owned().into(), value.clone()])
+            }
+            Self::ArrayItem(value) => Value::Array(vec![salt.into(), value.clone()]),
         }
     }
-}
-
-fn validate_property_disclosure(
-    salt: &serde_json::Value,
-    name: &serde_json::Value,
-    value: &serde_json::Value,
-) -> Result<DecodedDisclosure, DecodeError> {
-    let salt = salt.as_str().ok_or(DecodeError::DisclosureMalformed)?;
-
-    let name = name.as_str().ok_or(DecodeError::DisclosureMalformed)?;
-
-    Ok(DecodedDisclosure {
-        salt: salt.to_owned(),
-        kind: DisclosureKind::Property {
-            name: name.to_owned(),
-            value: value.clone(),
-        },
-    })
-}
-
-fn validate_array_item_disclosure(
-    salt: &serde_json::Value,
-    value: &serde_json::Value,
-) -> Result<DecodedDisclosure, DecodeError> {
-    let salt = salt.as_str().ok_or(DecodeError::DisclosureMalformed)?;
-
-    Ok(DecodedDisclosure {
-        salt: salt.to_owned(),
-        kind: DisclosureKind::ArrayItem(value.clone()),
-    })
 }
 
 #[cfg(test)]
@@ -209,10 +330,10 @@ mod tests {
     #[test]
     fn decode_array_disclosure() {
         assert_eq!(
-            DecodedDisclosure {
-                salt: "nPuoQnkRFq3BIeAm7AnXFA".to_owned(),
-                kind: DisclosureKind::ArrayItem(serde_json::json!("DE"))
-            },
+            DecodedDisclosure::from_parts(
+                "nPuoQnkRFq3BIeAm7AnXFA".to_owned(),
+                DisclosureKind::ArrayItem(serde_json::json!("DE"))
+            ),
             DecodedDisclosure::new("WyJuUHVvUW5rUkZxM0JJZUFtN0FuWEZBIiwgIkRFIl0").unwrap()
         )
     }

@@ -1,4 +1,7 @@
-use crate::{DecodeError, DecodedJWS, DecodedJWSRef, DecodedSigningBytesRef, Header, InvalidHeader, JWSSignature};
+use crate::{
+    DecodeError, DecodedJWS, DecodedJWSRef, DecodedSigningBytesRef, Header, InvalidHeader,
+    JWSSignature,
+};
 pub use base64::DecodeError as Base64DecodeError;
 use base64::Engine;
 use ssi_claims_core::{ProofValidationError, ResolverProvider, Verification};
@@ -125,7 +128,9 @@ impl CompactJWS {
     }
 
     pub fn decode_signature(&self) -> Result<JWSSignature, Base64DecodeError> {
-        base64::prelude::BASE64_URL_SAFE_NO_PAD.decode(self.signature()).map(JWSSignature::new)
+        base64::prelude::BASE64_URL_SAFE_NO_PAD
+            .decode(self.signature())
+            .map(JWSSignature::new)
     }
 
     /// Decodes the entire JWS.
