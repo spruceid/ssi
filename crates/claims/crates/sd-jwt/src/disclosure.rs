@@ -11,6 +11,17 @@ use std::{
 #[error("invalid SD-JWT disclosure: `{0}`")]
 pub struct InvalidDisclosure<T>(pub T);
 
+/// Creates a static disclosure.
+#[macro_export]
+macro_rules! disclosure {
+    ($s:literal) => {
+        match $crate::Disclosure::from_str_const($s) {
+            Ok(d) => d,
+            Err(_) => panic!("invalid disclosure"),
+        }
+    };
+}
+
 /// Encoded disclosure.
 ///
 /// An encoded disclosure is a url-safe base-64 string encoding (without
@@ -34,30 +45,49 @@ impl Disclosure {
         }
     }
 
+    /// Parses the given `disclosure` string.
+    ///
+    /// Returns an error if the input string is not a valid url-safe base64
+    /// string without padding.
+    ///
+    /// This function is limited to a `&str` input, but can be used in the const
+    /// context.
+    pub const fn from_str_const(disclosure: &str) -> Result<&Self, InvalidDisclosure<&str>> {
+        let bytes = disclosure.as_bytes();
+        let mut i = 0;
+
+        while i < bytes.len() {
+            if !is_url_safe_base64_char(bytes[i]) {
+                return Err(InvalidDisclosure(disclosure));
+            }
+
+            i += 1
+        }
+
+        Ok(unsafe { Self::new_unchecked(bytes) })
+    }
+
     /// Creates a new disclosure out of the given `bytes` without validation.
     ///
     /// # Safety
     ///
     /// The input bytes **must** be a valid url-safe base64 string without
     /// padding.
-    pub unsafe fn new_unchecked(bytes: &[u8]) -> &Self {
+    pub const unsafe fn new_unchecked(bytes: &[u8]) -> &Self {
         std::mem::transmute(bytes)
     }
 
+    /// Returns underlying bytes of the disclosure.
     pub fn as_bytes(&self) -> &[u8] {
         &self.0
     }
 
+    /// Returns this disclosure as a string.
     pub fn as_str(&self) -> &str {
         unsafe {
             // SAFETY: disclosures are url-safe base-64 strings.
             std::str::from_utf8_unchecked(&self.0)
         }
-    }
-
-    /// Decode this disclosure.
-    pub fn decode(&self) -> Result<DecodedDisclosure, DecodeError> {
-        DecodedDisclosure::new(self)
     }
 }
 
@@ -93,10 +123,12 @@ impl ToOwned for Disclosure {
     }
 }
 
+/// Owned disclosure.
 pub struct DisclosureBuf(Vec<u8>);
 
 impl DisclosureBuf {
-    pub fn encode_from_parts(salt: &str, kind: &DisclosureKind) -> Self {
+    /// Creates a disclosure from its defining parts.
+    pub fn encode_from_parts(salt: &str, kind: &DisclosureDescription) -> Self {
         Self(
             BASE64_URL_SAFE_NO_PAD
                 .encode(kind.to_value(salt).to_string())
@@ -104,6 +136,7 @@ impl DisclosureBuf {
         )
     }
 
+    /// Borrows the disclosure.
     pub fn as_disclosure(&self) -> &Disclosure {
         unsafe {
             // SAFETY: `self.0` is a disclosure by construction.
@@ -135,11 +168,16 @@ impl fmt::Debug for DisclosureBuf {
 pub struct DecodedDisclosure<'a> {
     /// Encoded disclosure.
     pub encoded: Cow<'a, Disclosure>,
+
+    /// Salt.
     pub salt: String,
-    pub kind: DisclosureKind,
+
+    /// Disclosure description.
+    pub desc: DisclosureDescription,
 }
 
 impl<'a> DecodedDisclosure<'a> {
+    /// Decodes the given encoded disclosure.
     pub fn new(encoded: &'a (impl ?Sized + AsRef<[u8]>)) -> Result<Self, DecodeError> {
         let base64 = encoded.as_ref();
         let bytes = BASE64_URL_SAFE_NO_PAD
@@ -161,8 +199,8 @@ impl<'a> DecodedDisclosure<'a> {
                         .as_str()
                         .ok_or(DecodeError::DisclosureMalformed)?
                         .to_owned(),
-                    kind: DisclosureKind::Property {
-                        name: name
+                    desc: DisclosureDescription::ObjectEntry {
+                        key: name
                             .as_str()
                             .ok_or(DecodeError::DisclosureMalformed)?
                             .to_owned(),
@@ -175,7 +213,7 @@ impl<'a> DecodedDisclosure<'a> {
                         .as_str()
                         .ok_or(DecodeError::DisclosureMalformed)?
                         .to_owned(),
-                    kind: DisclosureKind::ArrayItem(value.clone()),
+                    desc: DisclosureDescription::ArrayItem(value.clone()),
                 }),
                 _ => Err(DecodeError::DisclosureMalformed),
             },
@@ -183,29 +221,41 @@ impl<'a> DecodedDisclosure<'a> {
         }
     }
 
-    pub fn from_parts(salt: String, kind: DisclosureKind) -> Self {
+    /// Creates a decoded disclosure from its parts.
+    ///
+    /// The parts will be automatically encoded to populate the `encoded`
+    /// field.
+    pub fn from_parts(salt: String, kind: DisclosureDescription) -> Self {
         Self {
             encoded: Cow::Owned(DisclosureBuf::encode_from_parts(&salt, &kind)),
             salt,
-            kind,
+            desc: kind,
         }
     }
 }
 
+/// Disclosure description.
 #[derive(Debug, PartialEq)]
-pub enum DisclosureKind {
-    Property {
-        name: String,
+pub enum DisclosureDescription {
+    /// Object entry disclosure.
+    ObjectEntry {
+        /// Entry key.
+        key: String,
+
+        /// Entry value.
         value: serde_json::Value,
     },
+
+    /// Array item disclosure.
     ArrayItem(serde_json::Value),
 }
 
-impl DisclosureKind {
+impl DisclosureDescription {
+    /// Turns this disclosure description into a JSON value.
     pub fn to_value(&self, salt: &str) -> Value {
         match self {
-            Self::Property { name, value } => {
-                Value::Array(vec![salt.into(), name.to_owned().into(), value.clone()])
+            Self::ObjectEntry { key, value } => {
+                Value::Array(vec![salt.into(), key.to_owned().into(), value.clone()])
             }
             Self::ArrayItem(value) => Value::Array(vec![salt.into(), value.clone()]),
         }
@@ -215,8 +265,7 @@ impl DisclosureKind {
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    use crate::digest::{hash_encoded_disclosure, SdAlg};
+    use crate::SdAlg;
 
     fn verify_sd_disclosures_array(
         digest_algo: SdAlg,
@@ -226,7 +275,7 @@ mod tests {
         let mut verfied_claims = serde_json::Map::new();
 
         for disclosure in disclosures {
-            let disclosure_hash = hash_encoded_disclosure(digest_algo, disclosure);
+            let disclosure_hash = digest_algo.hash(Disclosure::new(disclosure).unwrap());
 
             if !disclosure_hash_exists_in_sd_claims(&disclosure_hash, sd_claim) {
                 continue;
@@ -234,15 +283,15 @@ mod tests {
 
             let decoded = DecodedDisclosure::new(disclosure)?;
 
-            match decoded.kind {
-                DisclosureKind::Property { name, value } => {
+            match decoded.desc {
+                DisclosureDescription::ObjectEntry { key: name, value } => {
                     let orig = verfied_claims.insert(name, value);
 
                     if orig.is_some() {
                         return Err(DecodeError::DisclosureUsedMultipleTimes);
                     }
                 }
-                DisclosureKind::ArrayItem(_) => {
+                DisclosureDescription::ArrayItem(_) => {
                     return Err(DecodeError::ArrayDisclosureWhenExpectingProperty);
                 }
             }
@@ -332,7 +381,7 @@ mod tests {
         assert_eq!(
             DecodedDisclosure::from_parts(
                 "nPuoQnkRFq3BIeAm7AnXFA".to_owned(),
-                DisclosureKind::ArrayItem(serde_json::json!("DE"))
+                DisclosureDescription::ArrayItem(serde_json::json!("DE"))
             ),
             DecodedDisclosure::new("WyJuUHVvUW5rUkZxM0JJZUFtN0FuWEZBIiwgIkRFIl0").unwrap()
         )

@@ -1,5 +1,5 @@
 use crate::{
-    DecodeError, DecodedJWS, DecodedJWSRef, DecodedSigningBytesRef, Header, InvalidHeader,
+    CompactJWSString, DecodeError, DecodedJWS, DecodedSigningBytes, Header, InvalidHeader,
     JWSSignature,
 };
 pub use base64::DecodeError as Base64DecodeError;
@@ -134,15 +134,15 @@ impl CompactJWS {
     }
 
     /// Decodes the entire JWS.
-    pub fn decode(&self) -> Result<DecodedJWSRef<Cow<[u8]>>, DecodeError> {
+    pub fn decode(&self) -> Result<DecodedJWS<Cow<[u8]>>, DecodeError> {
         let header = self.decode_header().map_err(DecodeError::Header)?;
         let payload = self.decode_payload(&header).map_err(DecodeError::Payload)?;
         let signature = self.decode_signature().map_err(DecodeError::Signature)?;
         let signing_bytes = self.signing_bytes();
 
-        Ok(DecodedJWSRef::new(
-            DecodedSigningBytesRef {
-                bytes: signing_bytes,
+        Ok(DecodedJWS::new(
+            DecodedSigningBytes {
+                bytes: Cow::Borrowed(signing_bytes),
                 header: header,
                 payload: payload,
             },
@@ -262,10 +262,18 @@ impl CompactJWSBuf {
         self.0
     }
 
+    pub fn into_bytes(self) -> Vec<u8> {
+        self.0
+    }
+
     /// Decodes the entire JWS while preserving the signing bytes so they can
     /// be verified.
-    pub fn into_decoded(self) -> Result<DecodedJWS<Vec<u8>>, DecodeError> {
-        Ok(self.decode()?.into_owned().map(Cow::into_owned))
+    pub fn into_decoded(self) -> Result<DecodedJWS<'static>, DecodeError> {
+        Ok(self.decode()?.into_owned())
+    }
+
+    pub fn into_jws_string(self) -> Result<CompactJWSString, Self> {
+        CompactJWSString::new(self.0).map_err(|InvalidCompactJWS(bytes)| Self(bytes))
     }
 }
 

@@ -1,5 +1,4 @@
 mod registered;
-use core::fmt;
 use std::borrow::Cow;
 
 use chrono::Utc;
@@ -13,6 +12,22 @@ pub use any::*;
 use serde::{de::DeserializeOwned, Serialize};
 use ssi_claims_core::{ClaimsValidity, DateTimeProvider, InvalidClaims};
 
+#[derive(Debug, thiserror::Error)]
+#[error("invalid claim value")]
+pub struct InvalidClaimValue(String);
+
+impl InvalidClaimValue {
+    pub fn new(e: impl ToString) -> Self {
+        Self(e.to_string())
+    }
+}
+
+impl From<serde_json::Error> for InvalidClaimValue {
+    fn from(value: serde_json::Error) -> Self {
+        Self::new(value)
+    }
+}
+
 /// JWT claim.
 pub trait Claim: 'static + Clone + Serialize + DeserializeOwned {
     /// Claim name, used as key in the JSON representation.
@@ -20,15 +35,21 @@ pub trait Claim: 'static + Clone + Serialize + DeserializeOwned {
 }
 
 pub trait ClaimSet {
-    type Error: fmt::Display;
+    fn contains<C: Claim>(&self) -> bool {
+        false
+    }
 
-    fn contains<C: Claim>(&self) -> bool;
+    fn try_get<C: Claim>(&self) -> Result<Option<Cow<C>>, InvalidClaimValue> {
+        Ok(None)
+    }
 
-    fn try_get<C: Claim>(&self) -> Result<Option<Cow<C>>, Self::Error>;
+    fn try_set<C: Claim>(&mut self, claim: C) -> Result<Result<(), C>, InvalidClaimValue> {
+        Ok(Err(claim))
+    }
 
-    fn try_set<C: Claim>(&mut self, claim: C) -> Result<Result<(), C>, Self::Error>;
-
-    fn try_remove<C: Claim>(&mut self) -> Result<Option<C>, Self::Error>;
+    fn try_remove<C: Claim>(&mut self) -> Result<Option<C>, InvalidClaimValue> {
+        Ok(None)
+    }
 
     fn validate_registered_claims<E>(&self, env: &E) -> ClaimsValidity
     where
@@ -66,14 +87,6 @@ pub trait ClaimSet {
 
 /// Set of JWT claims.
 pub trait InfallibleClaimSet: ClaimSet {
-    fn get<C: Claim>(&self) -> Option<Cow<C>>;
-
-    fn set<C: Claim>(&mut self, claim: C) -> Result<(), C>;
-
-    fn remove<C: Claim>(&mut self) -> Option<C>;
-}
-
-impl<T: ClaimSet<Error = std::convert::Infallible>> InfallibleClaimSet for T {
     fn get<C: Claim>(&self) -> Option<Cow<C>> {
         Self::try_get(self).unwrap()
     }

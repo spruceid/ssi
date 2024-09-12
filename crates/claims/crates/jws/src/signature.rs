@@ -2,7 +2,7 @@ use ssi_claims_core::SignatureError;
 use ssi_jwk::{Algorithm, JWK};
 use std::borrow::Cow;
 
-use crate::{CompactJWSString, Header};
+use crate::{CompactJWSString, DecodedJWS, DecodedSigningBytes, Header, JWSSignature};
 
 /// JWS payload type.
 ///
@@ -24,8 +24,26 @@ pub trait JWSPayload {
 
     /// Signs the payload and returns a compact JWS.
     #[allow(async_fn_in_trait)]
-    async fn sign(&self, signer: &impl JWSSigner) -> Result<CompactJWSString, SignatureError> {
+    async fn sign(&self, signer: impl JWSSigner) -> Result<CompactJWSString, SignatureError> {
         signer.sign(self).await
+    }
+}
+
+impl<'a, P: ?Sized + JWSPayload> JWSPayload for &'a P {
+    fn typ(&self) -> Option<&str> {
+        P::typ(*self)
+    }
+
+    fn cty(&self) -> Option<&str> {
+        P::cty(*self)
+    }
+
+    fn payload_bytes(&self) -> Cow<[u8]> {
+        P::payload_bytes(*self)
+    }
+
+    async fn sign(&self, signer: impl JWSSigner) -> Result<CompactJWSString, SignatureError> {
+        P::sign(*self, signer).await
     }
 }
 
@@ -53,6 +71,12 @@ impl JWSPayload for String {
     }
 }
 
+impl JWSPayload for serde_json::Value {
+    fn payload_bytes(&self) -> Cow<[u8]> {
+        Cow::Owned(serde_json::to_vec(self).unwrap())
+    }
+}
+
 pub struct JWSSignerInfo {
     pub key_id: Option<String>,
     pub algorithm: Algorithm,
@@ -70,10 +94,10 @@ pub trait JWSSigner {
     async fn sign_bytes(&self, signing_bytes: &[u8]) -> Result<Vec<u8>, SignatureError>;
 
     #[allow(async_fn_in_trait)]
-    async fn sign(
+    async fn sign_into_decoded<P: JWSPayload>(
         &self,
-        payload: &(impl ?Sized + JWSPayload),
-    ) -> Result<CompactJWSString, SignatureError> {
+        payload: P,
+    ) -> Result<DecodedJWS<'static, P>, SignatureError> {
         let info = self.fetch_info().await?;
         let payload_bytes = payload.payload_bytes();
 
@@ -86,12 +110,27 @@ pub trait JWSSigner {
         };
 
         let signing_bytes = header.encode_signing_bytes(&payload_bytes);
-        let signature = self.sign_bytes(&signing_bytes).await?;
+        let signature = JWSSignature::new(self.sign_bytes(&signing_bytes).await?);
 
-        Ok(
-            CompactJWSString::encode_from_signing_bytes_and_signature(signing_bytes, &signature)
-                .unwrap(),
-        )
+        Ok(DecodedJWS {
+            signing_bytes: DecodedSigningBytes {
+                bytes: Cow::Owned(signing_bytes),
+                header,
+                payload,
+            },
+            signature,
+        })
+    }
+
+    #[allow(async_fn_in_trait)]
+    async fn sign(&self, payload: impl JWSPayload) -> Result<CompactJWSString, SignatureError> {
+        Ok(self
+            .sign_into_decoded(payload)
+            .await?
+            .into_encoded()
+            .into_jws_string()
+            .ok()
+            .unwrap())
     }
 }
 
@@ -104,10 +143,7 @@ impl<'a, T: JWSSigner> JWSSigner for &'a T {
         T::sign_bytes(*self, signing_bytes).await
     }
 
-    async fn sign(
-        &self,
-        payload: &(impl ?Sized + JWSPayload),
-    ) -> Result<CompactJWSString, SignatureError> {
+    async fn sign(&self, payload: impl JWSPayload) -> Result<CompactJWSString, SignatureError> {
         T::sign(*self, payload).await
     }
 }
@@ -121,10 +157,7 @@ impl<'a, T: JWSSigner + Clone> JWSSigner for Cow<'a, T> {
         T::sign_bytes(self.as_ref(), signing_bytes).await
     }
 
-    async fn sign(
-        &self,
-        payload: &(impl ?Sized + JWSPayload),
-    ) -> Result<CompactJWSString, SignatureError> {
+    async fn sign(&self, payload: impl JWSPayload) -> Result<CompactJWSString, SignatureError> {
         T::sign(self.as_ref(), payload).await
     }
 }

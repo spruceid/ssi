@@ -1,10 +1,15 @@
+use std::sync::LazyLock;
+
 use serde::{Deserialize, Serialize};
 use serde_json::json;
+use ssi_claims_core::{ValidateClaims, VerificationParameters};
+use ssi_core::json_pointer;
 use ssi_jwk::{Algorithm, JWK};
+use ssi_jwt::{ClaimSet, JWTClaims};
 use ssi_sd_jwt::*;
 
-fn test_key() -> JWK {
-    serde_json::from_value(serde_json::json!({
+static JWK: LazyLock<JWK> = LazyLock::new(|| {
+    serde_json::json!({
         "kty": "EC",
         "d": "oYVImrMZjUclmWuhqa6bjzqGx5HFkbx76_00oWUHiLw",
         "use": "sig",
@@ -13,24 +18,49 @@ fn test_key() -> JWK {
         "x": "UX7TC8uQ9sn06c3DxXy1Ua5V9BK-cb9fQfukVrCLD8s",
         "y": "yNXRKOnwBMTx536uajfNHklxpG9bAbdLlmVn6-XuK0Q",
         "alg": "ES256"
-    }))
+    })
+    .try_into()
     .unwrap()
-}
+});
 
-#[test]
-fn full_pathway_regular_claim() {
+#[async_std::test]
+async fn full_pathway_regular_claim() {
     #[derive(Debug, Serialize, Deserialize, PartialEq)]
     struct BaseClaims {
-        sub: String,
-        disclosure0: Option<String>,
-        disclosure1: Option<String>,
+        property0: Option<String>,
+        property1: Option<String>,
     }
 
-    let base_claims = BaseClaims {
-        sub: "user".to_owned(),
-        disclosure0: None,
-        disclosure1: None,
-    };
+    impl ClaimSet for BaseClaims {}
+    impl<E, P> ValidateClaims<E, P> for BaseClaims {}
+
+    let base_claims = JWTClaims::builder()
+        .sub("user")
+        .with_private_claims(BaseClaims {
+            property0: Some("value0".to_owned()),
+            property1: Some("value1".to_owned()),
+        })
+        .unwrap();
+
+    let sd_jwt = base_claims
+        .conceal_and_sign(
+            SdAlg::Sha256,
+            &[json_pointer!("/property0"), json_pointer!("/property1")],
+            &*JWK,
+        )
+        .await
+        .unwrap();
+
+    let params = VerificationParameters::from_resolver(&*JWK);
+
+    let (revealed, verification) = sd_jwt
+        .decode_reveal_verify::<BaseClaims, _>(params)
+        .await
+        .unwrap();
+
+    assert_eq!(verification, Ok(()));
+
+    // revealed.disclosures
 
     let (jwt, disclosures) = encode_sign(
         Algorithm::ES256,
@@ -56,8 +86,8 @@ fn full_pathway_regular_claim() {
     assert_eq!(
         BaseClaims {
             sub: "user".to_owned(),
-            disclosure0: Some("value0".to_owned()),
-            disclosure1: Some("value1".to_owned()),
+            property0: Some("value0".to_owned()),
+            property1: Some("value1".to_owned()),
         },
         full_jwt_claims,
     );
@@ -74,8 +104,8 @@ fn full_pathway_regular_claim() {
     assert_eq!(
         BaseClaims {
             sub: "user".to_owned(),
-            disclosure0: None,
-            disclosure1: Some("value1".to_owned())
+            property0: None,
+            property1: Some("value1".to_owned())
         },
         one_sd_claim,
     );

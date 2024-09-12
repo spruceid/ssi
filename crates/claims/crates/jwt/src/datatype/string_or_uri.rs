@@ -47,6 +47,7 @@ impl TryFrom<String> for StringOrURI {
         }
     }
 }
+
 impl TryFrom<&str> for StringOrURI {
     type Error = iref::InvalidUri<String>;
 

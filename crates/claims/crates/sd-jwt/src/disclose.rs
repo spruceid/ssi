@@ -1,12 +1,12 @@
 use crate::{
-    disclosure::{DecodedDisclosure, DisclosureKind},
+    disclosure::{DecodedDisclosure, DisclosureDescription},
     utils::TryRetainMut,
-    DecodedSdJwtRef, DisclosedSdJwt, SdAlg, SdJwtPayload, ARRAY_CLAIM_ITEM_PROPERTY_NAME,
+    DecodedSdJwt, RevealedSdJwt, SdAlg, SdJwtPayload, ARRAY_CLAIM_ITEM_PROPERTY_NAME,
     SD_CLAIM_NAME,
 };
 use serde::de::DeserializeOwned;
 use serde_json::Value;
-use ssi_jwt::JWTClaims;
+use ssi_jwt::{DecodedJWT, JWTClaims};
 use std::collections::BTreeMap;
 
 /// Disclosing error.
@@ -39,14 +39,22 @@ pub enum DiscloseError {
     Json(#[from] serde_json::Error),
 }
 
-impl<'a> DecodedSdJwtRef<'a> {
+impl<'a> DecodedSdJwt<'a> {
     /// Discloses the decoded SD-JWT.
-    pub fn disclose<T: DeserializeOwned>(self) -> Result<DisclosedSdJwt<'a, T>, DiscloseError> {
-        let disclosed_claims = self.jwt.signing_bytes.payload.disclose(&self.disclosures)?;
-        Ok(DisclosedSdJwt {
-            undisclosed_jwt: self.jwt,
-            claims: disclosed_claims,
+    pub fn disclose<T: DeserializeOwned>(self) -> Result<RevealedSdJwt<'a, T>, DiscloseError> {
+        let jwt = self
+            .jwt
+            .try_map(|payload| payload.disclose(&self.disclosures))?;
+
+        Ok(RevealedSdJwt {
+            jwt,
+            disclosures: self.disclosures,
         })
+    }
+
+    /// Discloses the decoded SD-JWT.
+    pub fn disclose_any(self) -> Result<RevealedSdJwt<'a>, DiscloseError> {
+        self.disclose()
     }
 }
 
@@ -129,12 +137,12 @@ fn disclose_value(
 
                     in_progress_disclosure.found = true;
 
-                    match &in_progress_disclosure.disclosure.kind {
-                        DisclosureKind::ArrayItem(value) => {
+                    match &in_progress_disclosure.disclosure.desc {
+                        DisclosureDescription::ArrayItem(value) => {
                             *item = value.clone();
                             Ok(true)
                         }
-                        DisclosureKind::Property { .. } => {
+                        DisclosureDescription::ObjectEntry { .. } => {
                             Err(DiscloseError::ExpectedArrayItemDisclosure)
                         }
                     }
@@ -172,11 +180,11 @@ fn disclose_sd_claim(
 
             in_progress_disclosure.found = true;
 
-            match &in_progress_disclosure.disclosure.kind {
-                DisclosureKind::ArrayItem(_) => {
+            match &in_progress_disclosure.disclosure.desc {
+                DisclosureDescription::ArrayItem(_) => {
                     return Err(DiscloseError::ExpectedPropertyDisclosure)
                 }
-                DisclosureKind::Property { name, value } => {
+                DisclosureDescription::ObjectEntry { key: name, value } => {
                     found_disclosures.push((name.clone(), value.clone()))
                 }
             }
@@ -194,4 +202,64 @@ fn as_undisclosed_array_item(item: &serde_json::Value) -> Option<&str> {
     }
 
     obj.get(ARRAY_CLAIM_ITEM_PROPERTY_NAME)?.as_str()
+}
+
+#[cfg(test)]
+mod tests {
+    use serde_json::json;
+    use std::cell::LazyCell;
+
+    use crate::SdJwt;
+
+    const SD_JWT: &str = concat!(
+        "eyJhbGciOiAiRVMyNTYifQ.eyJfc2QiOiBbIkM5aW5wNllvUmFFWFI0Mjd6WUpQN1Fya",
+        "zFXSF84YmR3T0FfWVVyVW5HUVUiLCAiS3VldDF5QWEwSElRdlluT1ZkNTloY1ZpTzlVZ",
+        "zZKMmtTZnFZUkJlb3d2RSIsICJNTWxkT0ZGekIyZDB1bWxtcFRJYUdlcmhXZFVfUHBZZ",
+        "kx2S2hoX2ZfOWFZIiwgIlg2WkFZT0lJMnZQTjQwVjd4RXhad1Z3ejd5Um1MTmNWd3Q1R",
+        "Ew4Ukx2NGciLCAiWTM0em1JbzBRTExPdGRNcFhHd2pCZ0x2cjE3eUVoaFlUMEZHb2ZSL",
+        "WFJRSIsICJmeUdwMFdUd3dQdjJKRFFsbjFsU2lhZW9iWnNNV0ExMGJRNTk4OS05RFRzI",
+        "iwgIm9tbUZBaWNWVDhMR0hDQjB1eXd4N2ZZdW8zTUhZS08xNWN6LVJaRVlNNVEiLCAic",
+        "zBCS1lzTFd4UVFlVTh0VmxsdE03TUtzSVJUckVJYTFQa0ptcXhCQmY1VSJdLCAiaXNzI",
+        "jogImh0dHBzOi8vZXhhbXBsZS5jb20vaXNzdWVyIiwgImlhdCI6IDE2ODMwMDAwMDAsI",
+        "CJleHAiOiAxODgzMDAwMDAwLCAiYWRkcmVzcyI6IHsiX3NkIjogWyI2YVVoelloWjdTS",
+        "jFrVm1hZ1FBTzN1MkVUTjJDQzFhSGhlWnBLbmFGMF9FIiwgIkF6TGxGb2JrSjJ4aWF1c",
+        "FJFUHlvSnotOS1OU2xkQjZDZ2pyN2ZVeW9IemciLCAiUHp6Y1Z1MHFiTXVCR1NqdWxmZ",
+        "Xd6a2VzRDl6dXRPRXhuNUVXTndrclEtayIsICJiMkRrdzBqY0lGOXJHZzhfUEY4WmN2b",
+        "mNXN3p3Wmo1cnlCV3ZYZnJwemVrIiwgImNQWUpISVo4VnUtZjlDQ3lWdWIyVWZnRWs4a",
+        "nZ2WGV6d0sxcF9KbmVlWFEiLCAiZ2xUM2hyU1U3ZlNXZ3dGNVVEWm1Xd0JUdzMyZ25Vb",
+        "GRJaGk4aEdWQ2FWNCIsICJydkpkNmlxNlQ1ZWptc0JNb0d3dU5YaDlxQUFGQVRBY2k0M",
+        "G9pZEVlVnNBIiwgInVOSG9XWWhYc1poVkpDTkUyRHF5LXpxdDd0NjlnSkt5NVFhRnY3R",
+        "3JNWDQiXX0sICJfc2RfYWxnIjogInNoYS0yNTYifQ.rFsowW-KSZe7EITlWsGajR9nnG",
+        "BLlQ78qgtdGIZg3FZuZnxtapP0H8CUMnffJAwPQJmGnpFpulTkLWHiI1kMmw~WyJHMDJ",
+        "OU3JRZmpGWFE3SW8wOXN5YWpBIiwgInJlZ2lvbiIsICJcdTZlMmZcdTUzM2EiXQ~WyJs",
+        "a2x4RjVqTVlsR1RQVW92TU5JdkNBIiwgImNvdW50cnkiLCAiSlAiXQ~"
+    );
+
+    const DISCLOSED_CLAIMS: LazyCell<serde_json::Value> = LazyCell::new(|| {
+        json!({
+            "iss": "https://example.com/issuer",
+            "iat": 1683000000,
+            "exp": 1883000000,
+            "sub": "6c5c0a49-b589-431d-bae7-219122a9ec2c",
+            "given_name": "太郎",
+            "family_name": "山田",
+            "email": "\"unusual email address\"@example.jp",
+            "phone_number": "+81-80-1234-5678",
+            "address": {
+                "street_address": "東京都港区芝公園４丁目２−８",
+                "locality": "東京都",
+                "region": "港区",
+                "country": "JP"
+            },
+            "birthdate": "1940-01-01"
+        })
+    });
+
+    #[test]
+    fn disclose() {
+        let sd_jwt = SdJwt::new(SD_JWT).unwrap();
+        let disclosed = sd_jwt.decode().unwrap().disclose_any().unwrap();
+        let output = serde_json::to_value(disclosed.claims()).unwrap();
+        assert_eq!(output, *DISCLOSED_CLAIMS)
+    }
 }

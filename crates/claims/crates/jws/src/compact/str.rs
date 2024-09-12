@@ -1,7 +1,6 @@
-use core::fmt;
-use std::{borrow::Cow, ops::Deref, str::FromStr};
-
 use base64::Engine;
+use core::fmt;
+use std::{ops::Deref, str::FromStr};
 
 use crate::{CompactJWS, DecodeError, DecodedJWS, Header, InvalidCompactJWS};
 
@@ -221,8 +220,8 @@ impl CompactJWSString {
 
     /// Decodes the entire JWS while preserving the signing bytes so they can
     /// be verified.
-    pub fn into_decoded(self) -> Result<DecodedJWS<Vec<u8>>, DecodeError> {
-        Ok(self.decode()?.into_owned().map(Cow::into_owned))
+    pub fn into_decoded(self) -> Result<DecodedJWS<'static>, DecodeError> {
+        Ok(self.decode()?.into_owned())
     }
 }
 

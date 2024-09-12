@@ -228,8 +228,5 @@ impl<'de> Deserialize<'de> for HmacShaAnyKey {
 
 pub mod canonicalize;
 pub mod group;
-pub mod json_pointer;
 pub mod select;
 pub mod skolemize;
-
-pub use json_pointer::{JsonPointer, JsonPointerBuf};

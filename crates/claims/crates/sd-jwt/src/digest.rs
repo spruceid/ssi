@@ -85,17 +85,6 @@ impl<'de> Deserialize<'de> for SdAlg {
     }
 }
 
-/// Lower level API to generate the hash of a given disclosure string already converted
-/// into base 64
-pub fn hash_encoded_disclosure(digest_algo: SdAlg, disclosure: &str) -> String {
-    match digest_algo {
-        SdAlg::Sha256 => {
-            let digest = sha2::Sha256::digest(disclosure.as_bytes());
-            BASE64_URL_SAFE_NO_PAD.encode(digest)
-        }
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -103,9 +92,8 @@ mod tests {
     #[test]
     fn test_disclosure_hashing() {
         assert_eq!(
-            hash_encoded_disclosure(
-                SdAlg::Sha256,
-                "WyI2cU1RdlJMNWhhaiIsICJmYW1pbHlfbmFtZSIsICJNw7ZiaXVzIl0"
+            SdAlg::Sha256.hash(
+                Disclosure::new("WyI2cU1RdlJMNWhhaiIsICJmYW1pbHlfbmFtZSIsICJNw7ZiaXVzIl0").unwrap()
             ),
             "uutlBuYeMDyjLLTpf6Jxi7yNkEF35jdyWMn9U7b_RYY",
         );

@@ -1,7 +1,4 @@
-use crate::{
-    verify_bytes, DecodedJWS, DecodedJWSRef, DecodedSigningBytes, DecodedSigningBytesRef, Error,
-    Header,
-};
+use crate::{verify_bytes, DecodedJWS, DecodedSigningBytes, Error, Header};
 use ssi_claims_core::{
     ClaimsValidity, InvalidProof, ProofValidationError, ProofValidity, ResolverProvider,
     ValidateClaims, ValidateProof, VerifiableClaims,
@@ -13,14 +10,12 @@ use std::{
 };
 
 pub trait ValidateJWSHeader<E> {
-    fn validate_jws_header(&self, env: &E, header: &Header) -> ClaimsValidity;
-}
-
-impl<E> ValidateJWSHeader<E> for [u8] {
     fn validate_jws_header(&self, _env: &E, _header: &Header) -> ClaimsValidity {
         Ok(())
     }
 }
+
+impl<E> ValidateJWSHeader<E> for [u8] {}
 
 impl<'a, E, T: ?Sized + ToOwned + ValidateJWSHeader<E>> ValidateJWSHeader<E> for Cow<'a, T> {
     fn validate_jws_header(&self, env: &E, header: &Header) -> ClaimsValidity {
@@ -29,16 +24,7 @@ impl<'a, E, T: ?Sized + ToOwned + ValidateJWSHeader<E>> ValidateJWSHeader<E> for
 }
 
 impl<'a, E, T: ValidateClaims<E, JWSSignature> + ValidateJWSHeader<E>>
-    ValidateClaims<E, JWSSignature> for DecodedSigningBytesRef<'a, T>
-{
-    fn validate_claims(&self, env: &E, signature: &JWSSignature) -> ClaimsValidity {
-        self.payload.validate_jws_header(env, &self.header)?;
-        self.payload.validate_claims(env, signature)
-    }
-}
-
-impl<E, T: ValidateClaims<E, JWSSignature> + ValidateJWSHeader<E>> ValidateClaims<E, JWSSignature>
-    for DecodedSigningBytes<T>
+    ValidateClaims<E, JWSSignature> for DecodedSigningBytes<'a, T>
 {
     fn validate_claims(&self, env: &E, signature: &JWSSignature) -> ClaimsValidity {
         self.payload.validate_jws_header(env, &self.header)?;
@@ -95,8 +81,8 @@ impl Borrow<[u8]> for JWSSignature {
     }
 }
 
-impl<'a, T> VerifiableClaims for DecodedJWSRef<'a, T> {
-    type Claims = DecodedSigningBytesRef<'a, T>;
+impl<'a, T> VerifiableClaims for DecodedJWS<'a, T> {
+    type Claims = DecodedSigningBytes<'a, T>;
     type Proof = JWSSignature;
 
     fn claims(&self) -> &Self::Claims {
@@ -108,20 +94,7 @@ impl<'a, T> VerifiableClaims for DecodedJWSRef<'a, T> {
     }
 }
 
-impl<T> VerifiableClaims for DecodedJWS<T> {
-    type Claims = DecodedSigningBytes<T>;
-    type Proof = JWSSignature;
-
-    fn claims(&self) -> &Self::Claims {
-        &self.signing_bytes
-    }
-
-    fn proof(&self) -> &Self::Proof {
-        &self.signature
-    }
-}
-
-impl<V, T> ValidateProof<V, DecodedSigningBytes<T>> for JWSSignature
+impl<'b, V, T> ValidateProof<V, DecodedSigningBytes<'b, T>> for JWSSignature
 where
     V: ResolverProvider,
     V::Resolver: JWKResolver,
@@ -129,29 +102,7 @@ where
     async fn validate_proof<'a>(
         &'a self,
         verifier: &'a V,
-        claims: &'a DecodedSigningBytes<T>,
-    ) -> Result<ProofValidity, ProofValidationError> {
-        let key = verifier
-            .resolver()
-            .fetch_public_jwk(claims.header.key_id.as_deref())
-            .await?;
-        match verify_bytes(claims.header.algorithm, &claims.bytes, &key, &self.0) {
-            Ok(()) => Ok(Ok(())),
-            Err(Error::InvalidSignature) => Ok(Err(InvalidProof::Signature)),
-            Err(_) => Err(ProofValidationError::InvalidSignature),
-        }
-    }
-}
-
-impl<'j, V, T> ValidateProof<V, DecodedSigningBytesRef<'j, T>> for JWSSignature
-where
-    V: ResolverProvider,
-    V::Resolver: JWKResolver,
-{
-    async fn validate_proof<'a>(
-        &'a self,
-        verifier: &'a V,
-        claims: &'a DecodedSigningBytesRef<'j, T>,
+        claims: &'a DecodedSigningBytes<'b, T>,
     ) -> Result<ProofValidity, ProofValidationError> {
         let key = verifier
             .resolver()

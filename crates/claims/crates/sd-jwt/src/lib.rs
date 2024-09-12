@@ -2,30 +2,47 @@
 //!
 //! [SD-JWT]: <https://datatracker.ietf.org/doc/draft-ietf-oauth-selective-disclosure-jwt/>
 #![warn(missing_docs)]
-use serde::{Deserialize, Serialize};
+use rand::{CryptoRng, RngCore};
+use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use serde_json::Value;
-use ssi_jws::{CompactJWSStr, DecodedJWSRef};
-use ssi_jwt::JWTClaims;
+use ssi_claims_core::{
+    DateTimeProvider, ProofValidationError, ResolverProvider, SignatureError, ValidateClaims,
+    Verification,
+};
+use ssi_core::{BytesBuf, JsonPointer};
+use ssi_jwk::JWKResolver;
+use ssi_jws::{CompactJWSStr, DecodedJWS, JWSPayload, JWSSignature, JWSSigner, ValidateJWSHeader};
+use ssi_jwt::{AnyClaims, ClaimSet, DecodedJWT, JWTClaims};
 use std::{
-    collections::BTreeMap,
+    borrow::{Borrow, Cow},
     fmt::{self, Write},
+    ops::Deref,
 };
 
-pub(crate) mod digest;
-mod disclose;
-pub(crate) mod disclosure;
-pub(crate) mod encode;
-mod error;
 pub(crate) mod utils;
-mod verify;
-
-pub use digest::{hash_encoded_disclosure, SdAlg};
-use disclosure::{DecodedDisclosure, Disclosure};
-pub use encode::{
-    encode_array_disclosure, encode_property_disclosure, encode_sign, UnencodedDisclosure,
-};
-pub use error::{DecodeError, EncodeError};
 use utils::is_url_safe_base64_char;
+
+// mod error;
+// pub use error::*;
+
+mod digest;
+pub use digest::*;
+
+// pub(crate) mod encode;
+// pub use encode::{
+//     encode_array_disclosure, encode_property_disclosure, encode_sign, UnencodedDisclosure,
+// };
+
+mod decode;
+pub use decode::*;
+
+mod disclosure;
+pub use disclosure::*;
+
+mod conceal;
+pub use conceal::*;
+// mod sign;
+mod disclose;
 
 const SD_CLAIM_NAME: &str = "_sd";
 const SD_ALG_CLAIM_NAME: &str = "_sd_alg";
@@ -96,6 +113,19 @@ impl SdJwt {
         std::mem::transmute(input)
     }
 
+    /// Returns the underlying bytes of the SD-JWT.
+    pub fn as_bytes(&self) -> &[u8] {
+        &self.0
+    }
+
+    /// Returns this SD-JWT as a string.
+    pub fn as_str(&self) -> &str {
+        unsafe {
+            // SAFETY: SD-JWT are valid UTF-8 strings by definition.
+            std::str::from_utf8_unchecked(&self.0)
+        }
+    }
+
     /// Returns the byte-position just after the issuer-signed JWT.
     fn jwt_end(&self) -> usize {
         self.0.iter().copied().position(|c| c == b'~').unwrap()
@@ -127,8 +157,151 @@ impl SdJwt {
     }
 
     /// Decode a compact SD-JWT.
-    pub fn decode(&self) -> Result<DecodedSdJwtRef, DecodeError> {
+    pub fn decode(&self) -> Result<DecodedSdJwt, DecodeError> {
         self.parts().decode()
+    }
+
+    /// Decode a compact SD-JWT.
+    pub async fn decode_verify_concealed<P>(
+        &self,
+        params: P,
+    ) -> Result<(DecodedSdJwt, Verification), ProofValidationError>
+    where
+        P: ResolverProvider<Resolver: JWKResolver>,
+    {
+        let decoded = self.decode().map_err(ProofValidationError::input_data)?;
+        let verification = decoded.verify_concealed(params).await?;
+        Ok((decoded, verification))
+    }
+
+    /// Decodes, reveals and verify a compact SD-JWT.
+    ///
+    /// Only the registered JWT claims will be validated.
+    /// If you need to validate custom claims, use the [`Self::reveal_verify`]
+    /// method with `T` defining the custom claims.
+    ///
+    /// Returns the decoded JWT with the verification status.
+    pub async fn decode_reveal_verify_any<P>(
+        &self,
+        params: P,
+    ) -> Result<(RevealedSdJwt, Verification), ProofValidationError>
+    where
+        P: ResolverProvider<Resolver: JWKResolver> + DateTimeProvider,
+    {
+        let decoded = self.decode().map_err(ProofValidationError::input_data)?;
+        decoded.reveal_verify_any(params).await
+    }
+
+    /// Decodes, reveals and verify a compact SD-JWT.
+    ///
+    /// Returns the decoded JWT with the verification status.
+    pub async fn decode_reveal_verify<T, P>(
+        &self,
+        params: P,
+    ) -> Result<(RevealedSdJwt<T>, Verification), ProofValidationError>
+    where
+        T: ClaimSet + DeserializeOwned + ValidateClaims<P, JWSSignature>,
+        P: ResolverProvider<Resolver: JWKResolver> + DateTimeProvider,
+    {
+        let decoded = self.decode().map_err(ProofValidationError::input_data)?;
+        decoded.reveal_verify(params).await
+    }
+}
+
+impl AsRef<str> for SdJwt {
+    fn as_ref(&self) -> &str {
+        self.as_str()
+    }
+}
+
+impl AsRef<[u8]> for SdJwt {
+    fn as_ref(&self) -> &[u8] {
+        self.as_bytes()
+    }
+}
+
+/// Owned SD-JWT.
+pub struct SdJwtBuf(Vec<u8>);
+
+impl SdJwtBuf {
+    /// Creates a new owned SD-JWT.
+    pub fn new<B: BytesBuf>(bytes: B) -> Result<Self, InvalidDisclosure<B>> {
+        if SdJwt::validate(bytes.as_ref()) {
+            Ok(Self(bytes.into()))
+        } else {
+            Err(InvalidDisclosure(bytes))
+        }
+    }
+
+    /// Creates a new owned SD-JWT without validating the input bytes.
+    ///
+    /// # Safety
+    ///
+    /// The input `bytes` **must** represent an SD-JWT.
+    pub unsafe fn new_unchecked(bytes: Vec<u8>) -> Self {
+        Self(bytes)
+    }
+
+    /// Conceals and sign the given claims.
+    pub async fn conceal_and_sign(
+        claims: &JWTClaims<impl Serialize>,
+        sd_alg: SdAlg,
+        pointers: &[impl Borrow<JsonPointer>],
+        signer: impl JWSSigner,
+    ) -> Result<Self, SignatureError> {
+        DecodedSdJwt::conceal_and_sign(claims, sd_alg, pointers, signer)
+            .await
+            .map(DecodedSdJwt::into_encoded)
+    }
+
+    /// Conceals and sign the given claims.
+    pub async fn conceal_and_sign_with(
+        claims: &JWTClaims<impl Serialize>,
+        sd_alg: SdAlg,
+        pointers: &[impl Borrow<JsonPointer>],
+        signer: impl JWSSigner,
+        rng: impl CryptoRng + RngCore,
+    ) -> Result<Self, SignatureError> {
+        DecodedSdJwt::conceal_and_sign_with(claims, sd_alg, pointers, signer, rng)
+            .await
+            .map(DecodedSdJwt::into_encoded)
+    }
+
+    /// Borrows the SD-JWT.
+    pub fn as_sd_jwt(&self) -> &SdJwt {
+        unsafe { SdJwt::new_unchecked(&self.0) }
+    }
+}
+
+impl Deref for SdJwtBuf {
+    type Target = SdJwt;
+
+    fn deref(&self) -> &Self::Target {
+        self.as_sd_jwt()
+    }
+}
+
+impl Borrow<SdJwt> for SdJwtBuf {
+    fn borrow(&self) -> &SdJwt {
+        self.as_sd_jwt()
+    }
+}
+
+impl AsRef<SdJwt> for SdJwtBuf {
+    fn as_ref(&self) -> &SdJwt {
+        self.as_sd_jwt()
+    }
+}
+
+impl AsRef<str> for SdJwtBuf {
+    fn as_ref(&self) -> &str {
+        self.as_str()
+    }
+}
+
+impl AsRef<[u8]> for SdJwtBuf {
+    fn as_ref(&self) -> &[u8] {
+        self.as_bytes()
     }
 }
 
@@ -182,26 +355,6 @@ impl<'a> PartsRef<'a> {
     pub fn new(jwt: &'a CompactJWSStr, disclosures: Vec<&'a Disclosure>) -> Self {
         Self { jwt, disclosures }
     }
-
-    /// Decode the JWT-SD parts.
-    pub fn decode(self) -> Result<DecodedSdJwtRef<'a>, DecodeError> {
-        Ok(DecodedSdJwtRef {
-            jwt: self
-                .jwt
-                .decode()?
-                .try_map(|bytes| serde_json::from_slice(&bytes))?,
-            disclosures: self
-                .disclosures
-                .into_iter()
-                .map(Disclosure::decode)
-                .collect::<Result<_, _>>()?,
-        })
-    }
-
-    // /// Convert Deserialized into a compact serialized format
-    // pub fn compact_serialize(&self) -> String {
-    //     serialize_string_format(self.jwt, &self.disclosures)
-    // }
 }
 
 impl<'a> fmt::Display for PartsRef<'a> {
@@ -227,34 +380,153 @@ pub struct SdJwtPayload {
 
     /// Other claims.
     #[serde(flatten)]
-    pub claims: BTreeMap<String, Value>,
+    pub claims: serde_json::Map<String, Value>,
 }
 
+impl JWSPayload for SdJwtPayload {
+    fn payload_bytes(&self) -> Cow<[u8]> {
+        Cow::Owned(serde_json::to_vec(self).unwrap())
+    }
+}
+
+impl<E> ValidateJWSHeader<E> for SdJwtPayload {}
+
+impl<E, P> ValidateClaims<E, P> for SdJwtPayload {}
+
 /// Decoded SD-JWT.
-pub struct DecodedSdJwtRef<'a> {
+pub struct DecodedSdJwt<'a> {
     /// JWT who's claims can be selectively disclosed.
-    pub jwt: DecodedJWSRef<'a, SdJwtPayload>,
+    pub jwt: DecodedJWS<'a, SdJwtPayload>,
 
     /// Disclosures for associated JWT.
     pub disclosures: Vec<DecodedDisclosure<'a>>,
 }
 
-// /// Decoded SD-JWT.
-// pub struct DecodedSdJwt {
-//     /// JWT who's claims can be selectively disclosed.
-//     pub jwt: DecodedJWT<SdJwtPayload>,
+impl<'a> DecodedSdJwt<'a> {
+    /// Verifies the decoded SD-JWT without revealing the concealed claims.
+    ///
+    /// No revealing the claims means only the registered JWT claims will be
+    /// validated.
+    pub async fn verify_concealed<P>(&self, params: P) -> Result<Verification, ProofValidationError>
+    where
+        P: ResolverProvider<Resolver: JWKResolver>,
+    {
+        self.jwt.verify(params).await
+    }
 
-//     /// Disclosures for associated JWT.
-//     pub disclosures: Vec<String>
-// }
+    /// Verifies the decoded SD-JWT after revealing the claims.
+    ///
+    /// Only the registered JWT claims will be validated.
+    /// If you need to validate custom claims, use the [`Self::reveal_verify`]
+    /// method with `T` defining the custom claims.
+    ///
+    /// Returns the decoded JWT with the verification status.
+    pub async fn reveal_verify_any<P>(
+        self,
+        params: P,
+    ) -> Result<(RevealedSdJwt<'a>, Verification), ProofValidationError>
+    where
+        P: ResolverProvider<Resolver: JWKResolver> + DateTimeProvider,
+    {
+        let revealed = self
+            .disclose_any()
+            .map_err(ProofValidationError::input_data)?;
+        let verification = revealed.verify(params).await?;
+        Ok((revealed, verification))
+    }
 
-/// Disclosed SD-JWT, ready to be verified.
-pub struct DisclosedSdJwt<'a, T> {
-    /// Undisclosed decoded JWT.
-    pub undisclosed_jwt: DecodedJWSRef<'a, SdJwtPayload>,
+    /// Verifies the decoded SD-JWT after revealing the claims.
+    ///
+    /// The `T` type parameter is the type of private claims.
+    pub async fn reveal_verify<T, P>(
+        self,
+        params: P,
+    ) -> Result<(RevealedSdJwt<'a, T>, Verification), ProofValidationError>
+    where
+        T: ClaimSet + DeserializeOwned + ValidateClaims<P, JWSSignature>,
+        P: ResolverProvider<Resolver: JWKResolver> + DateTimeProvider,
+    {
+        let revealed = self
+            .disclose::<T>()
+            .map_err(ProofValidationError::input_data)?;
+        let verification = revealed.verify(params).await?;
+        Ok((revealed, verification))
+    }
+}
 
-    /// Disclosed JWT claims.
-    pub claims: JWTClaims<T>,
+impl DecodedSdJwt<'static> {
+    /// Conceal and sign the given claims.
+    pub async fn conceal_and_sign(
+        claims: &JWTClaims<impl Serialize>,
+        sd_alg: SdAlg,
+        pointers: &[impl Borrow<JsonPointer>],
+        signer: impl JWSSigner,
+    ) -> Result<Self, SignatureError> {
+        let (payload, disclosures) =
+            SdJwtPayload::conceal(claims, sd_alg, pointers).map_err(SignatureError::other)?;
+
+        Ok(Self {
+            jwt: signer.sign_into_decoded(payload).await?,
+            disclosures,
+        })
+    }
+
+    /// Conceal and sign the given claims with a custom rng.
+    pub async fn conceal_and_sign_with(
+        claims: &JWTClaims<impl Serialize>,
+        sd_alg: SdAlg,
+        pointers: &[impl Borrow<JsonPointer>],
+        signer: impl JWSSigner,
+        rng: impl CryptoRng + RngCore,
+    ) -> Result<Self, SignatureError> {
+        let (payload, disclosures) = SdJwtPayload::conceal_with(claims, sd_alg, pointers, rng)
+            .map_err(SignatureError::other)?;
+
+        Ok(Self {
+            jwt: signer.sign_into_decoded(payload).await?,
+            disclosures,
+        })
+    }
+
+    /// Encodes the SD-JWT.
+    pub fn into_encoded(self) -> SdJwtBuf {
+        let mut bytes = self.jwt.into_encoded().into_bytes();
+        bytes.push(b'~');
+
+        for d in self.disclosures {
+            bytes.extend_from_slice(d.encoded.as_bytes());
+            bytes.push(b'~');
+        }
+
+        unsafe {
+            // SAFETY: we just constructed those bytes following the SD-JWT
+            // syntax.
+            SdJwtBuf::new_unchecked(bytes)
+        }
+    }
+}
+
+pub struct RevealedSdJwt<'a, T = AnyClaims> {
+    pub jwt: DecodedJWT<'a, T>,
+    pub disclosures: Vec<DecodedDisclosure<'a>>,
+}
+
+impl<'a, T> RevealedSdJwt<'a, T> {
+    pub fn claims(&self) -> &JWTClaims<T> {
+        &self.jwt.signing_bytes.payload
+    }
+
+    pub fn into_claims(self) -> JWTClaims<T> {
+        self.jwt.signing_bytes.payload
+    }
+
+    pub async fn verify<P>(&self, params: P) -> Result<Verification, ProofValidationError>
+    where
+        T: ClaimSet + ValidateClaims<P, JWSSignature>,
+        P: ResolverProvider<Resolver: JWKResolver> + DateTimeProvider,
+    {
+        self.jwt.verify(params).await
+    }
 }
 
 #[cfg(test)]

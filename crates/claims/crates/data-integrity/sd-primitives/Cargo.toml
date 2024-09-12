@@ -9,6 +9,7 @@ repository = "https://github.com/spruceid/ssi/"
 documentation = "https://docs.rs/ssi-di-sd-primitives/"
 
 [dependencies]
+ssi-core.workspace = true
 ssi-rdf.workspace = true
 ssi-json-ld.workspace = true
 linked-data.workspace = true

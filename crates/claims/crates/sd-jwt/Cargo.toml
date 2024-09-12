@@ -14,6 +14,7 @@ rand.workspace = true
 serde = { workspace = true, features = ["derive"] }
 serde_json.workspace = true
 sha2.workspace = true
+ssi-core.workspace = true
 ssi-claims-core.workspace = true
 ssi-jwk.workspace = true
 ssi-jws.workspace = true
@@ -23,3 +24,4 @@ thiserror.workspace = true
 [dev-dependencies]
 hex-literal = "0.4.1"
 ssi-jws = { workspace = true, features = ["secp256r1"] }
+async-std.workspace = true

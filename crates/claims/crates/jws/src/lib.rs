@@ -144,105 +144,24 @@ impl<'a, T: ?Sized + ToOwned> JWS<Cow<'a, T>> {
 ///
 /// JWS with its signing bytes.
 #[derive(Clone, PartialEq, Eq)]
-pub struct DecodedJWSRef<'a, T = &'a [u8]> {
-    pub signing_bytes: DecodedSigningBytesRef<'a, T>,
+pub struct DecodedJWS<'a, T = Vec<u8>> {
+    pub signing_bytes: DecodedSigningBytes<'a, T>,
     pub signature: JWSSignature,
 }
 
-impl<'a, T> DecodedJWSRef<'a, T> {
-    pub fn new(signing_bytes: DecodedSigningBytesRef<'a, T>, signature: JWSSignature) -> Self {
+impl<'a, T> DecodedJWS<'a, T> {
+    pub fn new(signing_bytes: DecodedSigningBytes<'a, T>, signature: JWSSignature) -> Self {
         Self {
             signing_bytes,
             signature,
         }
     }
 
-    pub fn map<U>(self, f: impl FnOnce(T) -> U) -> DecodedJWSRef<'a, U> {
-        DecodedJWSRef::new(self.signing_bytes.map(f), self.signature)
-    }
-
-    pub fn try_map<U, E>(
-        self,
-        f: impl FnOnce(T) -> Result<U, E>,
-    ) -> Result<DecodedJWSRef<'a, U>, E> {
-        Ok(DecodedJWSRef::new(
-            self.signing_bytes.try_map(f)?,
-            self.signature,
-        ))
-    }
-
-    pub fn into_owned(self) -> DecodedJWS<T> {
-        DecodedJWS {
-            signing_bytes: self.signing_bytes.into_owned(),
-            signature: self.signature.to_owned(),
-        }
-    }
-
-    /// Verify the JWS signature.
-    ///
-    /// This will check the signature and the validity of the decoded payload.
-    ///
-    /// The `params` argument provides all the verification parameters required
-    /// to validate the claims and proof.
-    ///
-    /// # What verification parameters should I use?
-    ///
-    /// It really depends on the claims type, but `P` must at least provide
-    /// a `JWKResolver` through the `ResolverProvider` trait.
-    /// Notable implementors are:
-    /// - [`VerificationParameters`](ssi_claims_core::VerificationParameters):
-    /// A good default providing many other common verification parameters that
-    /// are not necessary here.
-    /// - [`JWK`](ssi_jwk::JWK): allows you to put a JWK as `params`, which
-    /// will resolve into itself. Can be useful if you don't need key resolution
-    /// because you know in advance what key was used to sign the JWS.
-    ///
-    /// # Passing the parameters by reference
-    ///
-    /// If the validation traits are implemented for `P`, they will be
-    /// implemented for `&P` as well. This means the parameters can be passed
-    /// by move *or* by reference.
-    pub async fn verify<P>(&self, params: P) -> Result<Verification, ProofValidationError>
-    where
-        T: ValidateJWSHeader<P> + ValidateClaims<P, JWSSignature>,
-        P: ResolverProvider,
-        P::Resolver: JWKResolver,
-    {
-        VerifiableClaims::verify(self, params).await
-    }
-}
-
-impl<'a, T: ?Sized + ToOwned> DecodedJWSRef<'a, &'a T> {
-    pub fn to_owned(&self) -> DecodedJWS<T::Owned> {
-        DecodedJWS {
-            signing_bytes: self.signing_bytes.to_owned(),
-            signature: self.signature.to_owned(),
-        }
-    }
-}
-
-/// Decoded JWS.
-///
-/// JWS with its signing bytes.
-#[derive(Clone, PartialEq, Eq)]
-pub struct DecodedJWS<T = Vec<u8>> {
-    pub signing_bytes: DecodedSigningBytes<T>,
-    pub signature: JWSSignature,
-}
-
-impl<T> DecodedJWS<T> {
-    pub fn new(signing_bytes: DecodedSigningBytes<T>, signature: JWSSignature) -> Self {
-        Self {
-            signing_bytes,
-            signature,
-        }
-    }
-
-    pub fn map<U>(self, f: impl FnOnce(T) -> U) -> DecodedJWS<U> {
+    pub fn map<U>(self, f: impl FnOnce(T) -> U) -> DecodedJWS<'a, U> {
         DecodedJWS::new(self.signing_bytes.map(f), self.signature)
     }
 
-    pub fn try_map<U, E>(self, f: impl FnOnce(T) -> Result<U, E>) -> Result<DecodedJWS<U>, E> {
+    pub fn try_map<U, E>(self, f: impl FnOnce(T) -> Result<U, E>) -> Result<DecodedJWS<'a, U>, E> {
         Ok(DecodedJWS::new(
             self.signing_bytes.try_map(f)?,
             self.signature,
@@ -257,7 +176,7 @@ impl<T> DecodedJWS<T> {
         )
     }
 
-    pub fn into_jws_and_signing_bytes(self) -> (JWS<T>, Vec<u8>) {
+    pub fn into_jws_and_signing_bytes(self) -> (JWS<T>, Cow<'a, [u8]>) {
         (
             JWS::new(
                 self.signing_bytes.header,
@@ -266,6 +185,14 @@ impl<T> DecodedJWS<T> {
             ),
             self.signing_bytes.bytes,
         )
+    }
+
+    pub fn into_encoded(self) -> CompactJWSBuf {
+        CompactJWSBuf::from_signing_bytes_and_signature(
+            self.signing_bytes.bytes.into_owned(),
+            &self.signature,
+        )
+        .unwrap()
     }
 
     /// Verify the JWS signature.
@@ -302,17 +229,26 @@ impl<T> DecodedJWS<T> {
     }
 }
 
-impl<'a, T: ?Sized + ToOwned> DecodedJWS<Cow<'a, T>> {
-    pub fn into_owned(self) -> DecodedJWS<T::Owned> {
+impl<'a, 'b, T: ?Sized + ToOwned> DecodedJWS<'a, &'b T> {
+    pub fn to_owned(&self) -> DecodedJWS<'static, T::Owned> {
+        DecodedJWS {
+            signing_bytes: self.signing_bytes.to_owned(),
+            signature: self.signature.to_owned(),
+        }
+    }
+}
+
+impl<'a, 'b, T: ?Sized + ToOwned> DecodedJWS<'a, Cow<'b, T>> {
+    pub fn into_owned(self) -> DecodedJWS<'static, T::Owned> {
         DecodedJWS::new(self.signing_bytes.into_owned(), self.signature)
     }
 }
 
 /// JWS decoded signing bytes.
 #[derive(Clone, PartialEq, Eq)]
-pub struct DecodedSigningBytesRef<'a, T = &'a [u8]> {
+pub struct DecodedSigningBytes<'a, T = Vec<u8>> {
     /// Encoded bytes.
-    pub bytes: &'a [u8],
+    pub bytes: Cow<'a, [u8]>,
 
     /// Decoded JOSE Header.
     pub header: Header,
@@ -321,60 +257,8 @@ pub struct DecodedSigningBytesRef<'a, T = &'a [u8]> {
     pub payload: T,
 }
 
-impl<'a, T> DecodedSigningBytesRef<'a, T> {
-    pub fn map<U>(self, f: impl FnOnce(T) -> U) -> DecodedSigningBytesRef<'a, U> {
-        DecodedSigningBytesRef {
-            bytes: self.bytes,
-            header: self.header,
-            payload: f(self.payload),
-        }
-    }
-
-    pub fn try_map<U, E>(
-        self,
-        f: impl FnOnce(T) -> Result<U, E>,
-    ) -> Result<DecodedSigningBytesRef<'a, U>, E> {
-        Ok(DecodedSigningBytesRef {
-            bytes: self.bytes,
-            header: self.header,
-            payload: f(self.payload)?,
-        })
-    }
-
-    pub fn into_owned(self) -> DecodedSigningBytes<T> {
-        DecodedSigningBytes {
-            bytes: self.bytes.to_owned(),
-            header: self.header.clone(),
-            payload: self.payload,
-        }
-    }
-}
-
-impl<'a, T: ?Sized + ToOwned> DecodedSigningBytesRef<'a, &'a T> {
-    pub fn to_owned(&self) -> DecodedSigningBytes<T::Owned> {
-        DecodedSigningBytes {
-            bytes: self.bytes.to_owned(),
-            header: self.header.clone(),
-            payload: self.payload.to_owned(),
-        }
-    }
-}
-
-/// JWS decoded signing bytes.
-#[derive(Clone, PartialEq, Eq)]
-pub struct DecodedSigningBytes<T = Vec<u8>> {
-    /// Encoded bytes.
-    pub bytes: Vec<u8>,
-
-    /// Decoded JOSE Header.
-    pub header: Header,
-
-    /// Decoded payload.
-    pub payload: T,
-}
-
-impl<T> DecodedSigningBytes<T> {
-    pub fn new(bytes: Vec<u8>, header: Header, payload: T) -> Self {
+impl<'a, T> DecodedSigningBytes<'a, T> {
+    pub fn new(bytes: Cow<'a, [u8]>, header: Header, payload: T) -> Self {
         Self {
             bytes,
             header,
@@ -382,7 +266,7 @@ impl<T> DecodedSigningBytes<T> {
         }
     }
 
-    pub fn map<U>(self, f: impl FnOnce(T) -> U) -> DecodedSigningBytes<U> {
+    pub fn map<U>(self, f: impl FnOnce(T) -> U) -> DecodedSigningBytes<'a, U> {
         DecodedSigningBytes {
             bytes: self.bytes,
             header: self.header,
@@ -393,7 +277,7 @@ impl<T> DecodedSigningBytes<T> {
     pub fn try_map<U, E>(
         self,
         f: impl FnOnce(T) -> Result<U, E>,
-    ) -> Result<DecodedSigningBytes<U>, E> {
+    ) -> Result<DecodedSigningBytes<'a, U>, E> {
         Ok(DecodedSigningBytes {
             bytes: self.bytes,
             header: self.header,
@@ -402,9 +286,23 @@ impl<T> DecodedSigningBytes<T> {
     }
 }
 
-impl<'a, T: ?Sized + ToOwned> DecodedSigningBytes<Cow<'a, T>> {
-    pub fn into_owned(self) -> DecodedSigningBytes<T::Owned> {
-        self.map(Cow::into_owned)
+impl<'a, 'b, T: ?Sized + ToOwned> DecodedSigningBytes<'a, &'b T> {
+    pub fn to_owned(&self) -> DecodedSigningBytes<'static, T::Owned> {
+        DecodedSigningBytes {
+            bytes: Cow::Owned(self.bytes.as_ref().to_owned()),
+            header: self.header.clone(),
+            payload: self.payload.to_owned(),
+        }
+    }
+}
+
+impl<'a, 'b, T: ?Sized + ToOwned> DecodedSigningBytes<'a, Cow<'b, T>> {
+    pub fn into_owned(self) -> DecodedSigningBytes<'static, T::Owned> {
+        DecodedSigningBytes {
+            bytes: Cow::Owned(self.bytes.into_owned()),
+            header: self.header,
+            payload: self.payload.into_owned(),
+        }
     }
 }
 
@@ -1165,7 +1063,7 @@ pub fn decode_jws_parts(
     header_b64: &str,
     payload_enc: &[u8],
     signature_b64: &str,
-) -> Result<DecodedJWS, Error> {
+) -> Result<DecodedJWS<'static>, Error> {
     let signature = base64::prelude::BASE64_URL_SAFE_NO_PAD.decode(signature_b64)?;
     let header = Header::decode(header_b64.as_bytes())?;
     let payload = if header.base64urlencode_payload.unwrap_or(true) {
@@ -1183,7 +1081,7 @@ pub fn decode_jws_parts(
     }
     let signing_input = [header_b64.as_bytes(), b".", payload_enc].concat();
     Ok(DecodedJWS::new(
-        DecodedSigningBytes::new(signing_input, header, payload),
+        DecodedSigningBytes::new(Cow::Owned(signing_input), header, payload),
         signature.into(),
     ))
 }
