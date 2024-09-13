@@ -1,6 +1,6 @@
 use crate::{
     CompactJWSString, DecodeError, DecodedJWS, DecodedSigningBytes, Header, InvalidHeader,
-    JWSSignature,
+    JWSSignature, UrlSafeJwsBuf,
 };
 pub use base64::DecodeError as Base64DecodeError;
 use base64::Engine;
@@ -19,7 +19,7 @@ impl CompactJWS {
         T: ?Sized + AsRef<[u8]>,
     {
         let bytes = data.as_ref();
-        if Self::check(bytes) {
+        if Self::validate(bytes) {
             Ok(unsafe { Self::new_unchecked(bytes) })
         } else {
             Err(InvalidCompactJWS(data))
@@ -35,7 +35,7 @@ impl CompactJWS {
         std::mem::transmute(data)
     }
 
-    pub fn check(data: &[u8]) -> bool {
+    pub fn validate(data: &[u8]) -> bool {
         enum State {
             Header,
             Payload,
@@ -205,7 +205,7 @@ pub struct CompactJWSBuf(Vec<u8>);
 
 impl CompactJWSBuf {
     pub fn new(bytes: Vec<u8>) -> Result<Self, InvalidCompactJWS<Vec<u8>>> {
-        if CompactJWS::check(&bytes) {
+        if CompactJWS::validate(&bytes) {
             Ok(Self(bytes))
         } else {
             Err(InvalidCompactJWS(bytes))
@@ -270,6 +270,10 @@ impl CompactJWSBuf {
     /// be verified.
     pub fn into_decoded(self) -> Result<DecodedJWS<'static>, DecodeError> {
         Ok(self.decode()?.into_owned())
+    }
+
+    pub fn into_url_safe(self) -> Result<UrlSafeJwsBuf, Self> {
+        UrlSafeJwsBuf::new(self.0).map_err(|InvalidCompactJWS(bytes)| Self(bytes))
     }
 
     pub fn into_jws_string(self) -> Result<CompactJWSString, Self> {

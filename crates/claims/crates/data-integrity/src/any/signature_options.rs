@@ -1,5 +1,6 @@
 use serde::Deserialize;
-use ssi_di_sd_primitives::{HmacShaAnyKey, JsonPointerBuf};
+use ssi_core::JsonPointerBuf;
+use ssi_di_sd_primitives::HmacShaAnyKey;
 use ssi_verification_methods::multikey::MultikeyPair;
 
 #[derive(Debug, Default, Deserialize)]

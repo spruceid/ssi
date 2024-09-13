@@ -1,8 +1,9 @@
+use ssi_core::JsonPointerBuf;
 use ssi_data_integrity_core::{
     suite::{ConfigurationError, InputSignatureOptions, InputVerificationOptions},
     ProofConfiguration, ProofOptions,
 };
-use ssi_di_sd_primitives::{HmacShaAnyKey, JsonPointerBuf};
+use ssi_di_sd_primitives::HmacShaAnyKey;
 use ssi_verification_methods::{multikey::MultikeyPair, Multikey};
 
 use crate::EcdsaSd2023;

@@ -4,7 +4,10 @@ use ssi_jws::{JWSPayload, ValidateJWSHeader};
 use std::borrow::Cow;
 
 use super::{Claim, InfallibleClaimSet, RegisteredClaims};
-use crate::{AnyClaims, ClaimSet, InvalidClaimValue, RegisteredClaim, Subject, TryIntoClaim};
+use crate::{
+    AnyClaims, ClaimSet, ExpirationTime, InvalidClaimValue, IssuedAt, Issuer, RegisteredClaim,
+    Subject, TryIntoClaim,
+};
 
 mod de;
 
@@ -111,6 +114,18 @@ impl JWTClaimsBuilder {
         }
 
         self
+    }
+
+    pub fn iss(self, value: impl TryIntoClaim<Issuer>) -> Self {
+        self.set(value)
+    }
+
+    pub fn iat(self, value: impl TryIntoClaim<IssuedAt>) -> Self {
+        self.set(value)
+    }
+
+    pub fn exp(self, value: impl TryIntoClaim<ExpirationTime>) -> Self {
+        self.set(value)
     }
 
     pub fn sub(self, value: impl TryIntoClaim<Subject>) -> Self {

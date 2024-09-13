@@ -7,7 +7,7 @@ pub trait TryRetainMut {
 
     fn try_retain_mut<E>(
         &mut self,
-        f: impl FnMut(&mut Self::Item) -> Result<bool, E>,
+        f: impl FnMut(usize, &mut Self::Item) -> Result<bool, E>,
     ) -> Result<(), E>;
 }
 
@@ -16,14 +16,18 @@ impl<T> TryRetainMut for Vec<T> {
 
     fn try_retain_mut<E>(
         &mut self,
-        mut f: impl FnMut(&mut Self::Item) -> Result<bool, E>,
+        mut f: impl FnMut(usize, &mut Self::Item) -> Result<bool, E>,
     ) -> Result<(), E> {
         let mut result = Ok(());
 
+        let mut i = 0;
         self.retain_mut(|t| {
             if result.is_ok() {
-                match f(t) {
-                    Ok(retain) => retain,
+                match f(i, t) {
+                    Ok(retain) => {
+                        i += 1;
+                        retain
+                    }
                     Err(e) => {
                         result = Err(e);
                         false

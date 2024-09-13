@@ -111,8 +111,31 @@ impl std::ops::Sub<Duration> for NumericDate {
     }
 }
 
+impl From<i32> for NumericDate {
+    fn from(value: i32) -> Self {
+        Self(NotNan::new(value as f64).unwrap())
+    }
+}
+
+impl TryFrom<i64> for NumericDate {
+    type Error = NumericDateConversionError;
+
+    fn try_from(value: i64) -> Result<Self, Self::Error> {
+        Self::try_from_seconds(value as f64)
+    }
+}
+
+impl TryFrom<f64> for NumericDate {
+    type Error = NumericDateConversionError;
+
+    fn try_from(value: f64) -> Result<Self, Self::Error> {
+        Self::try_from_seconds(value)
+    }
+}
+
 impl TryFrom<DateTime<Utc>> for NumericDate {
     type Error = NumericDateConversionError;
+
     fn try_from(dtu: DateTime<Utc>) -> Result<Self, Self::Error> {
         // Have to take seconds and nanoseconds separately in order to get the full allowable
         // range of microsecond-precision values as described above.

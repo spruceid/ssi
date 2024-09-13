@@ -86,6 +86,8 @@ use std::{borrow::Cow, collections::BTreeMap};
 
 pub type VerificationWarnings = Vec<String>;
 
+pub(crate) mod utils;
+
 mod compact;
 pub use compact::*;
 
@@ -143,7 +145,7 @@ impl<'a, T: ?Sized + ToOwned> JWS<Cow<'a, T>> {
 /// Decoded JWS.
 ///
 /// JWS with its signing bytes.
-#[derive(Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct DecodedJWS<'a, T = Vec<u8>> {
     pub signing_bytes: DecodedSigningBytes<'a, T>,
     pub signature: JWSSignature,
@@ -155,6 +157,10 @@ impl<'a, T> DecodedJWS<'a, T> {
             signing_bytes,
             signature,
         }
+    }
+
+    pub fn header(&self) -> &Header {
+        &self.signing_bytes.header
     }
 
     pub fn map<U>(self, f: impl FnOnce(T) -> U) -> DecodedJWS<'a, U> {
@@ -245,7 +251,7 @@ impl<'a, 'b, T: ?Sized + ToOwned> DecodedJWS<'a, Cow<'b, T>> {
 }
 
 /// JWS decoded signing bytes.
-#[derive(Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct DecodedSigningBytes<'a, T = Vec<u8>> {
     /// Encoded bytes.
     pub bytes: Cow<'a, [u8]>,

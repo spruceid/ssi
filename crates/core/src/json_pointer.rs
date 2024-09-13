@@ -1,5 +1,9 @@
 use core::fmt;
-use std::{borrow::Cow, ops::Deref, str::FromStr};
+use std::{
+    borrow::{Borrow, Cow},
+    ops::Deref,
+    str::FromStr,
+};
 
 use serde::{Deserialize, Serialize};
 
@@ -22,10 +26,21 @@ pub struct InvalidJsonPointer<T = String>(pub T);
 /// JSON Pointer.
 ///
 /// See: <https://datatracker.ietf.org/doc/html/rfc6901>
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct JsonPointer([u8]);
 
+impl<'a> Default for &'a JsonPointer {
+    fn default() -> Self {
+        JsonPointer::ROOT
+    }
+}
+
 impl JsonPointer {
+    pub const ROOT: &Self = unsafe {
+        // SAFETY: the empty string is a valid JSON pointer.
+        JsonPointer::new_unchecked(&[])
+    };
+
     /// Converts the given string into a JSON pointer.
     pub fn new<S: AsRef<[u8]>>(s: &S) -> Result<&Self, InvalidJsonPointer<&S>> {
         let bytes = s.as_ref();
@@ -124,6 +139,20 @@ impl JsonPointer {
     }
 }
 
+impl ToOwned for JsonPointer {
+    type Owned = JsonPointerBuf;
+
+    fn to_owned(&self) -> Self::Owned {
+        JsonPointerBuf(self.0.to_owned())
+    }
+}
+
+impl AsRef<JsonPointer> for JsonPointer {
+    fn as_ref(&self) -> &JsonPointer {
+        self
+    }
+}
+
 impl fmt::Display for JsonPointer {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         self.as_str().fmt(f)
@@ -152,8 +181,14 @@ impl<'a> Iterator for JsonPointerIter<'a> {
 /// JSON Pointer buffer.
 ///
 /// See: <https://datatracker.ietf.org/doc/html/rfc6901>
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct JsonPointerBuf(Vec<u8>);
+
+impl Default for JsonPointerBuf {
+    fn default() -> Self {
+        JsonPointer::ROOT.to_owned()
+    }
+}
 
 impl JsonPointerBuf {
     /// Converts the given byte string into an owned JSON pointer.
@@ -163,6 +198,32 @@ impl JsonPointerBuf {
         } else {
             Err(InvalidJsonPointer(value))
         }
+    }
+
+    pub fn push(&mut self, token: &str) {
+        self.0.push(b'/');
+        for c in token.chars() {
+            match c {
+                '~' => {
+                    self.0.push(b'~');
+                    self.0.push(b'0');
+                }
+                '/' => {
+                    self.0.push(b'~');
+                    self.0.push(b'1');
+                }
+                _ => {
+                    let i = self.0.len();
+                    let len = c.len_utf8();
+                    self.0.resize(i + len, 0);
+                    c.encode_utf8(&mut self.0[i..]);
+                }
+            }
+        }
+    }
+
+    pub fn push_index(&mut self, i: usize) {
+        self.push(&i.to_string())
     }
 
     pub fn as_json_pointer(&self) -> &JsonPointer {
@@ -179,6 +240,18 @@ impl Deref for JsonPointerBuf {
 
     fn deref(&self) -> &Self::Target {
         unsafe { JsonPointer::new_unchecked(&self.0) }
+    }
+}
+
+impl Borrow<JsonPointer> for JsonPointerBuf {
+    fn borrow(&self) -> &JsonPointer {
+        self.as_json_pointer()
+    }
+}
+
+impl AsRef<JsonPointer> for JsonPointerBuf {
+    fn as_ref(&self) -> &JsonPointer {
+        self.as_json_pointer()
     }
 }
 

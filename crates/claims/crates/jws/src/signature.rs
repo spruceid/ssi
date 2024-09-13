@@ -2,7 +2,7 @@ use ssi_claims_core::SignatureError;
 use ssi_jwk::{Algorithm, JWK};
 use std::borrow::Cow;
 
-use crate::{CompactJWSString, DecodedJWS, DecodedSigningBytes, Header, JWSSignature};
+use crate::{DecodedJWS, DecodedSigningBytes, Header, JWSSignature, UrlSafeJwsBuf};
 
 /// JWS payload type.
 ///
@@ -24,7 +24,7 @@ pub trait JWSPayload {
 
     /// Signs the payload and returns a compact JWS.
     #[allow(async_fn_in_trait)]
-    async fn sign(&self, signer: impl JWSSigner) -> Result<CompactJWSString, SignatureError> {
+    async fn sign(&self, signer: impl JWSSigner) -> Result<UrlSafeJwsBuf, SignatureError> {
         signer.sign(self).await
     }
 }
@@ -42,7 +42,7 @@ impl<'a, P: ?Sized + JWSPayload> JWSPayload for &'a P {
         P::payload_bytes(*self)
     }
 
-    async fn sign(&self, signer: impl JWSSigner) -> Result<CompactJWSString, SignatureError> {
+    async fn sign(&self, signer: impl JWSSigner) -> Result<UrlSafeJwsBuf, SignatureError> {
         P::sign(*self, signer).await
     }
 }
@@ -123,12 +123,12 @@ pub trait JWSSigner {
     }
 
     #[allow(async_fn_in_trait)]
-    async fn sign(&self, payload: impl JWSPayload) -> Result<CompactJWSString, SignatureError> {
+    async fn sign(&self, payload: impl JWSPayload) -> Result<UrlSafeJwsBuf, SignatureError> {
         Ok(self
             .sign_into_decoded(payload)
             .await?
             .into_encoded()
-            .into_jws_string()
+            .into_url_safe()
             .ok()
             .unwrap())
     }
@@ -143,7 +143,7 @@ impl<'a, T: JWSSigner> JWSSigner for &'a T {
         T::sign_bytes(*self, signing_bytes).await
     }
 
-    async fn sign(&self, payload: impl JWSPayload) -> Result<CompactJWSString, SignatureError> {
+    async fn sign(&self, payload: impl JWSPayload) -> Result<UrlSafeJwsBuf, SignatureError> {
         T::sign(*self, payload).await
     }
 }
@@ -157,7 +157,7 @@ impl<'a, T: JWSSigner + Clone> JWSSigner for Cow<'a, T> {
         T::sign_bytes(self.as_ref(), signing_bytes).await
     }
 
-    async fn sign(&self, payload: impl JWSPayload) -> Result<CompactJWSString, SignatureError> {
+    async fn sign(&self, payload: impl JWSPayload) -> Result<UrlSafeJwsBuf, SignatureError> {
         T::sign(self.as_ref(), payload).await
     }
 }

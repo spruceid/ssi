@@ -1,10 +1,10 @@
 use serde::{Deserialize, Serialize};
 use ssi_claims_core::ResolverProvider;
+use ssi_core::JsonPointerBuf;
 use ssi_data_integrity_core::{
     suite::{CryptographicSuiteSelect, SelectionError, SelectiveCryptographicSuite},
     DataIntegrity, ProofRef,
 };
-use ssi_di_sd_primitives::JsonPointerBuf;
 use ssi_json_ld::{Expandable, ExpandedDocument, JsonLdLoaderProvider, JsonLdNodeObject};
 use ssi_rdf::LexicalInterpretation;
 use ssi_verification_methods::{AnyMethod, VerificationMethodResolver};

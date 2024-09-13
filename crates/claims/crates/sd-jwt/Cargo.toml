@@ -20,6 +20,7 @@ ssi-jwk.workspace = true
 ssi-jws.workspace = true
 ssi-jwt.workspace = true
 thiserror.workspace = true
+indexmap.workspace = true
 
 [dev-dependencies]
 hex-literal = "0.4.1"

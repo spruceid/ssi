@@ -3,7 +3,7 @@ use std::{borrow::Cow, marker::PhantomData};
 use ssi_claims_core::{ProofValidationError, SignatureError};
 use ssi_crypto::algorithm::{SignatureAlgorithmInstance, SignatureAlgorithmType};
 use ssi_jwk::{Algorithm, JWK};
-use ssi_jws::{CompactJWSString, JWSSignature, JWS};
+use ssi_jws::{CompactJWSString, DecodedJWS, JWSSignature};
 use ssi_verification_methods::{MessageSigner, VerifyBytes, VerifyBytesWithRecoveryJwk};
 
 use crate::{
@@ -41,14 +41,19 @@ impl JwsSignature {
         &self,
         message: &[u8],
     ) -> Result<(Vec<u8>, JWSSignature, Algorithm), ProofValidationError> {
-        let JWS {
-            header, signature, ..
+        let DecodedJWS {
+            signing_bytes: detached_signing_bytes,
+            signature,
         } = self
             .jws
             .decode()
             .map_err(|_| ProofValidationError::InvalidSignature)?;
-        let signing_bytes = header.encode_signing_bytes(message);
-        Ok((signing_bytes, signature, header.algorithm))
+        let signing_bytes = detached_signing_bytes.header.encode_signing_bytes(message);
+        Ok((
+            signing_bytes,
+            signature,
+            detached_signing_bytes.header.algorithm,
+        ))
     }
 
     pub async fn sign_detached<A: SignatureAlgorithmType + Into<Algorithm>, S: MessageSigner<A>>(
@@ -120,17 +125,21 @@ where
         prepared_claims: S::PreparedClaims,
         proof: ProofRef<S>,
     ) -> Result<ssi_claims_core::ProofValidity, ProofValidationError> {
-        let JWS {
-            header, signature, ..
+        let DecodedJWS {
+            signing_bytes: detached_signing_bytes,
+            signature,
         } = proof
             .signature
             .jws
             .decode()
             .map_err(|_| ProofValidationError::InvalidSignature)?;
 
-        let signing_bytes = header.encode_signing_bytes(prepared_claims.as_ref());
+        let signing_bytes = detached_signing_bytes
+            .header
+            .encode_signing_bytes(prepared_claims.as_ref());
 
-        let algorithm = header
+        let algorithm = detached_signing_bytes
+            .header
             .algorithm
             .try_into()
             .map_err(|_| ProofValidationError::InvalidSignature)?;
@@ -182,17 +191,21 @@ where
         prepared_claims: S::PreparedClaims,
         proof: ProofRef<S>,
     ) -> Result<ssi_claims_core::ProofValidity, ProofValidationError> {
-        let JWS {
-            header, signature, ..
+        let DecodedJWS {
+            signing_bytes: detached_signing_bytes,
+            signature,
         } = proof
             .signature
             .jws
             .decode()
             .map_err(|_| ProofValidationError::InvalidSignature)?;
 
-        let signing_bytes = header.encode_signing_bytes(prepared_claims.as_ref());
+        let signing_bytes = detached_signing_bytes
+            .header
+            .encode_signing_bytes(prepared_claims.as_ref());
 
-        let found_algorithm = header
+        let found_algorithm = detached_signing_bytes
+            .header
             .algorithm
             .try_into()
             .map_err(|_| ProofValidationError::InvalidSignature)?;

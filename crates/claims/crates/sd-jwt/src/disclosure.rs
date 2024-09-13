@@ -164,7 +164,7 @@ impl fmt::Debug for DisclosureBuf {
 }
 
 /// Decoded disclosure.
-#[derive(Debug, PartialEq)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct DecodedDisclosure<'a> {
     /// Encoded disclosure.
     pub encoded: Cow<'a, Disclosure>,
@@ -235,7 +235,7 @@ impl<'a> DecodedDisclosure<'a> {
 }
 
 /// Disclosure description.
-#[derive(Debug, PartialEq)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum DisclosureDescription {
     /// Object entry disclosure.
     ObjectEntry {

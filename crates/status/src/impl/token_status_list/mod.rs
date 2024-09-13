@@ -23,7 +23,7 @@ pub mod json;
 pub use json::StatusListJwt;
 use ssi_jwk::JWKResolver;
 use ssi_jws::{CompactJWS, InvalidCompactJWS};
-use ssi_jwt::{ClaimSet, JWTClaims, ToDecodedJWT};
+use ssi_jwt::{ClaimSet, InvalidClaimValue, JWTClaims, ToDecodedJWT};
 
 use crate::{
     EncodedStatusMap, FromBytes, FromBytesOptions, Overflow, StatusMap, StatusMapEntry,
@@ -507,6 +507,9 @@ pub enum EntrySetFromBytesError {
 
     #[error(transparent)]
     JWT(#[from] ssi_jwt::DecodeError),
+
+    #[error(transparent)]
+    ClaimValue(#[from] InvalidClaimValue),
 
     #[error("proof preparation failed: {0}")]
     ProofPreparation(#[from] ssi_claims_core::ProofPreparationError),
