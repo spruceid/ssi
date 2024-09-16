@@ -12,7 +12,7 @@
 use ssi::{
     claims::{
         data_integrity::{AnySuite, CryptographicSuite, ProofOptions},
-        jws::{CompactJWSString, JWSPayload},
+        jws::{JwsPayload, JwsString},
     },
     verification_methods::{ProofPurpose, SingleSecretSigner},
 };
@@ -31,7 +31,7 @@ async fn verify(proof_format_in: &str, proof_format_out: &str, input_vc: &str) {
                 serde_json::from_str(input_vc).unwrap();
             ssi::claims::JsonCredentialOrJws::Credential(vc_ldp)
         }
-        "jwt" => match CompactJWSString::from_string(input_vc.to_string()) {
+        "jwt" => match JwsString::from_string(input_vc.to_string()) {
             Ok(vc_jwt) => ssi::claims::JsonCredentialOrJws::Jws(vc_jwt),
             Err(_) => {
                 panic!("Input must be a compact JWT");

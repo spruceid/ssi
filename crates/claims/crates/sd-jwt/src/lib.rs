@@ -11,8 +11,8 @@ use ssi_claims_core::{
 };
 use ssi_core::{BytesBuf, JsonPointer, JsonPointerBuf};
 use ssi_jwk::JWKResolver;
-use ssi_jws::{DecodedJWS, JWSPayload, JWSSignature, JWSSigner, UrlSafeJws, ValidateJWSHeader};
-use ssi_jwt::{AnyClaims, ClaimSet, DecodedJWT, JWTClaims};
+use ssi_jws::{DecodedJws, Jws, JwsPayload, JwsSignature, JwsSigner, ValidateJwsHeader};
+use ssi_jwt::{AnyClaims, ClaimSet, DecodedJwt, JWTClaims};
 use std::{
     borrow::{Borrow, Cow},
     collections::BTreeMap,
@@ -125,7 +125,7 @@ impl SdJwt {
         }
 
         // Validate the JWS.
-        if !UrlSafeJws::validate_range(bytes, 0, i) {
+        if !Jws::validate_range(bytes, 0, i) {
             return false;
         }
 
@@ -188,11 +188,11 @@ impl SdJwt {
     }
 
     /// Returns the issuer-signed JWT.
-    pub fn jwt(&self) -> &UrlSafeJws {
+    pub fn jwt(&self) -> &Jws {
         unsafe {
             // SAFETY: we already validated the SD-JWT and know it
             // starts with a valid JWT.
-            UrlSafeJws::new_unchecked(&self.0[..self.jwt_end()])
+            Jws::new_unchecked(&self.0[..self.jwt_end()])
         }
     }
 
@@ -241,8 +241,9 @@ impl SdJwt {
     /// Decodes, reveals and verify a compact SD-JWT.
     ///
     /// Only the registered JWT claims will be validated.
-    /// If you need to validate custom claims, use the [`Self::reveal_verify`]
-    /// method with `T` defining the custom claims.
+    /// If you need to validate custom claims, use the
+    /// [`Self::decode_reveal_verify`] method with `T` defining the custom
+    /// claims.
     ///
     /// Returns the decoded JWT with the verification status.
     pub async fn decode_reveal_verify_any<P>(
@@ -263,7 +264,7 @@ impl SdJwt {
         params: P,
     ) -> Result<(RevealedSdJwt<T>, Verification), ProofValidationError>
     where
-        T: ClaimSet + DeserializeOwned + ValidateClaims<P, JWSSignature>,
+        T: ClaimSet + DeserializeOwned + ValidateClaims<P, JwsSignature>,
         P: ResolverProvider<Resolver: JWKResolver> + DateTimeProvider,
     {
         self.parts().decode_reveal_verify(params).await
@@ -309,7 +310,7 @@ impl SdJwtBuf {
         claims: &JWTClaims<impl Serialize>,
         sd_alg: SdAlg,
         pointers: &[impl Borrow<JsonPointer>],
-        signer: impl JWSSigner,
+        signer: impl JwsSigner,
     ) -> Result<Self, SignatureError> {
         DecodedSdJwt::conceal_and_sign(claims, sd_alg, pointers, signer)
             .await
@@ -321,7 +322,7 @@ impl SdJwtBuf {
         claims: &JWTClaims<impl Serialize>,
         sd_alg: SdAlg,
         pointers: &[impl Borrow<JsonPointer>],
-        signer: impl JWSSigner,
+        signer: impl JwsSigner,
         rng: impl CryptoRng + RngCore,
     ) -> Result<Self, SignatureError> {
         DecodedSdJwt::conceal_and_sign_with(claims, sd_alg, pointers, signer, rng)
@@ -406,7 +407,7 @@ impl<'a> Iterator for Disclosures<'a> {
 #[derive(Debug, PartialEq)]
 pub struct PartsRef<'a> {
     /// JWT who's claims can be selectively disclosed.
-    pub jwt: &'a UrlSafeJws,
+    pub jwt: &'a Jws,
 
     /// Disclosures for associated JWT
     pub disclosures: Vec<&'a Disclosure>,
@@ -414,7 +415,7 @@ pub struct PartsRef<'a> {
 
 impl<'a> PartsRef<'a> {
     /// Creates a new `PartsRef`.
-    pub fn new(jwt: &'a UrlSafeJws, disclosures: Vec<&'a Disclosure>) -> Self {
+    pub fn new(jwt: &'a Jws, disclosures: Vec<&'a Disclosure>) -> Self {
         Self { jwt, disclosures }
     }
 
@@ -446,8 +447,9 @@ impl<'a> PartsRef<'a> {
     /// Decodes, reveals and verify a compact SD-JWT.
     ///
     /// Only the registered JWT claims will be validated.
-    /// If you need to validate custom claims, use the [`Self::reveal_verify`]
-    /// method with `T` defining the custom claims.
+    /// If you need to validate custom claims, use the
+    /// [`Self::decode_reveal_verify`] method with `T` defining the custom
+    /// claims.
     ///
     /// Returns the decoded JWT with the verification status.
     pub async fn decode_reveal_verify_any<P>(
@@ -469,7 +471,7 @@ impl<'a> PartsRef<'a> {
         params: P,
     ) -> Result<(RevealedSdJwt<'a, T>, Verification), ProofValidationError>
     where
-        T: ClaimSet + DeserializeOwned + ValidateClaims<P, JWSSignature>,
+        T: ClaimSet + DeserializeOwned + ValidateClaims<P, JwsSignature>,
         P: ResolverProvider<Resolver: JWKResolver> + DateTimeProvider,
     {
         let decoded = self.decode().map_err(ProofValidationError::input_data)?;
@@ -503,20 +505,20 @@ pub struct SdJwtPayload {
     pub claims: serde_json::Map<String, Value>,
 }
 
-impl JWSPayload for SdJwtPayload {
+impl JwsPayload for SdJwtPayload {
     fn payload_bytes(&self) -> Cow<[u8]> {
         Cow::Owned(serde_json::to_vec(self).unwrap())
     }
 }
 
-impl<E> ValidateJWSHeader<E> for SdJwtPayload {}
+impl<E> ValidateJwsHeader<E> for SdJwtPayload {}
 
 impl<E, P> ValidateClaims<E, P> for SdJwtPayload {}
 
 /// Decoded SD-JWT.
 pub struct DecodedSdJwt<'a> {
     /// JWT who's claims can be selectively disclosed.
-    pub jwt: DecodedJWS<'a, SdJwtPayload>,
+    pub jwt: DecodedJws<'a, SdJwtPayload>,
 
     /// Disclosures for associated JWT.
     pub disclosures: Vec<DecodedDisclosure<'a>>,
@@ -563,7 +565,7 @@ impl<'a> DecodedSdJwt<'a> {
         params: P,
     ) -> Result<(RevealedSdJwt<'a, T>, Verification), ProofValidationError>
     where
-        T: ClaimSet + DeserializeOwned + ValidateClaims<P, JWSSignature>,
+        T: ClaimSet + DeserializeOwned + ValidateClaims<P, JwsSignature>,
         P: ResolverProvider<Resolver: JWKResolver> + DateTimeProvider,
     {
         let revealed = self
@@ -580,7 +582,7 @@ impl DecodedSdJwt<'static> {
         claims: &JWTClaims<impl Serialize>,
         sd_alg: SdAlg,
         pointers: &[impl Borrow<JsonPointer>],
-        signer: impl JWSSigner,
+        signer: impl JwsSigner,
     ) -> Result<Self, SignatureError> {
         let (payload, disclosures) =
             SdJwtPayload::conceal(claims, sd_alg, pointers).map_err(SignatureError::other)?;
@@ -596,7 +598,7 @@ impl DecodedSdJwt<'static> {
         claims: &JWTClaims<impl Serialize>,
         sd_alg: SdAlg,
         pointers: &[impl Borrow<JsonPointer>],
-        signer: impl JWSSigner,
+        signer: impl JwsSigner,
         rng: impl CryptoRng + RngCore,
     ) -> Result<Self, SignatureError> {
         let (payload, disclosures) = SdJwtPayload::conceal_with(claims, sd_alg, pointers, rng)
@@ -637,7 +639,7 @@ pub struct RevealedSdJwt<'a, T = AnyClaims> {
     ///
     /// The JWT bytes still contain the concealed SD-JWT claims, but the
     /// decoded payload is revealed.
-    pub jwt: DecodedJWT<'a, T>,
+    pub jwt: DecodedJwt<'a, T>,
 
     /// Disclosures bound to their JSON pointers.
     pub disclosures: BTreeMap<JsonPointerBuf, DecodedDisclosure<'a>>,
@@ -657,7 +659,7 @@ impl<'a, T> RevealedSdJwt<'a, T> {
     /// Verifies the SD-JWT, validating the revealed claims.
     pub async fn verify<P>(&self, params: P) -> Result<Verification, ProofValidationError>
     where
-        T: ClaimSet + ValidateClaims<P, JWSSignature>,
+        T: ClaimSet + ValidateClaims<P, JwsSignature>,
         P: ResolverProvider<Resolver: JWKResolver> + DateTimeProvider,
     {
         self.jwt.verify(params).await
@@ -809,7 +811,7 @@ mod tests {
         assert_eq!(
             SdJwt::new(ENCODED).unwrap().parts(),
             PartsRef::new(
-                UrlSafeJws::new(JWT).unwrap(),
+                Jws::new(JWT).unwrap(),
                 vec![
                     Disclosure::new(DISCLOSURE_0).unwrap(),
                     Disclosure::new(DISCLOSURE_1).unwrap()
@@ -827,7 +829,7 @@ mod tests {
     fn serialize_parts() {
         assert_eq!(
             PartsRef::new(
-                UrlSafeJws::new(JWT).unwrap(),
+                Jws::new(JWT).unwrap(),
                 vec![
                     Disclosure::new(DISCLOSURE_0).unwrap(),
                     Disclosure::new(DISCLOSURE_1).unwrap()

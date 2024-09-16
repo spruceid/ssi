@@ -3,7 +3,7 @@ use std::{borrow::Cow, marker::PhantomData};
 use ssi_claims_core::{ProofValidationError, SignatureError};
 use ssi_crypto::algorithm::{SignatureAlgorithmInstance, SignatureAlgorithmType};
 use ssi_jwk::{Algorithm, JWK};
-use ssi_jws::{CompactJWSString, DecodedJWS, JWSSignature};
+use ssi_jws::{DecodedJws, JwsSignature, JwsString};
 use ssi_verification_methods::{MessageSigner, VerifyBytes, VerifyBytesWithRecoveryJwk};
 
 use crate::{
@@ -24,13 +24,13 @@ use super::AlgorithmSelection;
     linked_data::Deserialize,
 )]
 #[ld(prefix("sec" = "https://w3id.org/security#"))]
-pub struct JwsSignature {
+pub struct DetachedJwsSignature {
     #[ld("sec:jws")]
-    pub jws: CompactJWSString,
+    pub jws: JwsString,
 }
 
-impl JwsSignature {
-    pub fn new(jws: CompactJWSString) -> Self {
+impl DetachedJwsSignature {
+    pub fn new(jws: JwsString) -> Self {
         Self { jws }
     }
 
@@ -40,8 +40,8 @@ impl JwsSignature {
     pub fn decode(
         &self,
         message: &[u8],
-    ) -> Result<(Vec<u8>, JWSSignature, Algorithm), ProofValidationError> {
-        let DecodedJWS {
+    ) -> Result<(Vec<u8>, JwsSignature, Algorithm), ProofValidationError> {
+        let DecodedJws {
             signing_bytes: detached_signing_bytes,
             signature,
         } = self
@@ -65,27 +65,27 @@ impl JwsSignature {
         let header = ssi_jws::Header::new_unencoded(algorithm_instance.algorithm().into(), key_id);
         let signing_bytes = header.encode_signing_bytes(payload);
         let signature = signer.sign(algorithm_instance, &signing_bytes).await?;
-        let jws = ssi_jws::CompactJWSString::encode_detached(header, &signature);
-        Ok(JwsSignature::new(jws))
+        let jws = ssi_jws::JwsString::encode_detached(header, &signature);
+        Ok(Self::new(jws))
     }
 }
 
-impl AsRef<str> for JwsSignature {
+impl AsRef<str> for DetachedJwsSignature {
     fn as_ref(&self) -> &str {
         self.jws.as_str()
     }
 }
 
-impl super::AlterSignature for JwsSignature {
+impl super::AlterSignature for DetachedJwsSignature {
     fn alter(&mut self) {
-        self.jws = CompactJWSString::from_string(format!("ff{}", self.jws)).unwrap();
+        self.jws = JwsString::from_string(format!("ff{}", self.jws)).unwrap();
     }
 }
 
 pub struct DetachedJwsSigning<A>(PhantomData<A>);
 
 impl<A> SignatureAndVerificationAlgorithm for DetachedJwsSigning<A> {
-    type Signature = JwsSignature;
+    type Signature = DetachedJwsSignature;
 }
 
 impl<A, S, T> SignatureAlgorithm<S, T> for DetachedJwsSigning<A>
@@ -103,7 +103,7 @@ where
         prepared_claims: S::PreparedClaims,
         proof_configuration: ProofConfigurationRef<'_, S>,
     ) -> Result<Self::Signature, SignatureError> {
-        JwsSignature::sign_detached(
+        DetachedJwsSignature::sign_detached(
             prepared_claims.as_ref(),
             signer,
             None,
@@ -115,7 +115,7 @@ where
 
 impl<A, S> VerificationAlgorithm<S> for DetachedJwsSigning<A>
 where
-    S: CryptographicSuite<Signature = JwsSignature>,
+    S: CryptographicSuite<Signature = DetachedJwsSignature>,
     S::PreparedClaims: AsRef<[u8]>,
     S::VerificationMethod: VerifyBytes<A>,
     A: TryFrom<Algorithm>,
@@ -125,7 +125,7 @@ where
         prepared_claims: S::PreparedClaims,
         proof: ProofRef<S>,
     ) -> Result<ssi_claims_core::ProofValidity, ProofValidationError> {
-        let DecodedJWS {
+        let DecodedJws {
             signing_bytes: detached_signing_bytes,
             signature,
         } = proof
@@ -151,7 +151,7 @@ where
 pub struct DetachedJwsRecoverySigning<A>(PhantomData<A>);
 
 impl<A> SignatureAndVerificationAlgorithm for DetachedJwsRecoverySigning<A> {
-    type Signature = JwsSignature;
+    type Signature = DetachedJwsSignature;
 }
 
 impl<A, S, T> SignatureAlgorithm<S, T> for DetachedJwsRecoverySigning<A>
@@ -168,7 +168,7 @@ where
         prepared_claims: S::PreparedClaims,
         proof_configuration: ProofConfigurationRef<'_, S>,
     ) -> Result<Self::Signature, SignatureError> {
-        JwsSignature::sign_detached(
+        DetachedJwsSignature::sign_detached(
             prepared_claims.as_ref(),
             signer,
             proof_configuration.options.public_jwk().key_id.clone(),
@@ -180,7 +180,7 @@ where
 
 impl<A, S> VerificationAlgorithm<S> for DetachedJwsRecoverySigning<A>
 where
-    S: CryptographicSuite<Signature = JwsSignature>,
+    S: CryptographicSuite<Signature = DetachedJwsSignature>,
     S::PreparedClaims: AsRef<[u8]>,
     S::ProofOptions: RecoverPublicJwk,
     S::VerificationMethod: VerifyBytesWithRecoveryJwk<A>,
@@ -191,7 +191,7 @@ where
         prepared_claims: S::PreparedClaims,
         proof: ProofRef<S>,
     ) -> Result<ssi_claims_core::ProofValidity, ProofValidationError> {
-        let DecodedJWS {
+        let DecodedJws {
             signing_bytes: detached_signing_bytes,
             signature,
         } = proof

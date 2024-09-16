@@ -2,12 +2,12 @@ use ssi_claims_core::SignatureError;
 use ssi_jwk::{Algorithm, JWK};
 use std::borrow::Cow;
 
-use crate::{DecodedJWS, DecodedSigningBytes, Header, JWSSignature, UrlSafeJwsBuf};
+use crate::{DecodedJws, DecodedSigningBytes, Header, JwsBuf, JwsSignature};
 
 /// JWS payload type.
 ///
 /// Any type that can be serialized with a give JWS type.
-pub trait JWSPayload {
+pub trait JwsPayload {
     /// JWS type.
     ///
     /// Value of the `typ` field in the JWS header.
@@ -24,12 +24,12 @@ pub trait JWSPayload {
 
     /// Signs the payload and returns a compact JWS.
     #[allow(async_fn_in_trait)]
-    async fn sign(&self, signer: impl JWSSigner) -> Result<UrlSafeJwsBuf, SignatureError> {
+    async fn sign(&self, signer: impl JwsSigner) -> Result<JwsBuf, SignatureError> {
         signer.sign(self).await
     }
 }
 
-impl<'a, P: ?Sized + JWSPayload> JWSPayload for &'a P {
+impl<'a, P: ?Sized + JwsPayload> JwsPayload for &'a P {
     fn typ(&self) -> Option<&str> {
         P::typ(*self)
     }
@@ -42,42 +42,42 @@ impl<'a, P: ?Sized + JWSPayload> JWSPayload for &'a P {
         P::payload_bytes(*self)
     }
 
-    async fn sign(&self, signer: impl JWSSigner) -> Result<UrlSafeJwsBuf, SignatureError> {
+    async fn sign(&self, signer: impl JwsSigner) -> Result<JwsBuf, SignatureError> {
         P::sign(*self, signer).await
     }
 }
 
-impl JWSPayload for [u8] {
+impl JwsPayload for [u8] {
     fn payload_bytes(&self) -> Cow<[u8]> {
         Cow::Borrowed(self)
     }
 }
 
-impl JWSPayload for Vec<u8> {
+impl JwsPayload for Vec<u8> {
     fn payload_bytes(&self) -> Cow<[u8]> {
         Cow::Borrowed(self)
     }
 }
 
-impl JWSPayload for str {
+impl JwsPayload for str {
     fn payload_bytes(&self) -> Cow<[u8]> {
         Cow::Borrowed(self.as_bytes())
     }
 }
 
-impl JWSPayload for String {
+impl JwsPayload for String {
     fn payload_bytes(&self) -> Cow<[u8]> {
         Cow::Borrowed(self.as_bytes())
     }
 }
 
-impl JWSPayload for serde_json::Value {
+impl JwsPayload for serde_json::Value {
     fn payload_bytes(&self) -> Cow<[u8]> {
         Cow::Owned(serde_json::to_vec(self).unwrap())
     }
 }
 
-pub struct JWSSignerInfo {
+pub struct JwsSignerInfo {
     pub key_id: Option<String>,
     pub algorithm: Algorithm,
 }
@@ -86,18 +86,18 @@ pub struct JWSSignerInfo {
 ///
 /// Any type that can fetch a JWK using the `kid` parameter of a JWS JOSE
 /// header and sign bytes.
-pub trait JWSSigner {
+pub trait JwsSigner {
     #[allow(async_fn_in_trait)]
-    async fn fetch_info(&self) -> Result<JWSSignerInfo, SignatureError>;
+    async fn fetch_info(&self) -> Result<JwsSignerInfo, SignatureError>;
 
     #[allow(async_fn_in_trait)]
     async fn sign_bytes(&self, signing_bytes: &[u8]) -> Result<Vec<u8>, SignatureError>;
 
     #[allow(async_fn_in_trait)]
-    async fn sign_into_decoded<P: JWSPayload>(
+    async fn sign_into_decoded<P: JwsPayload>(
         &self,
         payload: P,
-    ) -> Result<DecodedJWS<'static, P>, SignatureError> {
+    ) -> Result<DecodedJws<'static, P>, SignatureError> {
         let info = self.fetch_info().await?;
         let payload_bytes = payload.payload_bytes();
 
@@ -110,9 +110,9 @@ pub trait JWSSigner {
         };
 
         let signing_bytes = header.encode_signing_bytes(&payload_bytes);
-        let signature = JWSSignature::new(self.sign_bytes(&signing_bytes).await?);
+        let signature = JwsSignature::new(self.sign_bytes(&signing_bytes).await?);
 
-        Ok(DecodedJWS {
+        Ok(DecodedJws {
             signing_bytes: DecodedSigningBytes {
                 bytes: Cow::Owned(signing_bytes),
                 header,
@@ -123,7 +123,7 @@ pub trait JWSSigner {
     }
 
     #[allow(async_fn_in_trait)]
-    async fn sign(&self, payload: impl JWSPayload) -> Result<UrlSafeJwsBuf, SignatureError> {
+    async fn sign(&self, payload: impl JwsPayload) -> Result<JwsBuf, SignatureError> {
         Ok(self
             .sign_into_decoded(payload)
             .await?
@@ -134,8 +134,8 @@ pub trait JWSSigner {
     }
 }
 
-impl<'a, T: JWSSigner> JWSSigner for &'a T {
-    async fn fetch_info(&self) -> Result<JWSSignerInfo, SignatureError> {
+impl<'a, T: JwsSigner> JwsSigner for &'a T {
+    async fn fetch_info(&self) -> Result<JwsSignerInfo, SignatureError> {
         T::fetch_info(*self).await
     }
 
@@ -143,13 +143,13 @@ impl<'a, T: JWSSigner> JWSSigner for &'a T {
         T::sign_bytes(*self, signing_bytes).await
     }
 
-    async fn sign(&self, payload: impl JWSPayload) -> Result<UrlSafeJwsBuf, SignatureError> {
+    async fn sign(&self, payload: impl JwsPayload) -> Result<JwsBuf, SignatureError> {
         T::sign(*self, payload).await
     }
 }
 
-impl<'a, T: JWSSigner + Clone> JWSSigner for Cow<'a, T> {
-    async fn fetch_info(&self) -> Result<JWSSignerInfo, SignatureError> {
+impl<'a, T: JwsSigner + Clone> JwsSigner for Cow<'a, T> {
+    async fn fetch_info(&self) -> Result<JwsSignerInfo, SignatureError> {
         T::fetch_info(self.as_ref()).await
     }
 
@@ -157,14 +157,14 @@ impl<'a, T: JWSSigner + Clone> JWSSigner for Cow<'a, T> {
         T::sign_bytes(self.as_ref(), signing_bytes).await
     }
 
-    async fn sign(&self, payload: impl JWSPayload) -> Result<UrlSafeJwsBuf, SignatureError> {
+    async fn sign(&self, payload: impl JwsPayload) -> Result<JwsBuf, SignatureError> {
         T::sign(self.as_ref(), payload).await
     }
 }
 
-impl JWSSigner for JWK {
-    async fn fetch_info(&self) -> Result<JWSSignerInfo, SignatureError> {
-        Ok(JWSSignerInfo {
+impl JwsSigner for JWK {
+    async fn fetch_info(&self) -> Result<JwsSignerInfo, SignatureError> {
+        Ok(JwsSignerInfo {
             key_id: self.key_id.clone(),
             algorithm: self
                 .get_algorithm()
@@ -180,20 +180,20 @@ impl JWSSigner for JWK {
     }
 }
 
-pub struct JWKWithAlgorithm<'a> {
+pub struct JwkWithAlgorithm<'a> {
     pub jwk: &'a JWK,
     pub algorithm: Algorithm,
 }
 
-impl<'a> JWKWithAlgorithm<'a> {
+impl<'a> JwkWithAlgorithm<'a> {
     pub fn new(jwk: &'a JWK, algorithm: Algorithm) -> Self {
         Self { jwk, algorithm }
     }
 }
 
-impl<'a> JWSSigner for JWKWithAlgorithm<'a> {
-    async fn fetch_info(&self) -> Result<JWSSignerInfo, SignatureError> {
-        Ok(JWSSignerInfo {
+impl<'a> JwsSigner for JwkWithAlgorithm<'a> {
+    async fn fetch_info(&self) -> Result<JwsSignerInfo, SignatureError> {
+        Ok(JwsSignerInfo {
             key_id: self.jwk.key_id.clone(),
             algorithm: self.algorithm,
         })

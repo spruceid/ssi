@@ -11,7 +11,7 @@ impl SdJwtKb {
                 break unsafe {
                     // SAFETY: we already validated the SD-JWT and know it
                     // starts with a valid JWT.
-                    CompactJWSStr::new_unchecked(self.0[..i].as_bytes())
+                    Jws::new_unchecked(self.0[..i].as_bytes())
                 }
             }
         };
@@ -35,7 +35,7 @@ impl SdJwtKb {
                         Some(unsafe {
                             // SAFETY: we already validated the SD-JWT and know
                             // it ends with a valid JWT.
-                            CompactJWSStr::new_unchecked(self.0[i..].as_bytes())
+                            Jws::new_unchecked(self.0[i..].as_bytes())
                         })
                     } else {
                         None
@@ -57,11 +57,11 @@ impl SdJwtKb {
 #[derive(Debug, PartialEq)]
 pub struct PartsRef<'a> {
     /// JWT who's claims can be selectively disclosed.
-    pub jwt: &'a CompactJWSStr,
+    pub jwt: &'a Jws,
 
     /// Disclosures for associated JWT
     pub disclosures: Vec<&'a Disclosure>,
 
     /// Key binding JWT.
-    pub key_binding_jwt: Option<&'a CompactJWSStr>
+    pub key_binding_jwt: Option<&'a Jws>
 }

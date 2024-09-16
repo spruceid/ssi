@@ -2,7 +2,7 @@ use super::{Claim, InvalidClaimValue, JWTClaims};
 use crate::{CastClaim, ClaimSet, InfallibleClaimSet, NumericDate, StringOrURI};
 use ssi_claims_core::{ClaimsValidity, DateTimeProvider, ValidateClaims};
 use ssi_core::OneOrMany;
-use ssi_jws::JWSPayload;
+use ssi_jws::JwsPayload;
 use std::{borrow::Cow, collections::BTreeMap};
 
 pub trait RegisteredClaim: Claim + Into<AnyRegisteredClaim> {
@@ -77,7 +77,7 @@ impl RegisteredClaims {
 
 impl InfallibleClaimSet for RegisteredClaims {}
 
-impl JWSPayload for RegisteredClaims {
+impl JwsPayload for RegisteredClaims {
     fn typ(&self) -> Option<&'static str> {
         Some("JWT")
     }

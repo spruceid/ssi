@@ -297,10 +297,10 @@ pub fn jws_decode_verify_inner<Claims: DeserializeOwned>(
     jwt: &str,
     get_key: impl FnOnce(&Claims) -> &PublicKeyJwk,
 ) -> Result<(ssi_jws::Header, Claims), JWSDecodeVerifyError> {
-    use ssi_jws::{decode_jws_parts, split_jws, verify_bytes, DecodedJWS};
+    use ssi_jws::{decode_jws_parts, split_jws, verify_bytes, DecodedJws};
     let (header_b64, payload_enc, signature_b64) =
         split_jws(jwt).map_err(JWSDecodeVerifyError::SplitJWS)?;
-    let DecodedJWS {
+    let DecodedJws {
         signing_bytes:
             DecodedSigningBytes {
                 bytes: signing_bytes,

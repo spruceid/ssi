@@ -6,7 +6,7 @@ use flate2::Compression;
 use iref::UriBuf;
 use serde::{Deserialize, Serialize};
 use ssi_claims_core::ValidateClaims;
-use ssi_jws::ValidateJWSHeader;
+use ssi_jws::ValidateJwsHeader;
 use ssi_jwt::{
     match_claim_type, AnyClaims, Claim, ClaimSet, InvalidClaimValue, IssuedAt, Issuer, JWTClaims,
     Subject,
@@ -145,7 +145,7 @@ impl<E, P> ValidateClaims<E, P> for StatusListJwtPrivateClaims {
     }
 }
 
-impl<E> ValidateJWSHeader<E> for StatusListJwtPrivateClaims {
+impl<E> ValidateJwsHeader<E> for StatusListJwtPrivateClaims {
     fn validate_jws_header(
         &self,
         _env: &E,

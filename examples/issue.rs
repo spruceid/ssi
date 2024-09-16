@@ -5,7 +5,7 @@
 use serde_json::json;
 use ssi_claims::{
     data_integrity::{AnySuite, CryptographicSuite, ProofOptions},
-    jws::JWSPayload,
+    jws::JwsPayload,
     vc::v1::ToJwtClaims,
     VerificationParameters,
 };

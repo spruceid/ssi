@@ -4,50 +4,57 @@ use ssi_core::BytesBuf;
 use std::{ops::Deref, str::FromStr};
 
 use crate::{
-    utils::is_url_safe_base64_char, CompactJWS, CompactJWSStr, DecodeError, DecodedJWS, Header,
-    InvalidCompactJWS,
+    utils::is_url_safe_base64_char, DecodeError, DecodedJws, Header, InvalidJws, JwsSlice, JwsStr,
 };
 
 /// Creates a new static URL-safe JWS reference from a string literal.
 #[macro_export]
-macro_rules! url_safe_jws {
+macro_rules! jws {
     ($value:literal) => {
-        match $crate::UrlSafeJws::from_str_const($value) {
+        match $crate::Jws::from_str_const($value) {
             Ok(value) => value,
             Err(_) => panic!("invalid URL-safe JWS"),
         }
     };
 }
 
-/// URL-safe JWS.
+/// Borrowed URL-safe JWS.
 ///
-/// Contrarily to [`CompactJWS`] or [`CompactJWSStr`], this type guarantees that
-/// the payload uses URL-safe characters (even if it is not URL-safe encoded).
+/// This is an unsized type borrowing the JWS and meant to be referenced as
+/// `&Jws`, just like `&str`.
+/// Use [`JwsBuf`] if you need to own the JWS.
+///
+/// Contrarily to [`JwsSlice`] or [`JwsStr`], this type guarantees that
+/// the payload is URL-safe, even if it is unencoded.
+///
+/// Use [`JwsStr`] if you expect an UTF-8 encoded JWS but don't know if it is
+/// URL-safe.
+/// Use [`JwsSlice`] if you don't have any expectations about the encoding.
 #[derive(PartialEq, Eq, PartialOrd, Ord, Hash)]
 #[repr(transparent)]
-pub struct UrlSafeJws(CompactJWSStr);
+pub struct Jws(JwsStr);
 
-impl UrlSafeJws {
-    pub fn new<T: ?Sized + AsRef<[u8]>>(data: &T) -> Result<&Self, InvalidCompactJWS<&T>> {
+impl Jws {
+    pub fn new<T: ?Sized + AsRef<[u8]>>(data: &T) -> Result<&Self, InvalidJws<&T>> {
         let bytes = data.as_ref();
         match std::str::from_utf8(bytes) {
             Ok(_) => {
-                let _ = CompactJWS::new(bytes).map_err(|_| InvalidCompactJWS(data))?;
+                let _ = JwsSlice::new(bytes).map_err(|_| InvalidJws(data))?;
                 Ok(unsafe { Self::new_unchecked(bytes) })
             }
-            Err(_) => Err(InvalidCompactJWS(data)),
+            Err(_) => Err(InvalidJws(data)),
         }
     }
 
     /// Parses the given `input` string as an URL-safe JWS.
     ///
     /// Returns an error if it is not a valid URL-safe JWS.
-    pub const fn from_str_const(input: &str) -> Result<&Self, InvalidCompactJWS<&str>> {
+    pub const fn from_str_const(input: &str) -> Result<&Self, InvalidJws<&str>> {
         let bytes = input.as_bytes();
         if Self::validate(bytes) {
             Ok(unsafe { Self::new_unchecked(bytes) })
         } else {
-            Err(InvalidCompactJWS(input))
+            Err(InvalidJws(input))
         }
     }
 
@@ -127,27 +134,27 @@ impl UrlSafeJws {
     }
 }
 
-impl Deref for UrlSafeJws {
-    type Target = CompactJWS;
+impl Deref for Jws {
+    type Target = JwsSlice;
 
     fn deref(&self) -> &Self::Target {
         &self.0
     }
 }
 
-impl fmt::Display for UrlSafeJws {
+impl fmt::Display for Jws {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         self.as_str().fmt(f)
     }
 }
 
-impl fmt::Debug for UrlSafeJws {
+impl fmt::Debug for Jws {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         self.as_str().fmt(f)
     }
 }
 
-impl serde::Serialize for UrlSafeJws {
+impl serde::Serialize for Jws {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
         S: serde::Serializer,
@@ -156,60 +163,64 @@ impl serde::Serialize for UrlSafeJws {
     }
 }
 
-impl PartialEq<str> for UrlSafeJws {
+impl PartialEq<str> for Jws {
     fn eq(&self, other: &str) -> bool {
         self.as_str() == other
     }
 }
 
-impl PartialEq<String> for UrlSafeJws {
+impl PartialEq<String> for Jws {
     fn eq(&self, other: &String) -> bool {
         self.as_str() == other
     }
 }
 
-impl<'a> PartialEq<String> for &'a UrlSafeJws {
+impl<'a> PartialEq<String> for &'a Jws {
     fn eq(&self, other: &String) -> bool {
         self.as_str() == other
     }
 }
 
-impl PartialEq<UrlSafeJws> for str {
-    fn eq(&self, other: &UrlSafeJws) -> bool {
+impl PartialEq<Jws> for str {
+    fn eq(&self, other: &Jws) -> bool {
         self == other.as_str()
     }
 }
 
-impl PartialEq<UrlSafeJws> for String {
-    fn eq(&self, other: &UrlSafeJws) -> bool {
+impl PartialEq<Jws> for String {
+    fn eq(&self, other: &Jws) -> bool {
         self == other.as_str()
     }
 }
 
-impl<'a> PartialEq<&'a UrlSafeJws> for String {
-    fn eq(&self, other: &&'a UrlSafeJws) -> bool {
+impl<'a> PartialEq<&'a Jws> for String {
+    fn eq(&self, other: &&'a Jws) -> bool {
         self == other.as_str()
     }
 }
 
 /// Owned URL-safe JWS.
 ///
-/// Contrarily to [`CompactJWSBuf`] or [`CompactJWSString`], this type
-/// guarantees that the payload uses URL-safe characters (even if it is not
-/// URL-safe encoded).
+/// Contrarily to [`JwsVec`](crate::JwsVec) or [`JwsString`](crate::JwsString),
+/// this type guarantees that the payload is URL-safe, even if it is unencoded.
+///
+/// Use [`JwsString`](crate::JwsString) if you expect an UTF-8 encoded JWS but
+/// don't know if it is URL-safe.
+/// Use [`JwsVec`](crate::JwsVec) if you don't have any expectations about the
+/// encoding.
 #[derive(Clone, serde::Serialize)]
 #[serde(transparent)]
-pub struct UrlSafeJwsBuf(String);
+pub struct JwsBuf(String);
 
-impl UrlSafeJwsBuf {
-    pub fn new<B: BytesBuf>(bytes: B) -> Result<Self, InvalidCompactJWS<B>> {
-        if UrlSafeJws::validate(bytes.as_ref()) {
+impl JwsBuf {
+    pub fn new<B: BytesBuf>(bytes: B) -> Result<Self, InvalidJws<B>> {
+        if Jws::validate(bytes.as_ref()) {
             Ok(unsafe {
                 // SAFETY: we just validated the bytes.
                 Self::new_unchecked(bytes.into())
             })
         } else {
-            Err(InvalidCompactJWS(bytes))
+            Err(InvalidJws(bytes))
         }
     }
 
@@ -224,10 +235,7 @@ impl UrlSafeJwsBuf {
     /// Creates a new detached JWS from a header and base64-encoded signature.
     ///
     /// Detached means the payload will not appear in the JWS.
-    pub fn new_detached(
-        header: Header,
-        b64_signature: &[u8],
-    ) -> Result<Self, InvalidCompactJWS<Vec<u8>>> {
+    pub fn new_detached(header: Header, b64_signature: &[u8]) -> Result<Self, InvalidJws<Vec<u8>>> {
         let mut bytes = header.encode().into_bytes();
         bytes.extend(b"..");
         bytes.extend(b64_signature.iter().copied());
@@ -246,7 +254,7 @@ impl UrlSafeJwsBuf {
     pub fn encode_from_signing_bytes_and_signature(
         signing_bytes: Vec<u8>,
         signature: &[u8],
-    ) -> Result<Self, InvalidCompactJWS<Vec<u8>>> {
+    ) -> Result<Self, InvalidJws<Vec<u8>>> {
         let b64_signature = base64::prelude::BASE64_URL_SAFE_NO_PAD.encode(signature);
         let mut bytes = signing_bytes;
         bytes.push(b'.');
@@ -257,7 +265,7 @@ impl UrlSafeJwsBuf {
     pub fn from_signing_bytes_and_signature(
         signing_bytes: Vec<u8>,
         signature: impl IntoIterator<Item = u8>,
-    ) -> Result<Self, InvalidCompactJWS<Vec<u8>>> {
+    ) -> Result<Self, InvalidJws<Vec<u8>>> {
         let mut bytes = signing_bytes;
         bytes.push(b'.');
         bytes.extend(signature);
@@ -278,8 +286,8 @@ impl UrlSafeJwsBuf {
         Self::new_unchecked(bytes)
     }
 
-    pub fn as_compact_jws_str(&self) -> &UrlSafeJws {
-        unsafe { UrlSafeJws::new_unchecked(self.0.as_bytes()) }
+    pub fn as_compact_jws_str(&self) -> &Jws {
+        unsafe { Jws::new_unchecked(self.0.as_bytes()) }
     }
 
     pub fn into_signing_bytes(mut self) -> String {
@@ -293,48 +301,48 @@ impl UrlSafeJwsBuf {
 
     /// Decodes the entire JWS while preserving the signing bytes so they can
     /// be verified.
-    pub fn into_decoded(self) -> Result<DecodedJWS<'static>, DecodeError> {
+    pub fn into_decoded(self) -> Result<DecodedJws<'static>, DecodeError> {
         Ok(self.decode()?.into_owned())
     }
 }
 
-impl Deref for UrlSafeJwsBuf {
-    type Target = UrlSafeJws;
+impl Deref for JwsBuf {
+    type Target = Jws;
 
     fn deref(&self) -> &Self::Target {
         self.as_compact_jws_str()
     }
 }
 
-impl fmt::Display for UrlSafeJwsBuf {
+impl fmt::Display for JwsBuf {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         self.as_str().fmt(f)
     }
 }
 
-impl fmt::Debug for UrlSafeJwsBuf {
+impl fmt::Debug for JwsBuf {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         self.as_str().fmt(f)
     }
 }
 
-impl FromStr for UrlSafeJwsBuf {
-    type Err = InvalidCompactJWS;
+impl FromStr for JwsBuf {
+    type Err = InvalidJws;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         Self::new(s.to_owned())
     }
 }
 
-impl TryFrom<String> for UrlSafeJwsBuf {
-    type Error = InvalidCompactJWS<String>;
+impl TryFrom<String> for JwsBuf {
+    type Error = InvalidJws<String>;
 
     fn try_from(value: String) -> Result<Self, Self::Error> {
         Self::new(value)
     }
 }
 
-impl<'de> serde::Deserialize<'de> for UrlSafeJwsBuf {
+impl<'de> serde::Deserialize<'de> for JwsBuf {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
         D: serde::Deserializer<'de>,
@@ -342,7 +350,7 @@ impl<'de> serde::Deserialize<'de> for UrlSafeJwsBuf {
         struct Visitor;
 
         impl<'de> serde::de::Visitor<'de> for Visitor {
-            type Value = UrlSafeJwsBuf;
+            type Value = JwsBuf;
 
             fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
                 formatter.write_str("compact JWS")
@@ -359,7 +367,7 @@ impl<'de> serde::Deserialize<'de> for UrlSafeJwsBuf {
             where
                 E: serde::de::Error,
             {
-                UrlSafeJwsBuf::new(v).map_err(|e| E::custom(e))
+                JwsBuf::new(v).map_err(|e| E::custom(e))
             }
         }
 
@@ -367,38 +375,38 @@ impl<'de> serde::Deserialize<'de> for UrlSafeJwsBuf {
     }
 }
 
-impl PartialEq<str> for UrlSafeJwsBuf {
+impl PartialEq<str> for JwsBuf {
     fn eq(&self, other: &str) -> bool {
         self.as_str() == other
     }
 }
 
-impl<'a> PartialEq<&'a str> for UrlSafeJwsBuf {
+impl<'a> PartialEq<&'a str> for JwsBuf {
     fn eq(&self, other: &&'a str) -> bool {
         self.as_str() == *other
     }
 }
 
-impl PartialEq<String> for UrlSafeJwsBuf {
+impl PartialEq<String> for JwsBuf {
     fn eq(&self, other: &String) -> bool {
         self.as_str() == other
     }
 }
 
-impl PartialEq<UrlSafeJwsBuf> for str {
-    fn eq(&self, other: &UrlSafeJwsBuf) -> bool {
+impl PartialEq<JwsBuf> for str {
+    fn eq(&self, other: &JwsBuf) -> bool {
         self == other.as_str()
     }
 }
 
-impl<'a> PartialEq<UrlSafeJwsBuf> for &'a str {
-    fn eq(&self, other: &UrlSafeJwsBuf) -> bool {
+impl<'a> PartialEq<JwsBuf> for &'a str {
+    fn eq(&self, other: &JwsBuf) -> bool {
         *self == other.as_str()
     }
 }
 
-impl PartialEq<UrlSafeJwsBuf> for String {
-    fn eq(&self, other: &UrlSafeJwsBuf) -> bool {
+impl PartialEq<JwsBuf> for String {
+    fn eq(&self, other: &JwsBuf) -> bool {
         self == other.as_str()
     }
 }

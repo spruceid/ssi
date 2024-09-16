@@ -3,7 +3,7 @@ use std::sync::LazyLock;
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use ssi_jwk::JWK;
-use ssi_jws::{JWSPayload, UrlSafeJwsBuf};
+use ssi_jws::{JwsBuf, JwsPayload};
 use ssi_jwt::{JWTClaims, NumericDate};
 use ssi_sd_jwt::{disclosure, Disclosure, PartsRef};
 
@@ -91,7 +91,7 @@ static UNDISCLOSED_CLAIMS: LazyLock<Value> = LazyLock::new(|| {
     })
 });
 
-async fn test_standard_sd_jwt() -> UrlSafeJwsBuf {
+async fn test_standard_sd_jwt() -> JwsBuf {
     (*UNDISCLOSED_CLAIMS).sign(&*JWK).await.unwrap()
 }
 

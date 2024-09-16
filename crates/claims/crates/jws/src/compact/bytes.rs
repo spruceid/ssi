@@ -1,6 +1,6 @@
 use crate::{
-    CompactJWSString, DecodeError, DecodedJWS, DecodedSigningBytes, Header, InvalidHeader,
-    JWSSignature, UrlSafeJwsBuf,
+    utils::is_url_safe_base64_char, DecodeError, DecodedJws, DecodedSigningBytes, Header,
+    InvalidHeader, InvalidJws, JwsBuf, JwsSignature, JwsString,
 };
 pub use base64::DecodeError as Base64DecodeError;
 use base64::Engine;
@@ -8,13 +8,24 @@ use ssi_claims_core::{ProofValidationError, ResolverProvider, Verification};
 use ssi_jwk::JWKResolver;
 use std::{borrow::Cow, ops::Deref};
 
-/// JWS in compact serialized form.
+/// Borrowed JWS without any encoding guaranties.
+///
+/// This is an unsized type borrowing the JWS and meant to be referenced as
+/// `&JwsSlice`, just like `&[u8]`.
+/// Use [`JwsVec`] if you need to own the JWS.
+///
+/// This type is similar to the [`Jws`](crate::Jws) type.
+/// However contrarily to `Jws`, there is no guarantee that the JWS is a valid
+/// UTF-8 string (and even less URL-safe).
+///
+/// Use [`JwsStr`](crate::JwsStr) if you expect UTF-8 encoded JWSs.
+/// Use [`Jws`](crate::Jws) if you expect URL-safe JWSs.
 #[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
 #[repr(transparent)]
-pub struct CompactJWS([u8]);
+pub struct JwsSlice([u8]);
 
-impl CompactJWS {
-    pub fn new<T>(data: &T) -> Result<&Self, InvalidCompactJWS<&T>>
+impl JwsSlice {
+    pub fn new<T>(data: &T) -> Result<&Self, InvalidJws<&T>>
     where
         T: ?Sized + AsRef<[u8]>,
     {
@@ -22,7 +33,7 @@ impl CompactJWS {
         if Self::validate(bytes) {
             Ok(unsafe { Self::new_unchecked(bytes) })
         } else {
-            Err(InvalidCompactJWS(data))
+            Err(InvalidJws(data))
         }
     }
 
@@ -35,44 +46,75 @@ impl CompactJWS {
         std::mem::transmute(data)
     }
 
-    pub fn validate(data: &[u8]) -> bool {
-        enum State {
-            Header,
-            Payload,
-            Signature,
-        }
-
-        let mut state = State::Header;
-
-        for &b in data {
-            match state {
-                State::Header => match b {
-                    b'.' => state = State::Payload,
-                    b'0'..=b'9' | b'A'..=b'Z' | b'a'..=b'z' | b'+' | b'/' => (),
-                    _ => return false,
-                },
-                State::Payload => {
-                    if b == b'.' {
-                        state = State::Signature
-                    }
-                }
-                State::Signature => (),
-            }
-        }
-
-        matches!(state, State::Signature)
+    pub const fn validate(bytes: &[u8]) -> bool {
+        Self::validate_range(bytes, 0, bytes.len())
     }
 
-    pub fn check_signing_bytes(data: &[u8]) -> bool {
-        for &b in data {
-            match b {
-                b'0'..=b'9' | b'A'..=b'Z' | b'a'..=b'z' | b'+' | b'/' => (),
-                b'.' => return true,
-                _ => return false,
+    pub const fn validate_range(bytes: &[u8], mut i: usize, end: usize) -> bool {
+        let mut j = if end > bytes.len() { bytes.len() } else { end };
+
+        // Header.
+        loop {
+            if i >= j {
+                // Missing `.`
+                return false;
             }
+
+            if bytes[i] == b'.' {
+                break;
+            }
+
+            if !is_url_safe_base64_char(bytes[i]) {
+                return false;
+            }
+
+            i += 1
         }
 
-        false
+        // Signature.
+        if i >= j {
+            return false;
+        }
+        j -= 1;
+        loop {
+            if i >= j {
+                // Missing `.`
+                return false;
+            }
+
+            if bytes[j] == b'.' {
+                break;
+            }
+
+            if !is_url_safe_base64_char(bytes[j]) {
+                return false;
+            }
+
+            j -= 1
+        }
+
+        true
+    }
+
+    pub fn check_signing_bytes(bytes: &[u8]) -> bool {
+        let mut i = 0;
+
+        loop {
+            if i >= bytes.len() {
+                // Missing `.`
+                break false;
+            }
+
+            if bytes[i] == b'.' {
+                break true;
+            }
+
+            if !is_url_safe_base64_char(bytes[i]) {
+                return false;
+            }
+
+            i += 1
+        }
     }
 
     pub fn len(&self) -> usize {
@@ -127,20 +169,20 @@ impl CompactJWS {
         unsafe { std::str::from_utf8_unchecked(&self.0[self.signature_start()..]) }
     }
 
-    pub fn decode_signature(&self) -> Result<JWSSignature, Base64DecodeError> {
+    pub fn decode_signature(&self) -> Result<JwsSignature, Base64DecodeError> {
         base64::prelude::BASE64_URL_SAFE_NO_PAD
             .decode(self.signature())
-            .map(JWSSignature::new)
+            .map(JwsSignature::new)
     }
 
     /// Decodes the entire JWS.
-    pub fn decode(&self) -> Result<DecodedJWS<Cow<[u8]>>, DecodeError> {
+    pub fn decode(&self) -> Result<DecodedJws<Cow<[u8]>>, DecodeError> {
         let header = self.decode_header().map_err(DecodeError::Header)?;
         let payload = self.decode_payload(&header).map_err(DecodeError::Payload)?;
         let signature = self.decode_signature().map_err(DecodeError::Signature)?;
         let signing_bytes = self.signing_bytes();
 
-        Ok(DecodedJWS::new(
+        Ok(DecodedJws::new(
             DecodedSigningBytes {
                 bytes: Cow::Borrowed(signing_bytes),
                 header: header,
@@ -200,15 +242,22 @@ impl CompactJWS {
     }
 }
 
-/// JWS in compact serialized form.
-pub struct CompactJWSBuf(Vec<u8>);
+/// Owned JWS without any encoding guaranties.
+///
+/// This type is similar to the [`JwsBuf`](crate::JwsBuf) type.
+/// However contrarily to `JwsBuf`, there is no guarantee that the JWS is a
+/// valid UTF-8 string (and even less URL-safe).
+///
+/// Use [`JwsString`](crate::JwsString) if you expect UTF-8 encoded JWSs.
+/// Use [`JwsBuf`](crate::JwsBuf) if you expect URL-safe JWSs.
+pub struct JwsVec(Vec<u8>);
 
-impl CompactJWSBuf {
-    pub fn new(bytes: Vec<u8>) -> Result<Self, InvalidCompactJWS<Vec<u8>>> {
-        if CompactJWS::validate(&bytes) {
+impl JwsVec {
+    pub fn new(bytes: Vec<u8>) -> Result<Self, InvalidJws<Vec<u8>>> {
+        if JwsSlice::validate(&bytes) {
             Ok(Self(bytes))
         } else {
-            Err(InvalidCompactJWS(bytes))
+            Err(InvalidJws(bytes))
         }
     }
 
@@ -222,7 +271,7 @@ impl CompactJWSBuf {
     pub fn from_signing_bytes_and_signature(
         signing_bytes: Vec<u8>,
         signature: &[u8],
-    ) -> Result<Self, InvalidCompactJWS<Vec<u8>>> {
+    ) -> Result<Self, InvalidJws<Vec<u8>>> {
         let mut bytes = signing_bytes;
         bytes.push(b'.');
         bytes.extend_from_slice(signature);
@@ -253,8 +302,8 @@ impl CompactJWSBuf {
         Self::new_unchecked(bytes)
     }
 
-    pub fn as_compact_jws(&self) -> &CompactJWS {
-        unsafe { CompactJWS::new_unchecked(&self.0) }
+    pub fn as_compact_jws(&self) -> &JwsSlice {
+        unsafe { JwsSlice::new_unchecked(&self.0) }
     }
 
     pub fn into_signing_bytes(mut self) -> Vec<u8> {
@@ -268,33 +317,23 @@ impl CompactJWSBuf {
 
     /// Decodes the entire JWS while preserving the signing bytes so they can
     /// be verified.
-    pub fn into_decoded(self) -> Result<DecodedJWS<'static>, DecodeError> {
+    pub fn into_decoded(self) -> Result<DecodedJws<'static>, DecodeError> {
         Ok(self.decode()?.into_owned())
     }
 
-    pub fn into_url_safe(self) -> Result<UrlSafeJwsBuf, Self> {
-        UrlSafeJwsBuf::new(self.0).map_err(|InvalidCompactJWS(bytes)| Self(bytes))
+    pub fn into_url_safe(self) -> Result<JwsBuf, Self> {
+        JwsBuf::new(self.0).map_err(|InvalidJws(bytes)| Self(bytes))
     }
 
-    pub fn into_jws_string(self) -> Result<CompactJWSString, Self> {
-        CompactJWSString::new(self.0).map_err(|InvalidCompactJWS(bytes)| Self(bytes))
+    pub fn into_jws_string(self) -> Result<JwsString, Self> {
+        JwsString::new(self.0).map_err(|InvalidJws(bytes)| Self(bytes))
     }
 }
 
-impl Deref for CompactJWSBuf {
-    type Target = CompactJWS;
+impl Deref for JwsVec {
+    type Target = JwsSlice;
 
     fn deref(&self) -> &Self::Target {
         self.as_compact_jws()
-    }
-}
-
-#[derive(Debug, thiserror::Error)]
-#[error("invalid compact JWS")]
-pub struct InvalidCompactJWS<B = String>(pub B);
-
-impl<'a> InvalidCompactJWS<&'a [u8]> {
-    pub fn into_owned(self) -> InvalidCompactJWS<Vec<u8>> {
-        InvalidCompactJWS(self.0.to_owned())
     }
 }
