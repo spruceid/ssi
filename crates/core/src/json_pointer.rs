@@ -36,7 +36,7 @@ impl<'a> Default for &'a JsonPointer {
 }
 
 impl JsonPointer {
-    pub const ROOT: &Self = unsafe {
+    pub const ROOT: &'static Self = unsafe {
         // SAFETY: the empty string is a valid JSON pointer.
         JsonPointer::new_unchecked(&[])
     };
