@@ -117,6 +117,7 @@ impl JwsSlice {
         }
     }
 
+    #[allow(clippy::len_without_is_empty)] // A JWS slice cannot be empty.
     pub fn len(&self) -> usize {
         self.0.len()
     }
@@ -185,8 +186,8 @@ impl JwsSlice {
         Ok(DecodedJws::new(
             DecodedSigningBytes {
                 bytes: Cow::Borrowed(signing_bytes),
-                header: header,
-                payload: payload,
+                header,
+                payload,
             },
             signature,
         ))

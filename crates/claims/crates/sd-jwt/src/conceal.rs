@@ -151,7 +151,7 @@ impl SdJwtPayload {
         let mut sorted_pointers: Vec<_> = pointers.iter().map(Borrow::borrow).collect();
         sorted_pointers.sort_unstable();
 
-        for pointer in pointers.into_iter().rev() {
+        for pointer in pointers.iter().rev() {
             disclosures.push(conceal_object_at(
                 &mut claims,
                 &mut rng,

@@ -128,6 +128,7 @@ impl JWTClaimsBuilder {
         self.set(value)
     }
 
+    #[allow(clippy::should_implement_trait)]
     pub fn sub(self, value: impl TryIntoClaim<Subject>) -> Self {
         self.set(value)
     }

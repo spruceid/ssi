@@ -532,9 +532,8 @@ impl<'a> Iterator for BitStringIter<'a> {
     type Item = u8;
 
     fn next(&mut self) -> Option<Self::Item> {
-        self.bit_string.get(self.index).map(|status| {
+        self.bit_string.get(self.index).inspect(|_| {
             self.index += 1;
-            status
         })
     }
 }
