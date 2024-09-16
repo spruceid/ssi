@@ -196,7 +196,7 @@ impl<'a, T> DecodedJWS<'a, T> {
     pub fn into_encoded(self) -> CompactJWSBuf {
         CompactJWSBuf::from_signing_bytes_and_signature(
             self.signing_bytes.bytes.into_owned(),
-            &self.signature,
+            self.signature.encode().as_bytes(),
         )
         .unwrap()
     }

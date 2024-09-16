@@ -382,7 +382,7 @@ impl<'a> Iterator for Disclosures<'a> {
     fn next(&mut self) -> Option<Self::Item> {
         let mut i = self.offset;
 
-        while i < self.offset {
+        while i < self.bytes.len() {
             if self.bytes[i] == b'~' {
                 let disclosure = unsafe {
                     // SAFETY: we already validated the SD-JWT and know

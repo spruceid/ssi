@@ -225,7 +225,7 @@ impl CompactJWSBuf {
     ) -> Result<Self, InvalidCompactJWS<Vec<u8>>> {
         let mut bytes = signing_bytes;
         bytes.push(b'.');
-        bytes.extend(signature.iter().copied());
+        bytes.extend_from_slice(signature);
         Self::new(bytes)
     }
 

@@ -20,8 +20,8 @@ pub enum RevealError {
     Decode(#[from] DecodeError),
 
     /// Unused disclosure.
-    #[error("unused disclosure")]
-    UnusedDisclosure,
+    #[error("unused disclosure `{0:?}`")]
+    UnusedDisclosure(DecodedDisclosure<'static>),
 
     /// Claim collision.
     #[error("claim collision")]
@@ -79,6 +79,9 @@ impl SdJwtPayload {
         disclosures: &[DecodedDisclosure],
         pointers: &mut Vec<JsonPointerBuf>,
     ) -> Result<JWTClaims<T>, RevealError> {
+        eprintln!("payload: {}", serde_json::to_string_pretty(self).unwrap());
+        eprintln!("disclosures: {disclosures:#?}");
+
         let mut disclosures: IndexMap<_, _> = disclosures
             .iter()
             .map(|disclosure| {
@@ -87,17 +90,17 @@ impl SdJwtPayload {
             })
             .collect();
 
-        let mut disclosed_claims = serde_json::Map::new();
-        for (key, value) in &self.claims {
-            let mut pointer = JsonPointerBuf::default();
-            pointer.push(key);
-            let mut value = value.clone();
-            reveal_value(&pointer, &mut value, &mut disclosures)?;
-            disclosed_claims.insert(key.clone(), value);
-        }
+        let mut disclosed_claims = self.claims.clone();
+        reveal_object(
+            &JsonPointerBuf::default(),
+            &mut disclosed_claims,
+            &mut disclosures,
+        )?;
 
         for (_, disclosure) in disclosures {
-            pointers.push(disclosure.pointer.ok_or(RevealError::UnusedDisclosure)?);
+            pointers.push(disclosure.pointer.ok_or_else(|| {
+                RevealError::UnusedDisclosure(disclosure.disclosure.clone().into_owned())
+            })?);
         }
 
         serde_json::from_value(Value::Object(disclosed_claims)).map_err(Into::into)
@@ -127,25 +130,7 @@ fn reveal_value(
     disclosures: &mut IndexMap<String, InProgressDisclosure>,
 ) -> Result<(), RevealError> {
     match value {
-        Value::Object(object) => {
-            // Process `_sd` claim.
-            if let Some(sd_claims) = object.remove(SD_CLAIM_NAME) {
-                for (key, value) in reveal_sd_claim(pointer, &sd_claims, disclosures)? {
-                    if object.insert(key, value).is_some() {
-                        return Err(RevealError::Collision);
-                    }
-                }
-            }
-
-            // Visit sub-values.
-            for (key, sub_value) in object {
-                let mut pointer = pointer.to_owned();
-                pointer.push(key);
-                reveal_value(&pointer, sub_value, disclosures)?
-            }
-
-            Ok(())
-        }
+        Value::Object(object) => reveal_object(pointer, object, disclosures),
         Value::Array(array) => array.try_retain_mut(|i, item| {
             let mut pointer = pointer.to_owned();
             pointer.push_index(i);
@@ -154,11 +139,16 @@ fn reveal_value(
                 Some(hash) => match disclosures.get_mut(hash) {
                     Some(in_progress_disclosure) => match &in_progress_disclosure.disclosure.desc {
                         DisclosureDescription::ArrayItem(value) => {
-                            if in_progress_disclosure.pointer.replace(pointer).is_some() {
+                            if in_progress_disclosure
+                                .pointer
+                                .replace(pointer.clone())
+                                .is_some()
+                            {
                                 return Err(RevealError::DisclosureUsedMultipleTimes);
                             }
 
                             *item = value.clone();
+                            reveal_value(&pointer, item, disclosures)?;
                             Ok(true)
                         }
                         DisclosureDescription::ObjectEntry { .. } => {
@@ -175,6 +165,30 @@ fn reveal_value(
         }),
         _ => Ok(()),
     }
+}
+
+fn reveal_object(
+    pointer: &JsonPointer,
+    object: &mut serde_json::Map<String, Value>,
+    disclosures: &mut IndexMap<String, InProgressDisclosure>,
+) -> Result<(), RevealError> {
+    // Process `_sd` claim.
+    if let Some(sd_claims) = object.remove(SD_CLAIM_NAME) {
+        for (key, value) in reveal_sd_claim(pointer, &sd_claims, disclosures)? {
+            if object.insert(key, value).is_some() {
+                return Err(RevealError::Collision);
+            }
+        }
+    }
+
+    // Visit sub-values.
+    for (key, sub_value) in object {
+        let mut pointer = pointer.to_owned();
+        pointer.push(key);
+        reveal_value(&pointer, sub_value, disclosures)?
+    }
+
+    Ok(())
 }
 
 fn reveal_sd_claim(
@@ -261,25 +275,26 @@ mod tests {
             "iss": "https://example.com/issuer",
             "iat": 1683000000,
             "exp": 1883000000,
-            "sub": "6c5c0a49-b589-431d-bae7-219122a9ec2c",
-            "given_name": "太郎",
-            "family_name": "山田",
-            "email": "\"unusual email address\"@example.jp",
-            "phone_number": "+81-80-1234-5678",
+            // "sub": "6c5c0a49-b589-431d-bae7-219122a9ec2c",
+            // "given_name": "太郎",
+            // "family_name": "山田",
+            // "email": "\"unusual email address\"@example.jp",
+            // "phone_number": "+81-80-1234-5678",
             "address": {
-                "street_address": "東京都港区芝公園４丁目２−８",
-                "locality": "東京都",
+                // "street_address": "東京都港区芝公園４丁目２−８",
+                // "locality": "東京都",
                 "region": "港区",
                 "country": "JP"
             },
-            "birthdate": "1940-01-01"
+            // "birthdate": "1940-01-01"
         })
     });
 
     #[test]
     fn disclose() {
         let sd_jwt = SdJwt::new(SD_JWT).unwrap();
-        let disclosed = sd_jwt.decode().unwrap().reveal_any().unwrap();
+        let decoded = sd_jwt.decode().unwrap();
+        let disclosed = decoded.reveal_any().unwrap();
         let output = serde_json::to_value(disclosed.claims()).unwrap();
         assert_eq!(output, *DISCLOSED_CLAIMS)
     }

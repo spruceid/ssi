@@ -9,22 +9,46 @@ use ssi_sd_jwt::{disclosure, Disclosure, PartsRef};
 
 #[derive(Debug, Default, Deserialize, Serialize, PartialEq)]
 struct ExampleClaims {
+    #[serde(skip_serializing_if = "Option::is_none")]
     given_name: Option<String>,
+
+    #[serde(skip_serializing_if = "Option::is_none")]
     family_name: Option<String>,
+
+    #[serde(skip_serializing_if = "Option::is_none")]
     email: Option<String>,
+
+    #[serde(skip_serializing_if = "Option::is_none")]
     phone_number: Option<String>,
+
+    #[serde(skip_serializing_if = "Option::is_none")]
     phone_number_verified: Option<bool>,
+
+    #[serde(skip_serializing_if = "Option::is_none")]
     address: Option<AddressClaim>,
+
+    #[serde(skip_serializing_if = "Option::is_none")]
     birthdate: Option<String>,
+
+    #[serde(skip_serializing_if = "Option::is_none")]
     updated_at: Option<NumericDate>,
+
+    #[serde(skip_serializing_if = "Option::is_none")]
     nationalities: Option<Vec<String>>,
 }
 
 #[derive(Debug, Default, Deserialize, Serialize, PartialEq)]
 struct AddressClaim {
+    #[serde(skip_serializing_if = "Option::is_none")]
     street_address: Option<String>,
+
+    #[serde(skip_serializing_if = "Option::is_none")]
     locality: Option<String>,
+
+    #[serde(skip_serializing_if = "Option::is_none")]
     region: Option<String>,
+
+    #[serde(skip_serializing_if = "Option::is_none")]
     country: Option<String>,
 }
 
@@ -97,17 +121,28 @@ async fn disclose_single() {
 
     let disclosed = sd_jwt.decode().unwrap().reveal::<ExampleClaims>().unwrap();
 
-    assert_eq!(
-        disclosed.into_claims(),
-        JWTClaims::builder()
-            .sub("user_42")
-            .with_private_claims(ExampleClaims {
-                email: Some("johndoe@example.com".to_owned()),
-                nationalities: Some(vec![]),
-                ..Default::default()
-            })
-            .unwrap()
+    let expected = JWTClaims::builder()
+        .iss("https://example.com/issuer")
+        .iat(1683000000)
+        .exp(1883000000)
+        .sub("user_42")
+        .with_private_claims(ExampleClaims {
+            email: Some("johndoe@example.com".to_owned()),
+            nationalities: Some(vec![]),
+            ..Default::default()
+        })
+        .unwrap();
+
+    eprintln!(
+        "found    = {}",
+        serde_json::to_string_pretty(disclosed.claims()).unwrap()
     );
+    eprintln!(
+        "expected = {}",
+        serde_json::to_string_pretty(&expected).unwrap()
+    );
+
+    assert_eq!(disclosed.into_claims(), expected);
 }
 
 #[async_std::test]
@@ -121,6 +156,9 @@ async fn decode_single_array_item() {
     assert_eq!(
         disclosed.into_claims(),
         JWTClaims::builder()
+            .iss("https://example.com/issuer")
+            .iat(1683000000)
+            .exp(1883000000)
             .sub("user_42")
             .with_private_claims(ExampleClaims {
                 nationalities: Some(vec!["DE".to_owned()]),

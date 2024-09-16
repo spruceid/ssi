@@ -148,7 +148,10 @@ impl SdJwtPayload {
     ) -> Result<(Self, Vec<DecodedDisclosure<'static>>), ConcealError> {
         let mut disclosures = Vec::new();
 
-        for pointer in pointers {
+        let mut sorted_pointers: Vec<_> = pointers.iter().map(Borrow::borrow).collect();
+        sorted_pointers.sort_unstable();
+
+        for pointer in pointers.into_iter().rev() {
             disclosures.push(conceal_object_at(
                 &mut claims,
                 &mut rng,

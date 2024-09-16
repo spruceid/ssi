@@ -1,5 +1,6 @@
 use base64::Engine;
 use core::fmt;
+use ssi_core::BytesBuf;
 use std::{ops::Deref, str::FromStr};
 
 use crate::{
@@ -201,24 +202,14 @@ impl<'a> PartialEq<&'a UrlSafeJws> for String {
 pub struct UrlSafeJwsBuf(String);
 
 impl UrlSafeJwsBuf {
-    pub fn new(bytes: Vec<u8>) -> Result<Self, InvalidCompactJWS<Vec<u8>>> {
-        match String::from_utf8(bytes) {
-            Ok(string) => {
-                if CompactJWS::validate(string.as_bytes()) {
-                    Ok(Self(string))
-                } else {
-                    Err(InvalidCompactJWS(string.into_bytes()))
-                }
-            }
-            Err(e) => Err(InvalidCompactJWS(e.into_bytes())),
-        }
-    }
-
-    pub fn from_string(string: String) -> Result<Self, InvalidCompactJWS<String>> {
-        if CompactJWS::validate(string.as_bytes()) {
-            Ok(Self(string))
+    pub fn new<B: BytesBuf>(bytes: B) -> Result<Self, InvalidCompactJWS<B>> {
+        if UrlSafeJws::validate(bytes.as_ref()) {
+            Ok(unsafe {
+                // SAFETY: we just validated the bytes.
+                Self::new_unchecked(bytes.into())
+            })
         } else {
-            Err(InvalidCompactJWS(string))
+            Err(InvalidCompactJWS(bytes))
         }
     }
 
@@ -331,7 +322,7 @@ impl FromStr for UrlSafeJwsBuf {
     type Err = InvalidCompactJWS;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        Self::from_string(s.to_owned())
+        Self::new(s.to_owned())
     }
 }
 
@@ -339,7 +330,7 @@ impl TryFrom<String> for UrlSafeJwsBuf {
     type Error = InvalidCompactJWS<String>;
 
     fn try_from(value: String) -> Result<Self, Self::Error> {
-        Self::from_string(value)
+        Self::new(value)
     }
 }
 
@@ -368,7 +359,7 @@ impl<'de> serde::Deserialize<'de> for UrlSafeJwsBuf {
             where
                 E: serde::de::Error,
             {
-                UrlSafeJwsBuf::from_string(v).map_err(|e| E::custom(e))
+                UrlSafeJwsBuf::new(v).map_err(|e| E::custom(e))
             }
         }
 

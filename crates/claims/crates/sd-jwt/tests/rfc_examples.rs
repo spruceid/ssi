@@ -24,19 +24,36 @@ static JWK: LazyLock<JWK> = LazyLock::new(|| {
 async fn rfc_a_1_example_2_verification() {
     #[derive(Debug, Default, Clone, Serialize, Deserialize, PartialEq)]
     struct Example2Address {
+        #[serde(skip_serializing_if = "Option::is_none")]
         street_address: Option<String>,
+
+        #[serde(skip_serializing_if = "Option::is_none")]
         locality: Option<String>,
+
+        #[serde(skip_serializing_if = "Option::is_none")]
         region: Option<String>,
+
+        #[serde(skip_serializing_if = "Option::is_none")]
         country: Option<String>,
     }
 
     #[derive(Debug, Default, Clone, Serialize, Deserialize, PartialEq)]
     struct Example2Claims {
+        #[serde(skip_serializing_if = "Option::is_none")]
         given_name: Option<String>,
+
+        #[serde(skip_serializing_if = "Option::is_none")]
         family_name: Option<String>,
+
+        #[serde(skip_serializing_if = "Option::is_none")]
         email: Option<String>,
+
+        #[serde(skip_serializing_if = "Option::is_none")]
         phone_number: Option<String>,
-        address: Option<Example2Address>,
+
+        address: Example2Address,
+
+        #[serde(skip_serializing_if = "Option::is_none")]
         birthdate: Option<String>,
     }
 
@@ -92,43 +109,61 @@ async fn rfc_a_1_example_2_verification() {
         .unwrap();
 
     assert_eq!(verification, Ok(()));
-    assert_eq!(
-        *revealed.claims(),
-        JWTClaims::builder()
-            .sub("6c5c0a49-b589-431d-bae7-219122a9ec2c")
-            .iss("https://example.com/issuer")
-            .iat(1683000000)
-            .exp(1883000000)
-            .with_private_claims(Example2Claims {
-                given_name: Some("太郎".to_owned()),
-                family_name: Some("山田".to_owned()),
-                email: Some("\"unusual email address\"@example.jp".to_owned()),
-                phone_number: Some("+81-80-1234-5678".to_owned()),
-                address: Some(Example2Address {
-                    street_address: Some("東京都港区芝公園４丁目２−８".to_owned()),
-                    locality: Some("東京都".to_owned()),
-                    region: Some("港区".to_owned()),
-                    country: Some("JP".to_owned()),
-                }),
-                birthdate: Some("1940-01-01".to_owned())
-            })
-            .unwrap()
+
+    let expected = JWTClaims::builder()
+        .sub("6c5c0a49-b589-431d-bae7-219122a9ec2c")
+        .iss("https://issuer.example.com")
+        .iat(1683000000)
+        .exp(1883000000)
+        .with_private_claims(Example2Claims {
+            given_name: Some("太郎".to_owned()),
+            family_name: Some("山田".to_owned()),
+            email: Some("\"unusual email address\"@example.jp".to_owned()),
+            phone_number: Some("+81-80-1234-5678".to_owned()),
+            address: Example2Address {
+                street_address: Some("東京都港区芝公園４丁目２−８".to_owned()),
+                locality: Some("東京都".to_owned()),
+                region: Some("港区".to_owned()),
+                country: Some("JP".to_owned()),
+            },
+            birthdate: Some("1940-01-01".to_owned()),
+        })
+        .unwrap();
+
+    eprintln!(
+        "expected = {}",
+        serde_json::to_string_pretty(&expected).unwrap()
     );
+    eprintln!(
+        "found    = {}",
+        serde_json::to_string_pretty(revealed.claims()).unwrap()
+    );
+
+    assert_eq!(*revealed.claims(), expected);
 
     let empty_sd_jwt = revealed.clone().cleared().into_encoded();
 
     let (empty_revealed, verification) = empty_sd_jwt.decode_reveal_verify(&params).await.unwrap();
 
     assert_eq!(verification, Ok(()));
-    assert_eq!(
-        *empty_revealed.claims(),
-        JWTClaims::builder()
-            .iss("https://example.com/issuer")
-            .iat(1683000000)
-            .exp(1883000000)
-            .with_private_claims(Example2Claims::default())
-            .unwrap()
+
+    let expected = JWTClaims::builder()
+        .iss("https://issuer.example.com")
+        .iat(1683000000)
+        .exp(1883000000)
+        .with_private_claims(Example2Claims::default())
+        .unwrap();
+
+    eprintln!(
+        "expected = {}",
+        serde_json::to_string_pretty(&expected).unwrap()
     );
+    eprintln!(
+        "found    = {}",
+        serde_json::to_string_pretty(empty_revealed.claims()).unwrap()
+    );
+
+    assert_eq!(*empty_revealed.claims(), expected);
 
     let sub_sd_jwt = revealed
         .clone()
@@ -142,37 +177,46 @@ async fn rfc_a_1_example_2_verification() {
         *sub_revealed.claims(),
         JWTClaims::builder()
             .sub("6c5c0a49-b589-431d-bae7-219122a9ec2c")
-            .iss("https://example.com/issuer")
+            .iss("https://issuer.example.com")
             .iat(1683000000)
             .exp(1883000000)
             .with_private_claims(Example2Claims::default())
             .unwrap()
     );
 
-    let address_sd_jwt = revealed
+    let country_sd_jwt = revealed
         .clone()
-        .retaining(&[json_pointer!("/address")])
+        .retaining(&[json_pointer!("/address/country")])
         .into_encoded();
 
-    let (address_revealed, verification) =
-        address_sd_jwt.decode_reveal_verify(&params).await.unwrap();
+    let (country_revealed, verification) =
+        country_sd_jwt.decode_reveal_verify(&params).await.unwrap();
 
     assert_eq!(verification, Ok(()));
-    assert_eq!(
-        *address_revealed.claims(),
-        JWTClaims::builder()
-            .iss("https://example.com/issuer")
-            .iat(1683000000)
-            .exp(1883000000)
-            .with_private_claims(Example2Claims {
-                address: Some(Example2Address {
-                    country: Some("JP".to_owned()),
-                    ..Default::default()
-                }),
+
+    let expected = JWTClaims::builder()
+        .iss("https://issuer.example.com")
+        .iat(1683000000)
+        .exp(1883000000)
+        .with_private_claims(Example2Claims {
+            address: Example2Address {
+                country: Some("JP".to_owned()),
                 ..Default::default()
-            })
-            .unwrap()
+            },
+            ..Default::default()
+        })
+        .unwrap();
+
+    eprintln!(
+        "expected = {}",
+        serde_json::to_string_pretty(&expected).unwrap()
     );
+    eprintln!(
+        "found    = {}",
+        serde_json::to_string_pretty(country_revealed.claims()).unwrap()
+    );
+
+    assert_eq!(*country_revealed.claims(), expected);
 }
 
 #[async_std::test]
@@ -195,17 +239,27 @@ async fn rfc_a_2_example_3_verification() {
 
     #[derive(Debug, Default, Serialize, Deserialize, PartialEq)]
     struct VerificationEvidence {
-        #[serde(rename = "type")]
+        #[serde(rename = "type", skip_serializing_if = "Option::is_none")]
         _type: Option<String>,
+
+        #[serde(skip_serializing_if = "Option::is_none")]
         method: Option<String>,
+
+        #[serde(skip_serializing_if = "Option::is_none")]
         time: Option<String>,
+
+        #[serde(skip_serializing_if = "Option::is_none")]
         document: Option<VerificationEvidenceDocument>,
     }
 
     #[derive(Debug, Default, Serialize, Deserialize, PartialEq)]
     struct Verification {
         trust_framework: String,
+
+        #[serde(skip_serializing_if = "Option::is_none")]
         time: Option<String>,
+
+        #[serde(skip_serializing_if = "Option::is_none")]
         verification_process: Option<String>,
         evidence: Vec<VerificationEvidence>,
     }
@@ -226,11 +280,22 @@ async fn rfc_a_2_example_3_verification() {
 
     #[derive(Debug, Default, Serialize, Deserialize, PartialEq)]
     struct VerifiedClaimsClaims {
+        #[serde(skip_serializing_if = "Option::is_none")]
         given_name: Option<String>,
+
+        #[serde(skip_serializing_if = "Option::is_none")]
         family_name: Option<String>,
+
+        #[serde(skip_serializing_if = "Option::is_none")]
         nationalities: Option<Vec<String>>,
+
+        #[serde(skip_serializing_if = "Option::is_none")]
         birthdate: Option<String>,
+
+        #[serde(skip_serializing_if = "Option::is_none")]
         place_of_birth: Option<PlaceOfBirth>,
+
+        #[serde(skip_serializing_if = "Option::is_none")]
         address: Option<Address>,
     }
 
@@ -243,8 +308,14 @@ async fn rfc_a_2_example_3_verification() {
     #[derive(Debug, Default, Serialize, Deserialize, PartialEq)]
     struct Example3Claims {
         verified_claims: VerifiedClaims,
+
+        #[serde(skip_serializing_if = "Option::is_none")]
         birth_middle_name: Option<String>,
+
+        #[serde(skip_serializing_if = "Option::is_none")]
         salutation: Option<String>,
+
+        #[serde(skip_serializing_if = "Option::is_none")]
         msisdn: Option<String>,
     }
 
@@ -318,7 +389,7 @@ async fn rfc_a_2_example_3_verification() {
     assert_eq!(
         *revealed.claims(),
         JWTClaims::builder()
-            .iss("https://example.com/issuer")
+            .iss("https://issuer.example.com")
             .iat(1683000000)
             .exp(1883000000)
             .with_private_claims(Example3Claims {

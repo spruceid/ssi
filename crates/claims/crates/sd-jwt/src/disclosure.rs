@@ -129,11 +129,10 @@ pub struct DisclosureBuf(Vec<u8>);
 impl DisclosureBuf {
     /// Creates a disclosure from its defining parts.
     pub fn encode_from_parts(salt: &str, kind: &DisclosureDescription) -> Self {
-        Self(
-            BASE64_URL_SAFE_NO_PAD
-                .encode(kind.to_value(salt).to_string())
-                .into_bytes(),
-        )
+        let string = kind.to_value(salt).to_string();
+        // eprintln!("value = {string}");
+
+        Self(BASE64_URL_SAFE_NO_PAD.encode(string).into_bytes())
     }
 
     /// Borrows the disclosure.
@@ -230,6 +229,15 @@ impl<'a> DecodedDisclosure<'a> {
             encoded: Cow::Owned(DisclosureBuf::encode_from_parts(&salt, &kind)),
             salt,
             desc: kind,
+        }
+    }
+
+    /// Clones the encoded disclosure to fully owned the decoded disclosure.
+    pub fn into_owned(self) -> DecodedDisclosure<'static> {
+        DecodedDisclosure {
+            encoded: Cow::Owned(self.encoded.into_owned()),
+            salt: self.salt,
+            desc: self.desc,
         }
     }
 }
@@ -383,7 +391,7 @@ mod tests {
                 "nPuoQnkRFq3BIeAm7AnXFA".to_owned(),
                 DisclosureDescription::ArrayItem(serde_json::json!("DE"))
             ),
-            DecodedDisclosure::new("WyJuUHVvUW5rUkZxM0JJZUFtN0FuWEZBIiwgIkRFIl0").unwrap()
+            DecodedDisclosure::new("WyJuUHVvUW5rUkZxM0JJZUFtN0FuWEZBIiwiREUiXQ").unwrap()
         )
     }
 }

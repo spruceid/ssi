@@ -1,4 +1,5 @@
 use crate::{verify_bytes, DecodedJWS, DecodedSigningBytes, Error, Header};
+use base64::{engine::general_purpose::URL_SAFE_NO_PAD, Engine};
 use ssi_claims_core::{
     ClaimsValidity, InvalidProof, ProofValidationError, ProofValidity, ResolverProvider,
     ValidateClaims, ValidateProof, VerifiableClaims,
@@ -46,6 +47,10 @@ impl JWSSignature {
 
     pub fn into_bytes(self) -> Vec<u8> {
         self.0
+    }
+
+    pub fn encode(&self) -> String {
+        URL_SAFE_NO_PAD.encode(&self.0)
     }
 }
 
