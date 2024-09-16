@@ -7,5 +7,3 @@ pub use jose::*;
 
 mod cose;
 pub use cose::*;
-
-mod sd_jwt;
