@@ -36,7 +36,7 @@ use ssi_claims_core::{
     DateTimeProvider, ProofValidationError, ResolverProvider, SignatureError, ValidateClaims,
     Verification,
 };
-use ssi_core::{BytesBuf, JsonPointer, JsonPointerBuf};
+use ssi_core::BytesBuf;
 use ssi_jwk::JWKResolver;
 use ssi_jws::{DecodedJws, Jws, JwsPayload, JwsSignature, JwsSigner, ValidateJwsHeader};
 use ssi_jwt::{AnyClaims, ClaimSet, DecodedJwt, JWTClaims};
@@ -47,6 +47,8 @@ use std::{
     ops::Deref,
     str::FromStr,
 };
+
+pub use ssi_core::{json_pointer, JsonPointer, JsonPointerBuf};
 
 pub(crate) mod utils;
 use utils::is_url_safe_base64_char;
