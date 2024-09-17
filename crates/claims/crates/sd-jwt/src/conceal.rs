@@ -11,7 +11,7 @@ use ssi_jwt::JWTClaims;
 
 use crate::{
     DecodedDisclosure, Disclosure, DisclosureDescription, SdAlg, SdJwtBuf, SdJwtPayload,
-    SD_CLAIM_NAME,
+    ARRAY_CLAIM_ITEM_PROPERTY_NAME, SD_CLAIM_NAME,
 };
 
 /// Error that can occur during concealing.
@@ -146,8 +146,11 @@ impl SdJwtPayload {
         sd_alg: SdAlg,
         pointers: &[impl Borrow<JsonPointer>],
     ) -> Result<(Self, Vec<DecodedDisclosure<'static>>), ConcealError> {
-        let mut disclosures = Vec::new();
+        let mut disclosures = Vec::with_capacity(pointers.len());
 
+        // We sort the pointers here in order to visit parent pointers *after*
+        // child pointers (e.g. `/foo` after `/foo/bar`). Pointers are sorted
+        // parents-first in `sorted_pointers`, so we iterate over it in reverse.
         let mut sorted_pointers: Vec<_> = pointers.iter().map(Borrow::borrow).collect();
         sorted_pointers.sort_unstable();
 
@@ -248,7 +251,10 @@ fn conceal_array_at(
 
 fn new_concealed_array_item(sd_alg: SdAlg, disclosure: &Disclosure) -> Value {
     let mut object = serde_json::Map::new();
-    object.insert("...".into(), sd_alg.hash(disclosure).into());
+    object.insert(
+        ARRAY_CLAIM_ITEM_PROPERTY_NAME.into(),
+        sd_alg.hash(disclosure).into(),
+    );
     Value::Object(object)
 }
 

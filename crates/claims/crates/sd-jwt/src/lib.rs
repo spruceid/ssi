@@ -1,6 +1,33 @@
 //! Selective Disclosure for JWTs ([SD-JWT]).
 //!
 //! [SD-JWT]: <https://datatracker.ietf.org/doc/draft-ietf-oauth-selective-disclosure-jwt/>
+//!
+//! # Usage
+//!
+//! Contrarily to regular JWTs or JWSs that can be verified directly after
+//! being decoded, SD-JWTs claims need to be revealed before being validated.
+//! The standard path looks like this:
+//! ```text
+//! ┌───────┐                     ┌──────────────┐                            ┌───────────────┐
+//! │       │                     │              │                            │               │
+//! │ SdJwt │ ─► SdJwt::decode ─► │ DecodedSdJwt │ ─► DecodedSdJwt::reveal ─► │ RevealedSdJwt │
+//! │       │                     │              │                            │               │
+//! └───────┘                     └──────────────┘                            └───────────────┘
+//! ```
+//!
+//! The base SD-JWT type is [`SdJwt`] (or [`SdJwtBuf`] if you want to own the
+//! SD-JWT). The [`SdJwt::decode`] function decodes the SD-JWT header, payload
+//! and disclosures into a [`DecodedSdJwt`]. At this point the payload claims
+//! are still concealed and cannot be validated. The [`DecodedSdJwt::reveal`]
+//! function uses the disclosures to reveal the disclosed claims and discard
+//! the non-disclosed claims. The result is a [`RevealedSdJwt`] containing the
+//! revealed JWT, and a set of JSON pointers ([`JsonPointerBuf`]) mapping each
+//! revealed claim to its disclosure. The [`RevealedSdJwt::verify`] function
+//! can then be used to verify the JWT as usual.
+//!
+//! Alternatively, if you don't care about the byproducts of decoding and
+//! revealing the claims, a [`SdJwt::decode_reveal_verify`] function is provided
+//! to decode, reveal and verify the claims directly.
 #![warn(missing_docs)]
 use rand::{CryptoRng, RngCore};
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
@@ -18,21 +45,14 @@ use std::{
     collections::BTreeMap,
     fmt::{self, Write},
     ops::Deref,
+    str::FromStr,
 };
 
 pub(crate) mod utils;
 use utils::is_url_safe_base64_char;
 
-// mod error;
-// pub use error::*;
-
 mod digest;
 pub use digest::*;
-
-// pub(crate) mod encode;
-// pub use encode::{
-//     encode_array_disclosure, encode_property_disclosure, encode_sign, UnencodedDisclosure,
-// };
 
 mod decode;
 pub use decode::*;
@@ -42,7 +62,6 @@ pub use disclosure::*;
 
 mod conceal;
 pub use conceal::*;
-// mod sign;
 
 mod reveal;
 pub use reveal::*;
@@ -54,7 +73,7 @@ const ARRAY_CLAIM_ITEM_PROPERTY_NAME: &str = "...";
 /// Invalid SD-JWT error.
 #[derive(Debug, thiserror::Error)]
 #[error("invalid SD-JWT: `{0}`")]
-pub struct InvalidSdJwt<T>(pub T);
+pub struct InvalidSdJwt<T = String>(pub T);
 
 /// Creates a new static SD-JWT reference from a string literal.
 #[macro_export]
@@ -80,6 +99,7 @@ macro_rules! sd_jwt {
 /// DISCLOSURE = BASE64URL
 /// SD-JWT = JWT "~" *[DISCLOSURE "~"]
 /// ```
+#[derive(PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct SdJwt([u8]);
 
 impl SdJwt {
@@ -258,6 +278,11 @@ impl SdJwt {
 
     /// Decodes, reveals and verify a compact SD-JWT.
     ///
+    /// The type parameter `T` corresponds to the set of private JWT claims
+    /// contained in the encoded SD-JWT. If you don't know what value to use
+    /// for this parameter, you can use the [`Self::decode_reveal_verify_any`]
+    /// function instead.
+    ///
     /// Returns the decoded JWT with the verification status.
     pub async fn decode_reveal_verify<T, P>(
         &self,
@@ -283,16 +308,47 @@ impl AsRef<[u8]> for SdJwt {
     }
 }
 
+impl fmt::Display for SdJwt {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        self.as_str().fmt(f)
+    }
+}
+
+impl fmt::Debug for SdJwt {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        self.as_str().fmt(f)
+    }
+}
+
+impl serde::Serialize for SdJwt {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        self.as_str().serialize(serializer)
+    }
+}
+
+impl<'de> serde::Deserialize<'de> for &'de SdJwt {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        SdJwt::new(<&'de str>::deserialize(deserializer)?).map_err(serde::de::Error::custom)
+    }
+}
+
 /// Owned SD-JWT.
+#[derive(PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct SdJwtBuf(Vec<u8>);
 
 impl SdJwtBuf {
     /// Creates a new owned SD-JWT.
-    pub fn new<B: BytesBuf>(bytes: B) -> Result<Self, InvalidDisclosure<B>> {
+    pub fn new<B: BytesBuf>(bytes: B) -> Result<Self, InvalidSdJwt<B>> {
         if SdJwt::validate(bytes.as_ref()) {
             Ok(Self(bytes.into()))
         } else {
-            Err(InvalidDisclosure(bytes))
+            Err(InvalidSdJwt(bytes))
         }
     }
 
@@ -365,6 +421,46 @@ impl AsRef<str> for SdJwtBuf {
 impl AsRef<[u8]> for SdJwtBuf {
     fn as_ref(&self) -> &[u8] {
         self.as_bytes()
+    }
+}
+
+impl fmt::Display for SdJwtBuf {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        self.as_str().fmt(f)
+    }
+}
+
+impl fmt::Debug for SdJwtBuf {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        self.as_str().fmt(f)
+    }
+}
+
+impl FromStr for SdJwtBuf {
+    type Err = InvalidSdJwt;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        Self::new(s.to_owned())
+    }
+}
+
+impl serde::Serialize for SdJwtBuf {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        self.as_str().serialize(serializer)
+    }
+}
+
+impl<'de> serde::Deserialize<'de> for SdJwtBuf {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        String::deserialize(deserializer)?
+            .parse()
+            .map_err(serde::de::Error::custom)
     }
 }
 
@@ -465,6 +561,11 @@ impl<'a> PartsRef<'a> {
 
     /// Decodes, reveals and verify a compact SD-JWT.
     ///
+    /// The type parameter `T` corresponds to the set of private JWT claims
+    /// contained in the encoded SD-JWT. If you don't know what value to use
+    /// for this parameter, you can use the [`Self::decode_reveal_verify_any`]
+    /// function instead.
+    ///
     /// Returns the decoded JWT with the verification status.
     pub async fn decode_reveal_verify<T, P>(
         self,
@@ -558,6 +659,10 @@ impl<'a> DecodedSdJwt<'a> {
     }
 
     /// Verifies the decoded SD-JWT after revealing the claims.
+    ///
+    /// The type parameter `T` corresponds to the set of private JWT claims.
+    /// If you don't know what value to use for this parameter, you can use the
+    /// [`Self::reveal_verify_any`] function instead.
     ///
     /// The `T` type parameter is the type of private claims.
     pub async fn reveal_verify<T, P>(

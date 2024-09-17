@@ -45,8 +45,8 @@ with JSON Web Signatures (or Tokens) and Verifiable Credentials.
 
 The simplest type of claim to load and verify is probably JSON Web
 Signatures (JWSs), often use to encode JSON Web Tokens (JWTs). To represent
-such claims SSI provides the `CompactJWSString` type representing a JWS
-in compact textual form. One can load a JWS using `from_string` and verify
+such claims SSI provides the `JwsBuf` type representing a JWS
+in compact textual form. One can load a JWS using `new` and verify
 it using `verify`.
 
 
@@ -54,7 +54,7 @@ it using `verify`.
 use ssi::prelude::*;
 
 // Load a JWT from the file system.
-let jwt = CompactJWSString::from_string(
+let jwt = JwsBuf::new(
   std::fs::read_to_string("examples/files/claims.jwt")
   .expect("unable to load JWT")
 ).expect("invalid JWS");
