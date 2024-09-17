@@ -16,7 +16,7 @@ use ssi_json_ld::{
     Loader,
 };
 use ssi_jwk::JWKResolver;
-use ssi_jws::{CompactJWS, InvalidCompactJWS, ValidateJWSHeader};
+use ssi_jws::{InvalidJws, JwsSlice, ValidateJwsHeader};
 use ssi_vc::{
     syntax::RequiredType,
     v2::syntax::{Context, JsonCredentialTypes},
@@ -155,7 +155,7 @@ where
     }
 }
 
-impl<E> ValidateJWSHeader<E> for BitstringStatusListCredential {
+impl<E> ValidateJwsHeader<E> for BitstringStatusListCredential {
     fn validate_jws_header(&self, _env: &E, _header: &ssi_jws::Header) -> ClaimsValidity {
         Ok(())
     }
@@ -185,7 +185,7 @@ pub enum FromBytesError {
     UnexpectedMediaType(String),
 
     #[error(transparent)]
-    CompactJWS(#[from] InvalidCompactJWS<Vec<u8>>),
+    Jws(#[from] InvalidJws<Vec<u8>>),
 
     #[error("invalid JWS: {0}")]
     JWS(#[from] ssi_jws::DecodeError),
@@ -221,9 +221,9 @@ where
     ) -> Result<Self, Self::Error> {
         match media_type {
             "application/vc+ld+json+jwt" => {
-                let jws = CompactJWS::new(bytes)
-                    .map_err(InvalidCompactJWS::into_owned)?
-                    .to_decoded()?
+                let jws = JwsSlice::new(bytes)
+                    .map_err(InvalidJws::into_owned)?
+                    .decode()?
                     .try_map::<Self, _>(|bytes| serde_json::from_slice(&bytes))?;
                 jws.verify(params).await??;
                 Ok(jws.signing_bytes.payload)

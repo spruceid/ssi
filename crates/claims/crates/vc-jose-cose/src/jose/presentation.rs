@@ -2,7 +2,7 @@ use super::JoseDecodeError;
 use serde::{de::DeserializeOwned, Serialize};
 use ssi_claims_core::{ClaimsValidity, SignatureError, ValidateClaims};
 use ssi_json_ld::{iref::Uri, syntax::Context};
-use ssi_jws::{CompactJWS, DecodedJWS, JWSPayload, JWSSigner, ValidateJWSHeader};
+use ssi_jws::{DecodedJws, JwsPayload, JwsSigner, JwsSlice, ValidateJwsHeader};
 use ssi_vc::{
     enveloped::{EnvelopedVerifiableCredential, EnvelopedVerifiablePresentation},
     v2::{syntax::JsonPresentation, Presentation, PresentationTypes},
@@ -14,7 +14,7 @@ use std::borrow::Cow;
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct JoseVp<T = JsonPresentation<EnvelopedVerifiableCredential>>(pub T);
 
-impl<T: Serialize> JWSPayload for JoseVp<T> {
+impl<T: Serialize> JwsPayload for JoseVp<T> {
     fn typ(&self) -> Option<&str> {
         Some("vp-ld+jwt")
     }
@@ -28,7 +28,7 @@ impl<T: Serialize> JWSPayload for JoseVp<T> {
     }
 }
 
-impl<E, T> ValidateJWSHeader<E> for JoseVp<T> {
+impl<E, T> ValidateJwsHeader<E> for JoseVp<T> {
     fn validate_jws_header(&self, _env: &E, _header: &ssi_jws::Header) -> ClaimsValidity {
         // There are no formal obligations about `typ` and `cty`.
         // It SHOULD be `vp-ld+jwt` and `vp`, but it does not MUST.
@@ -40,9 +40,9 @@ impl<T: Serialize> JoseVp<T> {
     /// Sign a JOSE VC into an enveloped verifiable presentation.
     pub async fn sign_into_enveloped(
         &self,
-        signer: &impl JWSSigner,
+        signer: &impl JwsSigner,
     ) -> Result<EnvelopedVerifiablePresentation, SignatureError> {
-        let jws = JWSPayload::sign(self, signer).await?;
+        let jws = JwsPayload::sign(self, signer).await?;
         Ok(EnvelopedVerifiablePresentation {
             context: Context::iri_ref(ssi_vc::v2::CREDENTIALS_V2_CONTEXT_IRI.to_owned().into()),
             id: format!("data:application/vp-ld+jwt,{jws}").parse().unwrap(),
@@ -52,8 +52,8 @@ impl<T: Serialize> JoseVp<T> {
 
 impl<T: DeserializeOwned> JoseVp<T> {
     /// Decode a JOSE VP.
-    pub fn decode(jws: &CompactJWS) -> Result<DecodedJWS<Self>, JoseDecodeError> {
-        jws.to_decoded()?
+    pub fn decode(jws: &JwsSlice) -> Result<DecodedJws<Self>, JoseDecodeError> {
+        jws.decode()?
             .try_map(|payload| serde_json::from_slice(&payload).map(Self))
             .map_err(Into::into)
     }
@@ -61,7 +61,7 @@ impl<T: DeserializeOwned> JoseVp<T> {
 
 impl JoseVp {
     /// Decode a JOSE VP with an arbitrary presentation type.
-    pub fn decode_any(jws: &CompactJWS) -> Result<DecodedJWS<Self>, JoseDecodeError> {
+    pub fn decode_any(jws: &JwsSlice) -> Result<DecodedJws<Self>, JoseDecodeError> {
         Self::decode(jws)
     }
 }
@@ -108,12 +108,12 @@ mod tests {
     use serde_json::json;
     use ssi_claims_core::VerificationParameters;
     use ssi_jwk::JWK;
-    use ssi_jws::{CompactJWS, CompactJWSBuf};
+    use ssi_jws::{JwsSlice, JwsVec};
     use ssi_vc::{enveloped::EnvelopedVerifiableCredential, v2::syntax::JsonPresentation};
 
     use crate::JoseVp;
 
-    async fn verify(input: &CompactJWS, key: &JWK) {
+    async fn verify(input: &JwsSlice, key: &JWK) {
         let vp = JoseVp::decode_any(input).unwrap();
         let params = VerificationParameters::from_resolver(key);
         let result = vp.verify(params).await.unwrap();
@@ -137,7 +137,7 @@ mod tests {
 
         let key = JWK::generate_p256();
         let enveloped = JoseVp(vp).sign_into_enveloped(&key).await.unwrap();
-        let jws = CompactJWSBuf::new(enveloped.id.decoded_data().unwrap().into_owned()).unwrap();
+        let jws = JwsVec::new(enveloped.id.decoded_data().unwrap().into_owned()).unwrap();
         verify(&jws, &key).await
     }
 }

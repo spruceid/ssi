@@ -21,7 +21,7 @@ pub enum Error {
     #[error(transparent)]
     CryptoErr(#[from] p384::ecdsa::Error),
     #[error(transparent)]
-    JWK(#[from] ssi_jwk::Error),
+    Jwk(#[from] ssi_jwk::Error),
     #[error(transparent)]
     Json(#[from] serde_json::Error),
     #[error(transparent)]
@@ -37,7 +37,7 @@ pub enum Error {
     AlgorithmMismatch,
     /// Invalid JWS
     #[error("Invalid JWS")]
-    InvalidJWS,
+    InvalidJws,
     /// Unsupported algorithm
     #[error("Unsupported algorithm `{0}`")]
     UnsupportedAlgorithm(String),

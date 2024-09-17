@@ -15,7 +15,7 @@ use ssi_json_ld::{
     Loader,
 };
 use ssi_jwk::JWKResolver;
-use ssi_jws::{CompactJWS, InvalidCompactJWS, ValidateJWSHeader};
+use ssi_jws::{InvalidJws, JwsSlice, ValidateJwsHeader};
 use ssi_vc::v2::{syntax::JsonCredentialTypes, Context};
 use ssi_verification_methods::{ssi_core::OneOrMany, AnyMethod, VerificationMethodResolver};
 
@@ -101,7 +101,7 @@ impl<E, P> ValidateClaims<E, P> for BitstringStatusListEntrySetCredential {
     }
 }
 
-impl<E> ValidateJWSHeader<E> for BitstringStatusListEntrySetCredential {
+impl<E> ValidateJwsHeader<E> for BitstringStatusListEntrySetCredential {
     fn validate_jws_header(&self, _env: &E, _header: &ssi_jws::Header) -> ClaimsValidity {
         Ok(())
     }
@@ -122,9 +122,9 @@ where
     ) -> Result<Self, Self::Error> {
         match media_type {
             "application/vc+ld+json+jwt" => {
-                let jws = CompactJWS::new(bytes)
-                    .map_err(InvalidCompactJWS::into_owned)?
-                    .to_decoded()?
+                let jws = JwsSlice::new(bytes)
+                    .map_err(InvalidJws::into_owned)?
+                    .decode()?
                     .try_map::<Self, _>(|bytes| serde_json::from_slice(&bytes))?;
                 jws.verify(params).await??;
                 Ok(jws.signing_bytes.payload)

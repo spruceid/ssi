@@ -22,8 +22,8 @@ pub mod json;
 
 pub use json::StatusListJwt;
 use ssi_jwk::JWKResolver;
-use ssi_jws::{CompactJWS, InvalidCompactJWS};
-use ssi_jwt::{ClaimSet, JWTClaims, ToDecodedJWT};
+use ssi_jws::{InvalidJws, JwsSlice};
+use ssi_jwt::{ClaimSet, InvalidClaimValue, JWTClaims, ToDecodedJwt};
 
 use crate::{
     EncodedStatusMap, FromBytes, FromBytesOptions, Overflow, StatusMap, StatusMapEntry,
@@ -73,7 +73,7 @@ pub enum FromBytesError {
     UnexpectedMediaType(String),
 
     #[error(transparent)]
-    JWS(#[from] InvalidCompactJWS<Vec<u8>>),
+    JWS(#[from] InvalidJws<Vec<u8>>),
 
     #[error("invalid JWT: {0}")]
     JWT(#[from] ssi_jwt::DecodeError),
@@ -109,8 +109,8 @@ where
     ) -> Result<Self, Self::Error> {
         match media_type {
             "statuslist+jwt" => {
-                let jwt = CompactJWS::new(bytes)
-                    .map_err(InvalidCompactJWS::into_owned)?
+                let jwt = JwsSlice::new(bytes)
+                    .map_err(InvalidJws::into_owned)?
                     .to_decoded_custom_jwt::<json::StatusListJwtPrivateClaims>()?;
 
                 match jwt.signing_bytes.header.type_.as_deref() {
@@ -490,9 +490,8 @@ impl<'a> Iterator for BitStringIter<'a> {
     type Item = u8;
 
     fn next(&mut self) -> Option<Self::Item> {
-        self.bit_string.get(self.index).map(|status| {
+        self.bit_string.get(self.index).inspect(|_| {
             self.index += 1;
-            status
         })
     }
 }
@@ -503,10 +502,13 @@ pub enum EntrySetFromBytesError {
     Json(#[from] serde_json::Error),
 
     #[error(transparent)]
-    JWS(#[from] InvalidCompactJWS<Vec<u8>>),
+    JWS(#[from] InvalidJws<Vec<u8>>),
 
     #[error(transparent)]
     JWT(#[from] ssi_jwt::DecodeError),
+
+    #[error(transparent)]
+    ClaimValue(#[from] InvalidClaimValue),
 
     #[error("proof preparation failed: {0}")]
     ProofPreparation(#[from] ssi_claims_core::ProofPreparationError),
@@ -549,8 +551,8 @@ where
                 ))
             }
             "application/jwt" => {
-                let jwt = CompactJWS::new(bytes)
-                    .map_err(InvalidCompactJWS::into_owned)?
+                let jwt = JwsSlice::new(bytes)
+                    .map_err(InvalidJws::into_owned)?
                     .to_decoded_jwt()?;
                 jwt.verify(verifier).await??;
 

@@ -90,7 +90,7 @@ impl EcdsaSecp256k1VerificationKey2019 {
         // let signing_bytes = header.encode_signing_bytes(data);
         ssi_jws::sign_bytes(algorithm, signing_bytes, secret_key)
             .map_err(|_| MessageSignatureError::InvalidSecretKey)
-        // Ok(CompactJWSString::from_signing_bytes_and_signature(signing_bytes, signature).unwrap())
+        // Ok(JwsBuf::from_signing_bytes_and_signature(signing_bytes, signature).unwrap())
     }
 
     pub fn verify_bytes(

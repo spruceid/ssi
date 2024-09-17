@@ -12,7 +12,7 @@ pub use ssi_claims_core::*;
 /// See: <https://datatracker.ietf.org/doc/html/rfc7515>
 pub use ssi_jws as jws;
 
-pub use jws::{CompactJWS, CompactJWSBuf, CompactJWSStr, CompactJWSString, JWSPayload};
+pub use jws::{Jws, JwsBuf, JwsPayload, JwsSlice, JwsStr, JwsString, JwsVec};
 
 /// JSON Web tokens (JWT).
 ///
@@ -62,7 +62,7 @@ pub enum JsonCredentialOrJws<S: CryptographicSuite = data_integrity::AnySuite> {
     Credential(DataIntegrity<vc::AnyJsonCredential, S>),
 
     /// JSON Web Signature.
-    Jws(jws::CompactJWSString),
+    Jws(jws::JwsString),
 }
 
 /// JSON-like verifiable presentation or JWS (presumably JWT).
@@ -81,7 +81,7 @@ pub enum JsonPresentationOrJws<S: CryptographicSuite = data_integrity::AnySuite>
     Presentation(DataIntegrity<vc::AnyJsonPresentation, S>),
 
     /// JSON Web Signature.
-    Jws(jws::CompactJWSString),
+    Jws(jws::JwsString),
 }
 
 #[cfg(test)]

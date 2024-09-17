@@ -1,7 +1,23 @@
 use core::fmt;
-use std::{borrow::Cow, ops::Deref, str::FromStr};
+use std::{
+    borrow::{Borrow, Cow},
+    ops::Deref,
+    str::FromStr,
+};
 
 use serde::{Deserialize, Serialize};
+
+use crate::BytesBuf;
+
+#[macro_export]
+macro_rules! json_pointer {
+    ($value:literal) => {
+        match $crate::JsonPointer::from_str_const($value) {
+            Ok(p) => p,
+            Err(_) => panic!("invalid JSON pointer"),
+        }
+    };
+}
 
 #[derive(Debug, Clone, Copy, thiserror::Error)]
 #[error("invalid JSON pointer `{0}`")]
@@ -10,14 +26,35 @@ pub struct InvalidJsonPointer<T = String>(pub T);
 /// JSON Pointer.
 ///
 /// See: <https://datatracker.ietf.org/doc/html/rfc6901>
-#[derive(Debug, Serialize)]
-pub struct JsonPointer(str);
+#[derive(Debug, Serialize, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct JsonPointer([u8]);
+
+impl<'a> Default for &'a JsonPointer {
+    fn default() -> Self {
+        JsonPointer::ROOT
+    }
+}
 
 impl JsonPointer {
+    pub const ROOT: &'static Self = unsafe {
+        // SAFETY: the empty string is a valid JSON pointer.
+        JsonPointer::new_unchecked(&[])
+    };
+
     /// Converts the given string into a JSON pointer.
-    pub fn new(s: &str) -> Result<&Self, InvalidJsonPointer<&str>> {
-        if Self::validate(s) {
-            Ok(unsafe { Self::new_unchecked(s) })
+    pub fn new<S: AsRef<[u8]>>(s: &S) -> Result<&Self, InvalidJsonPointer<&S>> {
+        let bytes = s.as_ref();
+        if Self::validate(bytes) {
+            Ok(unsafe { Self::new_unchecked(bytes) })
+        } else {
+            Err(InvalidJsonPointer(s))
+        }
+    }
+
+    pub const fn from_str_const(s: &str) -> Result<&Self, InvalidJsonPointer<&str>> {
+        let bytes = s.as_bytes();
+        if Self::validate(bytes) {
+            Ok(unsafe { Self::new_unchecked(bytes) })
         } else {
             Err(InvalidJsonPointer(s))
         }
@@ -28,23 +65,40 @@ impl JsonPointer {
     /// # Safety
     ///
     /// The input string *must* be a valid JSON pointer.
-    pub unsafe fn new_unchecked(s: &str) -> &Self {
+    pub const unsafe fn new_unchecked(s: &[u8]) -> &Self {
         std::mem::transmute(s)
     }
 
-    pub fn validate(str: &str) -> bool {
-        let mut chars = str.chars();
-        while let Some(c) = chars.next() {
-            if c == '~' && !matches!(chars.next(), Some('0' | '1')) {
-                return false;
+    pub const fn validate(bytes: &[u8]) -> bool {
+        if std::str::from_utf8(bytes).is_err() {
+            return false;
+        };
+
+        let mut i = 0;
+        while i < bytes.len() {
+            // Escape char.
+            if bytes[i] == b'~' {
+                i += 1;
+                if i >= bytes.len() || !matches!(bytes[i], b'0' | b'1') {
+                    return false;
+                }
             }
+
+            i += 1
         }
 
         true
     }
 
-    pub fn as_str(&self) -> &str {
+    pub fn as_bytes(&self) -> &[u8] {
         &self.0
+    }
+
+    pub fn as_str(&self) -> &str {
+        unsafe {
+            // SAFETY: a JSON pointer is an UTF-8 encoded string by definition.
+            std::str::from_utf8_unchecked(&self.0)
+        }
     }
 
     pub fn is_empty(&self) -> bool {
@@ -57,9 +111,8 @@ impl JsonPointer {
         } else {
             let mut i = 1;
 
-            let bytes = self.0.as_bytes();
-            while i < bytes.len() {
-                if bytes[i] == b'/' {
+            while i < self.0.len() {
+                if self.0[i] == b'/' {
                     break;
                 }
 
@@ -80,15 +133,29 @@ impl JsonPointer {
     }
 
     pub fn iter(&self) -> JsonPointerIter {
-        let mut tokens = self.0.split('/');
+        let mut tokens = self.as_str().split('/');
         tokens.next();
         JsonPointerIter(tokens)
     }
 }
 
+impl ToOwned for JsonPointer {
+    type Owned = JsonPointerBuf;
+
+    fn to_owned(&self) -> Self::Owned {
+        JsonPointerBuf(self.0.to_owned())
+    }
+}
+
+impl AsRef<JsonPointer> for JsonPointer {
+    fn as_ref(&self) -> &JsonPointer {
+        self
+    }
+}
+
 impl fmt::Display for JsonPointer {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        self.0.fmt(f)
+        self.as_str().fmt(f)
     }
 }
 
@@ -114,30 +181,56 @@ impl<'a> Iterator for JsonPointerIter<'a> {
 /// JSON Pointer buffer.
 ///
 /// See: <https://datatracker.ietf.org/doc/html/rfc6901>
-#[derive(Debug, Clone, Serialize)]
-pub struct JsonPointerBuf(String);
+#[derive(Debug, Clone, Serialize, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct JsonPointerBuf(Vec<u8>);
+
+impl Default for JsonPointerBuf {
+    fn default() -> Self {
+        JsonPointer::ROOT.to_owned()
+    }
+}
 
 impl JsonPointerBuf {
-    /// Converts the given string into an owned JSON pointer.
-    pub fn new(value: String) -> Result<Self, InvalidJsonPointer> {
-        if JsonPointer::validate(&value) {
-            Ok(Self(value))
+    /// Converts the given byte string into an owned JSON pointer.
+    pub fn new<B: BytesBuf>(value: B) -> Result<Self, InvalidJsonPointer<B>> {
+        if JsonPointer::validate(value.as_ref()) {
+            Ok(Self(value.into()))
         } else {
             Err(InvalidJsonPointer(value))
         }
     }
 
-    /// Converts the given byte string into an owned JSON pointer.
-    pub fn from_bytes(value: Vec<u8>) -> Result<Self, InvalidJsonPointer<Vec<u8>>> {
-        match String::from_utf8(value) {
-            Ok(value) => {
-                if JsonPointer::validate(&value) {
-                    Ok(Self(value))
-                } else {
-                    Err(InvalidJsonPointer(value.into_bytes()))
+    pub fn push(&mut self, token: &str) {
+        self.0.push(b'/');
+        for c in token.chars() {
+            match c {
+                '~' => {
+                    self.0.push(b'~');
+                    self.0.push(b'0');
+                }
+                '/' => {
+                    self.0.push(b'~');
+                    self.0.push(b'1');
+                }
+                _ => {
+                    let i = self.0.len();
+                    let len = c.len_utf8();
+                    self.0.resize(i + len, 0);
+                    c.encode_utf8(&mut self.0[i..]);
                 }
             }
-            Err(err) => Err(InvalidJsonPointer(err.into_bytes())),
+        }
+    }
+
+    pub fn push_index(&mut self, i: usize) {
+        self.push(&i.to_string())
+    }
+
+    pub fn as_json_pointer(&self) -> &JsonPointer {
+        unsafe {
+            // SAFETY: the inner bytes are representing a JSON pointer by
+            // construction.
+            JsonPointer::new_unchecked(&self.0)
         }
     }
 }
@@ -147,6 +240,18 @@ impl Deref for JsonPointerBuf {
 
     fn deref(&self) -> &Self::Target {
         unsafe { JsonPointer::new_unchecked(&self.0) }
+    }
+}
+
+impl Borrow<JsonPointer> for JsonPointerBuf {
+    fn borrow(&self) -> &JsonPointer {
+        self.as_json_pointer()
+    }
+}
+
+impl AsRef<JsonPointer> for JsonPointerBuf {
+    fn as_ref(&self) -> &JsonPointer {
+        self.as_json_pointer()
     }
 }
 
@@ -168,7 +273,7 @@ impl TryFrom<String> for JsonPointerBuf {
 
 impl fmt::Display for JsonPointerBuf {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        self.0.fmt(f)
+        self.as_str().fmt(f)
     }
 }
 
@@ -185,7 +290,7 @@ impl<'de> Deserialize<'de> for JsonPointerBuf {
 
 #[derive(Debug)]
 #[repr(transparent)]
-pub struct ReferenceToken(str);
+pub struct ReferenceToken([u8]);
 
 impl ReferenceToken {
     /// Converts the given string into a JSON pointer reference token without
@@ -194,25 +299,37 @@ impl ReferenceToken {
     /// # Safety
     ///
     /// The input string *must* be a valid JSON pointer reference token.
-    pub unsafe fn new_unchecked(s: &str) -> &Self {
+    pub const unsafe fn new_unchecked(s: &[u8]) -> &Self {
         std::mem::transmute(s)
     }
 
     pub fn is_escaped(&self) -> bool {
-        self.0.contains('~')
+        self.0.contains(&b'~')
     }
 
-    pub fn to_str(&self) -> Cow<str> {
+    pub fn as_bytes(&self) -> &[u8] {
+        &self.0
+    }
+
+    pub fn as_str(&self) -> &str {
+        unsafe {
+            // SAFETY: a reference token is an UTF-8 encoded string by
+            // definition.
+            std::str::from_utf8_unchecked(&self.0)
+        }
+    }
+
+    pub fn to_decoded(&self) -> Cow<str> {
         if self.is_escaped() {
             Cow::Owned(self.decode())
         } else {
-            Cow::Borrowed(&self.0)
+            Cow::Borrowed(self.as_str())
         }
     }
 
     pub fn decode(&self) -> String {
         let mut result = String::new();
-        let mut chars = self.0.chars();
+        let mut chars = self.as_str().chars();
         while let Some(c) = chars.next() {
             let decoded_c = match c {
                 '~' => match chars.next() {
@@ -230,7 +347,7 @@ impl ReferenceToken {
     }
 
     pub fn as_array_index(&self) -> Option<usize> {
-        let mut chars = self.0.chars();
+        let mut chars = self.as_str().chars();
         let mut i = chars.next()?.to_digit(10)? as usize;
         if i == 0 {
             match chars.next() {
@@ -250,6 +367,6 @@ impl ReferenceToken {
 
 impl fmt::Display for ReferenceToken {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        self.0.fmt(f)
+        self.as_str().fmt(f)
     }
 }

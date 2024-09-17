@@ -6,8 +6,11 @@ use flate2::Compression;
 use iref::UriBuf;
 use serde::{Deserialize, Serialize};
 use ssi_claims_core::ValidateClaims;
-use ssi_jws::ValidateJWSHeader;
-use ssi_jwt::{match_claim_type, AnyClaims, Claim, ClaimSet, IssuedAt, Issuer, JWTClaims, Subject};
+use ssi_jws::ValidateJwsHeader;
+use ssi_jwt::{
+    match_claim_type, AnyClaims, Claim, ClaimSet, InvalidClaimValue, IssuedAt, Issuer, JWTClaims,
+    Subject,
+};
 
 use crate::{
     token_status_list::{BitString, StatusSize},
@@ -75,8 +78,6 @@ pub struct StatusListJwtPrivateClaims {
 }
 
 impl ClaimSet for StatusListJwtPrivateClaims {
-    type Error = serde_json::Error;
-
     fn contains<C: Claim>(&self) -> bool {
         match_claim_type! {
             match C {
@@ -87,7 +88,7 @@ impl ClaimSet for StatusListJwtPrivateClaims {
         }
     }
 
-    fn try_get<C: Claim>(&self) -> Result<Option<Cow<C>>, Self::Error> {
+    fn try_get<C: Claim>(&self) -> Result<Option<Cow<C>>, InvalidClaimValue> {
         match_claim_type! {
             match C {
                 TimeToLiveClaim => {
@@ -103,7 +104,7 @@ impl ClaimSet for StatusListJwtPrivateClaims {
         }
     }
 
-    fn try_set<C: Claim>(&mut self, claim: C) -> Result<Result<(), C>, Self::Error> {
+    fn try_set<C: Claim>(&mut self, claim: C) -> Result<Result<(), C>, InvalidClaimValue> {
         match_claim_type! {
             match claim: C {
                 TimeToLiveClaim => {
@@ -121,7 +122,7 @@ impl ClaimSet for StatusListJwtPrivateClaims {
         }
     }
 
-    fn try_remove<C: Claim>(&mut self) -> Result<Option<C>, Self::Error> {
+    fn try_remove<C: Claim>(&mut self) -> Result<Option<C>, InvalidClaimValue> {
         match_claim_type! {
             match C {
                 TimeToLiveClaim => {
@@ -144,7 +145,7 @@ impl<E, P> ValidateClaims<E, P> for StatusListJwtPrivateClaims {
     }
 }
 
-impl<E> ValidateJWSHeader<E> for StatusListJwtPrivateClaims {
+impl<E> ValidateJwsHeader<E> for StatusListJwtPrivateClaims {
     fn validate_jws_header(
         &self,
         _env: &E,

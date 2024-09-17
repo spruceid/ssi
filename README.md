@@ -45,16 +45,18 @@ with JSON Web Signatures (or Tokens) and Verifiable Credentials.
 
 The simplest type of claim to load and verify is probably JSON Web
 Signatures (JWSs), often use to encode JSON Web Tokens (JWTs). To represent
-such claims SSI provides the `CompactJWSString` type representing a JWS
-in compact textual form. One can load a JWS using `from_string` and verify
-it using `verify`.
+such claims SSI provides the `JwsBuf` type representing a JWS
+in compact textual form. One can load a JWS using [`new`] and verify
+it using [`verify`].
 
+[`new`]: claims::JwsBuf::new
+[`verify`]: claims::JwsSlice::verify
 
 ```rust
 use ssi::prelude::*;
 
 // Load a JWT from the file system.
-let jwt = CompactJWSString::from_string(
+let jwt = JwsBuf::new(
   std::fs::read_to_string("examples/files/claims.jwt")
   .expect("unable to load JWT")
 ).expect("invalid JWS");
@@ -78,10 +80,11 @@ Verifiable Credential are much more complex as they require interpreting
 the input claims and proofs, such as Data-Integrity proofs as Linked-Data
 using JSON-LD. This operation is highly configurable. SSI provide
 functions exposing various levels of implementation details that you can
-tweak as needed. The simplest of them is `any_credential_from_json_str`
+tweak as needed. The simplest of them is [`any_credential_from_json_str`]
 that will simply load a VC from a string, assuming it is signed using
 any Data-Integrity proof supported by SSI.
 
+[`any_credential_from_json_str`]: claims::vc::v1::data_integrity::any_credential_from_json_str
 
 ```rust
 use ssi::prelude::*;
@@ -155,10 +158,11 @@ println!("{jwt}")
 #### Verifiable Credential
 
 We can use a similar technique to sign a VC with custom claims.
-The `SpecializedJsonCredential` type provides a customizable
+The [`SpecializedJsonCredential`] type provides a customizable
 implementation of the VC data-model 1.1 where you can set the credential type
 yourself.
 
+[`SpecializedJsonCredential`]: claims::vc::v1::SpecializedJsonCredential
 
 ```rust
 use static_iref::uri;
@@ -217,16 +221,19 @@ It is critical that custom claims can be interpreted as Linked-Data. In
 the above example this is done by specifying a serialization URL for each
 field of `MyCredentialSubject`. This can also be done by creating a custom
 JSON-LD context and embed it to `credential` using either
-`SpecializedJsonCredential`'s `context` field or leveraging its context type
+[`SpecializedJsonCredential`]'s [`context`] field or leveraging its context type
 parameter.
 
+[`context`]: claims::vc::v1::SpecializedJsonCredential::context
 
 ## Data-Models
 
 The examples above are using the VC data-model 1.1, but you ssi also has support for:
-- `VC data-model 2.0`
-- `A wrapper type to accept both`
+- [`VC data-model 2.0`]
+- [`A wrapper type to accept both`]
 
+[`VC data-model 2.0`]: claims::vc::v2
+[`A wrapper type to accept both`]: claims::vc::syntax::AnySpecializedJsonCredential
 
 ## Features
 

@@ -1,7 +1,8 @@
 use multibase::Base;
 use ssi_claims_core::SignatureError;
+use ssi_core::JsonPointerBuf;
 use ssi_crypto::algorithm::ES256OrES384;
-use ssi_di_sd_primitives::{HmacShaAnyKey, JsonPointerBuf, ShaAny, ShaAnyBytes};
+use ssi_di_sd_primitives::{HmacShaAnyKey, ShaAny, ShaAnyBytes};
 use ssi_multicodec::{MultiEncoded, MultiEncodedBuf};
 use ssi_rdf::IntoNQuads;
 use ssi_security::MultibaseBuf;

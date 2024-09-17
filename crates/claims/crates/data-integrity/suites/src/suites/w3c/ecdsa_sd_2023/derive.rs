@@ -2,12 +2,12 @@ use std::{borrow::Cow, collections::HashMap};
 
 use rdf_types::{BlankIdBuf, Quad};
 use serde::Serialize;
+use ssi_core::JsonPointerBuf;
 use ssi_data_integrity_core::{DataIntegrity, Proof, ProofRef};
 use ssi_di_sd_primitives::{
     canonicalize::create_hmac_id_label_map_function,
     group::{canonicalize_and_group, GroupError},
     select::{select_json_ld, DanglingJsonPointer},
-    JsonPointerBuf,
 };
 use ssi_json_ld::{Expandable, ExpandedDocument, JsonLdNodeObject};
 use ssi_multicodec::MultiEncodedBuf;

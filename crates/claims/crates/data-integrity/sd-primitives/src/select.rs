@@ -1,12 +1,12 @@
 use std::collections::{BTreeMap, HashMap};
 
 use rdf_types::{BlankId, BlankIdBuf, LexicalQuad};
+use ssi_core::{JsonPointer, JsonPointerBuf};
 use ssi_json_ld::syntax::Value;
 
 use crate::{
     canonicalize::relabel_quads,
     skolemize::{compact_to_deskolemized_nquads, SkolemError},
-    JsonPointer, JsonPointerBuf,
 };
 
 #[derive(Debug, thiserror::Error)]
@@ -276,7 +276,7 @@ impl Select for ssi_json_ld::syntax::Object {
     ) -> Result<(), DanglingJsonPointer> {
         match pointer.split_first() {
             Some((token, rest)) => {
-                let key = token.to_str();
+                let key = token.to_decoded();
                 let a_item = self.get(key.as_ref()).next().ok_or(DanglingJsonPointer)?;
                 let b_item =
                     selection.get_mut_or_insert_with(&key, || create_initial_selection(a_item));

@@ -1,8 +1,8 @@
-use super::{Claim, JWTClaims};
-use crate::{CastClaim, ClaimSet, NumericDate, StringOrURI};
+use super::{Claim, InvalidClaimValue, JWTClaims};
+use crate::{CastClaim, ClaimSet, InfallibleClaimSet, NumericDate, StringOrURI};
 use ssi_claims_core::{ClaimsValidity, DateTimeProvider, ValidateClaims};
 use ssi_core::OneOrMany;
-use ssi_jws::JWSPayload;
+use ssi_jws::JwsPayload;
 use std::{borrow::Cow, collections::BTreeMap};
 
 pub trait RegisteredClaim: Claim + Into<AnyRegisteredClaim> {
@@ -75,7 +75,9 @@ impl RegisteredClaims {
     }
 }
 
-impl JWSPayload for RegisteredClaims {
+impl InfallibleClaimSet for RegisteredClaims {}
+
+impl JwsPayload for RegisteredClaims {
     fn typ(&self) -> Option<&'static str> {
         Some("JWT")
     }
@@ -153,6 +155,12 @@ impl<'de> serde::Deserialize<'de> for RegisteredClaims {
     }
 }
 
+pub trait TryIntoClaim<C> {
+    type Error;
+
+    fn try_into_claim(self) -> Result<C, Self::Error>;
+}
+
 macro_rules! registered_claims {
     ($($(#[$meta:meta])* $name:literal: $variant:ident ( $ty:ty )),*) => {
         $(
@@ -164,6 +172,17 @@ macro_rules! registered_claims {
 
             impl Claim for $variant {
                 const JWT_CLAIM_NAME: &'static str = $name;
+            }
+
+            impl<T> TryIntoClaim<$variant> for T
+            where
+                T: TryInto<$ty>
+            {
+                type Error = T::Error;
+
+                fn try_into_claim(self) -> Result<$variant, Self::Error> {
+                    self.try_into().map($variant)
+                }
             }
 
             impl RegisteredClaim for $variant {
@@ -193,8 +212,6 @@ macro_rules! registered_claims {
         )*
 
         impl ClaimSet for RegisteredClaims {
-            type Error = std::convert::Infallible;
-
             fn contains<C: Claim>(&self) -> bool {
                 $(
                     if std::any::TypeId::of::<C>() == std::any::TypeId::of::<$variant>() {
@@ -205,7 +222,7 @@ macro_rules! registered_claims {
                 false
             }
 
-            fn try_get<C: Claim>(&self) -> Result<Option<Cow<C>>, Self::Error> {
+            fn try_get<C: Claim>(&self) -> Result<Option<Cow<C>>, InvalidClaimValue> {
                 $(
                     if std::any::TypeId::of::<C>() == std::any::TypeId::of::<$variant>() {
                         return Ok(unsafe { CastClaim::cast_claim(self.get::<$variant>()) }.map(Cow::Borrowed));
@@ -215,7 +232,7 @@ macro_rules! registered_claims {
                 Ok(None)
             }
 
-            fn try_set<C: Claim>(&mut self, claim: C) -> Result<Result<(), C>, Self::Error> {
+            fn try_set<C: Claim>(&mut self, claim: C) -> Result<Result<(), C>, InvalidClaimValue> {
                 $(
                     if std::any::TypeId::of::<C>() == std::any::TypeId::of::<$variant>() {
                         self.set::<$variant>(unsafe { CastClaim::cast_claim(claim) });
@@ -226,7 +243,7 @@ macro_rules! registered_claims {
                 Ok(Err(claim))
             }
 
-            fn try_remove<C: Claim>(&mut self) -> Result<Option<C>, Self::Error> {
+            fn try_remove<C: Claim>(&mut self) -> Result<Option<C>, InvalidClaimValue> {
                 $(
                     if std::any::TypeId::of::<C>() == std::any::TypeId::of::<$variant>() {
                         return Ok(unsafe { CastClaim::cast_claim(self.remove::<$variant>()) });

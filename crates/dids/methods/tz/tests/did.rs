@@ -12,7 +12,7 @@ use ssi_claims::{
 };
 use ssi_dids_core::{did, resolution::Options, DIDResolver, VerificationMethodDIDResolver};
 use ssi_jwk::JWK;
-use ssi_jws::CompactJWSString;
+use ssi_jws::JwsString;
 use ssi_verification_methods_core::{ProofPurpose, SingleSecretSigner};
 use static_iref::{iri, uri};
 
@@ -177,7 +177,7 @@ async fn test_derivation_tz3() {
 //     let header = ssi_jws::Header::new_unencoded(ssi_jwk::Algorithm::EdBlake2b, None);
 //     let signing_bytes = header.encode_signing_bytes(&payload);
 //     let signature = ssi_jws::sign_bytes(ssi_jwk::Algorithm::EdBlake2b, &signing_bytes, &key).unwrap();
-//     let jws = ssi_jws::CompactJWSString::encode_detached(header, &signature);
+//     let jws = ssi_jws::JwsBuf::encode_detached(header, &signature);
 //     eprintln!("JWS: {jws}");
 // }
 
@@ -235,7 +235,7 @@ async fn credential_prove_verify_did_tz1() {
             ssi_claims::data_integrity::suites::tezos::Options::new(
                 r#"{"crv": "Ed25519","kty": "OKP","x": "CFdO_rVP08v1wQQVNybqBxHmTPOBPIt4Kn6LLhR1fMA"}"#.parse().unwrap()
             ),
-            ssi_claims::data_integrity::signing::JwsSignature::new(
+            ssi_claims::data_integrity::signing::DetachedJwsSignature::new(
                 // FIXME: this is wrong! The VM expects an EdBlake2b signature,
                 // instead this is EdDsa.
                 "eyJhbGciOiJFZERTQSIsImNyaXQiOlsiYjY0Il0sImI2NCI6ZmFsc2V9..thpumbPTltH6b6P9QUydy8DcoK2Jj63-FIntxiq09XBk7guF_inA0iQWw7_B_GBwmmsmhYdGL4TdtiNieAdeAg".parse().unwrap()
@@ -282,7 +282,7 @@ async fn credential_prove_verify_did_tz1() {
             ssi_claims::data_integrity::suites::tezos::Options::new(
                 r#"{"crv": "Ed25519","kty": "OKP","x": "CFdO_rVP08v1wQQVNybqBxHmTPOBPIt4Kn6LLhR1fMA"}"#.parse().unwrap()
             ),
-            ssi_claims::data_integrity::signing::JwsSignature::new(
+            ssi_claims::data_integrity::signing::DetachedJwsSignature::new(
                 // FIXME: this is wrong! The VM expects an EdBlake2b signature,
                 // instead this is EdDsa.
                 "eyJhbGciOiJFZERTQSIsImNyaXQiOlsiYjY0Il0sImI2NCI6ZmFsc2V9..7GLIUeNKvO3WsA3DmBZpbuPinhOcv7Mhgx9QP0svO55T_Zoy7wmJJtLXSoghtkI7DWOnVbiJO5X246Qr0CqGDw".parse().unwrap()
@@ -297,7 +297,7 @@ async fn credential_prove_verify_did_tz1() {
 
     // mess with the VP proof to make verify fail
     let mut vp1 = vp.clone();
-    vp1.proofs.first_mut().unwrap().signature.jws = CompactJWSString::from_string(format!(
+    vp1.proofs.first_mut().unwrap().signature.jws = JwsString::from_string(format!(
         "x{}",
         vp1.proofs.first_mut().unwrap().signature.jws
     ))

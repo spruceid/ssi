@@ -8,7 +8,7 @@ use ssi_claims_core::{
     InvalidProof, MessageSignatureError, ProofValidationError, ProofValidity, SignatureError,
 };
 use ssi_jwk::JWK;
-use ssi_jws::CompactJWSString;
+use ssi_jws::JwsString;
 use ssi_verification_methods_core::{JwkVerificationMethod, VerificationMethodSet, VerifyBytes};
 use static_iref::iri;
 
@@ -65,12 +65,12 @@ impl Ed25519VerificationKey2018 {
         &self,
         data: &[u8],
         secret_key: &ed25519_dalek::SigningKey,
-    ) -> Result<CompactJWSString, SignatureError> {
+    ) -> Result<JwsString, SignatureError> {
         let header = ssi_jws::Header::new_unencoded(ssi_jwk::Algorithm::EdDSA, None);
         let signing_bytes = header.encode_signing_bytes(data);
         let signature = secret_key.sign(&signing_bytes);
 
-        Ok(ssi_jws::CompactJWSString::from_signing_bytes_and_signature(
+        Ok(ssi_jws::JwsString::from_signing_bytes_and_signature(
             // TODO base64 encode signature?
             signing_bytes,
             signature.to_bytes(),

@@ -6,6 +6,7 @@ use std::{
 
 use linked_data::IntoQuadsError;
 use rdf_types::{BlankIdBuf, LexicalQuad};
+use ssi_core::JsonPointerBuf;
 use ssi_json_ld::{Expandable, ExpandedDocument, JsonLdObject};
 use ssi_rdf::{urdna2015::NormalizingSubstitution, LexicalInterpretation};
 
@@ -13,7 +14,6 @@ use crate::{
     canonicalize::label_replacement_canonicalize_nquads,
     select::{select_canonical_nquads, SelectError},
     skolemize::{expanded_to_deskolemized_nquads, SkolemError, Skolemize},
-    JsonPointerBuf,
 };
 
 #[derive(Debug, thiserror::Error)]
@@ -126,10 +126,11 @@ mod tests {
 
     use hmac::{Hmac, Mac};
     use lazy_static::lazy_static;
+    use ssi_core::JsonPointerBuf;
     use ssi_json_ld::CompactJsonLd;
     use ssi_rdf::IntoNQuads;
 
-    use crate::{canonicalize::create_hmac_id_label_map_function, HmacShaAny, JsonPointerBuf};
+    use crate::{canonicalize::create_hmac_id_label_map_function, HmacShaAny};
 
     use super::canonicalize_and_group;
 

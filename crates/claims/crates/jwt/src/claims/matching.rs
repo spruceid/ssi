@@ -162,7 +162,7 @@ mod tests {
     use serde::{Deserialize, Serialize};
     use std::borrow::Cow;
 
-    use crate::{AnyClaims, Claim, ClaimSet};
+    use crate::{AnyClaims, Claim, ClaimSet, InvalidClaimValue};
 
     #[derive(Clone, Serialize, Deserialize)]
     struct CustomClaim;
@@ -171,14 +171,13 @@ mod tests {
         const JWT_CLAIM_NAME: &'static str = "custom";
     }
 
+    #[allow(unused)]
     struct CustomClaimSet {
         custom: Option<CustomClaim>,
         other_claims: AnyClaims,
     }
 
     impl ClaimSet for CustomClaimSet {
-        type Error = serde_json::Error;
-
         fn contains<C: Claim>(&self) -> bool {
             match_claim_type! {
                 match C {
@@ -188,7 +187,7 @@ mod tests {
             }
         }
 
-        fn try_get<C: Claim>(&self) -> Result<Option<Cow<C>>, Self::Error> {
+        fn try_get<C: Claim>(&self) -> Result<Option<Cow<C>>, InvalidClaimValue> {
             match_claim_type! {
                 match C {
                     CustomClaim => {
@@ -201,7 +200,7 @@ mod tests {
             }
         }
 
-        fn try_set<C: Claim>(&mut self, claim: C) -> Result<Result<(), C>, Self::Error> {
+        fn try_set<C: Claim>(&mut self, claim: C) -> Result<Result<(), C>, InvalidClaimValue> {
             match_claim_type! {
                 match claim: C {
                     CustomClaim => {
@@ -215,7 +214,7 @@ mod tests {
             }
         }
 
-        fn try_remove<C: Claim>(&mut self) -> Result<Option<C>, Self::Error> {
+        fn try_remove<C: Claim>(&mut self) -> Result<Option<C>, InvalidClaimValue> {
             match_claim_type! {
                 match C {
                     CustomClaim => {

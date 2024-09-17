@@ -10,10 +10,10 @@
 //! # async_std::task::block_on(async {
 //! use serde_json::json;
 //! use ssi_jwk::JWK;
-//! use ssi_jws::CompactJWSStr;
-//! use ssi_jwt::ToDecodedJWT;
+//! use ssi_jws::Jws;
+//! use ssi_jwt::ToDecodedJwt;
 //!
-//! let jws = CompactJWSStr::new(b"eyJhbGciOiJFUzI1NiIsInR5cCI6IkpXVCJ9.eyJuYW1lIjoiSm9obiBTbWl0aCIsImlhdCI6MTcxNTM0Mjc5MCwiaXNzIjoiaHR0cDovL2V4YW1wbGUub3JnLyNpc3N1ZXIifQ.S51Gmlkwy4UxOhhc4nVl4_sHHVPSrNmjZDwJCDXDbKp2MT8-UyhZLw03gVKe-JRUzcsteWoeRCUoA5rwnuTSoA").unwrap();
+//! let jws = Jws::new(b"eyJhbGciOiJFUzI1NiIsInR5cCI6IkpXVCJ9.eyJuYW1lIjoiSm9obiBTbWl0aCIsImlhdCI6MTcxNTM0Mjc5MCwiaXNzIjoiaHR0cDovL2V4YW1wbGUub3JnLyNpc3N1ZXIifQ.S51Gmlkwy4UxOhhc4nVl4_sHHVPSrNmjZDwJCDXDbKp2MT8-UyhZLw03gVKe-JRUzcsteWoeRCUoA5rwnuTSoA").unwrap();
 //!
 //! let jwk: JWK = json!({
 //!     "kty": "EC",
@@ -28,24 +28,24 @@
 //! # })
 //! ```
 //!
-//! Internally [`ToDecodedJWT::verify_jwt`] uses
-//! [`ToDecodedJWT::to_decoded_jwt`] to decode the JWT,
-//! then [`DecodedJWS::verify`] to validate the signature and
+//! Internally [`ToDecodedJwt::verify_jwt`] uses
+//! [`ToDecodedJwt::to_decoded_jwt`] to decode the JWT,
+//! then [`DecodedJws::verify`] to validate the signature and
 //! registered claims.
 //!
-//! [`DecodedJWS::verify`]: ssi_jws::DecodedJWS::verify
+//! [`DecodedJws::verify`]: ssi_jws::DecodedJws::verify
 //!
 //! ## Signature
 //!
-//! Use the [`JWSPayload::sign`] method to sign a payload into a JWT.
+//! Use the [`JwsPayload::sign`] method to sign a payload into a JWT.
 //!
-//! [`JWSPayload::sign`]: ssi_jws::JWSPayload::sign
+//! [`JwsPayload::sign`]: ssi_jws::JwsPayload::sign
 //!
 //! ```
 //! # async_std::task::block_on(async {
 //! use serde_json::json;
 //! use ssi_jwk::JWK;
-//! use ssi_jws::JWSPayload;
+//! use ssi_jws::JwsPayload;
 //! use ssi_jwt::{JWTClaims, Issuer, IssuedAt, ExpirationTime};
 //!
 //! let mut claims: JWTClaims = Default::default();

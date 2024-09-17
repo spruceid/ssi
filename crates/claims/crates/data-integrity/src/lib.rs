@@ -1,7 +1,6 @@
+pub use ssi_core::{JsonPointer, JsonPointerBuf};
 pub use ssi_data_integrity_core::*;
 pub use ssi_data_integrity_suites as suites;
-
-pub use ssi_di_sd_primitives::{JsonPointer, JsonPointerBuf};
 
 mod any;
 pub use any::*;

@@ -2,7 +2,7 @@ use std::{borrow::Cow, collections::BTreeMap};
 
 use ssi_claims_core::{ClaimsValidity, DateTimeProvider, ValidateClaims};
 
-use crate::{Claim, ClaimSet};
+use crate::{Claim, ClaimSet, InfallibleClaimSet, InvalidClaimValue};
 
 /// Any set of JWT claims.
 #[derive(Debug, Default, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
@@ -50,30 +50,32 @@ impl IntoIterator for AnyClaims {
 }
 
 impl ClaimSet for AnyClaims {
-    type Error = serde_json::Error;
-
     fn contains<C: Claim>(&self) -> bool {
         self.contains(C::JWT_CLAIM_NAME)
     }
 
-    fn try_get<C: Claim>(&self) -> Result<Option<Cow<C>>, Self::Error> {
+    fn try_get<C: Claim>(&self) -> Result<Option<Cow<C>>, InvalidClaimValue> {
         self.get(C::JWT_CLAIM_NAME)
             .cloned()
             .map(serde_json::from_value)
             .transpose()
+            .map_err(Into::into)
     }
 
-    fn try_set<C: Claim>(&mut self, claim: C) -> Result<Result<(), C>, Self::Error> {
+    fn try_set<C: Claim>(&mut self, claim: C) -> Result<Result<(), C>, InvalidClaimValue> {
         self.set(C::JWT_CLAIM_NAME.to_owned(), serde_json::to_value(claim)?);
         Ok(Ok(()))
     }
 
-    fn try_remove<C: Claim>(&mut self) -> Result<Option<C>, Self::Error> {
+    fn try_remove<C: Claim>(&mut self) -> Result<Option<C>, InvalidClaimValue> {
         self.remove(C::JWT_CLAIM_NAME)
             .map(serde_json::from_value)
             .transpose()
+            .map_err(Into::into)
     }
 }
+
+impl InfallibleClaimSet for AnyClaims {}
 
 impl<E, P> ValidateClaims<E, P> for AnyClaims
 where

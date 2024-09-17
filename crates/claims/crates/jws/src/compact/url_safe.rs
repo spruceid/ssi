@@ -1,26 +1,40 @@
 use base64::Engine;
 use core::fmt;
+use ssi_core::BytesBuf;
 use std::{ops::Deref, str::FromStr};
 
 use crate::{
-    utils::is_url_safe_base64_char, DecodeError, DecodedJws, Header, InvalidJws, JwsSlice,
+    utils::is_url_safe_base64_char, DecodeError, DecodedJws, Header, InvalidJws, JwsSlice, JwsStr,
 };
 
-/// Borrowed UTF-8 encoded JWS.
+/// Creates a new static URL-safe JWS reference from a string literal.
+#[macro_export]
+macro_rules! jws {
+    ($value:literal) => {
+        match $crate::Jws::from_str_const($value) {
+            Ok(value) => value,
+            Err(_) => panic!("invalid URL-safe JWS"),
+        }
+    };
+}
+
+/// Borrowed URL-safe JWS.
 ///
 /// This is an unsized type borrowing the JWS and meant to be referenced as
-/// `&JwsStr`, just like `&str`.
-/// Use [`JwsString`] if you need to own the JWS.
+/// `&Jws`, just like `&str`.
+/// Use [`JwsBuf`] if you need to own the JWS.
 ///
-/// This type is similar to the [`Jws`](crate::Jws) type.
-/// However contrarily to `Jws`, there is no guarantee that the JWS is URL-safe.
+/// Contrarily to [`JwsSlice`] or [`JwsStr`], this type guarantees that
+/// the payload is URL-safe, even if it is unencoded.
 ///
-/// Use [`Jws`](crate::Jws) if you expect URL-safe JWSs.
+/// Use [`JwsStr`] if you expect an UTF-8 encoded JWS but don't know if it is
+/// URL-safe.
+/// Use [`JwsSlice`] if you don't have any expectations about the encoding.
 #[derive(PartialEq, Eq, PartialOrd, Ord, Hash)]
 #[repr(transparent)]
-pub struct JwsStr(JwsSlice);
+pub struct Jws(JwsStr);
 
-impl JwsStr {
+impl Jws {
     pub fn new<T: ?Sized + AsRef<[u8]>>(data: &T) -> Result<&Self, InvalidJws<&T>> {
         let bytes = data.as_ref();
         match std::str::from_utf8(bytes) {
@@ -32,16 +46,26 @@ impl JwsStr {
         }
     }
 
+    /// Parses the given `input` string as an URL-safe JWS.
+    ///
+    /// Returns an error if it is not a valid URL-safe JWS.
+    pub const fn from_str_const(input: &str) -> Result<&Self, InvalidJws<&str>> {
+        let bytes = input.as_bytes();
+        if Self::validate(bytes) {
+            Ok(unsafe { Self::new_unchecked(bytes) })
+        } else {
+            Err(InvalidJws(input))
+        }
+    }
+
     pub const fn validate(bytes: &[u8]) -> bool {
         Self::validate_range(bytes, 0, bytes.len())
     }
 
     pub const fn validate_range(bytes: &[u8], mut i: usize, end: usize) -> bool {
-        let mut j = if end > bytes.len() { bytes.len() } else { end };
-
         // Header.
         loop {
-            if i >= j {
+            if i >= end {
                 // Missing `.`
                 return false;
             }
@@ -57,33 +81,38 @@ impl JwsStr {
             i += 1
         }
 
-        // Signature.
-        if i >= j {
-            return false;
-        }
-        j -= 1;
+        i += 1;
+
+        // Payload.
         loop {
-            if i >= j {
+            if i >= end {
                 // Missing `.`
                 return false;
             }
 
-            if bytes[j] == b'.' {
+            if bytes[i] == b'.' {
                 break;
             }
 
-            if !is_url_safe_base64_char(bytes[j]) {
+            if !is_url_safe_base64_char(bytes[i]) {
                 return false;
             }
 
-            j -= 1
+            i += 1
         }
 
-        // Payload.
         i += 1;
-        let payload_bytes = unsafe { std::slice::from_raw_parts(bytes.as_ptr().add(i), j - i) };
 
-        std::str::from_utf8(payload_bytes).is_ok()
+        // Signature.
+        while i < end {
+            if !is_url_safe_base64_char(bytes[i]) {
+                return false;
+            }
+
+            i += 1
+        }
+
+        true
     }
 
     /// Creates a new compact JWS without checking the data.
@@ -105,7 +134,7 @@ impl JwsStr {
     }
 }
 
-impl Deref for JwsStr {
+impl Deref for Jws {
     type Target = JwsSlice;
 
     fn deref(&self) -> &Self::Target {
@@ -113,19 +142,19 @@ impl Deref for JwsStr {
     }
 }
 
-impl fmt::Display for JwsStr {
+impl fmt::Display for Jws {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         self.as_str().fmt(f)
     }
 }
 
-impl fmt::Debug for JwsStr {
+impl fmt::Debug for Jws {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         self.as_str().fmt(f)
     }
 }
 
-impl serde::Serialize for JwsStr {
+impl serde::Serialize for Jws {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
         S: serde::Serializer,
@@ -134,72 +163,64 @@ impl serde::Serialize for JwsStr {
     }
 }
 
-impl PartialEq<str> for JwsStr {
+impl PartialEq<str> for Jws {
     fn eq(&self, other: &str) -> bool {
         self.as_str() == other
     }
 }
 
-impl PartialEq<String> for JwsStr {
+impl PartialEq<String> for Jws {
     fn eq(&self, other: &String) -> bool {
         self.as_str() == other
     }
 }
 
-impl<'a> PartialEq<String> for &'a JwsStr {
+impl<'a> PartialEq<String> for &'a Jws {
     fn eq(&self, other: &String) -> bool {
         self.as_str() == other
     }
 }
 
-impl PartialEq<JwsStr> for str {
-    fn eq(&self, other: &JwsStr) -> bool {
+impl PartialEq<Jws> for str {
+    fn eq(&self, other: &Jws) -> bool {
         self == other.as_str()
     }
 }
 
-impl PartialEq<JwsStr> for String {
-    fn eq(&self, other: &JwsStr) -> bool {
+impl PartialEq<Jws> for String {
+    fn eq(&self, other: &Jws) -> bool {
         self == other.as_str()
     }
 }
 
-impl<'a> PartialEq<&'a JwsStr> for String {
-    fn eq(&self, other: &&'a JwsStr) -> bool {
+impl<'a> PartialEq<&'a Jws> for String {
+    fn eq(&self, other: &&'a Jws) -> bool {
         self == other.as_str()
     }
 }
 
-/// Owned UTF-8 encoded JWS.
+/// Owned URL-safe JWS.
 ///
-/// This type is similar to the [`JwsBuf`](crate::JwsBuf) type.
-/// However contrarily to `JwsBuf`, there is no guarantee that the JWS is
-/// URL-safe.
+/// Contrarily to [`JwsVec`](crate::JwsVec) or [`JwsString`](crate::JwsString),
+/// this type guarantees that the payload is URL-safe, even if it is unencoded.
 ///
-/// Use [`JwsBuf`](crate::JwsBuf) if you expect URL-safe JWSs.
+/// Use [`JwsString`](crate::JwsString) if you expect an UTF-8 encoded JWS but
+/// don't know if it is URL-safe.
+/// Use [`JwsVec`](crate::JwsVec) if you don't have any expectations about the
+/// encoding.
 #[derive(Clone, serde::Serialize)]
 #[serde(transparent)]
-pub struct JwsString(String);
+pub struct JwsBuf(String);
 
-impl JwsString {
-    pub fn new(bytes: Vec<u8>) -> Result<Self, InvalidJws<Vec<u8>>> {
-        match String::from_utf8(bytes) {
-            Ok(string) => {
-                if JwsSlice::validate(string.as_bytes()) {
-                    Ok(Self(string))
-                } else {
-                    Err(InvalidJws(string.into_bytes()))
-                }
-            }
-            Err(e) => Err(InvalidJws(e.into_bytes())),
-        }
-    }
-
-    pub fn from_string(string: String) -> Result<Self, InvalidJws<String>> {
-        if JwsSlice::validate(string.as_bytes()) {
-            Ok(Self(string))
+impl JwsBuf {
+    pub fn new<B: BytesBuf>(bytes: B) -> Result<Self, InvalidJws<B>> {
+        if Jws::validate(bytes.as_ref()) {
+            Ok(unsafe {
+                // SAFETY: we just validated the bytes.
+                Self::new_unchecked(bytes.into())
+            })
         } else {
-            Err(InvalidJws(string))
+            Err(InvalidJws(bytes))
         }
     }
 
@@ -265,8 +286,8 @@ impl JwsString {
         Self::new_unchecked(bytes)
     }
 
-    pub fn as_compact_jws_str(&self) -> &JwsStr {
-        unsafe { JwsStr::new_unchecked(self.0.as_bytes()) }
+    pub fn as_compact_jws_str(&self) -> &Jws {
+        unsafe { Jws::new_unchecked(self.0.as_bytes()) }
     }
 
     pub fn into_signing_bytes(mut self) -> String {
@@ -285,43 +306,43 @@ impl JwsString {
     }
 }
 
-impl Deref for JwsString {
-    type Target = JwsStr;
+impl Deref for JwsBuf {
+    type Target = Jws;
 
     fn deref(&self) -> &Self::Target {
         self.as_compact_jws_str()
     }
 }
 
-impl fmt::Display for JwsString {
+impl fmt::Display for JwsBuf {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         self.as_str().fmt(f)
     }
 }
 
-impl fmt::Debug for JwsString {
+impl fmt::Debug for JwsBuf {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         self.as_str().fmt(f)
     }
 }
 
-impl FromStr for JwsString {
+impl FromStr for JwsBuf {
     type Err = InvalidJws;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        Self::from_string(s.to_owned())
+        Self::new(s.to_owned())
     }
 }
 
-impl TryFrom<String> for JwsString {
+impl TryFrom<String> for JwsBuf {
     type Error = InvalidJws<String>;
 
     fn try_from(value: String) -> Result<Self, Self::Error> {
-        Self::from_string(value)
+        Self::new(value)
     }
 }
 
-impl<'de> serde::Deserialize<'de> for JwsString {
+impl<'de> serde::Deserialize<'de> for JwsBuf {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
         D: serde::Deserializer<'de>,
@@ -329,7 +350,7 @@ impl<'de> serde::Deserialize<'de> for JwsString {
         struct Visitor;
 
         impl<'de> serde::de::Visitor<'de> for Visitor {
-            type Value = JwsString;
+            type Value = JwsBuf;
 
             fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
                 formatter.write_str("compact JWS")
@@ -346,7 +367,7 @@ impl<'de> serde::Deserialize<'de> for JwsString {
             where
                 E: serde::de::Error,
             {
-                JwsString::from_string(v).map_err(|e| E::custom(e))
+                JwsBuf::new(v).map_err(|e| E::custom(e))
             }
         }
 
@@ -354,38 +375,38 @@ impl<'de> serde::Deserialize<'de> for JwsString {
     }
 }
 
-impl PartialEq<str> for JwsString {
+impl PartialEq<str> for JwsBuf {
     fn eq(&self, other: &str) -> bool {
         self.as_str() == other
     }
 }
 
-impl<'a> PartialEq<&'a str> for JwsString {
+impl<'a> PartialEq<&'a str> for JwsBuf {
     fn eq(&self, other: &&'a str) -> bool {
         self.as_str() == *other
     }
 }
 
-impl PartialEq<String> for JwsString {
+impl PartialEq<String> for JwsBuf {
     fn eq(&self, other: &String) -> bool {
         self.as_str() == other
     }
 }
 
-impl PartialEq<JwsString> for str {
-    fn eq(&self, other: &JwsString) -> bool {
+impl PartialEq<JwsBuf> for str {
+    fn eq(&self, other: &JwsBuf) -> bool {
         self == other.as_str()
     }
 }
 
-impl<'a> PartialEq<JwsString> for &'a str {
-    fn eq(&self, other: &JwsString) -> bool {
+impl<'a> PartialEq<JwsBuf> for &'a str {
+    fn eq(&self, other: &JwsBuf) -> bool {
         *self == other.as_str()
     }
 }
 
-impl PartialEq<JwsString> for String {
-    fn eq(&self, other: &JwsString) -> bool {
+impl PartialEq<JwsBuf> for String {
+    fn eq(&self, other: &JwsBuf) -> bool {
         self == other.as_str()
     }
 }

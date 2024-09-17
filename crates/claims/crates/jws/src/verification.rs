@@ -1,4 +1,5 @@
-use crate::{verify_bytes, DecodedJWS, DecodedSigningBytes, Error, Header};
+use crate::{verify_bytes, DecodedJws, DecodedSigningBytes, Error, Header};
+use base64::{engine::general_purpose::URL_SAFE_NO_PAD, Engine};
 use ssi_claims_core::{
     ClaimsValidity, InvalidProof, ProofValidationError, ProofValidity, ResolverProvider,
     ValidateClaims, ValidateProof, VerifiableClaims,
@@ -9,35 +10,37 @@ use std::{
     ops::Deref,
 };
 
-pub trait ValidateJWSHeader<E> {
-    fn validate_jws_header(&self, env: &E, header: &Header) -> ClaimsValidity;
-}
-
-impl<E> ValidateJWSHeader<E> for [u8] {
+pub trait ValidateJwsHeader<E> {
     fn validate_jws_header(&self, _env: &E, _header: &Header) -> ClaimsValidity {
         Ok(())
     }
 }
 
-impl<'a, E, T: ?Sized + ToOwned + ValidateJWSHeader<E>> ValidateJWSHeader<E> for Cow<'a, T> {
+impl<E> ValidateJwsHeader<E> for [u8] {}
+
+impl<'a, E, T: ?Sized + ToOwned + ValidateJwsHeader<E>> ValidateJwsHeader<E> for Cow<'a, T> {
     fn validate_jws_header(&self, env: &E, header: &Header) -> ClaimsValidity {
         self.as_ref().validate_jws_header(env, header)
     }
 }
 
-impl<E, T: ValidateClaims<E, JWSSignature> + ValidateJWSHeader<E>> ValidateClaims<E, JWSSignature>
-    for DecodedSigningBytes<T>
+impl<'a, E, T: ValidateClaims<E, JwsSignature> + ValidateJwsHeader<E>>
+    ValidateClaims<E, JwsSignature> for DecodedSigningBytes<'a, T>
 {
-    fn validate_claims(&self, env: &E, signature: &JWSSignature) -> ClaimsValidity {
+    fn validate_claims(&self, env: &E, signature: &JwsSignature) -> ClaimsValidity {
         self.payload.validate_jws_header(env, &self.header)?;
         self.payload.validate_claims(env, signature)
     }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct JWSSignature(Vec<u8>);
+pub struct JwsSignature(Vec<u8>);
 
-impl JWSSignature {
+impl JwsSignature {
+    pub fn new(bytes: Vec<u8>) -> Self {
+        Self(bytes)
+    }
+
     pub fn as_bytes(&self) -> &[u8] {
         &self.0
     }
@@ -45,43 +48,47 @@ impl JWSSignature {
     pub fn into_bytes(self) -> Vec<u8> {
         self.0
     }
+
+    pub fn encode(&self) -> String {
+        URL_SAFE_NO_PAD.encode(&self.0)
+    }
 }
 
-impl From<Vec<u8>> for JWSSignature {
+impl From<Vec<u8>> for JwsSignature {
     fn from(value: Vec<u8>) -> Self {
         Self(value)
     }
 }
 
-impl From<JWSSignature> for Vec<u8> {
-    fn from(value: JWSSignature) -> Self {
+impl From<JwsSignature> for Vec<u8> {
+    fn from(value: JwsSignature) -> Self {
         value.into_bytes()
     }
 }
 
-impl Deref for JWSSignature {
+impl Deref for JwsSignature {
     type Target = [u8];
 
     fn deref(&self) -> &Self::Target {
-        &self.0
+        self.as_bytes()
     }
 }
 
-impl AsRef<[u8]> for JWSSignature {
+impl AsRef<[u8]> for JwsSignature {
     fn as_ref(&self) -> &[u8] {
-        &self.0
+        self.as_bytes()
     }
 }
 
-impl Borrow<[u8]> for JWSSignature {
+impl Borrow<[u8]> for JwsSignature {
     fn borrow(&self) -> &[u8] {
-        &self.0
+        self.as_bytes()
     }
 }
 
-impl<T> VerifiableClaims for DecodedJWS<T> {
-    type Claims = DecodedSigningBytes<T>;
-    type Proof = JWSSignature;
+impl<'a, T> VerifiableClaims for DecodedJws<'a, T> {
+    type Claims = DecodedSigningBytes<'a, T>;
+    type Proof = JwsSignature;
 
     fn claims(&self) -> &Self::Claims {
         &self.signing_bytes
@@ -92,7 +99,7 @@ impl<T> VerifiableClaims for DecodedJWS<T> {
     }
 }
 
-impl<V, T> ValidateProof<V, DecodedSigningBytes<T>> for JWSSignature
+impl<'b, V, T> ValidateProof<V, DecodedSigningBytes<'b, T>> for JwsSignature
 where
     V: ResolverProvider,
     V::Resolver: JWKResolver,
@@ -100,7 +107,7 @@ where
     async fn validate_proof<'a>(
         &'a self,
         verifier: &'a V,
-        claims: &'a DecodedSigningBytes<T>,
+        claims: &'a DecodedSigningBytes<'b, T>,
     ) -> Result<ProofValidity, ProofValidationError> {
         let key = verifier
             .resolver()

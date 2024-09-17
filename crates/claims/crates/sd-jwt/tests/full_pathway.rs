@@ -1,10 +1,15 @@
+use std::sync::LazyLock;
+
 use serde::{Deserialize, Serialize};
 use serde_json::json;
-use ssi_jwk::{Algorithm, JWK};
+use ssi_claims_core::{ValidateClaims, VerificationParameters};
+use ssi_core::json_pointer;
+use ssi_jwk::JWK;
+use ssi_jwt::{ClaimSet, JWTClaims};
 use ssi_sd_jwt::*;
 
-fn test_key() -> JWK {
-    serde_json::from_value(serde_json::json!({
+static JWK: LazyLock<JWK> = LazyLock::new(|| {
+    json!({
         "kty": "EC",
         "d": "oYVImrMZjUclmWuhqa6bjzqGx5HFkbx76_00oWUHiLw",
         "use": "sig",
@@ -13,235 +18,236 @@ fn test_key() -> JWK {
         "x": "UX7TC8uQ9sn06c3DxXy1Ua5V9BK-cb9fQfukVrCLD8s",
         "y": "yNXRKOnwBMTx536uajfNHklxpG9bAbdLlmVn6-XuK0Q",
         "alg": "ES256"
-    }))
+    })
+    .try_into()
     .unwrap()
-}
+});
 
-#[test]
-fn full_pathway_regular_claim() {
+#[async_std::test]
+async fn full_pathway_regular_claim() {
     #[derive(Debug, Serialize, Deserialize, PartialEq)]
     struct BaseClaims {
-        sub: String,
-        disclosure0: Option<String>,
-        disclosure1: Option<String>,
+        property0: Option<String>,
+        property1: Option<String>,
     }
 
-    let base_claims = BaseClaims {
-        sub: "user".to_owned(),
-        disclosure0: None,
-        disclosure1: None,
-    };
+    impl ClaimSet for BaseClaims {}
+    impl<E, P> ValidateClaims<E, P> for BaseClaims {}
 
-    let (jwt, disclosures) = encode_sign(
-        Algorithm::ES256,
-        &base_claims,
-        &test_key(),
-        SdAlg::Sha256,
-        vec![
-            UnencodedDisclosure::new_property("disclosure0", &json!("value0")).unwrap(),
-            UnencodedDisclosure::new_property("disclosure1", &json!("value1")).unwrap(),
-        ],
-    )
-    .unwrap();
+    let base_claims = JWTClaims::builder()
+        .sub("user")
+        .with_private_claims(BaseClaims {
+            property0: Some("value0".to_owned()),
+            property1: Some("value1".to_owned()),
+        })
+        .unwrap();
 
-    let full_jwt_claims = decode_verify_disclosure_array::<BaseClaims>(
-        Deserialized {
-            jwt: &jwt,
-            disclosures: vec![&disclosures[0].encoded, &disclosures[1].encoded],
-        },
-        &test_key(),
-    )
-    .unwrap();
+    let sd_jwt = base_claims
+        .conceal_and_sign(
+            SdAlg::Sha256,
+            &[json_pointer!("/property0"), json_pointer!("/property1")],
+            &*JWK,
+        )
+        .await
+        .unwrap();
 
+    let params = VerificationParameters::from_resolver(&*JWK);
+
+    let (mut revealed, verification) = sd_jwt
+        .decode_reveal_verify::<BaseClaims, _>(&params)
+        .await
+        .unwrap();
+
+    assert_eq!(verification, Ok(()));
+    assert_eq!(*revealed.claims(), base_claims);
+
+    // Retain only the `property1` property disclosure.
+    revealed.retain(&[json_pointer!("/property1")]);
+
+    let sd_jwt = revealed.into_encoded();
+
+    let (revealed, verification) = sd_jwt
+        .decode_reveal_verify::<BaseClaims, _>(params)
+        .await
+        .unwrap();
+
+    assert_eq!(verification, Ok(()));
     assert_eq!(
-        BaseClaims {
-            sub: "user".to_owned(),
-            disclosure0: Some("value0".to_owned()),
-            disclosure1: Some("value1".to_owned()),
-        },
-        full_jwt_claims,
-    );
-
-    let one_sd_claim = decode_verify_disclosure_array::<BaseClaims>(
-        Deserialized {
-            jwt: &jwt,
-            disclosures: vec![&disclosures[1].encoded],
-        },
-        &test_key(),
-    )
-    .unwrap();
-
-    assert_eq!(
-        BaseClaims {
-            sub: "user".to_owned(),
-            disclosure0: None,
-            disclosure1: Some("value1".to_owned())
-        },
-        one_sd_claim,
+        *revealed.claims(),
+        JWTClaims::builder()
+            .sub("user")
+            .with_private_claims(BaseClaims {
+                property0: None, // concealed
+                property1: Some("value1".to_owned()),
+            })
+            .unwrap()
     );
 }
 
-#[test]
-fn full_pathway_array() {
+#[async_std::test]
+async fn full_pathway_array() {
     #[derive(Debug, Serialize, Deserialize, PartialEq)]
     struct BaseClaims {
-        sub: String,
         array_disclosure: Vec<String>,
     }
 
-    let base_claims = BaseClaims {
-        sub: "user".to_owned(),
-        array_disclosure: vec![],
-    };
+    impl ClaimSet for BaseClaims {}
+    impl<E, P> ValidateClaims<E, P> for BaseClaims {}
 
-    let (jwt, disclosures) = encode_sign(
-        Algorithm::ES256,
-        &base_claims,
-        &test_key(),
-        SdAlg::Sha256,
-        vec![
-            UnencodedDisclosure::new_array_item("array_disclosure", &json!("value0")).unwrap(),
-            UnencodedDisclosure::new_array_item("array_disclosure", &json!("value1")).unwrap(),
-        ],
-    )
-    .unwrap();
-
-    let full_jwt_claims = decode_verify_disclosure_array::<BaseClaims>(
-        Deserialized {
-            jwt: &jwt,
-            disclosures: vec![&disclosures[0].encoded, &disclosures[1].encoded],
-        },
-        &test_key(),
-    )
-    .unwrap();
-
-    assert_eq!(
-        BaseClaims {
-            sub: "user".to_owned(),
+    let base_claims = JWTClaims::builder()
+        .sub("user")
+        .with_private_claims(BaseClaims {
             array_disclosure: vec!["value0".to_owned(), "value1".to_owned()],
-        },
-        full_jwt_claims
+        })
+        .unwrap();
+
+    let sd_jwt = base_claims
+        .conceal_and_sign(
+            SdAlg::Sha256,
+            &[
+                json_pointer!("/array_disclosure/0"),
+                json_pointer!("/array_disclosure/1"),
+            ],
+            &*JWK,
+        )
+        .await
+        .unwrap();
+
+    let params = VerificationParameters::from_resolver(&*JWK);
+
+    let (mut revealed, verification) = sd_jwt
+        .decode_reveal_verify::<BaseClaims, _>(&params)
+        .await
+        .unwrap();
+
+    assert_eq!(verification, Ok(()));
+    assert_eq!(*revealed.claims(), base_claims);
+
+    // Retain only the second item disclosure.
+    revealed.retain(&[json_pointer!("/array_disclosure/1")]);
+
+    let sd_jwt = revealed.into_encoded();
+
+    let (revealed, verification) = sd_jwt
+        .decode_reveal_verify::<BaseClaims, _>(params)
+        .await
+        .unwrap();
+
+    assert_eq!(verification, Ok(()));
+    assert_eq!(
+        *revealed.claims(),
+        JWTClaims::builder()
+            .sub("user")
+            .with_private_claims(BaseClaims {
+                array_disclosure: vec!["value1".to_owned()]
+            })
+            .unwrap()
     );
 }
 
-#[test]
-fn nested_claims() {
-    const SD_ALG: SdAlg = SdAlg::Sha256;
-
+#[async_std::test]
+async fn nested_claims() {
     // Decode types
-    #[derive(Debug, Deserialize, PartialEq)]
+    #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
     struct InnerNestedClaim {
         inner_property: String,
     }
 
-    #[derive(Debug, Deserialize, PartialEq)]
+    #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
     struct OuterNestedClaim {
         inner: Option<InnerNestedClaim>,
     }
 
-    #[derive(Debug, Deserialize, PartialEq)]
+    #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
     struct Claims {
-        sub: String,
         outer: Option<OuterNestedClaim>,
     }
 
-    // Manually encode
-    let inner_disclosure = encode_property_disclosure(
-        SD_ALG,
-        "inner",
-        &serde_json::json!({"inner_property": "value"}),
-    )
-    .unwrap();
+    impl ClaimSet for Claims {}
+    impl<E, P> ValidateClaims<E, P> for Claims {}
 
-    let outer_disclosure = encode_property_disclosure(
-        SD_ALG,
-        "outer",
-        &serde_json::json!({
-            "_sd": [
-                inner_disclosure.hash
-            ]
-        }),
-    )
-    .unwrap();
-
-    let jwt = ssi_jwt::encode_sign(
-        Algorithm::ES256,
-        &serde_json::json!({
-            "_sd": [
-                outer_disclosure.hash
-            ],
-            "_sd_alg": SD_ALG.to_str(),
-            "sub": "user",
-        }),
-        &test_key(),
-    )
-    .unwrap();
-
-    // No claims provided
-    let no_sd_claims = decode_verify_disclosure_array::<Claims>(
-        Deserialized {
-            jwt: &jwt,
-            disclosures: vec![],
-        },
-        &test_key(),
-    )
-    .unwrap();
-    assert_eq!(
-        no_sd_claims,
-        Claims {
-            sub: "user".to_owned(),
-            outer: None,
-        }
-    );
-
-    // Outer provided
-    let outer_provided = decode_verify_disclosure_array::<Claims>(
-        Deserialized {
-            jwt: &jwt,
-            disclosures: vec![&outer_disclosure.encoded],
-        },
-        &test_key(),
-    )
-    .unwrap();
-
-    assert_eq!(
-        outer_provided,
-        Claims {
-            sub: "user".to_owned(),
-            outer: Some(OuterNestedClaim { inner: None })
-        }
-    );
-
-    // Inner and outer provided
-    let inner_and_outer_provided = decode_verify_disclosure_array::<Claims>(
-        Deserialized {
-            jwt: &jwt,
-            disclosures: vec![&outer_disclosure.encoded, &inner_disclosure.encoded],
-        },
-        &test_key(),
-    )
-    .unwrap();
-
-    assert_eq!(
-        inner_and_outer_provided,
-        Claims {
-            sub: "user".to_owned(),
+    let base_claims = JWTClaims::builder()
+        .sub("user")
+        .with_private_claims(Claims {
             outer: Some(OuterNestedClaim {
                 inner: Some(InnerNestedClaim {
                     inner_property: "value".to_owned(),
-                })
-            })
-        }
+                }),
+            }),
+        })
+        .unwrap();
+
+    let base_sd_jwt = base_claims
+        .conceal_and_sign(
+            SdAlg::Sha256,
+            &[json_pointer!("/outer"), json_pointer!("/outer/inner")],
+            &*JWK,
+        )
+        .await
+        .unwrap();
+
+    let inner_revealed = base_sd_jwt.decode_reveal::<Claims>().unwrap();
+
+    let params = VerificationParameters::from_resolver(&*JWK);
+
+    let empty_sd_jwt = inner_revealed.clone().cleared().into_encoded();
+
+    let (empty_revealed, verification) = empty_sd_jwt
+        .decode_reveal_verify::<Claims, _>(&params)
+        .await
+        .unwrap();
+
+    assert_eq!(verification, Ok(()));
+    assert_eq!(
+        *empty_revealed.claims(),
+        JWTClaims::builder()
+            .sub("user")
+            .with_private_claims(Claims { outer: None })
+            .unwrap()
     );
 
-    // Inner without outer errors
-    let result = decode_verify_disclosure_array::<Claims>(
-        Deserialized {
-            jwt: &jwt,
-            disclosures: vec![&inner_disclosure.encoded],
-        },
-        &test_key(),
+    let full_sd_jwt = inner_revealed
+        .clone()
+        .retaining(&[json_pointer!("/outer"), json_pointer!("/outer/inner")])
+        .into_encoded();
+
+    let (full_revealed, verification) = full_sd_jwt
+        .decode_reveal_verify::<Claims, _>(&params)
+        .await
+        .unwrap();
+
+    assert_eq!(verification, Ok(()));
+    assert_eq!(*full_revealed.claims(), base_claims);
+
+    let outer_sd_jwt = inner_revealed
+        .clone()
+        .retaining(&[json_pointer!("/outer")])
+        .into_encoded();
+
+    let (full_revealed, verification) = outer_sd_jwt
+        .decode_reveal_verify::<Claims, _>(&params)
+        .await
+        .unwrap();
+
+    assert_eq!(verification, Ok(()));
+    assert_eq!(
+        *full_revealed.claims(),
+        JWTClaims::builder()
+            .sub("user")
+            .with_private_claims(Claims {
+                outer: Some(OuterNestedClaim { inner: None })
+            })
+            .unwrap()
     );
+
+    let inner_sd_jwt = inner_revealed
+        .clone()
+        .retaining(&[json_pointer!("/outer/inner")])
+        .into_encoded();
+
+    let result = inner_sd_jwt
+        .decode_reveal_verify::<Claims, _>(&params)
+        .await;
 
     assert!(result.is_err());
 }

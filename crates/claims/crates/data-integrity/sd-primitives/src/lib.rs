@@ -6,6 +6,8 @@ use hmac::Mac;
 use serde::{Deserialize, Serialize};
 use sha2::{Sha256, Sha384};
 
+pub use ssi_core::{JsonPointer, JsonPointerBuf};
+
 pub type HmacSha256 = Hmac<Sha256>;
 pub type HmacSha384 = Hmac<Sha384>;
 
@@ -228,8 +230,5 @@ impl<'de> Deserialize<'de> for HmacShaAnyKey {
 
 pub mod canonicalize;
 pub mod group;
-pub mod json_pointer;
 pub mod select;
 pub mod skolemize;
-
-pub use json_pointer::{JsonPointer, JsonPointerBuf};

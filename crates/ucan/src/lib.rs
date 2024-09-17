@@ -22,7 +22,7 @@ use ssi_dids_core::{
     DIDBuf, DIDResolver, DIDURLBuf, Document,
 };
 use ssi_jwk::{Algorithm, JWK};
-use ssi_jws::{decode_jws_parts, sign_bytes, split_jws, verify_bytes, Header, JWSSignature};
+use ssi_jws::{decode_jws_parts, sign_bytes, split_jws, verify_bytes, Header, JwsSignature};
 use ssi_jwt::NumericDate;
 use ssi_verification_methods::{GenericVerificationMethod, InvalidVerificationMethod};
 use std::{
@@ -36,7 +36,7 @@ use std::{
 pub struct Ucan<F = JsonValue, A = JsonValue> {
     pub header: Header,
     pub payload: Payload<F, A>,
-    pub signature: JWSSignature,
+    pub signature: JwsSignature,
     // unfortunately this matters for sig verification
     // we have to keep track of how this ucan was created
     // alternatively we could have 2 different types?
@@ -106,7 +106,7 @@ impl<F, A> Ucan<F, A> {
             self.header.algorithm,
             self.encode()?
                 .rsplit_once('.')
-                .ok_or(ssi_jws::Error::InvalidJWS)?
+                .ok_or(ssi_jws::Error::InvalidJws)?
                 .0
                 .as_bytes(),
             &key,

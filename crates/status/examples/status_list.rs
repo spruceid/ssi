@@ -100,7 +100,7 @@ impl Command {
                 let signature =
                     ssi_jws::sign_bytes_b64(header.algorithm, &signing_bytes, &jwk).unwrap();
 
-                let jws = ssi_jws::CompactJWSString::from_signing_bytes_and_signature(
+                let jws = ssi_jws::JwsString::from_signing_bytes_and_signature(
                     signing_bytes,
                     signature.into_bytes(),
                 )
