@@ -18,6 +18,9 @@ use ssi_vc::{
 pub struct SdJwtVp<T = JsonPresentation<EnvelopedVerifiableCredential>>(pub T);
 
 impl<T> SdJwtVp<T> {
+    /// Returns this presentation as JWT claims.
+    ///
+    /// These are the claims that will be encoded in the SD-JWT.
     pub fn as_jwt_claims(&self) -> JWTClaims<&Self> {
         JWTClaims {
             registered: Default::default(),
@@ -25,6 +28,9 @@ impl<T> SdJwtVp<T> {
         }
     }
 
+    /// Turns this presentation into JWT claims.
+    ///
+    /// These claims can then be encoded in the SD-JWT.
     pub fn into_jwt_claims(self) -> JWTClaims<Self> {
         JWTClaims {
             registered: Default::default(),
@@ -34,12 +40,22 @@ impl<T> SdJwtVp<T> {
 }
 
 impl<T: Serialize> SdJwtVp<T> {
+    /// Signs the presentation into an SD-JWT without any concealed claims.
+    ///
+    /// The generated SD-JWT will not have any disclosures.
+    ///
+    /// Use [`Self::conceal_and_sign`] to select the claims to be concealed.
     pub async fn sign(&self, signer: &impl JwsSigner) -> Result<SdJwtBuf, SignatureError> {
         let pointers: [&JsonPointer; 0] = [];
         self.conceal_and_sign(SdAlg::Sha256, &pointers, signer)
             .await
     }
 
+    /// Signs the presentation while concealing the claims selected by the given
+    /// JSON pointers.
+    ///
+    /// You can use [`Self::sign`] directly if you don't need to conceal
+    /// anything.
     pub async fn conceal_and_sign(
         &self,
         sd_alg: SdAlg,
@@ -49,6 +65,14 @@ impl<T: Serialize> SdJwtVp<T> {
         SdJwtBuf::conceal_and_sign(&self.as_jwt_claims(), sd_alg, pointers, signer).await
     }
 
+    /// Signs the presentation into an enveloped verifiable presentation (with
+    /// an SD-JWT identifier) without concealing any claim.
+    ///
+    /// The generated SD-JWT, encoded in the presentation identifier, will not
+    /// have any disclosures.
+    ///
+    /// Use [`Self::conceal_and_sign_into_enveloped`] to select the claims to be
+    /// concealed.
     pub async fn sign_into_enveloped(
         &self,
         signer: &impl JwsSigner,
@@ -58,7 +82,15 @@ impl<T: Serialize> SdJwtVp<T> {
             .await
     }
 
-    /// Sign a JOSE VP into an enveloped verifiable credential.
+    /// Signs the presentation into an enveloped verifiable presentation (with
+    /// an SD-JWT identifier) while concealing the claims selected by the given
+    /// JSON pointers.
+    ///
+    /// The generated SD-JWT, encoded in the presentation identifier, will not
+    /// have any disclosures.
+    ///
+    /// Use [`Self::conceal_and_sign_into_enveloped`] to select the claims to be
+    /// concealed.
     pub async fn conceal_and_sign_into_enveloped(
         &self,
         sd_alg: SdAlg,
@@ -76,14 +108,22 @@ impl<T: Serialize> SdJwtVp<T> {
 }
 
 impl<T: DeserializeOwned> SdJwtVp<T> {
-    /// Decode a SD-JWT VP.
+    /// Decodes a SD-JWT VP, revealing its disclosed claims.
+    ///
+    /// This function requires the `T` parameter, representing the presentation
+    /// type, to be known. If you don't know what `T` you should use, use the
+    /// [`Self::decode_reveal_any`].
     pub fn decode_reveal(sd_jwt: &SdJwt) -> Result<RevealedSdJwt<Self>, RevealError> {
         sd_jwt.decode_reveal()
     }
 }
 
 impl SdJwtVp {
-    /// Decode a SD-JWT VP.
+    /// Decodes a SD-JWT VP, revealing its disclosed claims.
+    ///
+    /// This function uses [`JsonPresentation<EnvelopedVerifiableCredential>`]
+    /// as presentation type. If you need to use a custom presentation type, use
+    /// the [`Self::decode_reveal`] function.
     pub fn decode_reveal_any(sd_jwt: &SdJwt) -> Result<RevealedSdJwt<Self>, RevealError> {
         sd_jwt.decode_reveal()
     }
