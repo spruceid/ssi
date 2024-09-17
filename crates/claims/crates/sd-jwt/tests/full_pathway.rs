@@ -177,10 +177,21 @@ async fn nested_claims() {
         })
         .unwrap();
 
-    let base_sd_jwt = base_claims
+    // Conceal the base claims.
+    base_claims
         .conceal_and_sign(
             SdAlg::Sha256,
             &[json_pointer!("/outer"), json_pointer!("/outer/inner")],
+            &*JWK,
+        )
+        .await
+        .unwrap();
+
+    // Conceal again but changing the order of pointers (this should have no effect).
+    let base_sd_jwt = base_claims
+        .conceal_and_sign(
+            SdAlg::Sha256,
+            &[json_pointer!("/outer/inner"), json_pointer!("/outer")],
             &*JWK,
         )
         .await
