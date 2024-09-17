@@ -129,10 +129,11 @@ pub struct DisclosureBuf(Vec<u8>);
 impl DisclosureBuf {
     /// Creates a disclosure from its defining parts.
     pub fn encode_from_parts(salt: &str, kind: &DisclosureDescription) -> Self {
-        let string = kind.to_value(salt).to_string();
-        // eprintln!("value = {string}");
-
-        Self(BASE64_URL_SAFE_NO_PAD.encode(string).into_bytes())
+        Self(
+            BASE64_URL_SAFE_NO_PAD
+                .encode(kind.to_value(salt).to_string())
+                .into_bytes(),
+        )
     }
 
     /// Borrows the disclosure.
