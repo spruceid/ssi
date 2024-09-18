@@ -341,7 +341,7 @@ impl<'de> serde::Deserialize<'de> for &'de SdJwt {
 }
 
 /// Owned SD-JWT.
-#[derive(PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[derive(Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct SdJwtBuf(Vec<u8>);
 
 impl SdJwtBuf {
