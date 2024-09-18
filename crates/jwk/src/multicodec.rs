@@ -209,6 +209,7 @@ mod tests {
     use super::*;
 
     #[test]
+    #[cfg(feature = "secp256r1")]
     fn test_multicodec_jwk_jcs_pub() {
         let jwk = JWK::generate_p256();
         // Note: can't use JWK::to_multicodec() because it's based on the particular key within the JWK
