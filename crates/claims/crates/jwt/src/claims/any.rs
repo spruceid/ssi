@@ -49,6 +49,12 @@ impl IntoIterator for AnyClaims {
     }
 }
 
+impl FromIterator<(String, serde_json::Value)> for AnyClaims {
+    fn from_iter<T: IntoIterator<Item = (String, serde_json::Value)>>(iter: T) -> Self {
+        Self(BTreeMap::from_iter(iter))
+    }
+}
+
 impl ClaimSet for AnyClaims {
     fn contains<C: Claim>(&self) -> bool {
         self.contains(C::JWT_CLAIM_NAME)

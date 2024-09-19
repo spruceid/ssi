@@ -11,6 +11,8 @@ documentation = "https://docs.rs/vc-jose-cose/"
 [dependencies]
 ssi-claims-core.workspace = true
 ssi-jws.workspace = true
+ssi-jwt.workspace = true
+ssi-sd-jwt.workspace = true
 ssi-cose.workspace = true
 ssi-vc.workspace = true
 ssi-json-ld.workspace = true
