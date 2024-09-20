@@ -60,7 +60,7 @@ impl BitstringStatusListEntry {
         id: Option<UriBuf>,
         status_size: StatusSize,
         status_purpose: StatusPurpose,
-        status_message: Vec<StatusMessage>,
+        status_messages: Vec<StatusMessage>,
         status_list_credential: UriBuf,
         status_list_index: usize,
     ) -> Self {
@@ -68,7 +68,7 @@ impl BitstringStatusListEntry {
             id,
             status_size,
             status_purpose,
-            status_messages: status_message,
+            status_messages,
             status_reference: None,
             status_list_credential,
             status_list_index,

@@ -258,6 +258,13 @@ impl FromStr for StatusPurpose {
     }
 }
 
+/// Bit-string with status size.
+///
+///
+/// This type is similar to [`BitString`] but also stores the bit size of
+/// each item (status size) and the number of items in the list.
+/// This provides a safer access to the underlying bit-string, ensuring that
+/// status and list boundaries are respected.
 #[derive(Debug, Clone)]
 pub struct SizedBitString {
     inner: BitString,
@@ -419,6 +426,10 @@ impl SizedBitString {
 /// ```
 ///
 /// See: <https://www.w3.org/TR/vc-bitstring-status-list/#bitstring-encoding>
+///
+/// This type does not store the actual status size (the size of each item)
+/// nor the total number of items in the list. Use the [`SizedBitString`] type
+/// to access the list safely with regard to the items boundaries.
 #[derive(Debug, Default, Clone)]
 pub struct BitString(Vec<u8>);
 
@@ -631,6 +642,12 @@ impl StatusList {
     }
 }
 
+/// Status list with status size.
+///
+/// This type is similar to [`StatusList`] but also stores the bit size of
+/// each item (status size) and the number of items in the list.
+/// This provides a safer access to the underlying bit-string, ensuring that
+/// status and list boundaries are respected.
 #[derive(Debug, Clone)]
 pub struct SizedStatusList {
     bit_string: SizedBitString,
