@@ -595,6 +595,11 @@ impl OverflowingSignedShift for u8 {
     }
 }
 
+/// Status list.
+///
+/// This type does not store the actual status size (the size of each item)
+/// nor the total number of items in the list. Use the [`SizedStatusList`] type
+/// to access the list safely with regard to the items boundaries.
 #[derive(Debug, Clone)]
 pub struct StatusList {
     bit_string: BitString,
