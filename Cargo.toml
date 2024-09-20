@@ -35,7 +35,7 @@ ssi-rdf = { path = "./crates/rdf", version = "0.1", default-features = false }
 ssi-contexts = { path = "./crates/contexts", version = "0.1.6", default-features = false }
 ssi-json-ld = { path = "./crates/json-ld", version = "0.3", default-features = false }
 ssi-security = { path = "./crates/security", version = "0.1", default-features = false }
-ssi-caips = { path = "./crates/caips", version = "0.2", default-features = false }
+ssi-caips = { path = "./crates/caips", version = "0.2.1", default-features = false }
 ssi-ucan = { path = "./crates/ucan", version = "0.2.1", default-features = false }
 ssi-zcap-ld = { path = "./crates/zcap-ld", version = "0.2.1", default-features = false }
 ssi-ssh = { path = "./crates/ssh", version = "0.2.1", default-features = false }
@@ -58,13 +58,13 @@ ssi-claims = { path = "./crates/claims", version = "0.1.1", default-features = f
 
 # DID methods
 ssi-dids-core = { path = "./crates/dids/core", version = "0.1.1", default-features = false }
-did-ethr = { path = "./crates/dids/methods/ethr", version = "0.3", default-features = false }
+did-ethr = { path = "./crates/dids/methods/ethr", version = "0.3.1", default-features = false }
 did-ion = { path = "./crates/dids/methods/ion", version = "0.3.1", default-features = false }
 did-jwk = { path = "./crates/dids/methods/jwk", version = "0.2.1", default-features = false }
 did-method-key = { path = "./crates/dids/methods/key", version = "0.3.1", default-features = false }
 did-pkh = { path = "./crates/dids/methods/pkh", version = "0.3.1", default-features = false }
 did-tz = { path = "./crates/dids/methods/tz", version = "0.3.1", default-features = false }
-did-web = { path = "./crates/dids/methods/web", version = "0.3", default-features = false }
+did-web = { path = "./crates/dids/methods/web", version = "0.3.1", default-features = false }
 ssi-dids = { path = "./crates/dids", version = "0.2.1", default-features = false }
 
 # crypto
