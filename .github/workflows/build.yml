@@ -88,10 +88,17 @@ jobs:
     - name: Test each feature
       run: cargo hack test --each-feature --workspace --clean-per-run --exclude ssi --exclude 'ssi-did-test' -- --test-threads=4
 
-  semver:
-    runs-on: ubuntu-latest
-    steps:
-    - uses: actions/checkout@v4
-    - uses: lukka/get-cmake@latest
-    - name: Check semver
-      uses: obi1kenobi/cargo-semver-checks-action@v2
+  # Disabled until caching is fixed or cargo-semver-checks-actions works with our workspace
+  # semver:
+  #   runs-on: ubuntu-latest
+  #   steps:
+  #   - uses: actions/checkout@v4
+  #   - uses: lukka/get-cmake@latest
+  #   - uses: Swatinem/rust-cache@v2
+  #     with:
+  #       cache-on-failure: "true"
+  #   - uses: taiki-e/install-action@v2
+  #     with:
+  #       tool: cargo-semver-checks
+  #   - name: Check semver
+  #     run: cargo semver-checks --workspace --exclude ssi-cose # not yet published
