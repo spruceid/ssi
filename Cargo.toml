@@ -43,7 +43,7 @@ ssi-status = { path = "./crates/status", version = "0.2", default-features = fal
 ssi-bbs = { path = "./crates/bbs", version = "0.1", default-features = false }
 
 # Verifiable Claims
-ssi-claims-core = { path = "./crates/claims/core", version = "0.1", default-features = false }
+ssi-claims-core = { path = "./crates/claims/core", version = "0.1.2", default-features = false }
 ssi-jws = { path = "./crates/claims/crates/jws", version = "0.3", default-features = false }
 ssi-jwt = { path = "./crates/claims/crates/jwt", version = "0.3", default-features = false }
 ssi-sd-jwt = { path = "./crates/claims/crates/sd-jwt", version = "0.3", default-features = false }
