@@ -135,6 +135,8 @@ const REFERENCE_TEZOS_MAINNET: &str = "NetXdQprcVkpaWU";
 const REFERENCE_SOLANA_MAINNET: &str = "4sGjMW1sUnHzSxGspuhpqLDx6wiyjNtZ";
 
 /// did:pkh DID Method
+///
+/// See: <https://github.com/w3c-ccg/did-pkh/blob/main/did-pkh-method-draft.md>
 pub struct DIDPKH;
 
 type ResolutionResult = Result<(Document, JsonLdContext), Error>;

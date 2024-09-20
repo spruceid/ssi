@@ -25,38 +25,51 @@ pub use http::*;
 /// [DID URL dereferencing](DIDResolver::dereference).
 pub const MEDIA_TYPE_URL: &str = "text/url";
 
+/// DID resolution error.
+///
+/// Error raised by the [`DIDResolver::resolve`] method.
 #[derive(Debug, thiserror::Error)]
 pub enum Error {
+    /// DID method is not supported by this resolver.
     #[error("DID method `{0}` not supported")]
     MethodNotSupported(String),
 
+    /// DID document could not be found.
     #[error("DID document not found")]
     NotFound,
 
+    /// Resolver doesn't know what representation to use for the DID document.
     #[error("no representation specified")]
     NoRepresentation,
 
+    /// Requested DID document representation is not supported.
     #[error("DID representation `{0}` not supported")]
     RepresentationNotSupported(String),
 
+    /// Invalid data provided to the resolver.
     #[error(transparent)]
     InvalidData(InvalidData),
 
+    /// Invalid method-specific identifier.
     #[error("invalid method specific identifier: {0}")]
     InvalidMethodSpecificId(String),
 
+    /// Invalid resolution options.
     #[error("invalid options")]
     InvalidOptions,
 
+    /// Internal resolver-specific error.
     #[error("DID resolver internal error: {0}")]
     Internal(String),
 }
 
 impl Error {
+    /// Creates a new internal error.
     pub fn internal(error: impl ToString) -> Self {
         Self::Internal(error.to_string())
     }
 
+    /// Returns the error kind.
     pub fn kind(&self) -> ErrorKind {
         match self {
             Self::MethodNotSupported(_) => ErrorKind::MethodNotSupported,
@@ -77,6 +90,9 @@ impl From<representation::Unknown> for Error {
     }
 }
 
+/// Resolution error kind.
+///
+/// Each resolution [`Error`] has a kind provided by the [`Error::kind`] method.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum ErrorKind {
     MethodNotSupported,
@@ -116,10 +132,18 @@ impl<T: DIDResolverByMethod> DIDResolver for T {
     }
 }
 
-/// A [DID resolver](https://www.w3.org/TR/did-core/#dfn-did-resolvers),
-/// implementing the [DID Resolution](https://www.w3.org/TR/did-core/#did-resolution)
-/// [algorithm](https://w3c-ccg.github.io/did-resolution/#resolving-algorithm) and
-/// optionally [DID URL Dereferencing](https://www.w3.org/TR/did-core/#did-url-dereferencing).
+/// [DID resolver](https://www.w3.org/TR/did-core/#dfn-did-resolvers).
+///
+/// Any type implementing the [DID Resolution](https://www.w3.org/TR/did-core/#did-resolution)
+/// [algorithm](https://w3c-ccg.github.io/did-resolution/#resolving-algorithm)
+/// through the [`resolve`](DIDResolver::resolve) method
+/// and the [DID URL Dereferencing](https://www.w3.org/TR/did-core/#did-url-dereferencing)
+/// algorithm through the [`dereference`](DIDResolver::dereference) method.
+///
+/// This library provides the [`AnyDidMethod`] that implements this trait
+/// by grouping various DID method implementations.
+///
+/// [`AnyDidMethod`]: <../dids/struct.AnyDidMethod.html>
 pub trait DIDResolver {
     /// Resolves a DID representation.
     ///

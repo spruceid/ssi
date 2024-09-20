@@ -34,3 +34,6 @@ did-pkh.workspace = true
 did-tz.workspace = true
 did-web.workspace = true
 thiserror.workspace = true
+
+[dev-dependencies]
+async-std = { workspace = true, features = ["attributes"] }

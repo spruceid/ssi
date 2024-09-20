@@ -244,7 +244,9 @@
 #![doc = document_features::document_features!()]
 #![cfg_attr(docsrs, feature(doc_auto_cfg), feature(doc_cfg))]
 
-pub use xsd_types;
+/// XSD types.
+#[doc(inline)]
+pub use xsd_types as xsd;
 
 /// Collection of common names defined by SSI.
 pub mod prelude;
@@ -286,6 +288,7 @@ pub use ssi_security as security;
 pub use ssi_claims as claims;
 
 /// Claims status.
+#[doc(inline)]
 pub use ssi_status as status;
 
 /// Default verification parameters type.
@@ -344,5 +347,7 @@ pub use ssi_multicodec as multicodec;
 #[doc(inline)]
 pub use ssi_ssh as ssh;
 
+/// BBS cryptoscheme.
 #[cfg(feature = "bbs")]
+#[doc(inline)]
 pub use ssi_bbs as bbs;

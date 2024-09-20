@@ -10,7 +10,7 @@ pub use crate::{
     },
     dids::{DIDResolver, DIDJWK},
     verification_methods::{AnyJwkMethod, AnyMethod, SingleSecretSigner},
-    xsd_types::DateTime,
+    xsd::DateTime,
     DefaultVerificationParameters, JWK,
 };
 
