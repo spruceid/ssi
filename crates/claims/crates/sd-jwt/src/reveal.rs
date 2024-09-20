@@ -79,9 +79,6 @@ impl SdJwtPayload {
         disclosures: &[DecodedDisclosure],
         pointers: &mut Vec<JsonPointerBuf>,
     ) -> Result<JWTClaims<T>, RevealError> {
-        eprintln!("payload: {}", serde_json::to_string_pretty(self).unwrap());
-        eprintln!("disclosures: {disclosures:#?}");
-
         let mut disclosures: IndexMap<_, _> = disclosures
             .iter()
             .map(|disclosure| {
