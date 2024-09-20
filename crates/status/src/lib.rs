@@ -5,6 +5,7 @@ use iref::Uri;
 pub use r#impl::*;
 pub mod client;
 
+/// Encoded [`StatusMap`].
 pub trait EncodedStatusMap {
     type Decoded: StatusMap;
     type DecodeError: std::error::Error;
@@ -41,8 +42,28 @@ pub trait FromBytes<V>: Sized {
     }
 }
 
+#[derive(Debug, thiserror::Error)]
+pub enum StatusSizeError {
+    #[error("missing status size")]
+    Missing,
+
+    #[error("invalid status size")]
+    Invalid,
+}
+
+/// Status map.
+///
+/// A status map is a map from [`StatusMapEntry`] to [`StatusMap::Status`].
+/// The [`StatusMapEntry`] is generally found in the credential or claims you
+/// need to verify.
 pub trait StatusMap: Clone {
+    /// Key indexing each status in the map.
     type Key;
+
+    /// Status bit size type.
+    type StatusSize;
+
+    /// Status type.
     type Status;
 
     /// Maximum duration an implementer is allowed to cache a
@@ -51,10 +72,23 @@ pub trait StatusMap: Clone {
         None
     }
 
-    fn get_by_key(&self, key: Self::Key) -> Option<Self::Status>;
+    /// Returns a status using the given status size and key.
+    ///
+    /// If `status_size` is `None`, it is assumed that the map itself knows the
+    /// status size. If it does not, a [`StatusSizeError::Missing`] error is
+    /// returned.
+    fn get_by_key(
+        &self,
+        status_size: Option<Self::StatusSize>,
+        key: Self::Key,
+    ) -> Result<Option<Self::Status>, StatusSizeError>;
 
-    fn get_entry<E: StatusMapEntry<Key = Self::Key>>(&self, entry: &E) -> Option<Self::Status> {
-        self.get_by_key(entry.key())
+    /// Returns the status associated to the given entry.
+    fn get_entry<E: StatusMapEntry<Key = Self::Key, StatusSize = Self::StatusSize>>(
+        &self,
+        entry: &E,
+    ) -> Result<Option<Self::Status>, StatusSizeError> {
+        self.get_by_key(entry.status_size(), entry.key())
     }
 }
 
@@ -66,19 +100,47 @@ pub trait StatusMapEntrySet {
     fn get_entry(&self, purpose: StatusPurpose<&str>) -> Option<Self::Entry<'_>>;
 }
 
+/// Status map entry.
+///
+/// A status map entry is a reference to a particular status in a status map.
+/// It links to a status map, providing a key in this map.
 pub trait StatusMapEntry {
+    /// Key indexing each status in the referenced status list.
     type Key;
 
+    /// Status map status size type.
+    type StatusSize;
+
+    /// URL to the status map.
     fn status_list_url(&self) -> &Uri;
 
+    /// Size of each status in the status map, if it is known by the entry.
+    ///
+    /// For some [`StatusMap`] implementations such as
+    /// [`crate::token_status_list::StatusList`] the status size is stored in
+    /// the map, while for some other implementations such as
+    /// [`crate::bitstring_status_list::StatusList`] the status size is stored
+    /// in the entry
+    /// ([`crate::bitstring_status_list::BitstringStatusListEntry`]).
+    ///
+    /// If this function returns `None`, it is assumed that the status size
+    /// will be provided by the status map.
+    fn status_size(&self) -> Option<Self::StatusSize>;
+
+    /// Entry key.
     fn key(&self) -> Self::Key;
 }
 
 impl<'a, E: StatusMapEntry> StatusMapEntry for &'a E {
     type Key = E::Key;
+    type StatusSize = E::StatusSize;
 
     fn status_list_url(&self) -> &Uri {
         E::status_list_url(*self)
+    }
+
+    fn status_size(&self) -> Option<Self::StatusSize> {
+        E::status_size(*self)
     }
 
     fn key(&self) -> Self::Key {

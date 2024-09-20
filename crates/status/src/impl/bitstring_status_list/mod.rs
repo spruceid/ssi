@@ -1,4 +1,4 @@
-//! W3C Bitstring Status List v1.0 (Working Draft 06 April 2024)
+//! W3C Bitstring Status List v1.0 (Candidate Recommendation Draft 10 June 2024)
 //!
 //! A privacy-preserving, space-efficient, and high-performance mechanism for
 //! publishing status information such as suspension or revocation of Verifiable
@@ -10,7 +10,7 @@ use iref::UriBuf;
 use serde::{Deserialize, Serialize};
 use std::{hash::Hash, str::FromStr, time::Duration};
 
-use crate::{Overflow, StatusMap};
+use crate::{Overflow, StatusMap, StatusSizeError};
 
 mod syntax;
 pub use syntax::*;
@@ -32,6 +32,12 @@ impl StatusMessage {
 #[error("invalid status size `{0}`")]
 pub struct InvalidStatusSize(u8);
 
+impl From<InvalidStatusSize> for StatusSizeError {
+    fn from(_value: InvalidStatusSize) -> Self {
+        Self::Invalid
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize)]
 pub struct StatusSize(u8);
 
@@ -39,11 +45,17 @@ impl TryFrom<u8> for StatusSize {
     type Error = InvalidStatusSize;
 
     fn try_from(value: u8) -> Result<Self, Self::Error> {
-        if value <= 8 {
+        if (1..=8).contains(&value) {
             Ok(Self(value))
         } else {
             Err(InvalidStatusSize(value))
         }
+    }
+}
+
+impl From<StatusSize> for u8 {
+    fn from(value: StatusSize) -> Self {
+        value.0
     }
 }
 
@@ -62,6 +74,14 @@ impl StatusSize {
 
     fn offset_of(&self, index: usize) -> Offset {
         let bit_offset = self.0 as usize * index;
+        Offset {
+            byte: bit_offset / 8,
+            bit: bit_offset % 8,
+        }
+    }
+
+    fn last_of(&self, index: usize) -> Offset {
+        let bit_offset = self.0 as usize * index + self.0 as usize - 1;
         Offset {
             byte: bit_offset / 8,
             bit: bit_offset % 8,
@@ -151,8 +171,8 @@ pub enum StatusPurpose {
     /// Convey an arbitrary message related to the status of the verifiable
     /// credential.
     ///
-    /// The actual message is stored in the status list credential, in
-    /// [`BitstringStatusList::status_message`].
+    /// The actual message is stored in the status list entry, in
+    /// [`BitstringStatusListEntry::status_messages`].
     Message,
 }
 
@@ -238,28 +258,26 @@ impl FromStr for StatusPurpose {
     }
 }
 
-/// Bit-string as defined by the W3C Bitstring Status List specification.
+/// Bit-string with status size.
 ///
-/// Bits are indexed from most significant to least significant.
-/// ```text
-/// | 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | ... | n-8 | n-7 | n-6 | n-5 | n-4 | n-3 | n-2 | n-1 |
-/// | byte 0                        | ... | byte k-1                                      |
-/// ```
 ///
-/// See: <https://www.w3.org/TR/vc-bitstring-status-list/#bitstring-encoding>
+/// This type is similar to [`BitString`] but also stores the bit size of
+/// each item (status size) and the number of items in the list.
+/// This provides a safer access to the underlying bit-string, ensuring that
+/// status and list boundaries are respected.
 #[derive(Debug, Clone)]
-pub struct BitString {
+pub struct SizedBitString {
+    inner: BitString,
     status_size: StatusSize,
-    bytes: Vec<u8>,
     len: usize,
 }
 
-impl BitString {
-    /// Creates a new empty bit-string.
+impl SizedBitString {
+    /// Creates a new empty sized status list.
     pub fn new(status_size: StatusSize) -> Self {
         Self {
+            inner: BitString::new(),
             status_size,
-            bytes: Vec::new(),
             len: 0,
         }
     }
@@ -302,8 +320,8 @@ impl BitString {
     /// (in number of statuses).
     pub fn with_capacity(status_size: StatusSize, capacity: usize) -> Self {
         Self {
+            inner: BitString::with_capacity(status_size, capacity),
             status_size,
-            bytes: Vec::with_capacity((capacity * status_size.0 as usize).div_ceil(8)),
             len: 0,
         }
     }
@@ -312,10 +330,14 @@ impl BitString {
     pub fn from_bytes(status_size: StatusSize, bytes: Vec<u8>) -> Self {
         let len = bytes.len() * 8usize / status_size.0 as usize;
         Self {
+            inner: BitString::from_bytes(bytes),
             status_size,
-            bytes,
             len,
         }
+    }
+
+    pub fn status_size(&self) -> StatusSize {
+        self.status_size
     }
 
     /// Checks if the list is empty.
@@ -334,63 +356,7 @@ impl BitString {
             return None;
         }
 
-        let offset = self.status_size.offset_of(index);
-        let (high_shift, low_shift) = offset.left_shift(self.status_size);
-
-        Some(self.get_at(offset.byte, high_shift, low_shift))
-    }
-
-    fn get_at(&self, byte_offset: usize, high_shift: i32, low_shift: Option<u32>) -> u8 {
-        let high = self
-            .bytes
-            .get(byte_offset)
-            .unwrap()
-            .overflowing_signed_shr(high_shift)
-            .0;
-
-        let low = match low_shift {
-            Some(low_shift) => {
-                self.bytes
-                    .get(byte_offset + 1)
-                    .unwrap()
-                    .overflowing_shr(low_shift)
-                    .0
-            }
-            None => 0,
-        };
-
-        (high | low) & self.status_size.mask()
-    }
-
-    /// Sets the value at the given index.
-    ///
-    /// Returns the previous value, or an `Overflow` error if either the index
-    /// is out of bounds or the value is too large.
-    pub fn set(&mut self, index: usize, value: u8) -> Result<u8, Overflow> {
-        if index >= self.len {
-            return Err(Overflow::Index(index));
-        }
-
-        let mask = self.status_size.mask();
-        let masked_value = value & mask;
-        if masked_value != value {
-            return Err(Overflow::Value(value));
-        }
-
-        let offset = self.status_size.offset_of(index);
-        let (high_shift, low_shift) = offset.left_shift(self.status_size);
-
-        let old_value = self.get_at(offset.byte, high_shift, low_shift);
-
-        self.bytes[offset.byte] &= !mask.overflowing_signed_shl(high_shift).0; // clear high
-        self.bytes[offset.byte] |= masked_value.overflowing_signed_shl(high_shift).0; // set high
-        if let Some(low_shift) = low_shift {
-            self.bytes[offset.byte + 1] &= !mask.overflowing_shl(low_shift).0; // clear low
-            self.bytes[offset.byte + 1] |= masked_value.overflowing_shl(low_shift).0;
-            // set low
-        }
-
-        Ok(old_value)
+        self.inner.get(self.status_size, index)
     }
 
     /// Push a new value into the bit-string.
@@ -408,32 +374,200 @@ impl BitString {
 
         let (high_shift, low_shift) = offset.left_shift(self.status_size);
 
-        if offset.byte == self.bytes.len() {
-            self.bytes
+        if offset.byte == self.inner.0.len() {
+            self.inner
+                .0
                 .push(masked_value.overflowing_signed_shl(high_shift).0);
         } else {
-            self.bytes[offset.byte] |= masked_value.overflowing_signed_shl(high_shift).0
+            self.inner.0[offset.byte] |= masked_value.overflowing_signed_shl(high_shift).0
         }
 
         if let Some(low_shift) = low_shift {
-            self.bytes.push(masked_value.overflowing_shl(low_shift).0);
+            self.inner.0.push(masked_value.overflowing_shl(low_shift).0);
         }
 
         self.len += 1;
         Ok(index)
     }
 
+    /// Sets the value at the given index.
+    ///
+    /// Returns the previous value, or an `Overflow` error if either the index
+    /// is out of bounds or the value is too large.
+    pub fn set(&mut self, index: usize, value: u8) -> Result<u8, Overflow> {
+        if index >= self.len {
+            return Err(Overflow::Index(index));
+        }
+
+        self.inner.set(self.status_size, index, value)
+    }
+
     /// Returns an iterator over all the statuses stored in this bit-string.
     pub fn iter(&self) -> BitStringIter {
+        self.inner.iter(self.status_size)
+    }
+
+    /// Encodes the bit-string.
+    pub fn encode(&self) -> EncodedList {
+        self.inner.encode()
+    }
+
+    pub fn into_unsized(self) -> BitString {
+        self.inner
+    }
+}
+
+/// Bit-string as defined by the W3C Bitstring Status List specification.
+///
+/// Bits are indexed from most significant to least significant.
+/// ```text
+/// | 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | ... | n-8 | n-7 | n-6 | n-5 | n-4 | n-3 | n-2 | n-1 |
+/// | byte 0                        | ... | byte k-1                                      |
+/// ```
+///
+/// See: <https://www.w3.org/TR/vc-bitstring-status-list/#bitstring-encoding>
+///
+/// This type does not store the actual status size (the size of each item)
+/// nor the total number of items in the list. Use the [`SizedBitString`] type
+/// to access the list safely with regard to the items boundaries.
+#[derive(Debug, Default, Clone)]
+pub struct BitString(Vec<u8>);
+
+impl BitString {
+    /// Creates a new empty bit-string.
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Creates a new bit-string of the given length, using `f` to initialize
+    /// every status.
+    ///
+    /// The `f` function is called with the index of the initialized status.
+    pub fn new_with(
+        status_size: StatusSize,
+        len: usize,
+        f: impl FnMut(usize) -> u8,
+    ) -> Result<Self, Overflow> {
+        SizedBitString::new_with(status_size, len, f).map(SizedBitString::into_unsized)
+    }
+
+    /// Creates a new bit-string of the given length, setting every status
+    /// to the same value.
+    pub fn new_with_value(
+        status_size: StatusSize,
+        len: usize,
+        value: u8,
+    ) -> Result<Self, Overflow> {
+        Self::new_with(status_size, len, |_| value)
+    }
+
+    /// Creates a new bit-string of the given length, setting every status
+    /// to 0.
+    pub fn new_zeroed(status_size: StatusSize, len: usize) -> Self {
+        Self::new_with_value(status_size, len, 0).unwrap() // 0 cannot overflow.
+    }
+
+    /// Creates a new bit-string with the given status size and capacity
+    /// (in number of statuses).
+    pub fn with_capacity(status_size: StatusSize, capacity: usize) -> Self {
+        Self(Vec::with_capacity(
+            (capacity * status_size.0 as usize).div_ceil(8),
+        ))
+    }
+
+    /// Creates a bit-string from a byte array and status size.
+    pub fn from_bytes(bytes: Vec<u8>) -> Self {
+        Self(bytes)
+    }
+
+    /// Returns the value stored in the list at the given index.
+    pub fn get(&self, status_size: StatusSize, index: usize) -> Option<u8> {
+        if status_size.last_of(index).byte >= self.0.len() {
+            return None;
+        }
+
+        let offset = status_size.offset_of(index);
+        let (high_shift, low_shift) = offset.left_shift(status_size);
+
+        Some(self.get_at(status_size, offset.byte, high_shift, low_shift))
+    }
+
+    fn get_at(
+        &self,
+        status_size: StatusSize,
+        byte_offset: usize,
+        high_shift: i32,
+        low_shift: Option<u32>,
+    ) -> u8 {
+        let high = self
+            .0
+            .get(byte_offset)
+            .unwrap()
+            .overflowing_signed_shr(high_shift)
+            .0;
+
+        let low = match low_shift {
+            Some(low_shift) => {
+                self.0
+                    .get(byte_offset + 1)
+                    .unwrap()
+                    .overflowing_shr(low_shift)
+                    .0
+            }
+            None => 0,
+        };
+
+        (high | low) & status_size.mask()
+    }
+
+    /// Sets the value at the given index.
+    ///
+    /// Returns the previous value, or an `Overflow` error if either the index
+    /// is out of bounds or the value is too large.
+    pub fn set(
+        &mut self,
+        status_size: StatusSize,
+        index: usize,
+        value: u8,
+    ) -> Result<u8, Overflow> {
+        if status_size.last_of(index).byte >= self.0.len() {
+            return Err(Overflow::Index(index));
+        }
+
+        let mask = status_size.mask();
+        let masked_value = value & mask;
+        if masked_value != value {
+            return Err(Overflow::Value(value));
+        }
+
+        let offset = status_size.offset_of(index);
+        let (high_shift, low_shift) = offset.left_shift(status_size);
+
+        let old_value = self.get_at(status_size, offset.byte, high_shift, low_shift);
+
+        self.0[offset.byte] &= !mask.overflowing_signed_shl(high_shift).0; // clear high
+        self.0[offset.byte] |= masked_value.overflowing_signed_shl(high_shift).0; // set high
+        if let Some(low_shift) = low_shift {
+            self.0[offset.byte + 1] &= !mask.overflowing_shl(low_shift).0; // clear low
+            self.0[offset.byte + 1] |= masked_value.overflowing_shl(low_shift).0;
+            // set low
+        }
+
+        Ok(old_value)
+    }
+
+    /// Returns an iterator over all the statuses stored in this bit-string.
+    pub fn iter(&self, status_size: StatusSize) -> BitStringIter {
         BitStringIter {
             bit_string: self,
+            status_size,
             index: 0,
         }
     }
 
     /// Encodes the bit-string.
     pub fn encode(&self) -> EncodedList {
-        EncodedList::encode(&self.bytes)
+        EncodedList::encode(&self.0)
     }
 }
 
@@ -461,6 +595,11 @@ impl OverflowingSignedShift for u8 {
     }
 }
 
+/// Status list.
+///
+/// This type does not store the actual status size (the size of each item)
+/// nor the total number of items in the list. Use the [`SizedStatusList`] type
+/// to access the list safely with regard to the items boundaries.
 #[derive(Debug, Clone)]
 pub struct StatusList {
     bit_string: BitString,
@@ -468,26 +607,71 @@ pub struct StatusList {
 }
 
 impl StatusList {
+    pub fn new(ttl: TimeToLive) -> Self {
+        Self {
+            bit_string: BitString::new(),
+            ttl,
+        }
+    }
+
+    pub fn from_bytes(bytes: Vec<u8>, ttl: TimeToLive) -> Self {
+        Self {
+            bit_string: BitString::from_bytes(bytes),
+            ttl,
+        }
+    }
+
+    pub fn get(&self, status_size: StatusSize, index: usize) -> Option<u8> {
+        self.bit_string.get(status_size, index)
+    }
+
+    pub fn set(
+        &mut self,
+        status_size: StatusSize,
+        index: usize,
+        value: u8,
+    ) -> Result<u8, Overflow> {
+        self.bit_string.set(status_size, index, value)
+    }
+
+    pub fn iter(&self, status_size: StatusSize) -> BitStringIter {
+        self.bit_string.iter(status_size)
+    }
+
+    pub fn to_credential_subject(
+        &self,
+        id: Option<UriBuf>,
+        status_purpose: StatusPurpose,
+    ) -> BitstringStatusList {
+        BitstringStatusList::new(id, status_purpose, self.bit_string.encode(), self.ttl)
+    }
+}
+
+/// Status list with status size.
+///
+/// This type is similar to [`StatusList`] but also stores the bit size of
+/// each item (status size) and the number of items in the list.
+/// This provides a safer access to the underlying bit-string, ensuring that
+/// status and list boundaries are respected.
+#[derive(Debug, Clone)]
+pub struct SizedStatusList {
+    bit_string: SizedBitString,
+    ttl: TimeToLive,
+}
+
+impl SizedStatusList {
     pub fn new(status_size: StatusSize, ttl: TimeToLive) -> Self {
         Self {
-            bit_string: BitString::new(status_size),
+            bit_string: SizedBitString::new(status_size),
             ttl,
         }
     }
 
     pub fn from_bytes(status_size: StatusSize, bytes: Vec<u8>, ttl: TimeToLive) -> Self {
         Self {
-            bit_string: BitString::from_bytes(status_size, bytes),
+            bit_string: SizedBitString::from_bytes(status_size, bytes),
             ttl,
         }
-    }
-
-    pub fn is_empty(&self) -> bool {
-        self.bit_string.is_empty()
-    }
-
-    pub fn len(&self) -> usize {
-        self.bit_string.len()
     }
 
     pub fn get(&self, index: usize) -> Option<u8> {
@@ -510,21 +694,21 @@ impl StatusList {
         &self,
         id: Option<UriBuf>,
         status_purpose: StatusPurpose,
-        status_message: Vec<StatusMessage>,
     ) -> BitstringStatusList {
-        BitstringStatusList::new(
-            id,
-            status_purpose,
-            self.bit_string.status_size,
-            self.bit_string.encode(),
-            self.ttl,
-            status_message,
-        )
+        BitstringStatusList::new(id, status_purpose, self.bit_string.encode(), self.ttl)
+    }
+
+    pub fn into_unsized(self) -> StatusList {
+        StatusList {
+            bit_string: self.bit_string.into_unsized(),
+            ttl: self.ttl,
+        }
     }
 }
 
 pub struct BitStringIter<'a> {
     bit_string: &'a BitString,
+    status_size: StatusSize,
     index: usize,
 }
 
@@ -532,22 +716,32 @@ impl<'a> Iterator for BitStringIter<'a> {
     type Item = u8;
 
     fn next(&mut self) -> Option<Self::Item> {
-        self.bit_string.get(self.index).inspect(|_| {
-            self.index += 1;
-        })
+        self.bit_string
+            .get(self.status_size, self.index)
+            .inspect(|_| {
+                self.index += 1;
+            })
     }
 }
 
 impl StatusMap for StatusList {
     type Key = usize;
+    type StatusSize = StatusSize;
     type Status = u8;
 
     fn time_to_live(&self) -> Option<Duration> {
         Some(self.ttl.into())
     }
 
-    fn get_by_key(&self, key: Self::Key) -> Option<u8> {
-        self.bit_string.get(key).map(Into::into)
+    fn get_by_key(
+        &self,
+        status_size: Option<StatusSize>,
+        key: Self::Key,
+    ) -> Result<Option<u8>, StatusSizeError> {
+        Ok(self
+            .bit_string
+            .get(status_size.ok_or(StatusSizeError::Missing)?, key)
+            .map(Into::into))
     }
 }
 
@@ -579,20 +773,20 @@ mod tests {
 
     use crate::Overflow;
 
-    use super::{BitString, StatusSize};
+    use super::{SizedBitString, StatusSize};
 
     fn random_bit_string(
         rng: &mut StdRng,
         status_size: StatusSize,
         len: usize,
-    ) -> (Vec<u8>, BitString) {
+    ) -> (Vec<u8>, SizedBitString) {
         let mut values = Vec::with_capacity(len);
 
         for _ in 0..len {
             values.push((rng.next_u32() & 0xff) as u8 & status_size.mask())
         }
 
-        let mut bit_string = BitString::new(status_size);
+        let mut bit_string = SizedBitString::new(status_size);
         for &s in &values {
             bit_string.push(s).unwrap();
         }
@@ -605,7 +799,7 @@ mod tests {
         let (values, bit_string) = random_bit_string(&mut rng, status_size, len);
 
         let encoded = bit_string.encode();
-        let decoded = BitString::from_bytes(status_size, encoded.decode(None).unwrap());
+        let decoded = SizedBitString::from_bytes(status_size, encoded.decode(None).unwrap());
 
         assert!(decoded.len() >= len);
 

@@ -112,6 +112,7 @@ async fn run(args: Args) -> Result<(), Error> {
 
         let status = status_list
             .get_entry(&entry)
+            .unwrap()
             .ok_or(Error::MissingEntry(entry.key()))?;
 
         match status {
