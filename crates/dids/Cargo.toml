@@ -9,10 +9,12 @@ repository = "https://github.com/spruceid/ssi/"
 documentation = "https://docs.rs/ssi-dids/"
 
 [features]
-default = ["http", "secp256k1", "secp256r1", "ripemd-160", "eip", "tezos"]
+default = ["http", "rustls", "secp256k1", "secp256r1", "ripemd-160", "eip", "tezos"]
 
 example = ["ssi-dids-core/example"]
 http = ["ssi-dids-core/http"]
+native-tls = ["ssi-dids-core/native-tls"]
+rustls = ["ssi-dids-core/rustls"]
 
 secp256k1 = ["did-method-key/secp256k1"]
 secp256r1 = ["did-method-key/secp256r1"]

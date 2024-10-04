@@ -21,7 +21,7 @@ json-syntax = { workspace = true, features = ["serde"] }
 linked-data.workspace = true
 futures = "0.3"
 lazy_static = "1.4"
-combination = "0.1"
+combination = "0.2.2"
 ssi-contexts.workspace = true
 ssi-crypto.workspace = true
 ssi-rdf.workspace = true

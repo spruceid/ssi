@@ -1,4 +1,3 @@
-use http::header;
 use ssi_dids_core::{
     document::representation::MediaType,
     resolution::{self, DIDMethodResolver, Error, Output},
@@ -107,7 +106,7 @@ impl DIDMethodResolver for DIDWeb {
 
         let resp = client
             .get(&url)
-            .header(header::ACCEPT, accept.to_string())
+            .header(reqwest::header::ACCEPT, accept.to_string())
             .send()
             .await
             .map_err(|e| Error::internal(InternalError::Request(url.to_owned(), e)))?;
