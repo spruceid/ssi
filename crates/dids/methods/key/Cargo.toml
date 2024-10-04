@@ -35,7 +35,7 @@ iref.workspace = true
 static-iref.workspace = true
 thiserror.workspace = true
 serde_json.workspace = true
-simple_asn1 = "^0.5.2"
+simple_asn1.workspace = true
 k256 = { workspace = true, optional = true, features = ["ecdsa"] }
 p256 = { workspace = true, optional = true, features = ["ecdsa"] }
 
