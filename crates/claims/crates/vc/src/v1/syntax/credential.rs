@@ -10,9 +10,9 @@ use xsd_types::DateTime;
 
 use crate::{
     syntax::{
-        not_null, value_or_array, IdOr, IdentifiedObject, IdentifiedTypedObject,
-        MaybeIdentifiedTypedObject, RequiredContextList, RequiredType, RequiredTypeSet,
-        TypeSerializationPolicy, Types,
+        non_empty_value_or_array, not_null, value_or_array, IdOr, IdentifiedObject,
+        IdentifiedTypedObject, MaybeIdentifiedTypedObject, NonEmptyVec, RequiredContextList,
+        RequiredType, RequiredTypeSet, TypeSerializationPolicy, Types,
     },
     Identified, MaybeIdentified, Typed,
 };
@@ -79,12 +79,8 @@ pub struct SpecializedJsonCredential<
 
     /// Credential subjects.
     #[serde(rename = "credentialSubject")]
-    #[serde(
-        with = "value_or_array",
-        default,
-        skip_serializing_if = "Vec::is_empty"
-    )]
-    pub credential_subjects: Vec<Subject>,
+    #[serde(with = "non_empty_value_or_array")]
+    pub credential_subjects: NonEmptyVec<Subject>,
 
     /// Issuer.
     pub issuer: Issuer,
@@ -180,7 +176,7 @@ where
         id: Option<UriBuf>,
         issuer: Issuer,
         issuance_date: xsd_types::DateTime,
-        credential_subjects: Vec<Subject>,
+        credential_subjects: NonEmptyVec<Subject>,
     ) -> Self {
         Self {
             context: Context::default(),
