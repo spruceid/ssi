@@ -364,7 +364,7 @@ mod tests {
     use resolution::Parameters;
     use ssi_claims::{
         data_integrity::{AnyInputSuiteOptions, AnySuite},
-        vc::v1::JsonCredential,
+        vc::{syntax::NonEmptyVec, v1::JsonCredential},
         VerificationParameters,
     };
     use ssi_data_integrity::{CryptographicSuite, ProofOptions as SuiteOptions};
@@ -576,9 +576,9 @@ mod tests {
             Some(uri!("http://example.org/credentials/3731").to_owned()),
             did.clone().into_uri().into(),
             "2020-08-19T21:41:50Z".parse().unwrap(),
-            vec![json_syntax::json!({
+            NonEmptyVec::new(json_syntax::json!({
                 "id": "did:example:d23dd687a7dc6787646f2eb98d0"
-            })],
+            })),
         );
 
         let verification_method = DIDKey
@@ -630,9 +630,9 @@ mod tests {
             None,
             did.clone().into_uri().into(),
             "2021-02-18T20:17:46Z".parse().unwrap(),
-            vec![json_syntax::json!({
+            NonEmptyVec::new(json_syntax::json!({
                 "id": "did:example:d23dd687a7dc6787646f2eb98d0"
-            })],
+            })),
         );
 
         let verification_method = DIDKey
@@ -684,9 +684,9 @@ mod tests {
             None,
             did.clone().into_uri().into(),
             "2021-02-18T20:17:46Z".parse().unwrap(),
-            vec![json_syntax::json!({
+            NonEmptyVec::new(json_syntax::json!({
                 "id": "did:example:d23dd687a7dc6787646f2eb98d0"
-            })],
+            })),
         );
 
         let verification_method = DIDKey

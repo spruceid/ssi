@@ -957,7 +957,10 @@ mod tests {
             data_integrity::{
                 signing::AlterSignature, AnyInputSuiteOptions, CryptographicSuite, ProofOptions,
             },
-            vc::v1::{JsonCredential, JsonPresentation},
+            vc::{
+                syntax::NonEmptyVec,
+                v1::{JsonCredential, JsonPresentation},
+            },
             VerificationParameters,
         };
         use ssi_verification_methods_core::{ProofPurpose, SingleSecretSigner};
@@ -974,9 +977,9 @@ mod tests {
             None,
             did.clone().into_uri().into(),
             "2021-03-18T16:38:25Z".parse().unwrap(),
-            vec![json_syntax::json!({
+            NonEmptyVec::new(json_syntax::json!({
                 "id": "did:example:foo"
-            })],
+            })),
         );
 
         let issuance_date = cred.issuance_date.clone().unwrap();
@@ -1090,7 +1093,10 @@ mod tests {
             data_integrity::{
                 signing::AlterSignature, AnyInputSuiteOptions, CryptographicSuite, ProofOptions,
             },
-            vc::v1::{JsonCredential, JsonPresentation},
+            vc::{
+                syntax::NonEmptyVec,
+                v1::{JsonCredential, JsonPresentation},
+            },
             VerificationParameters,
         };
         use ssi_verification_methods_core::{ProofPurpose, SingleSecretSigner};
@@ -1105,9 +1111,9 @@ mod tests {
             None,
             did.clone().into_uri().into(),
             "2021-03-18T16:38:25Z".parse().unwrap(),
-            vec![json_syntax::json!({
+            NonEmptyVec::new(json_syntax::json!({
                 "id": "did:example:foo"
-            })],
+            })),
         );
         let issuance_date = cred.issuance_date.clone().unwrap();
         let created_date =
