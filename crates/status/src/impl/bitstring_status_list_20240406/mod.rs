@@ -4,7 +4,7 @@
 //! publishing status information such as suspension or revocation of Verifiable
 //! Credentials through use of bitstrings.
 //!
-//! See: <https://www.w3.org/TR/vc-bitstring-status-list/>
+//! See: <https://www.w3.org/TR/2024/WD-vc-bitstring-status-list-20240406/>
 use core::fmt;
 use iref::UriBuf;
 use serde::{Deserialize, Serialize};
