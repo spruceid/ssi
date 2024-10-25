@@ -380,7 +380,10 @@ mod tests {
             signing::AlterSignature, AnyInputSuiteOptions, AnySuite, CryptographicSuite,
             ProofOptions,
         },
-        vc::v1::{JsonCredential, JsonPresentation},
+        vc::{
+            syntax::NonEmptyVec,
+            v1::{JsonCredential, JsonPresentation},
+        },
         VerificationParameters,
     };
     use ssi_dids_core::{did, DIDResolver};
@@ -492,9 +495,9 @@ mod tests {
             None,
             did.clone().into_uri().into(),
             "2021-02-18T20:23:13Z".parse().unwrap(),
-            vec![json_syntax::json!({
+            NonEmptyVec::new(json_syntax::json!({
                 "id": "did:example:foo"
-            })],
+            })),
         );
 
         let verification_method = if eip712 {

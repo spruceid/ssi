@@ -138,7 +138,7 @@ impl DIDMethodResolver for DIDWeb {
 mod tests {
     use ssi_claims::{
         data_integrity::{AnySuite, CryptographicSuite, ProofOptions},
-        vc::v1::JsonCredential,
+        vc::{syntax::NonEmptyVec, v1::JsonCredential},
         VerificationParameters,
     };
     use ssi_dids_core::{did, DIDResolver, Document, VerificationMethodDIDResolver};
@@ -254,9 +254,9 @@ mod tests {
             None,
             did!("did:web:localhost").to_owned().into_uri().into(),
             "2021-01-26T16:57:27Z".parse().unwrap(),
-            vec![json_syntax::json!({
+            NonEmptyVec::new(json_syntax::json!({
                 "id": "did:web:localhost"
-            })],
+            })),
         );
 
         let key: JWK = include_str!("../../../../../tests/ed25519-2020-10-18.json")

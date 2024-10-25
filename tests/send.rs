@@ -17,6 +17,7 @@ use ssi::{
     verification_methods::SingleSecretSigner,
     JWK,
 };
+use ssi_claims::vc::syntax::NonEmptyVec;
 use static_iref::uri;
 use std::future::Future;
 
@@ -30,7 +31,10 @@ fn data_integrity_sign_is_send() {
         Some(uri!("https://example.org/#CredentialId").to_owned()), // id
         uri!("https://example.org/#Issuer").to_owned().into(),      // issuer
         xsd_types::DateTime::now(),                                 // issuance date
-        vec![],
+        NonEmptyVec::new(Claims {
+            name: "name".into(),
+            email: "email@example.com".into(),
+        }),
     );
 
     let key = JWK::generate_p256(); // requires the `p256` feature.

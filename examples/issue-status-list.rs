@@ -8,7 +8,7 @@ use ssi::{
     jwk::JWK,
     verification_methods::SingleSecretSigner,
 };
-use ssi_claims::VerificationParameters;
+use ssi_claims::{vc::syntax::NonEmptyVec, VerificationParameters};
 use ssi_dids::DIDResolver;
 use static_iref::{iri, uri};
 
@@ -28,7 +28,7 @@ async fn main() {
         Some(uri!("https://example.com/credentials/status/3").to_owned()),
         uri!("did:example:12345").to_owned().into(),
         xsd_types::DateTime::now_ms(),
-        vec![StatusList2021Subject::StatusList2021(rl)],
+        NonEmptyVec::new(StatusList2021Subject::StatusList2021(rl)),
     );
 
     let verification_method = iri!("did:example:12345#key1").into();
