@@ -7,7 +7,10 @@ use ssi_claims::{
         signing::AlterSignature, AnyInputSuiteOptions, AnySuite, CryptographicSuite, DataIntegrity,
         ProofOptions as SuiteOptions,
     },
-    vc::v1::{JsonCredential, JsonPresentation},
+    vc::{
+        syntax::NonEmptyVec,
+        v1::{JsonCredential, JsonPresentation},
+    },
     VerificationParameters,
 };
 use ssi_dids_core::{did, resolution::Options, DIDResolver, VerificationMethodDIDResolver};
@@ -223,9 +226,9 @@ async fn credential_prove_verify_did_tz1() {
             None,
             did.clone().into_uri().into(),
             "2021-01-27T16:39:07Z".parse().unwrap(),
-            vec![json_syntax::json!({
+            NonEmptyVec::new(json_syntax::json!({
                 "id": "did:example:foo"
-            })]
+            }))
         ),
         vec![ssi_claims::data_integrity::Proof::new(
             ssi_claims::data_integrity::suites::Ed25519BLAKE2BDigestSize20Base58CheckEncodedSignature2021,
@@ -327,9 +330,9 @@ async fn credential_prove_verify_did_tz2() {
         None,
         did.clone().into_uri().into(),
         "2021-02-18T20:23:13Z".parse().unwrap(),
-        vec![json_syntax::json!({
+        NonEmptyVec::new(json_syntax::json!({
             "id": "did:example:foo"
-        })],
+        })),
     );
 
     let didtz = VerificationMethodDIDResolver::new(DIDTZ);
@@ -425,9 +428,9 @@ async fn credential_prove_verify_did_tz3() {
         None,
         did.clone().into_uri().into(),
         "2021-03-04T14:18:21Z".parse().unwrap(),
-        vec![json_syntax::json!({
+        NonEmptyVec::new(json_syntax::json!({
             "id": "did:example:foo"
-        })],
+        })),
     );
 
     let didtz = VerificationMethodDIDResolver::new(DIDTZ);

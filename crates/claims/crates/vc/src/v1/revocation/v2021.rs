@@ -192,7 +192,7 @@ impl CredentialStatus for StatusList2021Entry {
             )));
         }
 
-        let revocation_list = match status_list_credential.credential_subjects.as_slice() {
+        let revocation_list = match status_list_credential.credential_subjects.as_ref() {
             [StatusList2021Subject::StatusList2021(l)] => l,
             [] => return Ok(StatusCheck::Invalid(Reason::MissingCredentialSubject)),
             _ => return Ok(StatusCheck::Invalid(Reason::TooManyCredentialSubjects)),
