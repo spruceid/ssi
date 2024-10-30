@@ -26,7 +26,7 @@ macro_rules! algorithms {
             ///
             /// Per the specs it should only be `none` but `None` is kept for backwards
             /// compatibility.
-            #[serde(alias = "None")]
+            #[serde(alias = "none")]
             None
         }
 
