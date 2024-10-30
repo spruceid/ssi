@@ -28,7 +28,7 @@ ssi-multicodec = { path = "./crates/multicodec", version = "0.2", default-featur
 ssi-crypto = { path = "./crates/crypto", version = "0.2.1", default-features = false }
 ssi-verification-methods-core = { path = "./crates/verification-methods/core", version = "0.1.1", default-features = false }
 ssi-verification-methods = { path = "./crates/verification-methods", version = "0.1.1", default-features = false }
-ssi-jwk = { path = "./crates/jwk", version = "0.3", default-features = false }
+ssi-jwk = { path = "./crates/jwk", version = "0.3.1", default-features = false }
 ssi-tzkey = { path = "./crates/tzkey", version = "0.2.1", default-features = false }
 ssi-eip712 = { path = "./crates/eip712", version = "0.1", default-features = false }
 ssi-rdf = { path = "./crates/rdf", version = "0.1", default-features = false }

@@ -26,7 +26,7 @@ macro_rules! algorithms {
             ///
             /// Per the specs it should only be `none` but `None` is kept for backwards
             /// compatibility.
-            #[serde(alias = "None")]
+            #[serde(alias = "None", rename = "none")]
             None
         }
 
@@ -290,5 +290,30 @@ impl From<ES256OrES384> for Algorithm {
             ES256OrES384::ES256 => Self::ES256,
             ES256OrES384::ES384 => Self::ES384,
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::Algorithm;
+
+    #[test]
+    fn none_serializes() {
+        assert_eq!(
+            serde_json::to_string(&Algorithm::None).unwrap(),
+            r#""none""#
+        )
+    }
+
+    #[test]
+    fn none_deserializes() {
+        assert_eq!(
+            serde_json::from_str::<Algorithm>(r#""none""#).unwrap(),
+            Algorithm::None
+        );
+        assert_eq!(
+            serde_json::from_str::<Algorithm>(r#""None""#).unwrap(),
+            Algorithm::None
+        )
     }
 }
