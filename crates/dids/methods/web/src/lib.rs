@@ -120,6 +120,16 @@ impl DIDMethodResolver for DIDWeb {
             }
         })?;
 
+        let media_type = resp
+            .headers()
+            .get(header::CONTENT_TYPE)
+            .map(|value| match value.as_bytes() {
+                b"application/json" => Ok(MediaType::Json),
+                other => MediaType::from_bytes(other),
+            })
+            .transpose()?
+            .unwrap_or(MediaType::Json);
+
         let document = resp
             .bytes()
             .await
@@ -129,7 +139,7 @@ impl DIDMethodResolver for DIDWeb {
         Ok(Output {
             document: document.into(),
             document_metadata: ssi_dids_core::document::Metadata::default(),
-            metadata: resolution::Metadata::from_content_type(Some(MediaType::JsonLd.to_string())),
+            metadata: resolution::Metadata::from_content_type(Some(media_type.to_string())),
         })
     }
 }
@@ -232,7 +242,7 @@ mod tests {
             proxy.replace(Some(url));
         });
         let doc = DIDWeb.resolve(did!("did:web:localhost")).await.unwrap();
-        let doc_expected = Document::from_bytes(MediaType::JsonLd, DID_JSON.as_bytes()).unwrap();
+        let doc_expected = Document::from_bytes(MediaType::Json, DID_JSON.as_bytes()).unwrap();
         assert_eq!(doc.document.document(), doc_expected.document());
         PROXY.with(|proxy| {
             proxy.replace(None);
