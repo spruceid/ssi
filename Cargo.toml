@@ -23,7 +23,7 @@ members = [
 ]
 
 [workspace.dependencies]
-ssi-core = { path = "./crates/core", version = "0.2.1", default-features = false }
+ssi-core = { path = "./crates/core", version = "0.2.2", default-features = false }
 ssi-multicodec = { path = "./crates/multicodec", version = "0.2", default-features = false }
 ssi-crypto = { path = "./crates/crypto", version = "0.2.1", default-features = false }
 ssi-verification-methods-core = { path = "./crates/verification-methods/core", version = "0.1.1", default-features = false }
