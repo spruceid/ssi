@@ -108,6 +108,14 @@ impl MediaType {
     pub fn into_name(self) -> &'static str {
         self.name()
     }
+
+    pub fn from_bytes(s: &[u8]) -> Result<Self, Unknown> {
+        match s {
+            b"application/did+json" => Ok(Self::Json),
+            b"application/did+ld+json" => Ok(Self::JsonLd),
+            unknown => Err(Unknown(String::from_utf8_lossy(unknown).into_owned())),
+        }
+    }
 }
 
 impl From<MediaType> for String {
