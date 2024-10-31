@@ -57,7 +57,7 @@ ssi-data-integrity = { path = "./crates/claims/crates/data-integrity", version =
 ssi-claims = { path = "./crates/claims", version = "0.2.0", default-features = false }
 
 # DID methods
-ssi-dids-core = { path = "./crates/dids/core", version = "0.1.1", default-features = false }
+ssi-dids-core = { path = "./crates/dids/core", version = "0.1.2", default-features = false }
 did-ethr = { path = "./crates/dids/methods/ethr", version = "0.3.1", default-features = false }
 did-ion = { path = "./crates/dids/methods/ion", version = "0.3.1", default-features = false }
 did-jwk = { path = "./crates/dids/methods/jwk", version = "0.2.1", default-features = false }
