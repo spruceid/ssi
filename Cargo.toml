@@ -32,7 +32,7 @@ ssi-jwk = { path = "./crates/jwk", version = "0.3.1", default-features = false }
 ssi-tzkey = { path = "./crates/tzkey", version = "0.2.1", default-features = false }
 ssi-eip712 = { path = "./crates/eip712", version = "0.1", default-features = false }
 ssi-rdf = { path = "./crates/rdf", version = "0.1", default-features = false }
-ssi-contexts = { path = "./crates/contexts", version = "0.1.6", default-features = false }
+ssi-contexts = { path = "./crates/contexts", version = "0.1.7", default-features = false }
 ssi-json-ld = { path = "./crates/json-ld", version = "0.3", default-features = false }
 ssi-security = { path = "./crates/security", version = "0.1", default-features = false }
 ssi-caips = { path = "./crates/caips", version = "0.2.1", default-features = false }
