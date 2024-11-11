@@ -125,6 +125,7 @@ impl DIDMethodResolver for DIDWeb {
             .get(header::CONTENT_TYPE)
             .map(|value| match value.as_bytes() {
                 b"application/json" => Ok(MediaType::Json),
+                b"application/json; charset=utf-8" => Ok(MediaType::Json),
                 other => MediaType::from_bytes(other),
             })
             .transpose()?
