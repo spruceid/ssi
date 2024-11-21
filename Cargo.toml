@@ -32,7 +32,7 @@ ssi-jwk = { path = "./crates/jwk", version = "0.3.1", default-features = false }
 ssi-tzkey = { path = "./crates/tzkey", version = "0.2.1", default-features = false }
 ssi-eip712 = { path = "./crates/eip712", version = "0.1", default-features = false }
 ssi-rdf = { path = "./crates/rdf", version = "0.1", default-features = false }
-ssi-contexts = { path = "./crates/contexts", version = "0.1.7", default-features = false }
+ssi-contexts = { path = "./crates/contexts", version = "0.1.8", default-features = false }
 ssi-json-ld = { path = "./crates/json-ld", version = "0.3", default-features = false }
 ssi-security = { path = "./crates/security", version = "0.1", default-features = false }
 ssi-caips = { path = "./crates/caips", version = "0.2.1", default-features = false }
@@ -64,7 +64,7 @@ did-jwk = { path = "./crates/dids/methods/jwk", version = "0.2.1", default-featu
 did-method-key = { path = "./crates/dids/methods/key", version = "0.3.1", default-features = false }
 did-pkh = { path = "./crates/dids/methods/pkh", version = "0.3.1", default-features = false }
 did-tz = { path = "./crates/dids/methods/tz", version = "0.3.1", default-features = false }
-did-web = { path = "./crates/dids/methods/web", version = "0.3.2", default-features = false }
+did-web = { path = "./crates/dids/methods/web", version = "0.3.3", default-features = false }
 ssi-dids = { path = "./crates/dids", version = "0.2.1", default-features = false }
 
 # crypto
