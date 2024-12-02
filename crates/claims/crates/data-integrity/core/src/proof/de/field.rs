@@ -295,7 +295,7 @@ impl<'de> serde::de::Visitor<'de> for FieldVisitor {
             "verificationMethod" => Ok(Field::VerificationMethod),
             "proofPurpose" => Ok(Field::ProofPurpose),
             "expires" => Ok(Field::Expires),
-            "domains" => Ok(Field::Domains),
+            "domain" => Ok(Field::Domains),
             "challenge" => Ok(Field::Challenge),
             "nonce" => Ok(Field::Nonce),
             _ => {
@@ -316,7 +316,7 @@ impl<'de> serde::de::Visitor<'de> for FieldVisitor {
             b"verificationMethod" => Ok(Field::VerificationMethod),
             b"proofPurpose" => Ok(Field::ProofPurpose),
             b"expires" => Ok(Field::Expires),
-            b"domains" => Ok(Field::Domains),
+            b"domain" => Ok(Field::Domains),
             b"challenge" => Ok(Field::Challenge),
             b"nonce" => Ok(Field::Nonce),
             _ => {
@@ -338,7 +338,7 @@ impl<'de> serde::de::Visitor<'de> for FieldVisitor {
             "verificationMethod" => Ok(Field::VerificationMethod),
             "proofPurpose" => Ok(Field::ProofPurpose),
             "expires" => Ok(Field::Expires),
-            "domains" => Ok(Field::Domains),
+            "domain" => Ok(Field::Domains),
             "challenge" => Ok(Field::Challenge),
             "nonce" => Ok(Field::Nonce),
             _ => {
@@ -360,7 +360,7 @@ impl<'de> serde::de::Visitor<'de> for FieldVisitor {
             b"verificationMethod" => Ok(Field::VerificationMethod),
             b"proofPurpose" => Ok(Field::ProofPurpose),
             b"expires" => Ok(Field::Expires),
-            b"domains" => Ok(Field::Domains),
+            b"domain" => Ok(Field::Domains),
             b"challenge" => Ok(Field::Challenge),
             b"nonce" => Ok(Field::Nonce),
             _ => {
