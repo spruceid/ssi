@@ -90,6 +90,14 @@ impl EcdsaSecp256r1VerificationKey2019 {
     pub const IRI: &'static Iri =
         iri!("https://w3id.org/security#EcdsaSecp256r1VerificationKey2019");
 
+    pub fn from_public_key(id: IriBuf, controller: UriBuf, public_key: p256::PublicKey) -> Self {
+        Self {
+            id,
+            controller,
+            public_key: PublicKey::encode(public_key),
+        }
+    }
+
     pub fn public_key_jwk(&self) -> JWK {
         self.public_key.to_jwk()
     }
@@ -232,6 +240,16 @@ pub struct PublicKey {
 }
 
 impl PublicKey {
+    pub fn encode(decoded: p256::PublicKey) -> Self {
+        let multi_encoded =
+            MultiEncodedBuf::encode_bytes(ssi_multicodec::P256_PUB, &decoded.to_sec1_bytes());
+
+        Self {
+            encoded: MultibaseBuf::encode(multibase::Base::Base58Btc, multi_encoded.as_bytes()),
+            decoded,
+        }
+    }
+
     pub fn decode(encoded: MultibaseBuf) -> Result<Self, InvalidPublicKey> {
         let pk_multi_encoded = MultiEncodedBuf::new(encoded.decode()?.1)?;
 
