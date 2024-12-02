@@ -1,5 +1,5 @@
 use iref::{Iri, Uri, UriBuf};
-use json_patch::patch;
+use json_patch::{patch, Patch};
 use serde::Deserialize;
 use ssi_dids_core::{
     document::{
@@ -347,7 +347,7 @@ fn decode_public_key(public_key: &str) -> Result<Vec<u8>, UpdateError> {
 #[derive(Deserialize)]
 #[serde(rename_all = "kebab-case")]
 struct SignedIetfJsonPatchPayload {
-    ietf_json_patch: serde_json::Value,
+    ietf_json_patch: Patch,
 }
 
 #[derive(Deserialize)]
@@ -597,14 +597,10 @@ impl DIDTz {
                                 decode_verify(&jws, &jwk).map_err(UpdateError::InvalidJws)?;
                             patch(
                                 &mut doc_json,
-                                &serde_json::from_slice(
-                                    serde_json::from_slice::<SignedIetfJsonPatchPayload>(&patch_)
-                                        .map_err(UpdateError::InvalidPatch)?
-                                        .ietf_json_patch
-                                        .to_string()
-                                        .as_bytes(),
-                                )
-                                .map_err(UpdateError::InvalidPatch)?,
+                                &serde_json::from_slice::<SignedIetfJsonPatchPayload>(&patch_)
+                                    .map_err(UpdateError::InvalidPatch)?
+                                    .ietf_json_patch
+                                    .0,
                             )
                             .map_err(UpdateError::Patch)?;
 

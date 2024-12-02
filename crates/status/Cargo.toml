@@ -26,9 +26,9 @@ serde_json.workspace = true
 rdf-types.workspace = true
 xsd-types.workspace = true
 log.workspace = true
-reqwest = "0.12.3"
+reqwest.workspace = true
 parking_lot = "0.12.1"
-flate2 = "1.0.28"
+flate2.workspace = true
 
 [dev-dependencies]
 ssi-jws = { workspace = true, features = ["secp256r1"] }

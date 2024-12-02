@@ -11,6 +11,10 @@ repository = "https://github.com/spruceid/ssi/"
 homepage = "https://github.com/spruceid/ssi/tree/main/did-ion/"
 documentation = "https://docs.rs/did-ion/"
 
+[features]
+native-tls = ["reqwest/native-tls"]
+rustls = ["reqwest/rustls-tls"]
+
 [dependencies]
 ssi-verification-methods.workspace = true
 ssi-dids-core = { workspace = true, features = ["http"] }
@@ -25,15 +29,12 @@ thiserror.workspace = true
 
 base64.workspace = true
 sha2 = "0.10"
-json-patch = "0.2.6"
-reqwest = { version = "0.11", default-features = false, features = ["json", "rustls-tls"] }
+json-patch.workspace = true
+reqwest.workspace = true
 
 [target.'cfg(target_os = "android")'.dependencies.reqwest]
-version = "0.11"
-features = ["json", "native-tls-vendored"]
-
-# [target.'cfg(target_arch = "wasm32", target_arch = "wasm64")'.dependencies]
-
+workspace = true
+features = ["native-tls-vendored"]
 
 [dev-dependencies]
 lazy_static = "1.4"
