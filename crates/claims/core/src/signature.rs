@@ -72,7 +72,7 @@ impl From<ssi_crypto::SignatureError> for SignatureError {
 
 #[derive(Debug, thiserror::Error)]
 pub enum MessageSignatureError {
-    #[error("0")]
+    #[error("{0}")]
     SignatureFailed(String),
 
     #[error("invalid signature client query")]
