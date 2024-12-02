@@ -243,7 +243,7 @@ impl<T> WithContext<T> {
 mod tests {
     use crate::{CompactJsonLd, ContextLoader, Expandable};
 
-    #[async_std::test]
+    #[tokio::test]
     async fn accept_defined_type() {
         let input = CompactJsonLd(json_syntax::json!({
             "@context": { "Defined": "http://example.org/#Defined" },
@@ -253,7 +253,7 @@ mod tests {
         assert!(input.expand(&ContextLoader::default()).await.is_ok());
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn reject_undefined_type() {
         let input = CompactJsonLd(json_syntax::json!({
             "@type": ["Undefined"]
@@ -262,7 +262,7 @@ mod tests {
         assert!(input.expand(&ContextLoader::default()).await.is_err());
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn accept_defined_property() {
         let input = CompactJsonLd(json_syntax::json!({
             "@context": { "defined": "http://example.org/#defined" },
@@ -272,7 +272,7 @@ mod tests {
         assert!(input.expand(&ContextLoader::default()).await.is_ok());
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn reject_undefined_property() {
         let input = CompactJsonLd(json_syntax::json!({
             "undefined": "foo"
