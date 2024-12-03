@@ -225,6 +225,21 @@ impl<'a> serde::Serialize for JsonLdTypes<'a> {
     }
 }
 
+impl<'a> From<JsonLdTypes<'a>> for Vec<String> {
+    fn from(value: JsonLdTypes<'a>) -> Self {
+        let mut vec: Vec<String> = Vec::with_capacity(value.len());
+        vec.extend_from_slice(
+            &value
+                .static_
+                .into_iter()
+                .map(ToString::to_string)
+                .collect::<Vec<String>>(),
+        );
+        vec.extend(value.non_static.into_owned());
+        vec
+    }
+}
+
 pub struct WithContext<T> {
     pub context: Option<json_ld::syntax::Context>,
     pub value: T,
