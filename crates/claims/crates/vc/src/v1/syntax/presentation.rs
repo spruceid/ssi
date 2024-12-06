@@ -21,7 +21,7 @@ impl RequiredType for PresentationType {
 }
 
 impl TypeSerializationPolicy for PresentationType {
-    const PREFER_ARRAY: bool = false;
+    const PREFER_ARRAY: bool = true;
 }
 
 pub type JsonPresentationTypes<T = ()> = Types<PresentationType, T>;
