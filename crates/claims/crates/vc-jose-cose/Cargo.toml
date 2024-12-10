@@ -27,5 +27,5 @@ base64.workspace = true
 ssi-jws = { workspace = true, features = ["secp256r1"] }
 ssi-jwk.workspace = true
 ssi-cose = { workspace = true, features = ["secp256r1"] }
-async-std.workspace = true
+async-std = { workspace = true, features = ["attributes"] }
 hex.workspace = true
