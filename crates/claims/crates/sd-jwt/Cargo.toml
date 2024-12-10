@@ -25,4 +25,4 @@ indexmap.workspace = true
 [dev-dependencies]
 hex-literal = "0.4.1"
 ssi-jws = { workspace = true, features = ["secp256r1"] }
-async-std.workspace = true
+async-std = { workspace = true, features = ["attributes"] }
