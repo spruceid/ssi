@@ -81,7 +81,7 @@ pub struct Proof<S: CryptographicSuite> {
     /// Example domain values include: `domain.example`` (DNS domain),
     /// `https://domain.example:8443` (Web origin), `mycorp-intranet` (bespoke
     /// text string), and `b31d37d4-dd59-47d3-9dd8-c973da43b63a` (UUID).
-    #[serde(skip_serializing_if = "Vec::is_empty")]
+    #[serde(skip_serializing_if = "Vec::is_empty", rename = "domain")]
     pub domains: Vec<String>,
 
     /// Used to mitigate replay attacks.
