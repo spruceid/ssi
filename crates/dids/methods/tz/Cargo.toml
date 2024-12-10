@@ -11,17 +11,21 @@ repository = "https://github.com/spruceid/ssi/"
 homepage = "https://github.com/spruceid/ssi/tree/main/did-tezos/"
 documentation = "https://docs.rs/did-tezos/"
 
+[features]
+native-tls = ["reqwest/native-tls"]
+rustls = ["reqwest/rustls-tls"]
+
 [dependencies]
 ssi-dids-core.workspace = true
 # TODO Enabling the tezos feature all the time as it is gating the blakesig stuff in ssi_jwk
 ssi-jwk = { workspace = true, default-features = false, features = ["tezos"] }
 ssi-jws = { workspace = true, default-features = false }
 ssi-core.workspace = true
-reqwest = { version = "0.11", default-features = false, features = ["json", "rustls-tls"] }
+reqwest.workspace = true
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 async-trait = "0.1"
-json-patch = "0.2.6"
+json-patch.workspace = true
 bs58 = { workspace = true, features = ["check"] }
 url = "2.2.1"
 iref.workspace = true
@@ -35,8 +39,8 @@ chrono = { workspace = true, features = ["serde"] }
 chrono = { workspace = true, features = ["serde", "wasmbind"] }
 
 [target.'cfg(target_os = "android")'.dependencies.reqwest]
-version = "0.11"
-features = ["json", "native-tls-vendored"]
+workspace = true
+features = ["native-tls-vendored"]
 
 [dev-dependencies]
 ssi-tzkey.workspace = true

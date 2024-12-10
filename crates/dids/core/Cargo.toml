@@ -10,6 +10,8 @@ documentation = "https://docs.rs/ssi-dids-core/"
 
 [features]
 http = ["reqwest", "percent-encoding"]
+native-tls = ["reqwest/native-tls"]
+rustls = ["reqwest/rustls-tls"]
 example = []
 
 [dependencies]
@@ -32,12 +34,12 @@ pin-project.workspace = true
 ssi-jwk.workspace = true
 
 # for the `http` feature.
-reqwest = { version = "0.11", default-features = false, features = ["json", "rustls-tls"], optional = true }
+reqwest = { workspace = true, optional = true }
 percent-encoding = { version = "2.1", optional = true }
 
 [target.'cfg(target_os = "android")'.dependencies.reqwest]
-version = "0.11"
-features = ["json", "native-tls-vendored"]
+workspace = true
+features = ["native-tls-vendored"]
 
 [dev-dependencies]
 async-std = { version = "1.9", features = ["attributes"] }
