@@ -171,6 +171,7 @@
 //! # async fn main() {
 //! use static_iref::uri;
 //! use serde::{Serialize, Deserialize};
+//! use ssi::claims::vc::syntax::NonEmptyVec;
 //! use ssi::prelude::*;
 //!
 //! // Defines the shape of our custom claims.
@@ -187,10 +188,10 @@
 //!   Some(uri!("https://example.org/#CredentialId").to_owned()), // id
 //!   uri!("https://example.org/#Issuer").to_owned().into(), // issuer
 //!   DateTime::now(), // issuance date
-//!   vec![MyCredentialSubject {
+//!   NonEmptyVec::new(MyCredentialSubject {
 //!     name: "John Smith".to_owned(),
 //!     email: "john.smith@example.org".to_owned()
-//!   }]
+//!   })
 //! );
 //!
 //! // Create a random signing key, and turn its public part into a DID URL.
@@ -221,7 +222,7 @@
 //! ).await.expect("signature failed");
 //! # }
 //! ```
-//!  
+//!
 //! It is critical that custom claims can be interpreted as Linked-Data. In
 //! the above example this is done by specifying a serialization URL for each
 //! field of `MyCredentialSubject`. This can also be done by creating a custom

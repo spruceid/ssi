@@ -1313,7 +1313,7 @@ mod tests {
             ],
             "VerifiablePresentation": [
               { "name": "@context", "type": "string[]" },
-              { "name": "type", "type": "string" },
+              { "name": "type", "type": "string[]" },
               { "name": "holder", "type": "string" },
               { "name": "verifiableCredential", "type": "VerifiableCredential" },
               { "name": "proof", "type": "Proof" }
