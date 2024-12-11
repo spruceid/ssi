@@ -85,7 +85,8 @@ pub trait Expandable: Sized {
 
 impl Expandable for CompactJsonLd {
     type Error = JsonLdError;
-    type Expanded<I, V> = json_ld::ExpandedDocument<V::Iri, V::BlankId>
+    type Expanded<I, V>
+        = json_ld::ExpandedDocument<V::Iri, V::BlankId>
     where
         I: Interpretation,
         V: VocabularyMut,
@@ -222,6 +223,15 @@ impl<'a> serde::Serialize for JsonLdTypes<'a> {
             seq.serialize_element(ty)?;
         }
         seq.end()
+    }
+}
+
+impl<'a> From<JsonLdTypes<'a>> for Vec<String> {
+    fn from(value: JsonLdTypes<'a>) -> Self {
+        let mut result = Vec::with_capacity(value.len());
+        result.extend(value.static_.iter().map(|s| s.to_string()));
+        result.extend(value.non_static.into_owned());
+        result
     }
 }
 
