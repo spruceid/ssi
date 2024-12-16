@@ -16,6 +16,7 @@ pub mod suite;
 pub use decode::*;
 use educe::Educe;
 pub use options::ProofOptions;
+pub use proof::value_or_array;
 pub use proof::*;
 use serde::Serialize;
 use ssi_claims_core::{

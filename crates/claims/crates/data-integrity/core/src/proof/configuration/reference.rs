@@ -30,7 +30,11 @@ pub struct ProofConfigurationRef<'a, S: CryptographicSuite> {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub expires: Option<xsd_types::DateTimeStamp>,
 
-    #[serde(skip_serializing_if = "<[String]>::is_empty")]
+    #[serde(
+        with = "crate::value_or_array",
+        skip_serializing_if = "<[String]>::is_empty",
+        rename = "domain"
+    )]
     pub domains: &'a [String],
 
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -151,7 +155,11 @@ pub struct ProofConfigurationRefWithoutOptions<'a, S: CryptographicSuite> {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub expires: Option<xsd_types::DateTimeStamp>,
 
-    #[serde(skip_serializing_if = "<[String]>::is_empty")]
+    #[serde(
+        with = "crate::value_or_array",
+        skip_serializing_if = "<[String]>::is_empty",
+        rename = "domain"
+    )]
     pub domains: &'a [String],
 
     #[serde(skip_serializing_if = "Option::is_none")]

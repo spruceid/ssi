@@ -81,7 +81,11 @@ pub struct Proof<S: CryptographicSuite> {
     /// Example domain values include: `domain.example`` (DNS domain),
     /// `https://domain.example:8443` (Web origin), `mycorp-intranet` (bespoke
     /// text string), and `b31d37d4-dd59-47d3-9dd8-c973da43b63a` (UUID).
-    #[serde(skip_serializing_if = "Vec::is_empty", rename = "domain")]
+    #[serde(
+        with = "crate::value_or_array",
+        skip_serializing_if = "Vec::is_empty",
+        rename = "domain"
+    )]
     pub domains: Vec<String>,
 
     /// Used to mitigate replay attacks.
@@ -439,5 +443,27 @@ impl<'de, S: DeserializeCryptographicSuite<'de>> Deserialize<'de> for Proofs<S> 
             OneOrMany::One(proof) => Ok(Self(vec![proof])),
             OneOrMany::Many(proofs) => Ok(Self(proofs)),
         }
+    }
+}
+
+pub mod value_or_array {
+    use serde::{Deserialize, Serialize};
+    use ssi_core::OneOrMany;
+
+    pub fn serialize<T: Serialize, S>(value: &[T], serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        match value.split_first() {
+            Some((first, [])) => first.serialize(serializer),
+            _ => value.serialize(serializer),
+        }
+    }
+
+    pub fn deserialize<'de, T: Deserialize<'de>, D>(deserializer: D) -> Result<Vec<T>, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        Ok(OneOrMany::deserialize(deserializer)?.into_vec())
     }
 }
