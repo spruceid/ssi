@@ -49,7 +49,6 @@ pub struct Proof<S: CryptographicSuite> {
 
     /// Date a creation of the proof.
     #[serde(
-        deserialize_with = "de::deserialize_datetime_utc",
         skip_serializing_if = "Option::is_none"
     )]
     pub created: Option<xsd_types::DateTimeStamp>,
@@ -63,7 +62,6 @@ pub struct Proof<S: CryptographicSuite> {
 
     /// Specifies when the proof expires.
     #[serde(
-        deserialize_with = "de::deserialize_datetime_utc",
         skip_serializing_if = "Option::is_none"
     )]
     pub expires: Option<xsd_types::DateTimeStamp>,
