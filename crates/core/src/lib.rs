@@ -8,3 +8,6 @@ pub use bytes_buf::BytesBuf;
 
 pub mod json_pointer;
 pub use json_pointer::{JsonPointer, JsonPointerBuf};
+
+pub mod lexical;
+pub use lexical::Lexical;

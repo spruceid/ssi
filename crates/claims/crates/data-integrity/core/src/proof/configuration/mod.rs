@@ -1,5 +1,6 @@
 use iref::Iri;
 use serde::Serialize;
+use ssi_core::Lexical;
 use ssi_verification_methods::{ProofPurpose, ReferenceOrOwned};
 use static_iref::iri;
 use std::collections::BTreeMap;
@@ -31,7 +32,7 @@ pub struct ProofConfiguration<S: CryptographicSuite> {
 
     /// Date a creation of the proof.
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub created: Option<xsd_types::DateTimeStamp>,
+    pub created: Option<Lexical<xsd_types::DateTimeStamp>>,
 
     /// Verification method.
     #[serde(serialize_with = "S::serialize_verification_method_ref")]
@@ -42,7 +43,7 @@ pub struct ProofConfiguration<S: CryptographicSuite> {
 
     /// Specifies when the proof expires.
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub expires: Option<xsd_types::DateTimeStamp>,
+    pub expires: Option<Lexical<xsd_types::DateTimeStamp>>,
 
     #[allow(rustdoc::bare_urls)]
     /// Conveys one or more security domains in which the proof is meant to be
@@ -94,7 +95,7 @@ pub struct ProofConfiguration<S: CryptographicSuite> {
 impl<S: CryptographicSuite> ProofConfiguration<S> {
     pub fn new(
         type_: S,
-        created: xsd_types::DateTimeStamp,
+        created: Lexical<xsd_types::DateTimeStamp>,
         verification_method: ReferenceOrOwned<S::VerificationMethod>,
         proof_purpose: ProofPurpose,
         options: S::ProofOptions,
@@ -122,7 +123,7 @@ impl<S: CryptographicSuite> ProofConfiguration<S> {
         Self {
             context: None,
             type_,
-            created: Some(xsd_types::DateTimeStamp::now_ms()),
+            created: Some(xsd_types::DateTimeStamp::now_ms().into()),
             verification_method,
             proof_purpose: ProofPurpose::default(),
             expires: None,
@@ -221,10 +222,10 @@ impl<S: CryptographicSuite> ProofConfiguration<S> {
         ProofConfigurationRef {
             context: self.context.as_ref(),
             type_: &self.type_,
-            created: self.created,
+            created: self.created.as_ref(),
             verification_method: self.verification_method.borrowed(),
             proof_purpose: self.proof_purpose,
-            expires: self.expires,
+            expires: self.expires.as_ref(),
             domains: &self.domains,
             challenge: self.challenge.as_deref(),
             nonce: self.nonce.as_deref(),

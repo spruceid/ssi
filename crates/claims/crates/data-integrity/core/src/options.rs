@@ -1,6 +1,7 @@
 use std::collections::BTreeMap;
 
 use serde::{Deserialize, Serialize};
+use ssi_core::Lexical;
 use ssi_verification_methods::{ProofPurpose, ReferenceOrOwned};
 
 use crate::{suite::ConfigurationError, CryptographicSuite, ProofConfiguration};
@@ -14,7 +15,7 @@ pub struct ProofOptions<M, T> {
 
     /// Date a creation of the proof.
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub created: Option<xsd_types::DateTimeStamp>,
+    pub created: Option<Lexical<xsd_types::DateTimeStamp>>,
 
     /// Verification method.
     pub verification_method: Option<ReferenceOrOwned<M>>,
@@ -25,7 +26,7 @@ pub struct ProofOptions<M, T> {
 
     /// Specifies when the proof expires.
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub expires: Option<xsd_types::DateTimeStamp>,
+    pub expires: Option<Lexical<xsd_types::DateTimeStamp>>,
 
     #[allow(rustdoc::bare_urls)]
     /// Conveys one or more security domains in which the proof is meant to be
@@ -79,7 +80,7 @@ impl<M, T: Default> Default for ProofOptions<M, T> {
     fn default() -> Self {
         Self {
             context: None,
-            created: Some(xsd_types::DateTimeStamp::now_ms()),
+            created: Some(xsd_types::DateTimeStamp::now_ms().into()),
             verification_method: None,
             proof_purpose: ProofPurpose::default(),
             expires: None,
@@ -94,7 +95,7 @@ impl<M, T: Default> Default for ProofOptions<M, T> {
 
 impl<M, T> ProofOptions<M, T> {
     pub fn new(
-        created: xsd_types::DateTimeStamp,
+        created: Lexical<xsd_types::DateTimeStamp>,
         verification_method: ReferenceOrOwned<M>,
         proof_purpose: ProofPurpose,
         options: T,
@@ -116,7 +117,7 @@ impl<M, T> ProofOptions<M, T> {
     pub fn from_method_and_options(verification_method: ReferenceOrOwned<M>, options: T) -> Self {
         Self {
             context: None,
-            created: Some(xsd_types::DateTimeStamp::now_ms()),
+            created: Some(xsd_types::DateTimeStamp::now_ms().into()),
             verification_method: Some(verification_method),
             proof_purpose: ProofPurpose::default(),
             expires: None,
