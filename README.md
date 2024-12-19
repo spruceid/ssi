@@ -183,7 +183,7 @@ pub struct MyCredentialSubject {
 let credential = ssi::claims::vc::v1::JsonCredential::<MyCredentialSubject>::new(
   Some(uri!("https://example.org/#CredentialId").to_owned()), // id
   uri!("https://example.org/#Issuer").to_owned().into(), // issuer
-  DateTime::now(), // issuance date
+  DateTime::now().into(), // issuance date
   NonEmptyVec::new(MyCredentialSubject {
     name: "John Smith".to_owned(),
     email: "john.smith@example.org".to_owned()
