@@ -184,7 +184,7 @@ where
             id,
             types: JsonCredentialTypes::default(),
             issuer,
-            issuance_date: Some(issuance_date.into()),
+            issuance_date: Some(issuance_date),
             credential_subjects,
             expiration_date: None,
             credential_status: Vec::new(),
