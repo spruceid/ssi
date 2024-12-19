@@ -183,3 +183,49 @@ impl<T: fmt::Display> fmt::Display for Lexical<T> {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+    struct I32String(i32);
+
+    impl FromStr for I32String {
+        type Err = <i32 as FromStr>::Err;
+
+        fn from_str(s: &str) -> Result<Self, Self::Err> {
+            s.parse().map(Self)
+        }
+    }
+
+    impl fmt::Display for I32String {
+        fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+            self.0.fmt(f)
+        }
+    }
+
+    impl Serialize for I32String {
+        fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+        where
+            S: serde::Serializer,
+        {
+            self.to_string().serialize(serializer)
+        }
+    }
+
+    #[test]
+    fn preserve_lexical_form() {
+        let n: Lexical<I32String> = "00001".parse().unwrap();
+        assert_eq!(n.to_string(), "00001");
+        assert_eq!(n, I32String(1));
+        assert_eq!(
+            serde_json::to_value(n).unwrap(),
+            serde_json::Value::String("00001".to_owned())
+        );
+
+        let m: Lexical<I32String> = serde_json::from_str("\"00001\"").unwrap();
+        assert_eq!(m.to_string(), "00001");
+        assert_eq!(m, I32String(1));
+    }
+}
