@@ -5,6 +5,9 @@ pub use ssi_data_integrity_suites as suites;
 mod any;
 pub use any::*;
 
+#[cfg(test)]
+mod core_tests;
+
 /// Any Data-Integrity proof known by this library.
 pub type AnyProof = Proof<AnySuite>;
 
