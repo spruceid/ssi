@@ -14,6 +14,7 @@ fn single_domain_de_serialization() {
             "proofValue": "z3H5Bi3cF6BGEgoWdAqp13gQHEibVGtNtVbJECwfQStGmBio1gmjHrq2TGtjJ3L18pd1pKCsb4Pos9oMDpginN68h"
         }
     );
-    let proof: Proof<AnySuite> = serde_json::from_value(json_proof.clone()).expect("Could not deserialize");
+    let proof: Proof<AnySuite> =
+        serde_json::from_value(json_proof.clone()).expect("Could not deserialize");
     assert_eq!(json_proof, serde_json::to_value(&proof).unwrap());
 }
