@@ -986,7 +986,7 @@ mod tests {
         let created_date =
             xsd_types::DateTimeStamp::new(issuance_date.date_time, issuance_date.offset.unwrap());
         let issue_options = ProofOptions::new(
-            created_date,
+            created_date.into(),
             IriBuf::new(did.to_string() + vm_relative_url)
                 .unwrap()
                 .into(),
@@ -1119,7 +1119,7 @@ mod tests {
         let created_date =
             xsd_types::DateTimeStamp::new(issuance_date.date_time, issuance_date.offset.unwrap());
         let issue_options = ProofOptions::new(
-            created_date,
+            created_date.into(),
             IriBuf::new(did.to_string() + vm_relative_url)
                 .unwrap()
                 .into(),

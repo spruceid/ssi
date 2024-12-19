@@ -27,7 +27,7 @@ async fn main() {
     let rl_vc = StatusList2021Credential::new(
         Some(uri!("https://example.com/credentials/status/3").to_owned()),
         uri!("did:example:12345").to_owned().into(),
-        xsd_types::DateTime::now_ms(),
+        xsd_types::DateTime::now_ms().into(),
         NonEmptyVec::new(StatusList2021Subject::StatusList2021(rl)),
     );
 

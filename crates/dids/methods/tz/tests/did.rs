@@ -343,7 +343,7 @@ async fn credential_prove_verify_did_tz2() {
     let created_date =
         xsd_types::DateTimeStamp::new(issuance_date.date_time, issuance_date.offset.unwrap());
     let vc_issue_options = SuiteOptions::new(
-        created_date,
+        created_date.into(),
         IriBuf::new(format!("{did}#blockchainAccountId"))
             .unwrap()
             .into(),
@@ -441,7 +441,7 @@ async fn credential_prove_verify_did_tz3() {
     let created_date =
         xsd_types::DateTimeStamp::new(issuance_date.date_time, issuance_date.offset.unwrap());
     let vc_issue_options = SuiteOptions::new(
-        created_date,
+        created_date.into(),
         IriBuf::new(format!("{did}#blockchainAccountId"))
             .unwrap()
             .into(),

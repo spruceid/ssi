@@ -72,10 +72,10 @@ where
     let new_proof = Proof {
         context: base_proof.context.cloned(),
         type_: EcdsaSd2023,
-        created: base_proof.created,
+        created: base_proof.created.cloned(),
         verification_method: base_proof.verification_method.cloned(),
         proof_purpose: base_proof.proof_purpose,
-        expires: base_proof.expires,
+        expires: base_proof.expires.cloned(),
         domains: base_proof.domains.to_vec(),
         challenge: base_proof.challenge.map(ToOwned::to_owned),
         nonce: base_proof.nonce.map(ToOwned::to_owned),

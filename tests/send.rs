@@ -28,9 +28,9 @@ fn assert_send(f: impl Send + Future) {
 #[test]
 fn data_integrity_sign_is_send() {
     let credential = JsonCredential::<Claims>::new(
-        Some(uri!("https://example.org/#CredentialId").to_owned()), // id
-        uri!("https://example.org/#Issuer").to_owned().into(),      // issuer
-        xsd_types::DateTime::now(),                                 // issuance date
+        Some(uri!("https://example.org/#CredentialId").to_owned()),
+        uri!("https://example.org/#Issuer").to_owned().into(),
+        xsd_types::DateTime::now().into(),
         NonEmptyVec::new(Claims {
             name: "name".into(),
             email: "email@example.com".into(),

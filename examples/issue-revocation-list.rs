@@ -29,7 +29,7 @@ async fn main() {
     let rl_vc = RevocationList2020Credential::new(
         Some(uri!("https://example.test/revocationList.json").to_owned()),
         uri!("did:example:foo").to_owned().into(),
-        xsd_types::DateTime::now_ms(),
+        xsd_types::DateTime::now_ms().into(),
         NonEmptyVec::new(RevocationList2020Subject::RevocationList2020(rl)),
     );
 
