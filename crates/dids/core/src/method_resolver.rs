@@ -68,7 +68,10 @@ impl<T: DIDResolver, M> DIDResolver for VerificationMethodDIDResolver<T, M> {
 }
 
 impl<T: DIDResolver, M> ControllerProvider for VerificationMethodDIDResolver<T, M> {
-    type Controller<'a> = Document where Self: 'a;
+    type Controller<'a>
+        = Document
+    where
+        Self: 'a;
 
     async fn get_controller<'a>(
         &'a self,

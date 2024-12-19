@@ -1,5 +1,6 @@
 use std::collections::BTreeMap;
 
+use ssi_core::Lexical;
 use ssi_verification_methods::{ProofPurpose, ReferenceOrOwnedRef};
 
 use crate::{CryptographicSuite, ProofConfigurationRef};
@@ -9,13 +10,13 @@ pub struct ProofRef<'a, S: CryptographicSuite> {
 
     pub type_: &'a S,
 
-    pub created: Option<xsd_types::DateTimeStamp>,
+    pub created: Option<&'a Lexical<xsd_types::DateTimeStamp>>,
 
     pub verification_method: ReferenceOrOwnedRef<'a, S::VerificationMethod>,
 
     pub proof_purpose: ProofPurpose,
 
-    pub expires: Option<xsd_types::DateTimeStamp>,
+    pub expires: Option<&'a Lexical<xsd_types::DateTimeStamp>>,
 
     pub domains: &'a [String],
 
