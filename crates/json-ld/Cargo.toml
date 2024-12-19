@@ -10,7 +10,7 @@ documentation = "https://docs.rs/ssi-json-ld/"
 
 [dependencies]
 thiserror.workspace = true
-json-ld = { version = "0.21.1", features = ["serde"] }
+json-ld = { version = "0.21.2", features = ["serde"] }
 iref.workspace = true
 static-iref.workspace = true
 json-syntax = { workspace = true, features = ["serde"] }
