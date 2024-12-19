@@ -96,7 +96,8 @@ impl<'d, 'a, S: SerializeCryptographicSuite> Expandable
     for EmbeddedProofConfigurationRef<'d, 'a, S>
 {
     type Error = ConfigurationExpansionError;
-    type Expanded<I, V> = ExpandedEmbeddedProofConfiguration<V::Iri, V::BlankId>
+    type Expanded<I, V>
+        = ExpandedEmbeddedProofConfiguration<V::Iri, V::BlankId>
     where
         I: Interpretation,
         V: VocabularyMut,

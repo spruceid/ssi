@@ -83,7 +83,8 @@ impl ssi_vc::v1::Credential for Credential {
 
 impl Expandable for Credential {
     type Error = std::convert::Infallible;
-    type Expanded<I, V> = Self
+    type Expanded<I, V>
+        = Self
     where
         I: Interpretation,
         V: VocabularyMut,
@@ -159,7 +160,7 @@ async fn main() {
     // Signature options, defining the crypto suite, signature date,
     // signing key and proof purpose.
     let proof_options = ProofOptions::new(
-        DateTimeStamp::now(),
+        DateTimeStamp::now().into(),
         iri!("https://example.com/controller#key").to_owned().into(),
         ProofPurpose::Assertion,
         (),
