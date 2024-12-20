@@ -14,7 +14,7 @@ use serde::{
     de::{DeserializeSeed, MapAccess},
     Deserialize,
 };
-use ssi_core::de::WithType;
+use ssi_core::{de::WithType, OneOrMany};
 use std::{collections::BTreeMap, marker::PhantomData};
 
 mod field;
@@ -54,7 +54,7 @@ impl<'de, T: DeserializeCryptographicSuite<'de>> Proof<T> {
         let mut verification_method = None;
         let mut proof_purpose = None;
         let mut expires: Option<xsd_types::DateTime> = None;
-        let mut domains = None;
+        let mut domains: Option<OneOrMany<String>> = None;
         let mut challenge = None;
         let mut nonce = None;
 
@@ -105,7 +105,7 @@ impl<'de, T: DeserializeCryptographicSuite<'de>> Proof<T> {
             proof_purpose: proof_purpose
                 .ok_or_else(|| serde::de::Error::custom("missing `proofPurpose` property"))?,
             expires: datetime_to_utc_datetimestamp(expires),
-            domains: domains.unwrap_or_default(),
+            domains: domains.map(|d| d.into_vec()).unwrap_or_default(),
             challenge,
             nonce,
             options,
