@@ -1,6 +1,6 @@
 [package]
 name = "ssi"
-version = "0.10.1"
+version = "0.10.2"
 authors = ["Spruce Systems, Inc."]
 edition = "2021"
 license = "Apache-2.0"
@@ -27,13 +27,13 @@ ssi-core = { path = "./crates/core", version = "0.2.2", default-features = false
 ssi-multicodec = { path = "./crates/multicodec", version = "0.2", default-features = false }
 ssi-crypto = { path = "./crates/crypto", version = "0.2.1", default-features = false }
 ssi-verification-methods-core = { path = "./crates/verification-methods/core", version = "0.1.1", default-features = false }
-ssi-verification-methods = { path = "./crates/verification-methods", version = "0.1.1", default-features = false }
+ssi-verification-methods = { path = "./crates/verification-methods", version = "0.1.3", default-features = false }
 ssi-jwk = { path = "./crates/jwk", version = "0.3.1", default-features = false }
 ssi-tzkey = { path = "./crates/tzkey", version = "0.2.1", default-features = false }
 ssi-eip712 = { path = "./crates/eip712", version = "0.1", default-features = false }
 ssi-rdf = { path = "./crates/rdf", version = "0.1", default-features = false }
-ssi-contexts = { path = "./crates/contexts", version = "0.1.8", default-features = false }
-ssi-json-ld = { path = "./crates/json-ld", version = "0.3", default-features = false }
+ssi-contexts = { path = "./crates/contexts", version = "0.1.9", default-features = false }
+ssi-json-ld = { path = "./crates/json-ld", version = "0.3.1", default-features = false }
 ssi-security = { path = "./crates/security", version = "0.1", default-features = false }
 ssi-caips = { path = "./crates/caips", version = "0.2.1", default-features = false }
 ssi-ucan = { path = "./crates/ucan", version = "0.2.1", default-features = false }
@@ -43,14 +43,14 @@ ssi-status = { path = "./crates/status", version = "0.3.0", default-features = f
 ssi-bbs = { path = "./crates/bbs", version = "0.1.1", default-features = false }
 
 # Verifiable Claims
-ssi-claims-core = { path = "./crates/claims/core", version = "0.1.2", default-features = false }
+ssi-claims-core = { path = "./crates/claims/core", version = "0.1.3", default-features = false }
 ssi-jws = { path = "./crates/claims/crates/jws", version = "0.3", default-features = false }
 ssi-jwt = { path = "./crates/claims/crates/jwt", version = "0.3", default-features = false }
 ssi-sd-jwt = { path = "./crates/claims/crates/sd-jwt", version = "0.3", default-features = false }
 ssi-cose = { path = "./crates/claims/crates/cose", version = "0.1", default-features = false }
-ssi-vc = { path = "./crates/claims/crates/vc", version = "0.4.0", default-features = false }
+ssi-vc = { path = "./crates/claims/crates/vc", version = "0.4.1", default-features = false }
 ssi-vc-jose-cose = { path = "./crates/claims/crates/vc-jose-cose", version = "0.2.0", default-features = false }
-ssi-data-integrity-core = { path = "./crates/claims/crates/data-integrity/core", version = "0.2", default-features = false }
+ssi-data-integrity-core = { path = "./crates/claims/crates/data-integrity/core", version = "0.2.1", default-features = false }
 ssi-di-sd-primitives = { path = "./crates/claims/crates/data-integrity/sd-primitives", version = "0.2", default-features = false }
 ssi-data-integrity-suites = { path = "./crates/claims/crates/data-integrity/suites", version = "0.1.1", default-features = false }
 ssi-data-integrity = { path = "./crates/claims/crates/data-integrity", version = "0.1.1", default-features = false }
