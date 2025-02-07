@@ -59,6 +59,8 @@ pub const JFF_VC_EDU_PLUGFEST_2022_CONTEXT: &Iri =
     iri!("https://w3c-ccg.github.io/vc-ed/plugfest-1-2022/jff-vc-edu-plugfest-1-context.json");
 pub const DID_CONFIGURATION_V0_0_CONTEXT: &Iri =
     iri!("https://identity.foundation/.well-known/contexts/did-configuration-v0.0.jsonld");
+pub const DID_CONFIGURATION_V1_CONTEXT: &Iri =
+    iri!("https://identity.foundation/.well-known/did-configuration/v1");
 pub const JFF_VC_EDU_PLUGFEST_2022_2_CONTEXT: &Iri =
     iri!("https://purl.imsglobal.org/spec/ob/v3p0/context.json");
 
@@ -218,6 +220,10 @@ lazy_static::lazy_static! {
         DID_CONFIGURATION_V0_0_CONTEXT,
         ssi_contexts::DID_CONFIGURATION_V0_0
     );
+    pub static ref DID_CONFIGURATION_V1_CONTEXT_DOCUMENT: RemoteDocument = load_static_context(
+        DID_CONFIGURATION_V1_CONTEXT,
+        ssi_contexts::DID_CONFIGURATION_V1
+    );
     pub static ref JFF_VC_EDU_PLUGFEST_2022_2_CONTEXT_DOCUMENT: RemoteDocument = load_static_context(
         JFF_VC_EDU_PLUGFEST_2022_2_CONTEXT,
         ssi_contexts::JFF_VC_EDU_PLUGFEST_2022_2
@@ -296,6 +302,9 @@ impl Loader for StaticLoader {
                 },
                 DID_CONFIGURATION_V0_0_CONTEXT => {
                     Ok(DID_CONFIGURATION_V0_0_CONTEXT_DOCUMENT.clone())
+                },
+                DID_CONFIGURATION_V1_CONTEXT => {
+                    Ok(DID_CONFIGURATION_V1_CONTEXT_DOCUMENT.clone())
                 },
                 JFF_VC_EDU_PLUGFEST_2022_2_CONTEXT => {
                     Ok(JFF_VC_EDU_PLUGFEST_2022_2_CONTEXT_DOCUMENT.clone())
