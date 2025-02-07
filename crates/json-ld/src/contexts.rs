@@ -63,6 +63,7 @@ pub const DID_CONFIGURATION_V1_CONTEXT: &Iri =
     iri!("https://identity.foundation/.well-known/did-configuration/v1");
 pub const JFF_VC_EDU_PLUGFEST_2022_2_CONTEXT: &Iri =
     iri!("https://purl.imsglobal.org/spec/ob/v3p0/context.json");
+pub const LINKED_VP_V1_CONTEXT: &Iri = iri!("https://identity.foundation/linked-vp/contexts/v1");
 
 /// Load a remote context from its static definition.
 fn load_static_context(iri: &Iri, content: &str) -> RemoteDocument {
@@ -228,6 +229,10 @@ lazy_static::lazy_static! {
         JFF_VC_EDU_PLUGFEST_2022_2_CONTEXT,
         ssi_contexts::JFF_VC_EDU_PLUGFEST_2022_2
     );
+    pub static ref LINKED_VP_V1_CONTEXT_DOCUMENT: RemoteDocument = load_static_context(
+        LINKED_VP_V1_CONTEXT,
+        ssi_contexts::LINKED_VP_V1
+    );
 }
 
 macro_rules! iri_match {
@@ -309,6 +314,7 @@ impl Loader for StaticLoader {
                 JFF_VC_EDU_PLUGFEST_2022_2_CONTEXT => {
                     Ok(JFF_VC_EDU_PLUGFEST_2022_2_CONTEXT_DOCUMENT.clone())
                 },
+                LINKED_VP_V1_CONTEXT => { Ok(LINKED_VP_V1_CONTEXT_DOCUMENT.clone()) },
                 _ as iri => Err(LoadError::new(iri.to_owned(), UnknownContext))
             }
         }
