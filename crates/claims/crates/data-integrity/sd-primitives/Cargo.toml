@@ -29,3 +29,6 @@ hex.workspace = true
 async-std = { workspace = true, features = ["attributes"] }
 lazy_static.workspace = true
 json-syntax.workspace = true
+
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+uuid = { workspace = true, features = ["v4", "js"] }
