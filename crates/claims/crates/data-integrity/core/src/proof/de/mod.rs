@@ -14,7 +14,7 @@ use serde::{
     de::{DeserializeSeed, MapAccess},
     Deserialize,
 };
-use ssi_core::{de::WithType, OneOrMany};
+use ssi_core::{de::WithType, Lexical, OneOrMany};
 use std::{collections::BTreeMap, marker::PhantomData};
 
 mod field;
@@ -28,15 +28,30 @@ pub use replay_map::*;
 
 mod configuration;
 
+/// Converts an XSD dateTime into a XSD dateTimeStamp while preserving the
+/// lexical representation.
+///
+/// If no offset is given in the dateTime, the UTC offset (`Z`) is added.
 fn datetime_to_utc_datetimestamp(
-    d: Option<xsd_types::DateTime>,
-) -> Option<xsd_types::DateTimeStamp> {
-    d.map(|d| {
-        xsd_types::DateTimeStamp::new(
-            d.date_time,
-            d.offset
-                .unwrap_or(chrono::FixedOffset::east_opt(0).unwrap()),
-        )
+    value: Option<Lexical<xsd_types::DateTime>>,
+) -> Option<Lexical<xsd_types::DateTimeStamp>> {
+    value.map(|lexical_dt| {
+        let (dt, mut representation) = lexical_dt.into_parts();
+
+        let dts = xsd_types::DateTimeStamp::new(
+            dt.date_time,
+            dt.offset.unwrap_or_else(|| {
+                if let Some(r) = &mut representation {
+                    // Keep most of the lexical representation, just add the
+                    // offset.
+                    r.push('Z');
+                }
+
+                chrono::FixedOffset::east_opt(0).unwrap()
+            }),
+        );
+
+        Lexical::from_parts(dts, representation)
     })
 }
 
@@ -50,10 +65,10 @@ impl<'de, T: DeserializeCryptographicSuite<'de>> Proof<T> {
             .map_err(|_| serde::de::Error::custom("unexpected cryptosuite"))?;
 
         let mut context = None;
-        let mut created: Option<xsd_types::DateTime> = None;
+        let mut created: Option<Lexical<xsd_types::DateTime>> = None;
         let mut verification_method = None;
         let mut proof_purpose = None;
-        let mut expires: Option<xsd_types::DateTime> = None;
+        let mut expires: Option<Lexical<xsd_types::DateTime>> = None;
         let mut domains: Option<OneOrMany<String>> = None;
         let mut challenge = None;
         let mut nonce = None;

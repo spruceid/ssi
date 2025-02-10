@@ -47,7 +47,10 @@ pub struct BitstringStatusListEntrySetCredential {
 }
 
 impl StatusMapEntrySet for BitstringStatusListEntrySetCredential {
-    type Entry<'a> = &'a BitstringStatusListEntry where Self: 'a;
+    type Entry<'a>
+        = &'a BitstringStatusListEntry
+    where
+        Self: 'a;
 
     fn get_entry(&self, purpose: crate::StatusPurpose<&str>) -> Option<Self::Entry<'_>> {
         (&self.credential_status)
@@ -70,7 +73,8 @@ impl JsonLdNodeObject for BitstringStatusListEntrySetCredential {
 
 impl Expandable for BitstringStatusListEntrySetCredential {
     type Error = JsonLdError;
-    type Expanded<I, V> = ssi_json_ld::ExpandedDocument<V::Iri, V::BlankId>
+    type Expanded<I, V>
+        = ssi_json_ld::ExpandedDocument<V::Iri, V::BlankId>
     where
         I: Interpretation,
         V: VocabularyMut,
