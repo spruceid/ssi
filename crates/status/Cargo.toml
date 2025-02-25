@@ -1,12 +1,12 @@
 [package]
 name = "ssi-status"
-version = "0.3.0"
+version = "0.3.1"
 edition = "2021"
 authors = ["Spruce Systems, Inc."]
 license = "Apache-2.0"
 description = "Status Lists implementations for the `ssi` library."
 repository = "https://github.com/spruceid/ssi/"
-documentation = "https://docs.rs/ssi-token-status-list/"
+documentation = "https://docs.rs/ssi-status/"
 
 [dependencies]
 ssi-claims-core.workspace = true

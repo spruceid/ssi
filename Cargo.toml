@@ -39,7 +39,7 @@ ssi-caips = { path = "./crates/caips", version = "0.2.1", default-features = fal
 ssi-ucan = { path = "./crates/ucan", version = "0.2.1", default-features = false }
 ssi-zcap-ld = { path = "./crates/zcap-ld", version = "0.3.0", default-features = false }
 ssi-ssh = { path = "./crates/ssh", version = "0.2.1", default-features = false }
-ssi-status = { path = "./crates/status", version = "0.3.0", default-features = false }
+ssi-status = { path = "./crates/status", version = "0.3.1", default-features = false }
 ssi-bbs = { path = "./crates/bbs", version = "0.1.1", default-features = false }
 
 # Verifiable Claims
