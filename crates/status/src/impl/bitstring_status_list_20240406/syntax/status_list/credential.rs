@@ -100,7 +100,8 @@ impl JsonLdNodeObject for BitstringStatusListCredential {
 impl Expandable for BitstringStatusListCredential {
     type Error = JsonLdError;
 
-    type Expanded<I: Interpretation, V: Vocabulary> = ssi_json_ld::ExpandedDocument<V::Iri, V::BlankId>
+    type Expanded<I: Interpretation, V: Vocabulary>
+        = ssi_json_ld::ExpandedDocument<V::Iri, V::BlankId>
     where
         I: Interpretation,
         V: VocabularyMut,
