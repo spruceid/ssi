@@ -32,14 +32,13 @@
 use rand::{CryptoRng, RngCore};
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use serde_json::Value;
-use ssi_claims_core::{
-    DateTimeProvider, ProofValidationError, ResolverProvider, SignatureError, ValidateClaims,
-    Verification,
-};
+use ssi_claims_core::{ProofValidationError, SignatureError, ValidateClaims, Verification};
 use ssi_core::BytesBuf;
-use ssi_jwk::JWKResolver;
-use ssi_jws::{DecodedJws, Jws, JwsPayload, JwsSignature, JwsSigner, ValidateJwsHeader};
-use ssi_jwt::{AnyClaims, ClaimSet, DecodedJwt, JWTClaims};
+use ssi_jws::{DecodedJws, Jws, JwsPayload, JwsSignature, ValidateJwsHeader};
+use ssi_jwt::{
+    ssi_crypto::{Signer, Verifier},
+    AnyClaims, ClaimSet, DecodedJwt, JWTClaims,
+};
 use std::{
     borrow::{Borrow, Cow},
     collections::BTreeMap,
@@ -250,14 +249,11 @@ impl SdJwt {
     }
 
     /// Decode a compact SD-JWT.
-    pub async fn decode_verify_concealed<P>(
+    pub async fn decode_verify_concealed(
         &self,
-        params: P,
-    ) -> Result<(DecodedSdJwt, Verification), ProofValidationError>
-    where
-        P: ResolverProvider<Resolver: JWKResolver>,
-    {
-        self.parts().decode_verify_concealed(params).await
+        verifier: impl Verifier,
+    ) -> Result<(DecodedSdJwt, Verification), ProofValidationError> {
+        self.parts().decode_verify_concealed(verifier).await
     }
 
     /// Decodes, reveals and verify a compact SD-JWT.
@@ -268,14 +264,11 @@ impl SdJwt {
     /// claims.
     ///
     /// Returns the decoded JWT with the verification status.
-    pub async fn decode_reveal_verify_any<P>(
+    pub async fn decode_reveal_verify_any(
         &self,
-        params: P,
-    ) -> Result<(RevealedSdJwt, Verification), ProofValidationError>
-    where
-        P: ResolverProvider<Resolver: JWKResolver> + DateTimeProvider,
-    {
-        self.parts().decode_reveal_verify_any(params).await
+        verifier: impl Verifier,
+    ) -> Result<(RevealedSdJwt, Verification), ProofValidationError> {
+        self.parts().decode_reveal_verify_any(verifier).await
     }
 
     /// Decodes, reveals and verify a compact SD-JWT.
@@ -286,15 +279,14 @@ impl SdJwt {
     /// function instead.
     ///
     /// Returns the decoded JWT with the verification status.
-    pub async fn decode_reveal_verify<T, P>(
+    pub async fn decode_reveal_verify<T>(
         &self,
-        params: P,
+        verifier: impl Verifier,
     ) -> Result<(RevealedSdJwt<T>, Verification), ProofValidationError>
     where
-        T: ClaimSet + DeserializeOwned + ValidateClaims<P, JwsSignature>,
-        P: ResolverProvider<Resolver: JWKResolver> + DateTimeProvider,
+        T: ClaimSet + DeserializeOwned + ValidateClaims<JwsSignature>,
     {
-        self.parts().decode_reveal_verify(params).await
+        self.parts().decode_reveal_verify(verifier).await
     }
 }
 
@@ -368,7 +360,7 @@ impl SdJwtBuf {
         claims: &JWTClaims<impl Serialize>,
         sd_alg: SdAlg,
         pointers: &[impl Borrow<JsonPointer>],
-        signer: impl JwsSigner,
+        signer: impl Signer,
     ) -> Result<Self, SignatureError> {
         DecodedSdJwt::conceal_and_sign(claims, sd_alg, pointers, signer)
             .await
@@ -380,7 +372,7 @@ impl SdJwtBuf {
         claims: &JWTClaims<impl Serialize>,
         sd_alg: SdAlg,
         pointers: &[impl Borrow<JsonPointer>],
-        signer: impl JwsSigner,
+        signer: impl Signer,
         rng: impl CryptoRng + RngCore,
     ) -> Result<Self, SignatureError> {
         DecodedSdJwt::conceal_and_sign_with(claims, sd_alg, pointers, signer, rng)
@@ -530,15 +522,12 @@ impl<'a> PartsRef<'a> {
     }
 
     /// Decode a compact SD-JWT.
-    pub async fn decode_verify_concealed<P>(
+    pub async fn decode_verify_concealed(
         self,
-        params: P,
-    ) -> Result<(DecodedSdJwt<'a>, Verification), ProofValidationError>
-    where
-        P: ResolverProvider<Resolver: JWKResolver>,
-    {
+        verifier: impl Verifier,
+    ) -> Result<(DecodedSdJwt<'a>, Verification), ProofValidationError> {
         let decoded = self.decode().map_err(ProofValidationError::input_data)?;
-        let verification = decoded.verify_concealed(params).await?;
+        let verification = decoded.verify_concealed(verifier).await?;
         Ok((decoded, verification))
     }
 
@@ -550,15 +539,12 @@ impl<'a> PartsRef<'a> {
     /// claims.
     ///
     /// Returns the decoded JWT with the verification status.
-    pub async fn decode_reveal_verify_any<P>(
+    pub async fn decode_reveal_verify_any(
         self,
-        params: P,
-    ) -> Result<(RevealedSdJwt<'a>, Verification), ProofValidationError>
-    where
-        P: ResolverProvider<Resolver: JWKResolver> + DateTimeProvider,
-    {
+        verifier: impl Verifier,
+    ) -> Result<(RevealedSdJwt<'a>, Verification), ProofValidationError> {
         let decoded = self.decode().map_err(ProofValidationError::input_data)?;
-        decoded.reveal_verify_any(params).await
+        decoded.reveal_verify_any(verifier).await
     }
 
     /// Decodes, reveals and verify a compact SD-JWT.
@@ -569,16 +555,15 @@ impl<'a> PartsRef<'a> {
     /// function instead.
     ///
     /// Returns the decoded JWT with the verification status.
-    pub async fn decode_reveal_verify<T, P>(
+    pub async fn decode_reveal_verify<T>(
         self,
-        params: P,
+        verifier: impl Verifier,
     ) -> Result<(RevealedSdJwt<'a, T>, Verification), ProofValidationError>
     where
-        T: ClaimSet + DeserializeOwned + ValidateClaims<P, JwsSignature>,
-        P: ResolverProvider<Resolver: JWKResolver> + DateTimeProvider,
+        T: ClaimSet + DeserializeOwned + ValidateClaims<JwsSignature>,
     {
         let decoded = self.decode().map_err(ProofValidationError::input_data)?;
-        decoded.reveal_verify(params).await
+        decoded.reveal_verify(verifier).await
     }
 }
 
@@ -614,9 +599,9 @@ impl JwsPayload for SdJwtPayload {
     }
 }
 
-impl<E> ValidateJwsHeader<E> for SdJwtPayload {}
+impl ValidateJwsHeader for SdJwtPayload {}
 
-impl<E, P> ValidateClaims<E, P> for SdJwtPayload {}
+impl<P> ValidateClaims<P> for SdJwtPayload {}
 
 /// Decoded SD-JWT.
 pub struct DecodedSdJwt<'a> {
@@ -632,11 +617,11 @@ impl<'a> DecodedSdJwt<'a> {
     ///
     /// No revealing the claims means only the registered JWT claims will be
     /// validated.
-    pub async fn verify_concealed<P>(&self, params: P) -> Result<Verification, ProofValidationError>
-    where
-        P: ResolverProvider<Resolver: JWKResolver>,
-    {
-        self.jwt.verify(params).await
+    pub async fn verify_concealed(
+        &self,
+        verifier: impl Verifier,
+    ) -> Result<Verification, ProofValidationError> {
+        self.jwt.verify(verifier).await
     }
 
     /// Verifies the decoded SD-JWT after revealing the claims.
@@ -646,17 +631,14 @@ impl<'a> DecodedSdJwt<'a> {
     /// method with `T` defining the custom claims.
     ///
     /// Returns the decoded JWT with the verification status.
-    pub async fn reveal_verify_any<P>(
+    pub async fn reveal_verify_any(
         self,
-        params: P,
-    ) -> Result<(RevealedSdJwt<'a>, Verification), ProofValidationError>
-    where
-        P: ResolverProvider<Resolver: JWKResolver> + DateTimeProvider,
-    {
+        verifier: impl Verifier,
+    ) -> Result<(RevealedSdJwt<'a>, Verification), ProofValidationError> {
         let revealed = self
             .reveal_any()
             .map_err(ProofValidationError::input_data)?;
-        let verification = revealed.verify(params).await?;
+        let verification = revealed.verify(verifier).await?;
         Ok((revealed, verification))
     }
 
@@ -667,18 +649,17 @@ impl<'a> DecodedSdJwt<'a> {
     /// [`Self::reveal_verify_any`] function instead.
     ///
     /// The `T` type parameter is the type of private claims.
-    pub async fn reveal_verify<T, P>(
+    pub async fn reveal_verify<T>(
         self,
-        params: P,
+        verifier: impl Verifier,
     ) -> Result<(RevealedSdJwt<'a, T>, Verification), ProofValidationError>
     where
-        T: ClaimSet + DeserializeOwned + ValidateClaims<P, JwsSignature>,
-        P: ResolverProvider<Resolver: JWKResolver> + DateTimeProvider,
+        T: ClaimSet + DeserializeOwned + ValidateClaims<JwsSignature>,
     {
         let revealed = self
             .reveal::<T>()
             .map_err(ProofValidationError::input_data)?;
-        let verification = revealed.verify(params).await?;
+        let verification = revealed.verify(verifier).await?;
         Ok((revealed, verification))
     }
 }
@@ -689,13 +670,13 @@ impl DecodedSdJwt<'static> {
         claims: &JWTClaims<impl Serialize>,
         sd_alg: SdAlg,
         pointers: &[impl Borrow<JsonPointer>],
-        signer: impl JwsSigner,
+        signer: impl Signer,
     ) -> Result<Self, SignatureError> {
         let (payload, disclosures) =
             SdJwtPayload::conceal(claims, sd_alg, pointers).map_err(SignatureError::other)?;
 
         Ok(Self {
-            jwt: signer.sign_into_decoded(payload).await?,
+            jwt: payload.sign_into_decoded(None, signer).await?,
             disclosures,
         })
     }
@@ -705,14 +686,14 @@ impl DecodedSdJwt<'static> {
         claims: &JWTClaims<impl Serialize>,
         sd_alg: SdAlg,
         pointers: &[impl Borrow<JsonPointer>],
-        signer: impl JwsSigner,
+        signer: impl Signer,
         rng: impl CryptoRng + RngCore,
     ) -> Result<Self, SignatureError> {
         let (payload, disclosures) = SdJwtPayload::conceal_with(claims, sd_alg, pointers, rng)
             .map_err(SignatureError::other)?;
 
         Ok(Self {
-            jwt: signer.sign_into_decoded(payload).await?,
+            jwt: payload.sign_into_decoded(None, signer).await?,
             disclosures,
         })
     }
@@ -764,12 +745,14 @@ impl<'a, T> RevealedSdJwt<'a, T> {
     }
 
     /// Verifies the SD-JWT, validating the revealed claims.
-    pub async fn verify<P>(&self, params: P) -> Result<Verification, ProofValidationError>
+    pub async fn verify(
+        &self,
+        verifier: impl Verifier,
+    ) -> Result<Verification, ProofValidationError>
     where
-        T: ClaimSet + ValidateClaims<P, JwsSignature>,
-        P: ResolverProvider<Resolver: JWKResolver> + DateTimeProvider,
+        T: ClaimSet + ValidateClaims<JwsSignature>,
     {
-        self.jwt.verify(params).await
+        self.jwt.verify(verifier).await
     }
 
     /// Removes all the disclosures.

@@ -19,7 +19,7 @@ pub enum SSHKeyToJWKError {
 }
 
 fn pk_to_jwk_rsa(pk: &sshkeys::RsaPublicKey) -> JWK {
-    JWK::from(JWKParams::RSA(ssi_jwk::RSAParams::new_public(&pk.e, &pk.n)))
+    JWK::from(JWKParams::Rsa(ssi_jwk::RsaParams::new_public(&pk.e, &pk.n)))
 }
 
 fn pk_to_jwk_ecdsa(pk: &sshkeys::EcdsaPublicKey) -> Result<JWK, SSHKeyToJWKError> {
@@ -31,7 +31,8 @@ fn pk_to_jwk_ecdsa(pk: &sshkeys::EcdsaPublicKey) -> Result<JWK, SSHKeyToJWKError
             }
             #[cfg(feature = "secp256r1")]
             {
-                ssi_jwk::p256_parse(&pk.key).map_err(|e| SSHKeyToJWKError::P256Parse(e.to_string()))
+                JWK::from_public_p256_bytes(&pk.key)
+                    .map_err(|e| SSHKeyToJWKError::P256Parse(e.to_string()))
             }
         }
         _ => Err(SSHKeyToJWKError::UnsupportedEcdsaKey(
@@ -41,7 +42,7 @@ fn pk_to_jwk_ecdsa(pk: &sshkeys::EcdsaPublicKey) -> Result<JWK, SSHKeyToJWKError
 }
 
 fn pk_to_jwk_ed25519(pk: &sshkeys::Ed25519PublicKey) -> JWK {
-    JWK::from(JWKParams::OKP(ssi_jwk::OctetParams {
+    JWK::from(JWKParams::Okp(ssi_jwk::OkpParams {
         curve: "Ed25519".to_string(),
         public_key: Base64urlUInt(pk.key.clone()),
         private_key: None,

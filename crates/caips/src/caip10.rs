@@ -145,7 +145,7 @@ const CHAIN_ID_MAX_LENGTH: usize = 41;
 // convert a JWK to a base58 byte string if it is Ed25519
 fn encode_ed25519(jwk: &JWK) -> Result<String, &'static str> {
     let string = match jwk.params {
-        Params::OKP(ref params) if params.curve == "Ed25519" => {
+        Params::Okp(ref params) if params.curve == "Ed25519" => {
             bs58::encode(&params.public_key.0).into_string()
         }
         _ => return Err("Expected Ed25519 key"),
@@ -175,7 +175,7 @@ impl BlockchainAccountId {
             self.chain_id.reference.as_str(),
         ) {
             #[cfg(feature = "tezos")]
-            ("tezos", _net) => ssi_jwk::blakesig::hash_public_key(jwk)
+            ("tezos", _net) => ssi_jwk::hash::blakesig::hash_public_key(jwk)
                 .map_err(|e| BlockchainAccountIdVerifyError::HashError(e.to_string())),
             #[cfg(feature = "eip")]
             // If account address contains uppercase, check EIP-55 checksum.
@@ -184,9 +184,9 @@ impl BlockchainAccountId {
                 .account_address
                 .contains(|c: char| c.is_ascii_uppercase())
             {
-                ssi_jwk::eip155::hash_public_key_eip55(jwk)
+                ssi_jwk::hash::eip155::hash_public_key_eip55(jwk)
             } else {
-                ssi_jwk::eip155::hash_public_key(jwk)
+                ssi_jwk::hash::eip155::hash_public_key(jwk)
             }
             .map_err(|e| BlockchainAccountIdVerifyError::HashError(e.to_string())),
             ("solana", _net) => encode_ed25519(jwk)
@@ -194,13 +194,13 @@ impl BlockchainAccountId {
             // Bitcoin
             #[cfg(feature = "ripemd-160")]
             ("bip122", "000000000019d6689c085ae165831e93") => {
-                ssi_jwk::ripemd160::hash_public_key(jwk, 0x00)
+                ssi_jwk::hash::ripemd160::hash_public_key(jwk, 0x00)
                     .map_err(|e| BlockchainAccountIdVerifyError::HashError(e.to_string()))
             }
             // Dogecoin
             #[cfg(feature = "ripemd-160")]
             ("bip122", "1a91e3dace36e2be3bf030a65679fe82") => {
-                ssi_jwk::ripemd160::hash_public_key(jwk, 0x1e)
+                ssi_jwk::hash::ripemd160::hash_public_key(jwk, 0x1e)
                     .map_err(|e| BlockchainAccountIdVerifyError::HashError(e.to_string()))
             }
             #[cfg(feature = "aleo")]

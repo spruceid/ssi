@@ -180,7 +180,7 @@ impl VerificationMethodType {
             #[cfg(feature = "secp256k1")]
             Self::EcdsaSecp256k1VerificationKey2019 => match encoded.codec() {
                 ssi_multicodec::SECP256K1_PUB => {
-                    match ssi_jwk::secp256k1_parse(encoded.data()) {
+                    match JWK::from_public_secp256k1_bytes(encoded.data()) {
                         Ok(jwk) => Ok(PublicKey::Jwk(Box::new(jwk))),
                         Err(_) => Err(Error::InvalidMethodSpecificId(id.to_owned())),
                     }

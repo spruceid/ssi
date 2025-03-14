@@ -1,6 +1,6 @@
 use serde::de::DeserializeOwned;
-use ssi_claims_core::{DateTimeProvider, ProofValidationError, ResolverProvider, Verification};
-use ssi_jwk::JWKResolver;
+use ssi_claims_core::{ProofValidationError, Verification};
+use ssi_crypto::Verifier;
 use ssi_jws::{DecodeError as JWSDecodeError, DecodedJws, JwsSlice, JwsStr, JwsString, JwsVec};
 
 use crate::{AnyClaims, JWTClaims};
@@ -39,11 +39,10 @@ pub trait ToDecodedJwt {
     ///
     /// This check the signature and the validity of registered claims.
     #[allow(async_fn_in_trait)]
-    async fn verify_jwt<V>(&self, verifier: &V) -> Result<Verification, ProofValidationError>
-    where
-        V: ResolverProvider + DateTimeProvider,
-        V::Resolver: JWKResolver,
-    {
+    async fn verify_jwt(
+        &self,
+        verifier: impl Verifier,
+    ) -> Result<Verification, ProofValidationError> {
         self.to_decoded_jwt()?.verify(verifier).await
     }
 }

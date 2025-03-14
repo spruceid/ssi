@@ -1,6 +1,6 @@
 use super::{Claim, InvalidClaimValue, JWTClaims};
-use crate::{CastClaim, ClaimSet, InfallibleClaimSet, NumericDate, StringOrURI};
-use ssi_claims_core::{ClaimsValidity, DateTimeProvider, ValidateClaims};
+use crate::{CastClaim, ClaimSet, InfallibleClaimSet, NumericDate, StringOrUri};
+use ssi_claims_core::{ClaimsValidity, ValidateClaims, VerificationParameters};
 use ssi_core::OneOrMany;
 use ssi_jws::JwsPayload;
 use std::{borrow::Cow, collections::BTreeMap};
@@ -87,11 +87,8 @@ impl JwsPayload for RegisteredClaims {
     }
 }
 
-impl<E, P> ValidateClaims<E, P> for RegisteredClaims
-where
-    E: DateTimeProvider,
-{
-    fn validate_claims(&self, env: &E, _proof: &P) -> ClaimsValidity {
+impl<P> ValidateClaims<P> for RegisteredClaims {
+    fn validate_claims(&self, env: &VerificationParameters, _proof: &P) -> ClaimsValidity {
         ClaimSet::validate_registered_claims(self, env)
     }
 }
@@ -348,7 +345,7 @@ registered_claims! {
     ///
     /// Principal that issued the JWT. The processing of this claim is generally
     /// application specific.
-    "iss": Issuer(StringOrURI),
+    "iss": Issuer(StringOrUri),
 
     /// Subject (`sub`) claim.
     ///
@@ -358,7 +355,7 @@ registered_claims! {
     /// unique.
     ///
     /// The processing of this claim is generally application specific.
-    "sub": Subject(StringOrURI),
+    "sub": Subject(StringOrUri),
 
     /// Audience (`aud`) claim.
     ///
@@ -367,7 +364,7 @@ registered_claims! {
     /// If the principal processing the claim does not identify itself with a
     /// value in the `aud` claim when this claim is present, then the JWT MUST
     /// be rejected.
-    "aud": Audience(OneOrMany<StringOrURI>),
+    "aud": Audience(OneOrMany<StringOrUri>),
 
     /// Expiration Time (`exp`) claim.
     ///

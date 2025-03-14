@@ -1,6 +1,6 @@
 use std::{borrow::Cow, collections::BTreeMap};
 
-use ssi_claims_core::{ClaimsValidity, DateTimeProvider, ValidateClaims};
+use ssi_claims_core::{ClaimsValidity, ValidateClaims, VerificationParameters};
 
 use crate::{Claim, ClaimSet, InfallibleClaimSet, InvalidClaimValue};
 
@@ -83,11 +83,8 @@ impl ClaimSet for AnyClaims {
 
 impl InfallibleClaimSet for AnyClaims {}
 
-impl<E, P> ValidateClaims<E, P> for AnyClaims
-where
-    E: DateTimeProvider,
-{
-    fn validate_claims(&self, env: &E, _proof: &P) -> ClaimsValidity {
+impl<P> ValidateClaims<P> for AnyClaims {
+    fn validate_claims(&self, env: &VerificationParameters, _proof: &P) -> ClaimsValidity {
         ClaimSet::validate_registered_claims(self, env)
     }
 }

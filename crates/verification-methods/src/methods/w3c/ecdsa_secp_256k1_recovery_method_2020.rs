@@ -241,7 +241,7 @@ impl PublicKey {
             Self::Jwk(jwk) => Ok(jwk.equals_public(other)),
             Self::Hex(hex) => Ok(hex.to_jwk().equals_public(other)),
             Self::EthereumAddress(a) => {
-                let ssi_jwk::Params::EC(params) = &other.params else {
+                let ssi_jwk::Params::Ec(params) = &other.params else {
                     return Err(InvalidPublicKey::InvalidParams);
                 };
 

@@ -1,14 +1,13 @@
 use std::convert::TryFrom;
 
-use crate::error::Error;
 use crate::{Params, JWK};
-use ssi_crypto::hashes::ripemd160;
+use ssi_crypto::{hashes::ripemd160, key::KeyConversionError};
 
 /// Compute a hash of a public key as an ripemd160 hash.
-pub fn hash_public_key(jwk: &JWK, version: u8) -> Result<String, Error> {
+pub fn hash_public_key(jwk: &JWK, version: u8) -> Result<String, KeyConversionError> {
     let ec_params = match jwk.params {
-        Params::EC(ref params) => params,
-        _ => return Err(Error::UnsupportedKeyType),
+        Params::Ec(ref params) => params,
+        _ => return Err(KeyConversionError::Unsupported),
     };
     let pk = k256::PublicKey::try_from(ec_params)?;
     Ok(ripemd160::hash_public_key(&pk, version))
@@ -17,7 +16,6 @@ pub fn hash_public_key(jwk: &JWK, version: u8) -> Result<String, Error> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::ECParams;
 
     #[test]
     fn hash() {
@@ -26,7 +24,7 @@ mod tests {
         let pk_bytes = hex::decode(pk_hex).unwrap();
         let pk = k256::PublicKey::from_sec1_bytes(&pk_bytes).unwrap();
         let jwk = JWK {
-            params: Params::EC(ECParams::try_from(&pk).unwrap()),
+            params: Params::Ec(crate::EcParams::try_from(&pk).unwrap()),
             public_key_use: None,
             key_operations: None,
             algorithm: None,

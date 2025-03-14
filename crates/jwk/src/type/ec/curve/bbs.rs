@@ -11,10 +11,10 @@ impl JWK {
         let mut rng = rand::rngs::OsRng {};
         Self::generate_bls12381g2_with(&mut rng)
     }
-}
 
-pub fn bls12381g2_parse(bytes: &[u8]) -> Result<JWK, ssi_bbs::Error> {
-    Ok(BBSplusPublicKey::from_bytes(bytes)?.into())
+    pub fn from_public_bls12381g2_bytes(bytes: &[u8]) -> Result<JWK, ssi_bbs::Error> {
+        Ok(BBSplusPublicKey::from_bytes(bytes)?.into())
+    }
 }
 
 impl<'a> TryFrom<&'a JWK> for BBSplusPublicKey {

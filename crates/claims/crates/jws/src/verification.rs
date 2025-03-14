@@ -1,43 +1,51 @@
-use crate::{verify_bytes, DecodedJws, DecodedSigningBytes, Error, Header};
+use crate::{DecodedJws, DecodedSigningBytes, Header};
 use base64::{engine::general_purpose::URL_SAFE_NO_PAD, Engine};
 use ssi_claims_core::{
-    ClaimsValidity, InvalidProof, ProofValidationError, ProofValidity, ResolverProvider,
-    ValidateClaims, ValidateProof, VerifiableClaims,
+    ClaimsValidity, ProofValidationError, ProofValidity, ValidateClaims, ValidateProof,
+    VerifiableClaims, VerificationParameters,
 };
-use ssi_jwk::JWKResolver;
+use ssi_crypto::Verifier;
 use std::{
     borrow::{Borrow, Cow},
     ops::Deref,
 };
 
-pub trait ValidateJwsHeader<E> {
-    fn validate_jws_header(&self, _env: &E, _header: &Header) -> ClaimsValidity {
+pub trait ValidateJwsHeader {
+    fn validate_jws_header(
+        &self,
+        _env: &VerificationParameters,
+        _header: &Header,
+    ) -> ClaimsValidity {
         Ok(())
     }
 }
 
-impl<E> ValidateJwsHeader<E> for [u8] {}
+impl ValidateJwsHeader for [u8] {}
 
-impl<'a, E, T: ?Sized + ToOwned + ValidateJwsHeader<E>> ValidateJwsHeader<E> for Cow<'a, T> {
-    fn validate_jws_header(&self, env: &E, header: &Header) -> ClaimsValidity {
+impl<'a, T: ?Sized + ToOwned + ValidateJwsHeader> ValidateJwsHeader for Cow<'a, T> {
+    fn validate_jws_header(&self, env: &VerificationParameters, header: &Header) -> ClaimsValidity {
         self.as_ref().validate_jws_header(env, header)
     }
 }
 
-impl<'a, E, T: ValidateClaims<E, JwsSignature> + ValidateJwsHeader<E>>
-    ValidateClaims<E, JwsSignature> for DecodedSigningBytes<'a, T>
+impl<'a, T: ValidateClaims<JwsSignature> + ValidateJwsHeader> ValidateClaims<JwsSignature>
+    for DecodedSigningBytes<'a, T>
 {
-    fn validate_claims(&self, env: &E, signature: &JwsSignature) -> ClaimsValidity {
+    fn validate_claims(
+        &self,
+        env: &VerificationParameters,
+        signature: &JwsSignature,
+    ) -> ClaimsValidity {
         self.payload.validate_jws_header(env, &self.header)?;
         self.payload.validate_claims(env, signature)
     }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct JwsSignature(Vec<u8>);
+pub struct JwsSignature(Box<[u8]>);
 
 impl JwsSignature {
-    pub fn new(bytes: Vec<u8>) -> Self {
+    pub fn new(bytes: Box<[u8]>) -> Self {
         Self(bytes)
     }
 
@@ -45,7 +53,7 @@ impl JwsSignature {
         &self.0
     }
 
-    pub fn into_bytes(self) -> Vec<u8> {
+    pub fn into_bytes(self) -> Box<[u8]> {
         self.0
     }
 
@@ -56,11 +64,17 @@ impl JwsSignature {
 
 impl From<Vec<u8>> for JwsSignature {
     fn from(value: Vec<u8>) -> Self {
+        Self(value.into_boxed_slice())
+    }
+}
+
+impl From<Box<[u8]>> for JwsSignature {
+    fn from(value: Box<[u8]>) -> Self {
         Self(value)
     }
 }
 
-impl From<JwsSignature> for Vec<u8> {
+impl From<JwsSignature> for Box<[u8]> {
     fn from(value: JwsSignature) -> Self {
         value.into_bytes()
     }
@@ -99,24 +113,21 @@ impl<'a, T> VerifiableClaims for DecodedJws<'a, T> {
     }
 }
 
-impl<'b, V, T> ValidateProof<V, DecodedSigningBytes<'b, T>> for JwsSignature
-where
-    V: ResolverProvider,
-    V::Resolver: JWKResolver,
-{
+impl<'b, T> ValidateProof<DecodedSigningBytes<'b, T>> for JwsSignature {
     async fn validate_proof<'a>(
         &'a self,
-        verifier: &'a V,
+        verifier: impl Verifier,
+        _params: &'a VerificationParameters,
         claims: &'a DecodedSigningBytes<'b, T>,
     ) -> Result<ProofValidity, ProofValidationError> {
-        let key = verifier
-            .resolver()
-            .fetch_public_jwk(claims.header.key_id.as_deref())
-            .await?;
-        match verify_bytes(claims.header.algorithm, &claims.bytes, &key, &self.0) {
-            Ok(()) => Ok(Ok(())),
-            Err(Error::InvalidSignature) => Ok(Err(InvalidProof::Signature)),
-            Err(_) => Err(ProofValidationError::InvalidSignature),
-        }
+        Ok(verifier
+            .verify_bytes(
+                claims.header.key_id.as_ref().map(String::as_bytes),
+                Some(claims.header.algorithm.into()),
+                &claims.bytes,
+                &self.0,
+            )
+            .await?
+            .map_err(Into::into))
     }
 }

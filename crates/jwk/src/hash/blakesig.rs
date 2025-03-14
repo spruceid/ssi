@@ -6,7 +6,8 @@
 //!
 //! [BLAKE2b]: https://blake2.net/
 //! [Tezos]: https://tezos.gitlab.io/
-use crate::{error::Error, Params, JWK};
+use crate::{Params, JWK};
+use ssi_crypto::key::KeyConversionError;
 
 const TZ1_HASH: [u8; 3] = [0x06, 0xa1, 0x9f];
 #[cfg(feature = "secp256k1")]
@@ -22,26 +23,26 @@ const TZ3_HASH: [u8; 3] = [0x06, 0xa1, 0xa4];
 /// Secp256r1 (p256).
 ///
 /// [Base58 prefix]: https://gitlab.com/tezos/tezos/blob/3ed1c460773466c565d43e1007f4b2d9348d90a7/scripts/b58_prefix/README.md
-pub fn hash_public_key(jwk: &JWK) -> Result<String, Error> {
+pub fn hash_public_key(jwk: &JWK) -> Result<String, KeyConversionError> {
     #[allow(unused)]
-    let bytes: Vec<u8>;
+    let bytes: Box<[u8]>;
     let (outer_prefix, public_key_bytes) = match jwk.params {
-        Params::OKP(ref params) => (&TZ1_HASH, &params.public_key.0),
-        Params::EC(ref params) => {
-            let curve = params.curve.as_ref().ok_or(Error::MissingCurve)?;
+        Params::Okp(ref params) => (&TZ1_HASH, params.public_key.0.as_slice()),
+        Params::Ec(ref params) => {
+            let curve = params.curve.as_ref().ok_or(KeyConversionError::Invalid)?;
             match &curve[..] {
                 "secp256k1" => {
-                    bytes = crate::serialize_secp256k1(params)?;
-                    (&TZ2_HASH, &bytes)
+                    bytes = params.to_public_secp256k1_bytes()?;
+                    (&TZ2_HASH, bytes.as_ref())
                 }
                 "P-256" => {
-                    bytes = crate::serialize_p256(params)?;
-                    (&TZ3_HASH, &bytes)
+                    bytes = params.to_public_p256_bytes()?;
+                    (&TZ3_HASH, bytes.as_ref())
                 }
-                _ => return Err(Error::CurveNotImplemented(curve.to_string())),
+                _ => return Err(KeyConversionError::Unsupported),
             }
         }
-        _ => return Err(Error::KeyTypeNotImplemented(Box::new(jwk.to_public()))),
+        _ => return Err(KeyConversionError::Unsupported),
     };
     let mut hasher = blake2b_simd::Params::new();
     hasher.hash_length(20);

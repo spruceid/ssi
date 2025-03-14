@@ -1,53 +1,98 @@
+use std::borrow::Cow;
+
 use coset::{
-    Algorithm, CborSerializable, CoseSign1, Header, ProtectedHeader, TaggedCborSerializable,
+    CborSerializable, ContentType, CoseSign1, Header, Label, ProtectedHeader,
+    TaggedCborSerializable,
 };
-use ssi_claims_core::SignatureError;
+use ssi_crypto::{SignatureError, Signer};
 
-use crate::{CosePayload, CoseSign1BytesBuf, TYP_LABEL};
+use crate::{algorithm::cose_algorithm, CoseSign1BytesBuf};
 
-/// COSE signer information.
-pub struct CoseSignerInfo {
-    /// Signature algorithm.
-    pub algorithm: Option<Algorithm>,
-
-    /// Signing key identifier.
-    pub key_id: Vec<u8>,
-}
-
-/// COSE signer.
+/// COSE payload.
 ///
-/// Any type with the ability to sign a COSE payload.
-pub trait CoseSigner {
-    /// Fetches the information about the signing key.
+/// This trait defines how a custom type can be encoded and signed using COSE.
+///
+/// # Example
+///
+/// ```
+/// use std::borrow::Cow;
+/// use serde::{Serialize, Deserialize};
+/// use ssi_cose::{CosePayload, CosePayloadType, ContentType};
+///
+/// // Our custom payload type.
+/// #[derive(Serialize, Deserialize)]
+/// struct CustomPayload {
+///   data: String
+/// }
+///
+/// // Define how the payload is encoded in COSE.
+/// impl CosePayload for CustomPayload {
+///   fn typ(&self) -> Option<CosePayloadType> {
+///     Some(CosePayloadType::Text(
+///       "application/json+cose".to_owned(),
+///     ))
+///   }
+///   
+///   fn content_type(&self) -> Option<ContentType> {
+///     Some(ContentType::Text("application/json".to_owned()))
+///   }
+///
+///   // Serialize the payload as JSON.
+///   fn payload_bytes(&self) -> Cow<[u8]> {
+///     Cow::Owned(serde_json::to_vec(self).unwrap())
+///   }
+/// }
+/// ```
+pub trait CosePayload {
+    /// `typ` header parameter.
     ///
-    /// This information will be included in the COSE header.
-    #[allow(async_fn_in_trait)]
-    async fn fetch_info(&self) -> Result<CoseSignerInfo, SignatureError>;
+    /// See: <https://www.rfc-editor.org/rfc/rfc9596#section-2>
+    fn typ(&self) -> Option<CosePayloadType> {
+        None
+    }
 
-    /// Signs the given bytes.
-    #[allow(async_fn_in_trait)]
-    async fn sign_bytes(&self, signing_bytes: &[u8]) -> Result<Vec<u8>, SignatureError>;
+    /// Content type header parameter.
+    fn content_type(&self) -> Option<ContentType> {
+        None
+    }
 
-    /// Signs the given payload.
+    /// Payload bytes.
     ///
-    /// Returns a serialized `COSE_Sign1` object, tagged or not according to
-    /// `tagged`.
+    /// Returns the payload bytes representing this value.
+    fn payload_bytes(&self) -> Cow<[u8]>;
+
+    /// Sign the payload to produce a serialized `COSE_Sign1` object.
+    ///
+    /// The `tagged` flag specifies if the COSE object should be tagged or
+    /// not.
     #[allow(async_fn_in_trait)]
     async fn sign(
         &self,
-        payload: &(impl ?Sized + CosePayload),
+        signer: impl Signer,
+        tagged: bool,
+    ) -> Result<CoseSign1BytesBuf, SignatureError> {
+        self.sign_with(signer, None, tagged).await
+    }
+
+    #[allow(async_fn_in_trait)]
+    async fn sign_with(
+        &self,
+        signer: impl Signer,
         additional_data: Option<&[u8]>,
         tagged: bool,
     ) -> Result<CoseSign1BytesBuf, SignatureError> {
-        let info = self.fetch_info().await?;
+        let metadata = signer.key_metadata();
+
+        let (key_id, algorithm_params) = metadata.into_id_and_algorithm(None)?;
+        let algorithm = algorithm_params.algorithm();
 
         let mut result = CoseSign1 {
             protected: ProtectedHeader {
                 header: Header {
-                    alg: info.algorithm,
-                    key_id: info.key_id,
-                    content_type: payload.content_type(),
-                    rest: match payload.typ() {
+                    alg: cose_algorithm(algorithm),
+                    key_id: key_id.unwrap_or_default(),
+                    content_type: self.content_type(),
+                    rest: match self.typ() {
                         Some(typ) => vec![(TYP_LABEL, typ.into())],
                         None => Vec::new(),
                     },
@@ -56,13 +101,13 @@ pub trait CoseSigner {
                 ..Default::default()
             },
             unprotected: Header::default(),
-            payload: Some(payload.payload_bytes().into_owned()),
+            payload: Some(self.payload_bytes().into_owned()),
             signature: Vec::new(),
         };
 
         let tbs = result.tbs_data(additional_data.unwrap_or_default());
 
-        result.signature = self.sign_bytes(&tbs).await?;
+        result.signature = signer.sign_bytes(algorithm_params, &tbs).await?.into_vec();
 
         Ok(if tagged {
             result.to_tagged_vec().unwrap().into()
@@ -72,30 +117,45 @@ pub trait CoseSigner {
     }
 }
 
-impl<'a, T: CoseSigner> CoseSigner for &'a T {
-    async fn fetch_info(&self) -> Result<CoseSignerInfo, SignatureError> {
-        T::fetch_info(*self).await
+impl CosePayload for [u8] {
+    fn payload_bytes(&self) -> Cow<[u8]> {
+        Cow::Borrowed(self)
     }
+}
 
-    async fn sign_bytes(&self, signing_bytes: &[u8]) -> Result<Vec<u8>, SignatureError> {
-        T::sign_bytes(*self, signing_bytes).await
+pub const TYP_LABEL: Label = Label::Int(16);
+
+/// COSE payload type.
+///
+/// Value of the `typ` header parameter.
+///
+/// See: <https://www.rfc-editor.org/rfc/rfc9596#section-2>
+pub enum CosePayloadType {
+    UInt(u64),
+    Text(String),
+}
+
+impl From<CosePayloadType> for crate::CborValue {
+    fn from(ty: CosePayloadType) -> Self {
+        match ty {
+            CosePayloadType::UInt(i) => Self::Integer(i.into()),
+            CosePayloadType::Text(t) => Self::Text(t),
+        }
     }
+}
 
-    async fn sign(
-        &self,
-        payload: &(impl ?Sized + CosePayload),
-        additional_data: Option<&[u8]>,
-        tagged: bool,
-    ) -> Result<CoseSign1BytesBuf, SignatureError> {
-        T::sign(*self, payload, additional_data, tagged).await
+/// COSE signature bytes.
+pub struct CoseSignatureBytes(pub Vec<u8>);
+
+impl CoseSignatureBytes {
+    pub fn into_bytes(self) -> Vec<u8> {
+        self.0
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use crate::{key::CoseKeyGenerate, CosePayload, DecodedCoseSign1};
-    use coset::CoseKey;
-    use ssi_claims_core::VerificationParameters;
+    use crate::{CoseKey, CosePayload, DecodedCoseSign1};
 
     async fn sign_with(key: &CoseKey, tagged: bool) {
         let bytes = b"PAYLOAD".sign(key, tagged).await.unwrap();
@@ -103,8 +163,7 @@ mod tests {
 
         assert_eq!(decoded.signing_bytes.payload.as_bytes(), b"PAYLOAD");
 
-        let params = VerificationParameters::from_resolver(key);
-        assert_eq!(decoded.verify(params).await.unwrap(), Ok(()));
+        assert_eq!(decoded.verify(key).await.unwrap(), Ok(()));
     }
 
     #[cfg(feature = "ed25519")]

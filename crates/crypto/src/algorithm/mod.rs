@@ -1,15 +1,183 @@
+//! <table>
+//!     <thead>
+//!         <tr>
+//!             <th rowspan="2">
+//!                 Key Type
+//!             </th>
+//!             <th colspan="4">
+//!                 Algorithm
+//!             </th>
+//!         </tr>
+//!         <tr>
+//!             <th>
+//!                 Name
+//!             </th>
+//!             <th>
+//!                 Recovery bit
+//!             </th>
+//!             <th>
+//!                 Digest Function
+//!             </th>
+//!             <th>
+//!                 Signature Function
+//!             </th>
+//!         </tr>
+//!     </thead>
+//!     <tbody>
+//!         <tr>
+//!             <td rowspan="2">P-256</td>
+//!             <td>ES256</td>
+//!             <td></td>
+//!             <td>SHA-256</td>
+//!             <td rowspan="8">ECDSA</td>
+//!         </tr>
+//!         <tr>
+//!             <td>ESBlake2b</td>
+//!             <td></td>
+//!             <td>Blake2b</td>
+//!         </tr>
+//!         <tr>
+//!             <td>P-384</td>
+//!             <td>ES384</td>
+//!             <td></td>
+//!             <td>SHA-384</td>
+//!         </tr>
+//!         <tr>
+//!             <td rowspan="5">K-256</td>
+//!             <td>ES256K</td>
+//!             <td></td>
+//!             <td rowspan="2">SHA-256</td>
+//!         </tr>
+//!         <tr>
+//!             <td>ES256KR</td>
+//!             <td>✓</td>
+//!         </tr>
+//!         <tr>
+//!             <td>ESBlake2bK</td>
+//!             <td></td>
+//!             <td>Blake2b</td>
+//!         </tr>
+//!         <tr>
+//!             <td>ESKeccakK</td>
+//!             <td></td>
+//!             <td rowspan="2">Keccak-256</td>
+//!         </tr>
+//!         <tr>
+//!             <td>ESKeccakKR</td>
+//!             <td>✓</td>
+//!         </tr>
+//!         <tr>
+//!             <td>Ed25519</td>
+//!             <td rowspan="2">EdDSA</td>
+//!             <td rowspan="2"></td>
+//!             <td rowspan="2">SHA-256</td>
+//!             <td rowspan="2">EdDSA</td>
+//!         </tr>
+//!         <tr>
+//!             <td>Ed448</td>
+//!         </tr>
+//!         <tr>
+//!             <td rowspan="3">Bytes</td>
+//!             <td>HS256</td>
+//!             <td></td>
+//!             <td>SHA-256</td>
+//!             <td rowspan="3">HMAC</td>
+//!         </tr>
+//!         <tr>
+//!             <td>HS384</td>
+//!             <td></td>
+//!             <td>SHA-384</td>
+//!         </tr>
+//!         <tr>
+//!             <td>HS512</td>
+//!             <td></td>
+//!             <td>SHA-512</td>
+//!         </tr>
+//!         <tr>
+//!             <td rowspan="6">RSA</td>
+//!             <td>PS256</td>
+//!             <td></td>
+//!             <td>SHA-256</td>
+//!             <td>RSASSA-PSS with MGF1+SHA-256</td>
+//!         </tr>
+//!         <tr>
+//!             <td>PS384</td>
+//!             <td></td>
+//!             <td>SHA-384</td>
+//!             <td>RSASSA-PSS with MGF1+SHA-384</td>
+//!         </tr>
+//!         <tr>
+//!             <td>PS512</td>
+//!             <td></td>
+//!             <td>SHA-512</td>
+//!             <td>RSASSA-PSS with MGF1+SHA-512</td>
+//!         </tr>
+//!         <tr>
+//!             <td>RS256</td>
+//!             <td></td>
+//!             <td>SHA-256</td>
+//!             <td rowspan="3">RSASSA-PKCS1 v1.5</td>
+//!         </tr>
+//!         <tr>
+//!             <td>RS384</td>
+//!             <td></td>
+//!             <td>SHA-384</td>
+//!         </tr>
+//!         <tr>
+//!             <td>RS512</td>
+//!             <td></td>
+//!             <td>SHA-512</td>
+//!         </tr>
+//!     </tbody>
+//! </table>
 use core::fmt;
 
 use serde::{Deserialize, Serialize};
 
-pub trait SignatureAlgorithmType {
-    type Instance: SignatureAlgorithmInstance<Algorithm = Self>;
+pub mod bbs;
+
+pub enum SignatureFunction {
+    /// BBS.
+    Bbs,
+
+    /// ECDSA
+    EcDsa,
+
+    /// EdDSA
+    EdDsa,
+
+    /// HMAC
+    Hmac,
+
+    /// RSASSA-PSS with MGF1+SHA-256
+    RsaSsaPssMgf1Sha256,
+
+    /// RSASSA-PSS with MGF1+SHA-384
+    RsaSsaPssMgf1Sha384,
+
+    /// RSASSA-PSS with MGF1+SHA-512
+    RsaSsaPssMgf1Sha512,
+
+    /// RSASSA-PKCS1 v1.5
+    RsaSsaPkcs1v1_5,
 }
 
-pub trait SignatureAlgorithmInstance {
-    type Algorithm;
+/// Digest function.
+pub enum DigestFunction {
+    /// SHA-256
+    Sha256,
 
-    fn algorithm(&self) -> Self::Algorithm;
+    /// SHA-384
+    Sha384,
+
+    /// SHA-512
+    Sha512,
+
+    /// Blake2b
+    Blake2b,
+
+    /// Keccak-256
+    Keccak256,
 }
 
 macro_rules! algorithms {
@@ -17,7 +185,7 @@ macro_rules! algorithms {
         $(#[doc = $doc:tt])*
         $(#[doc($doc_tag:ident)])?
         $(#[serde $serde:tt])?
-        $id:ident $( ($arg:ty) )? : $name:literal
+        $id:ident $( ($arg:ty) )? : $name:literal ($digest:ident, $signature:ident)
     ),*) => {
         /// Signature algorithm.
         #[derive(Debug, Serialize, Deserialize, Clone, Copy, PartialEq, Hash, Eq)]
@@ -29,12 +197,9 @@ macro_rules! algorithms {
                 #[serde(rename = $name)]
                 $id,
             )*
+
             /// No signature.
-            ///
-            /// Per the specs it should only be `none` but `None` is kept for backwards
-            /// compatibility.
-            #[serde(alias = "None")]
-            None
+            None,
         }
 
         impl Algorithm {
@@ -57,10 +222,6 @@ macro_rules! algorithms {
             }
         }
 
-        impl SignatureAlgorithmType for Algorithm {
-            type Instance = AlgorithmInstance;
-        }
-
         #[derive(Debug, Clone)]
         pub enum AlgorithmInstance {
             $(
@@ -81,99 +242,6 @@ macro_rules! algorithms {
                 }
             }
         }
-
-        impl SignatureAlgorithmInstance for AlgorithmInstance {
-            type Algorithm = Algorithm;
-
-            fn algorithm(&self) -> Algorithm {
-                self.algorithm()
-            }
-        }
-
-        $(
-            $(#[doc = $doc])*
-            #[derive(Debug, Default, Clone, Copy, PartialEq, Hash, Eq)]
-            pub struct $id;
-
-            algorithms!(@instance $id $($arg)?);
-
-            impl TryFrom<Algorithm> for $id {
-                type Error = UnsupportedAlgorithm;
-
-                fn try_from(a: Algorithm) -> Result<Self, Self::Error> {
-                    match a {
-                        Algorithm::$id => Ok(Self),
-                        a => Err(UnsupportedAlgorithm(a))
-                    }
-                }
-            }
-
-            impl From<$id> for Algorithm {
-                fn from(_a: $id) -> Self {
-                    Self::$id
-                }
-            }
-        )*
-    };
-    { @instance $id:ident } => {
-        impl SignatureAlgorithmType for $id {
-            type Instance = Self;
-        }
-
-        impl SignatureAlgorithmInstance for $id {
-            type Algorithm = $id;
-
-            fn algorithm(&self) -> $id {
-                *self
-            }
-        }
-
-        impl TryFrom<AlgorithmInstance> for $id {
-            type Error = UnsupportedAlgorithm;
-
-            fn try_from(a: AlgorithmInstance) -> Result<Self, Self::Error> {
-                match a {
-                    AlgorithmInstance::$id => Ok(Self),
-                    other => Err(UnsupportedAlgorithm(other.algorithm()))
-                }
-            }
-        }
-
-        impl From<$id> for AlgorithmInstance {
-            fn from(_: $id) -> Self {
-                Self::$id
-            }
-        }
-    };
-    { @instance $id:ident $arg:ty } => {
-        impl SignatureAlgorithmType for $id {
-            type Instance = $arg;
-        }
-
-        impl SignatureAlgorithmInstance for $arg {
-            type Algorithm = $id;
-
-            fn algorithm(&self) -> $id {
-                $id
-            }
-        }
-
-        impl TryFrom<AlgorithmInstance> for $arg {
-            type Error = UnsupportedAlgorithm;
-
-            fn try_from(a: AlgorithmInstance) -> Result<Self, Self::Error> {
-                match a {
-                    AlgorithmInstance::$id(arg) => Ok(arg),
-                    other => Err(UnsupportedAlgorithm(other.algorithm()))
-                }
-            }
-        }
-
-        impl From<$arg> for AlgorithmInstance {
-            fn from(value: $arg) -> Self {
-                Self::$id(value)
-            }
-        }
     };
     { @ignore_arg $arg:ty } => { _ };
 }
@@ -182,47 +250,47 @@ algorithms! {
     /// HMAC using SHA-256.
     ///
     /// See: <https://www.rfc-editor.org/rfc/rfc7518.txt>
-    HS256: "HS256",
+    HS256: "HS256" (Sha256, Hmac),
 
     /// HMAC using SHA-384.
     ///
     /// See: <https://www.rfc-editor.org/rfc/rfc7518.txt>
-    HS384: "HS384",
+    HS384: "HS384" (Sha384, Hmac),
 
     /// HMAC using SHA-512.
     ///
     /// See: <https://www.rfc-editor.org/rfc/rfc7518.txt>
-    HS512: "HS512",
+    HS512: "HS512" (Sha512, Hmac),
 
     /// RSASSA-PKCS1-v1_5 using SHA-256.
     ///
     /// See: <https://www.rfc-editor.org/rfc/rfc7518.txt>
-    RS256: "RS256",
+    RS256: "RS256" (Sha256, RsaSsaPkcs1v1_5),
 
     /// RSASSA-PKCS1-v1_5 using SHA-384.
     ///
     /// See: <https://www.rfc-editor.org/rfc/rfc7518.txt>
-    RS384: "RS384",
+    RS384: "RS384" (Sha384, RsaSsaPkcs1v1_5),
 
     /// RSASSA-PKCS1-v1_5 using SHA-512.
     ///
     /// See: <https://www.rfc-editor.org/rfc/rfc7518.txt>
-    RS512: "RS512",
+    RS512: "RS512" (Sha512, RsaSsaPkcs1v1_5),
 
     /// RSASSA-PSS using SHA-256 and MGF1 with SHA-256.
     ///
     /// See: <https://www.rfc-editor.org/rfc/rfc7518.txt>
-    PS256: "PS256",
+    PS256: "PS256" (Sha256, RsaSsaPssMgf1Sha256),
 
     /// RSASSA-PSS using SHA-384 and MGF1 with SHA-384.
     ///
     /// See: <https://www.rfc-editor.org/rfc/rfc7518.txt>
-    PS384: "PS384",
+    PS384: "PS384" (Sha256, RsaSsaPssMgf1Sha384),
 
     /// RSASSA-PSS using SHA-512 and MGF1 with SHA-512.
     ///
     /// See: <https://www.rfc-editor.org/rfc/rfc7518.txt>
-    PS512: "PS512",
+    PS512: "PS512" (Sha512, RsaSsaPssMgf1Sha512),
 
     /// Edwards-curve Digital Signature Algorithm (EdDSA) using SHA-256.
     ///
@@ -231,25 +299,25 @@ algorithms! {
     ///  - `Ed448`
     ///
     /// See: <https://www.rfc-editor.org/rfc/rfc8037>
-    EdDSA: "EdDSA",
+    EdDsa: "EdDSA" (Sha256, EdDsa),
 
-    /// EdDSA using SHA-256 and Blake2b as pre-hash function.
-    EdBlake2b: "EdBlake2b", // TODO Blake2b is supposed to replace SHA-256
+    /// EdDSA using Blake2b.
+    EdBlake2b: "EdBlake2b" (Blake2b, EdDsa),
 
     /// ECDSA using P-256 and SHA-256.
     ///
     /// See: <https://www.rfc-editor.org/rfc/rfc7518.txt>
-    ES256: "ES256",
+    ES256: "ES256" (Sha256, EcDsa),
 
     /// ECDSA using P-384 and SHA-384.
     ///
     /// See: <https://www.rfc-editor.org/rfc/rfc7518.txt>
-    ES384: "ES384",
+    ES384: "ES384" (Sha384, EcDsa),
 
     /// ECDSA using secp256k1 (K-256) and SHA-256.
     ///
     /// See: <https://datatracker.ietf.org/doc/html/rfc8812>
-    ES256K: "ES256K",
+    ES256K: "ES256K" (Sha256, EcDsa),
 
     /// ECDSA using secp256k1 (K-256) and SHA-256 with a recovery bit.
     ///
@@ -258,30 +326,26 @@ algorithms! {
     /// extract the public key from the signature.
     ///
     /// See: <https://github.com/decentralized-identity/EcdsaSecp256k1RecoverySignature2020#es256k-r>
-    ES256KR: "ES256K-R",
+    ES256KR: "ES256K-R" (Sha256, EcDsa),
 
     /// ECDSA using secp256k1 (K-256) and Keccak-256.
     ///
     /// Like `ES256K` but using Keccak-256 instead of SHA-256.
-    ESKeccakK: "ESKeccakK",
+    ESKeccakK: "ESKeccakK" (Keccak, EcDsa),
 
     /// ECDSA using secp256k1 (K-256) and Keccak-256 with a recovery bit.
     ///
     /// Like `ES256K-R` but using Keccak-256 instead of SHA-256.
-    ESKeccakKR: "ESKeccakKR",
+    ESKeccakKR: "ESKeccakKR" (Keccack, EcDsa),
 
     /// ECDSA using P-256 and Blake2b.
-    ESBlake2b: "ESBlake2b",
+    ESBlake2b: "ESBlake2b" (Blake2b, EcDsa),
 
     /// ECDSA using secp256k1 (K-256) and Blake2b.
-    ESBlake2bK: "ESBlake2bK",
+    ESBlake2bK: "ESBlake2bK" (Blake2b, EcDsa),
 
     /// BBS scheme.
-    Bbs(BbsInstance): "BBS",
-    // Bbs: "BBS",
-
-    #[doc(hidden)]
-    AleoTestnet1Signature: "AleoTestnet1Signature"
+    Bbs(bbs::BbsInstance): "BBS" (Sha256, Bbs)
 }
 
 impl Algorithm {
@@ -332,321 +396,3 @@ pub enum AlgorithmError {
 #[derive(Debug, thiserror::Error)]
 #[error("unsupported signature algorithm `{0}`")]
 pub struct UnsupportedAlgorithm(pub Algorithm);
-
-/// ECDSA using secp256k1 (K-256) and SHA-256, with or without recovery bit.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub enum AnyES256K {
-    /// ECDSA using secp256k1 (K-256) and SHA-256, without recovery bit.
-    ES256K,
-
-    /// ECDSA using secp256k1 (K-256) and SHA-256, with recovery bit.
-    ES256KR,
-}
-
-impl SignatureAlgorithmType for AnyES256K {
-    type Instance = Self;
-}
-
-impl SignatureAlgorithmInstance for AnyES256K {
-    type Algorithm = AnyES256K;
-
-    fn algorithm(&self) -> AnyES256K {
-        *self
-    }
-}
-
-impl TryFrom<Algorithm> for AnyES256K {
-    type Error = UnsupportedAlgorithm;
-
-    fn try_from(value: Algorithm) -> Result<Self, Self::Error> {
-        match value {
-            Algorithm::ES256K => Ok(Self::ES256K),
-            Algorithm::ES256KR => Ok(Self::ES256KR),
-            other => Err(UnsupportedAlgorithm(other)),
-        }
-    }
-}
-
-impl From<AnyES256K> for Algorithm {
-    fn from(value: AnyES256K) -> Self {
-        match value {
-            AnyES256K::ES256K => Self::ES256K,
-            AnyES256K::ES256KR => Self::ES256KR,
-        }
-    }
-}
-
-impl From<ES256K> for AnyES256K {
-    fn from(_value: ES256K) -> Self {
-        Self::ES256K
-    }
-}
-
-impl From<ES256KR> for AnyES256K {
-    fn from(_value: ES256KR) -> Self {
-        Self::ES256KR
-    }
-}
-
-/// ECDSA using secp256k1 (K-256) and SHA-256, with or without recovery bit.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub enum AnyESKeccakK {
-    /// ECDSA using secp256k1 (K-256) and Keccak-256.
-    ///
-    /// Like `ES256K` but using Keccak-256 instead of SHA-256.
-    ESKeccakK,
-
-    /// ECDSA using secp256k1 (K-256) and Keccak-256 with a recovery bit.
-    ///
-    /// Like `ES256K-R` but using Keccak-256 instead of SHA-256.
-    ESKeccakKR,
-}
-
-impl SignatureAlgorithmType for AnyESKeccakK {
-    type Instance = Self;
-}
-
-impl SignatureAlgorithmInstance for AnyESKeccakK {
-    type Algorithm = AnyESKeccakK;
-
-    fn algorithm(&self) -> AnyESKeccakK {
-        *self
-    }
-}
-
-impl TryFrom<Algorithm> for AnyESKeccakK {
-    type Error = UnsupportedAlgorithm;
-
-    fn try_from(value: Algorithm) -> Result<Self, Self::Error> {
-        match value {
-            Algorithm::ESKeccakK => Ok(Self::ESKeccakK),
-            Algorithm::ESKeccakKR => Ok(Self::ESKeccakKR),
-            other => Err(UnsupportedAlgorithm(other)),
-        }
-    }
-}
-
-impl From<AnyESKeccakK> for Algorithm {
-    fn from(value: AnyESKeccakK) -> Self {
-        match value {
-            AnyESKeccakK::ESKeccakK => Self::ESKeccakK,
-            AnyESKeccakK::ESKeccakKR => Self::ESKeccakKR,
-        }
-    }
-}
-
-impl From<AnyESKeccakK> for AlgorithmInstance {
-    fn from(value: AnyESKeccakK) -> Self {
-        match value {
-            AnyESKeccakK::ESKeccakK => Self::ESKeccakK,
-            AnyESKeccakK::ESKeccakKR => Self::ESKeccakKR,
-        }
-    }
-}
-
-impl From<ESKeccakK> for AnyESKeccakK {
-    fn from(_value: ESKeccakK) -> Self {
-        Self::ESKeccakK
-    }
-}
-
-impl From<ESKeccakKR> for AnyESKeccakK {
-    fn from(_value: ESKeccakKR) -> Self {
-        Self::ESKeccakKR
-    }
-}
-
-/// ECDSA using secp256k1 (K-256) and SHA-256, with or without recovery bit.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub enum AnyES {
-    /// ECDSA using secp256k1 (K-256) and SHA-256, without recovery bit.
-    ES256K,
-
-    /// ECDSA using secp256k1 (K-256) and SHA-256, with recovery bit.
-    ES256KR,
-
-    ESKeccakK,
-
-    /// ECDSA using secp256k1 (K-256) and Keccak-256 with a recovery bit.
-    ///
-    /// Like `ES256K-R` but using Keccak-256 instead of SHA-256.
-    ESKeccakKR,
-}
-
-impl SignatureAlgorithmType for AnyES {
-    type Instance = Self;
-}
-
-impl SignatureAlgorithmInstance for AnyES {
-    type Algorithm = AnyES;
-
-    fn algorithm(&self) -> AnyES {
-        *self
-    }
-}
-
-impl TryFrom<Algorithm> for AnyES {
-    type Error = UnsupportedAlgorithm;
-
-    fn try_from(value: Algorithm) -> Result<Self, Self::Error> {
-        match value {
-            Algorithm::ES256K => Ok(Self::ES256K),
-            Algorithm::ES256KR => Ok(Self::ES256KR),
-            other => Err(UnsupportedAlgorithm(other)),
-        }
-    }
-}
-
-impl From<AnyES> for Algorithm {
-    fn from(value: AnyES) -> Self {
-        match value {
-            AnyES::ES256K => Self::ES256K,
-            AnyES::ES256KR => Self::ES256KR,
-            AnyES::ESKeccakK => Self::ESKeccakK,
-            AnyES::ESKeccakKR => Self::ESKeccakKR,
-        }
-    }
-}
-
-impl From<ES256K> for AnyES {
-    fn from(_value: ES256K) -> Self {
-        Self::ES256K
-    }
-}
-
-impl From<ES256KR> for AnyES {
-    fn from(_value: ES256KR) -> Self {
-        Self::ES256KR
-    }
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub enum AnyBlake2b {
-    EdBlake2b,
-    ESBlake2bK,
-    ESBlake2b,
-}
-
-impl SignatureAlgorithmType for AnyBlake2b {
-    type Instance = Self;
-}
-
-impl SignatureAlgorithmInstance for AnyBlake2b {
-    type Algorithm = Self;
-
-    fn algorithm(&self) -> AnyBlake2b {
-        *self
-    }
-}
-
-impl From<AnyBlake2b> for Algorithm {
-    fn from(value: AnyBlake2b) -> Self {
-        match value {
-            AnyBlake2b::EdBlake2b => Self::EdBlake2b,
-            AnyBlake2b::ESBlake2bK => Self::ESBlake2bK,
-            AnyBlake2b::ESBlake2b => Self::ESBlake2b,
-        }
-    }
-}
-
-impl From<AnyBlake2b> for AlgorithmInstance {
-    fn from(value: AnyBlake2b) -> Self {
-        match value {
-            AnyBlake2b::EdBlake2b => Self::EdBlake2b,
-            AnyBlake2b::ESBlake2bK => Self::ESBlake2bK,
-            AnyBlake2b::ESBlake2b => Self::ESBlake2b,
-        }
-    }
-}
-
-impl TryFrom<Algorithm> for AnyBlake2b {
-    type Error = UnsupportedAlgorithm;
-
-    fn try_from(value: Algorithm) -> Result<Self, Self::Error> {
-        match value {
-            Algorithm::EdBlake2b => Ok(Self::EdBlake2b),
-            Algorithm::ESBlake2bK => Ok(Self::ESBlake2bK),
-            Algorithm::ESBlake2b => Ok(Self::ESBlake2b),
-            a => Err(UnsupportedAlgorithm(a)),
-        }
-    }
-}
-
-impl TryFrom<AlgorithmInstance> for AnyBlake2b {
-    type Error = UnsupportedAlgorithm;
-
-    fn try_from(value: AlgorithmInstance) -> Result<Self, Self::Error> {
-        match value {
-            AlgorithmInstance::EdBlake2b => Ok(Self::EdBlake2b),
-            AlgorithmInstance::ESBlake2bK => Ok(Self::ESBlake2bK),
-            AlgorithmInstance::ESBlake2b => Ok(Self::ESBlake2b),
-            a => Err(UnsupportedAlgorithm(a.algorithm())),
-        }
-    }
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub enum ES256OrES384 {
-    ES256,
-    ES384,
-}
-
-impl ES256OrES384 {
-    pub fn name(&self) -> &'static str {
-        match self {
-            Self::ES256 => "ES256",
-            Self::ES384 => "ES384",
-        }
-    }
-}
-
-impl SignatureAlgorithmType for ES256OrES384 {
-    type Instance = Self;
-}
-
-impl SignatureAlgorithmInstance for ES256OrES384 {
-    type Algorithm = Self;
-
-    fn algorithm(&self) -> Self {
-        *self
-    }
-}
-
-impl fmt::Display for ES256OrES384 {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        self.name().fmt(f)
-    }
-}
-
-impl From<ES256OrES384> for Algorithm {
-    fn from(value: ES256OrES384) -> Self {
-        match value {
-            ES256OrES384::ES256 => Self::ES256,
-            ES256OrES384::ES384 => Self::ES384,
-        }
-    }
-}
-
-impl From<ES256OrES384> for AlgorithmInstance {
-    fn from(value: ES256OrES384) -> Self {
-        match value {
-            ES256OrES384::ES256 => Self::ES256,
-            ES256OrES384::ES384 => Self::ES384,
-        }
-    }
-}
-
-#[derive(Debug, Clone)]
-pub struct BbsInstance(pub Box<BbsParameters>);
-
-#[derive(Debug, Clone)]
-pub enum BbsParameters {
-    Baseline {
-        header: [u8; 64],
-    },
-    Blind {
-        header: [u8; 64],
-        commitment_with_proof: Option<Vec<u8>>,
-        signer_blind: Option<[u8; 32]>,
-    },
-}

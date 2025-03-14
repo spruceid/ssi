@@ -1,9 +1,6 @@
 use core::fmt;
 use serde::{Deserialize, Serialize};
-use ssi_crypto::{
-    algorithm::{ES256OrES384, SignatureAlgorithmInstance, SignatureAlgorithmType},
-    UnsupportedAlgorithm,
-};
+use ssi_crypto::UnsupportedAlgorithm;
 
 macro_rules! algorithms {
     ($(
@@ -67,25 +64,6 @@ macro_rules! algorithms {
                 }
             }
         }
-
-        $(
-            impl From<ssi_crypto::algorithm::$id> for Algorithm {
-                fn from(_: ssi_crypto::algorithm::$id) -> Self {
-                    Self::$id
-                }
-            }
-
-            impl TryFrom<Algorithm> for ssi_crypto::algorithm::$id {
-                type Error = UnsupportedAlgorithm;
-
-                fn try_from(value: Algorithm) -> Result<Self, Self::Error> {
-                    match value {
-                        Algorithm::$id => Ok(Self),
-                        other => Err(UnsupportedAlgorithm(other.into()))
-                    }
-                }
-            }
-        )*
 
         impl TryFrom<ssi_crypto::Algorithm> for Algorithm {
             type Error = UnsupportedAlgorithm;
@@ -166,7 +144,7 @@ algorithms! {
     ///  - `Ed448`
     ///
     /// See: <https://www.rfc-editor.org/rfc/rfc8037>
-    EdDSA: "EdDSA",
+    EdDsa: "EdDSA",
 
     /// EdDSA using SHA-256 and Blake2b as pre-hash function.
     EdBlake2b: "EdBlake2b", // TODO Blake2b is supposed to replace SHA-256
@@ -209,10 +187,7 @@ algorithms! {
     ESBlake2b: "ESBlake2b",
 
     /// ECDSA using secp256k1 (K-256) and Blake2b.
-    ESBlake2bK: "ESBlake2bK",
-
-    #[doc(hidden)]
-    AleoTestnet1Signature: "AleoTestnet1Signature"
+    ESBlake2bK: "ESBlake2bK"
 }
 
 impl Algorithm {
@@ -231,18 +206,6 @@ impl Algorithm {
     }
 }
 
-impl SignatureAlgorithmType for Algorithm {
-    type Instance = Self;
-}
-
-impl SignatureAlgorithmInstance for Algorithm {
-    type Algorithm = Self;
-
-    fn algorithm(&self) -> Self {
-        *self
-    }
-}
-
 impl Default for Algorithm {
     fn default() -> Self {
         Self::None
@@ -258,38 +221,6 @@ impl AsRef<str> for Algorithm {
 impl fmt::Display for Algorithm {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         self.as_str().fmt(f)
-    }
-}
-
-impl From<ssi_crypto::algorithm::AnyBlake2b> for Algorithm {
-    fn from(value: ssi_crypto::algorithm::AnyBlake2b) -> Self {
-        match value {
-            ssi_crypto::algorithm::AnyBlake2b::ESBlake2b => Self::ESBlake2b,
-            ssi_crypto::algorithm::AnyBlake2b::ESBlake2bK => Self::ESBlake2bK,
-            ssi_crypto::algorithm::AnyBlake2b::EdBlake2b => Self::EdBlake2b,
-        }
-    }
-}
-
-impl TryFrom<Algorithm> for ssi_crypto::algorithm::AnyBlake2b {
-    type Error = UnsupportedAlgorithm;
-
-    fn try_from(value: Algorithm) -> Result<Self, Self::Error> {
-        match value {
-            Algorithm::ESBlake2b => Ok(Self::ESBlake2b),
-            Algorithm::ESBlake2bK => Ok(Self::ESBlake2bK),
-            Algorithm::EdBlake2b => Ok(Self::EdBlake2b),
-            other => Err(UnsupportedAlgorithm(other.into())),
-        }
-    }
-}
-
-impl From<ES256OrES384> for Algorithm {
-    fn from(value: ES256OrES384) -> Self {
-        match value {
-            ES256OrES384::ES256 => Self::ES256,
-            ES256OrES384::ES384 => Self::ES384,
-        }
     }
 }
 

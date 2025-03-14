@@ -212,7 +212,7 @@ fn resolve_public_key(
     let pk_bytes = hex::decode(&public_key_hex[2..])
         .map_err(|_| Error::InvalidMethodSpecificId(method_specific_id.to_owned()))?;
 
-    let pk_jwk = ssi_jwk::secp256k1_parse(&pk_bytes)
+    let pk_jwk = JWK::from_public_secp256k1_bytes(&pk_bytes)
         .map_err(|_| Error::InvalidMethodSpecificId(method_specific_id.to_owned()))?;
 
     let account_address = ssi_jwk::eip155::hash_public_key_eip55(&pk_jwk)

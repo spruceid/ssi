@@ -1,81 +1,61 @@
+use ssi_crypto::key::KeyConversionError;
 use ssi_multicodec::{Codec, MultiEncoded, MultiEncodedBuf};
 use std::borrow::Cow;
 
-use crate::{Error, Params, JWK};
+use crate::{Params, JWK};
 
 impl JWK {
-    pub fn from_multicodec(multicodec: &MultiEncoded) -> Result<Self, FromMulticodecError> {
+    pub fn from_multicodec(multicodec: &MultiEncoded) -> Result<Self, KeyConversionError> {
         #[allow(unused_variables)]
         let (codec, k) = multicodec.parts();
         match codec {
             #[cfg(feature = "rsa")]
-            ssi_multicodec::RSA_PUB => {
-                crate::rsa_x509_pub_parse(k).map_err(FromMulticodecError::RsaPub)
-            }
+            ssi_multicodec::RSA_PUB => Self::from_rsa_public_pkcs1_der_bytes(k),
             #[cfg(feature = "ed25519")]
-            ssi_multicodec::ED25519_PUB => {
-                crate::ed25519_parse(k).map_err(FromMulticodecError::Ed25519Pub)
-            }
+            ssi_multicodec::ED25519_PUB => Self::from_public_ed25519_bytes(k),
             #[cfg(feature = "ed25519")]
-            ssi_multicodec::ED25519_PRIV => {
-                crate::ed25519_parse_private(k).map_err(FromMulticodecError::Ed25519Priv)
-            }
+            ssi_multicodec::ED25519_PRIV => Self::from_secret_ed25519_bytes(k),
             #[cfg(feature = "secp256k1")]
-            ssi_multicodec::SECP256K1_PUB => {
-                crate::secp256k1_parse(k).map_err(FromMulticodecError::Secp256k1Pub)
-            }
+            ssi_multicodec::SECP256K1_PUB => Self::from_public_secp256k1_bytes(k),
             #[cfg(feature = "secp256k1")]
-            ssi_multicodec::SECP256K1_PRIV => {
-                crate::secp256k1_parse_private(k).map_err(FromMulticodecError::Secp256k1Priv)
-            }
+            ssi_multicodec::SECP256K1_PRIV => Self::from_secret_secp256k1_bytes(k),
             #[cfg(feature = "secp256r1")]
-            ssi_multicodec::P256_PUB => {
-                crate::p256_parse(k).map_err(FromMulticodecError::Secp256r1Pub)
-            }
+            ssi_multicodec::P256_PUB => Self::from_public_p256_bytes(k),
             #[cfg(feature = "secp256r1")]
-            ssi_multicodec::P256_PRIV => {
-                crate::p256_parse_private(k).map_err(FromMulticodecError::Secp256r1Priv)
-            }
+            ssi_multicodec::P256_PRIV => Self::from_secret_p256_bytes(k),
             #[cfg(feature = "secp384r1")]
-            ssi_multicodec::P384_PUB => {
-                crate::p384_parse(k).map_err(FromMulticodecError::Secp384r1Pub)
-            }
+            ssi_multicodec::P384_PUB => Self::from_public_p384_bytes(k),
             #[cfg(feature = "secp384r1")]
-            ssi_multicodec::P384_PRIV => {
-                crate::p384_parse_private(k).map_err(FromMulticodecError::Secp384r1Priv)
-            }
+            ssi_multicodec::P384_PRIV => Self::from_secret_p384_bytes(k),
             #[cfg(feature = "bbs")]
-            ssi_multicodec::BLS12_381_G2_PUB => {
-                crate::bls12381g2_parse(k).map_err(FromMulticodecError::Bls12381G2Pub)
-            }
+            ssi_multicodec::BLS12_381_G2_PUB => crate::from_public_bls12381g2_bytes(k),
             ssi_multicodec::JWK_JCS_PUB => {
-                JWK::from_bytes(k).map_err(FromMulticodecError::JwkJcsPub)
+                JWK::from_bytes(k).map_err(|_| KeyConversionError::Invalid)
             }
-            _ => Err(FromMulticodecError::UnsupportedCodec(codec)),
+            _ => Err(KeyConversionError::Unsupported),
         }
     }
 
-    pub fn to_multicodec(&self) -> Result<MultiEncodedBuf, ToMulticodecError> {
+    pub fn to_multicodec(&self) -> Result<MultiEncodedBuf, KeyConversionError> {
         match self.params {
-            Params::OKP(ref params) => match &params.curve[..] {
+            Params::Okp(ref params) => match &params.curve[..] {
                 "Ed25519" => Ok(MultiEncodedBuf::encode_bytes(
                     ssi_multicodec::ED25519_PUB,
                     &params.public_key.0,
                 )),
-                _ => Err(ToMulticodecError::UnsupportedCurve(params.curve.clone())),
+                _ => Err(KeyConversionError::Unsupported),
             },
-            Params::EC(ref params) => {
+            Params::Ec(ref params) => {
                 let curve = match params.curve {
                     Some(ref curve) => curve,
-                    None => return Err(ToMulticodecError::MissingCurve),
+                    None => return Err(KeyConversionError::Invalid),
                 };
 
                 match curve.as_str() {
                     #[cfg(feature = "secp256k1")]
                     "secp256k1" => {
                         use k256::elliptic_curve::sec1::ToEncodedPoint;
-                        let pk = k256::PublicKey::try_from(params)
-                            .map_err(ToMulticodecError::InvalidInputKey)?;
+                        let pk = k256::PublicKey::try_from(params)?;
 
                         Ok(MultiEncodedBuf::encode_bytes(
                             ssi_multicodec::SECP256K1_PUB,
@@ -85,8 +65,7 @@ impl JWK {
                     #[cfg(feature = "secp256r1")]
                     "P-256" => {
                         use p256::elliptic_curve::sec1::ToEncodedPoint;
-                        let pk = p256::PublicKey::try_from(params)
-                            .map_err(ToMulticodecError::InvalidInputKey)?;
+                        let pk = p256::PublicKey::try_from(params)?;
 
                         Ok(MultiEncodedBuf::encode_bytes(
                             ssi_multicodec::P256_PUB,
@@ -95,9 +74,7 @@ impl JWK {
                     }
                     #[cfg(feature = "secp384r1")]
                     "P-384" => {
-                        let pk_bytes = crate::serialize_p384(params)
-                            .map_err(ToMulticodecError::InvalidInputKey)?;
-
+                        let pk_bytes = params.to_public_p384_bytes()?;
                         Ok(MultiEncodedBuf::encode_bytes(
                             ssi_multicodec::P384_PUB,
                             &pk_bytes,
@@ -105,24 +82,22 @@ impl JWK {
                     }
                     #[cfg(feature = "bbs")]
                     "BLS12381G2" => {
-                        let pk: ssi_bbs::BBSplusPublicKey = self
-                            .try_into()
-                            .map_err(ToMulticodecError::InvalidInputKey)?;
+                        let pk: ssi_bbs::BBSplusPublicKey = self.try_into()?;
 
                         Ok(MultiEncodedBuf::encode_bytes(
                             ssi_multicodec::BLS12_381_G2_PUB,
                             &pk.to_bytes(),
                         ))
                     }
-                    _ => Err(ToMulticodecError::UnsupportedCurve(curve.to_owned())),
+                    _ => Err(KeyConversionError::Unsupported),
                 }
             }
-            Params::RSA(ref params) => {
-                let der = simple_asn1::der_encode(&params.to_public())
-                    .map_err(ToMulticodecError::InvalidInputKey)?;
+            #[cfg(feature = "rsa")]
+            Params::Rsa(ref params) => {
+                let der = params.to_rsa_public_pkcs1_der_bytes()?;
                 Ok(MultiEncodedBuf::encode_bytes(ssi_multicodec::RSA_PUB, &der))
             }
-            _ => Err(ToMulticodecError::UnsupportedKeyType),
+            _ => Err(KeyConversionError::Unsupported),
         }
     }
 }
@@ -137,71 +112,6 @@ impl Codec for JWK {
     fn from_bytes(bytes: &[u8]) -> Result<Self, ssi_multicodec::Error> {
         Self::try_from(bytes).map_err(|_| ssi_multicodec::Error::InvalidData)
     }
-}
-
-#[derive(Debug, thiserror::Error)]
-pub enum FromMulticodecError {
-    #[cfg(feature = "rsa")]
-    #[error(transparent)]
-    RsaPub(crate::RsaX509PubParseError),
-
-    #[cfg(feature = "ed25519")]
-    #[error(transparent)]
-    Ed25519Pub(Error),
-
-    #[cfg(feature = "ed25519")]
-    #[error(transparent)]
-    Ed25519Priv(Error),
-
-    #[cfg(feature = "secp256k1")]
-    #[error(transparent)]
-    Secp256k1Pub(Error),
-
-    #[cfg(feature = "secp256k1")]
-    #[error(transparent)]
-    Secp256k1Priv(Error),
-
-    #[cfg(feature = "secp256r1")]
-    #[error(transparent)]
-    Secp256r1Pub(Error),
-
-    #[cfg(feature = "secp256r1")]
-    #[error(transparent)]
-    Secp256r1Priv(Error),
-
-    #[cfg(feature = "secp384r1")]
-    #[error(transparent)]
-    Secp384r1Pub(Error),
-
-    #[cfg(feature = "secp384r1")]
-    #[error(transparent)]
-    Secp384r1Priv(Error),
-
-    #[cfg(feature = "bbs")]
-    #[error(transparent)]
-    Bls12381G2Pub(ssi_bbs::Error),
-
-    #[error(transparent)]
-    JwkJcsPub(ssi_multicodec::Error),
-
-    /// Unexpected multibase (multicodec) key prefix multicodec
-    #[error("Unsupported multicodec key type 0x{0:x}")]
-    UnsupportedCodec(u64),
-}
-
-#[derive(Debug, thiserror::Error)]
-pub enum ToMulticodecError {
-    #[error("unsupported key type")]
-    UnsupportedKeyType,
-
-    #[error("unsupported curve `{0}`")]
-    UnsupportedCurve(String),
-
-    #[error("missing curve")]
-    MissingCurve,
-
-    #[error("invalid input key: {0}")]
-    InvalidInputKey(Error),
 }
 
 #[cfg(test)]

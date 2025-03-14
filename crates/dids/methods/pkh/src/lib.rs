@@ -14,7 +14,7 @@ use ssi_dids_core::{
     resolution::{DIDMethodResolver, Error},
     DIDURLBuf, Document, DID,
 };
-use ssi_jwk::{Base64urlUInt, OctetParams, Params, JWK};
+use ssi_jwk::{Base64urlUInt, OkpParams, Params, JWK};
 
 mod json_ld_context;
 
@@ -277,7 +277,7 @@ async fn resolve_solana(did: &DID, account_address: &str, reference: &str) -> Re
     };
 
     let pk_jwk = JWK {
-        params: Params::OKP(OctetParams {
+        params: Params::Okp(OkpParams {
             curve: "Ed25519".to_string(),
             public_key: Base64urlUInt(public_key_bytes),
             private_key: None,
@@ -529,7 +529,7 @@ impl DIDMethodResolver for DIDPKH {
 
 fn generate_sol(jwk: &JWK) -> Result<String, GenerateError> {
     match jwk.params {
-        Params::OKP(ref params) if params.curve == "Ed25519" => {
+        Params::Okp(ref params) if params.curve == "Ed25519" => {
             Ok(bs58::encode(&params.public_key.0).into_string())
         }
         _ => Err(GenerateError::UnsupportedKeyType),
@@ -633,7 +633,7 @@ fn generate_caip10_solana(
         reference,
     };
     let pk_bs58 = match key.params {
-        Params::OKP(ref params) if params.curve == "Ed25519" => {
+        Params::Okp(ref params) if params.curve == "Ed25519" => {
             bs58::encode(&params.public_key.0).into_string()
         }
         _ => return Err(GenerateError::UnsupportedKeyType),
@@ -656,7 +656,7 @@ fn generate_caip10_aleo(
     };
     use bech32::ToBase32;
     let pk_bs58 = match key.params {
-        Params::OKP(ref params) if params.curve == "AleoTestnet1Key" => bech32::encode(
+        Params::Okp(ref params) if params.curve == "AleoTestnet1Key" => bech32::encode(
             "aleo",
             params.public_key.0.to_base32(),
             bech32::Variant::Bech32m,

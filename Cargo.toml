@@ -81,6 +81,7 @@ zkryptium = "0.2.2"   # BBS
 
 # other common dependencies
 log = "0.4.21"
+anyhow = "1.0.97"
 async-std = "1.9"
 async-trait = "0.1.68"
 thiserror = "1.0.40"

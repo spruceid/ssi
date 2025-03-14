@@ -2,7 +2,7 @@ use std::sync::LazyLock;
 
 use serde::{Deserialize, Serialize};
 use serde_json::json;
-use ssi_claims_core::{ValidateClaims, VerificationParameters};
+use ssi_claims_core::ValidateClaims;
 use ssi_core::json_pointer;
 use ssi_jwk::JWK;
 use ssi_jwt::{ClaimSet, JWTClaims};
@@ -32,7 +32,7 @@ async fn full_pathway_regular_claim() {
     }
 
     impl ClaimSet for BaseClaims {}
-    impl<E, P> ValidateClaims<E, P> for BaseClaims {}
+    impl<P> ValidateClaims<P> for BaseClaims {}
 
     let base_claims = JWTClaims::builder()
         .sub("user")
@@ -51,10 +51,10 @@ async fn full_pathway_regular_claim() {
         .await
         .unwrap();
 
-    let params = VerificationParameters::from_resolver(&*JWK);
+    // let params = VerificationParameters::from_resolver(&*JWK);
 
     let (mut revealed, verification) = sd_jwt
-        .decode_reveal_verify::<BaseClaims, _>(&params)
+        .decode_reveal_verify::<BaseClaims>(&*JWK)
         .await
         .unwrap();
 
@@ -67,7 +67,7 @@ async fn full_pathway_regular_claim() {
     let sd_jwt = revealed.into_encoded();
 
     let (revealed, verification) = sd_jwt
-        .decode_reveal_verify::<BaseClaims, _>(params)
+        .decode_reveal_verify::<BaseClaims>(&*JWK)
         .await
         .unwrap();
 
@@ -92,7 +92,7 @@ async fn full_pathway_array() {
     }
 
     impl ClaimSet for BaseClaims {}
-    impl<E, P> ValidateClaims<E, P> for BaseClaims {}
+    impl<P> ValidateClaims<P> for BaseClaims {}
 
     let base_claims = JWTClaims::builder()
         .sub("user")
@@ -113,10 +113,8 @@ async fn full_pathway_array() {
         .await
         .unwrap();
 
-    let params = VerificationParameters::from_resolver(&*JWK);
-
     let (mut revealed, verification) = sd_jwt
-        .decode_reveal_verify::<BaseClaims, _>(&params)
+        .decode_reveal_verify::<BaseClaims>(&*JWK)
         .await
         .unwrap();
 
@@ -129,7 +127,7 @@ async fn full_pathway_array() {
     let sd_jwt = revealed.into_encoded();
 
     let (revealed, verification) = sd_jwt
-        .decode_reveal_verify::<BaseClaims, _>(params)
+        .decode_reveal_verify::<BaseClaims>(&*JWK)
         .await
         .unwrap();
 
@@ -164,7 +162,7 @@ async fn nested_claims() {
     }
 
     impl ClaimSet for Claims {}
-    impl<E, P> ValidateClaims<E, P> for Claims {}
+    impl<P> ValidateClaims<P> for Claims {}
 
     let base_claims = JWTClaims::builder()
         .sub("user")
@@ -199,12 +197,10 @@ async fn nested_claims() {
 
     let inner_revealed = base_sd_jwt.decode_reveal::<Claims>().unwrap();
 
-    let params = VerificationParameters::from_resolver(&*JWK);
-
     let empty_sd_jwt = inner_revealed.clone().cleared().into_encoded();
 
     let (empty_revealed, verification) = empty_sd_jwt
-        .decode_reveal_verify::<Claims, _>(&params)
+        .decode_reveal_verify::<Claims>(&*JWK)
         .await
         .unwrap();
 
@@ -223,7 +219,7 @@ async fn nested_claims() {
         .into_encoded();
 
     let (full_revealed, verification) = full_sd_jwt
-        .decode_reveal_verify::<Claims, _>(&params)
+        .decode_reveal_verify::<Claims>(&*JWK)
         .await
         .unwrap();
 
@@ -236,7 +232,7 @@ async fn nested_claims() {
         .into_encoded();
 
     let (full_revealed, verification) = outer_sd_jwt
-        .decode_reveal_verify::<Claims, _>(&params)
+        .decode_reveal_verify::<Claims>(&*JWK)
         .await
         .unwrap();
 
@@ -256,9 +252,7 @@ async fn nested_claims() {
         .retaining(&[json_pointer!("/outer/inner")])
         .into_encoded();
 
-    let result = inner_sd_jwt
-        .decode_reveal_verify::<Claims, _>(&params)
-        .await;
+    let result = inner_sd_jwt.decode_reveal_verify::<Claims>(&*JWK).await;
 
     assert!(result.is_err());
 }

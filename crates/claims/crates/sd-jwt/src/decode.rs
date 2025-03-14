@@ -63,10 +63,6 @@ pub enum DecodeError {
     #[error("A disclosure was not used during decoding")]
     UnusedDisclosure,
 
-    /// Bubbled up error from ssi_jws
-    #[error(transparent)]
-    JWS(#[from] ssi_jws::Error),
-
     /// Bubbled up error from serde_json
     #[error(transparent)]
     JsonDeserialization(#[from] serde_json::Error),

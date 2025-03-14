@@ -21,5 +21,5 @@ impl Sidetree for ION {
 
 /// Check that a JWK is Secp256k1
 pub fn is_secp256k1(jwk: &JWK) -> bool {
-    matches!(jwk, JWK {params: ssi_jwk::Params::EC(ssi_jwk::ECParams { curve: Some(curve), ..}), ..} if curve == "secp256k1")
+    matches!(jwk, JWK {params: ssi_jwk::Params::Ec(ssi_jwk::EcParams { curve: Some(curve), ..}), ..} if curve == "secp256k1")
 }

@@ -7,7 +7,6 @@
 //! This module provides [sign] and [verify] functions for Aleo signatures
 //! using static parameters ([struct@COM_PARAMS], [struct@ENC_PARAMS], [struct@SIG_PARAMS])
 //! and a [JWK-based keypair representation](OKP_CURVE).
-
 use crate::{Base64urlUInt, OctetParams, Params, JWK};
 use thiserror::Error;
 
@@ -156,6 +155,12 @@ lazy_static::lazy_static! {
 /// key ("d") parameter. An Aleo public key JWK is usable for verification of signatures using
 /// [struct@ENC_PARAMS].
 pub const OKP_CURVE: &str = "AleoTestnet1Key";
+
+impl JWK {
+    pub fn generate_aleo() -> Result<JWK, Error> {
+        crate::aleo::generate_private_key_jwk().map_err(Error::AleoGeneratePrivateKey)
+    }
+}
 
 /// Generate an Aleo private key in [unofficial JWK format][OKP_CURVE]. **CPU-intensive (slow)**.
 ///

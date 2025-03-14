@@ -5,6 +5,8 @@ use std::borrow::Cow;
 pub use ssi_eip712::Eip712TypesLoaderProvider;
 pub use ssi_json_ld::JsonLdLoaderProvider;
 
+use super::VerificationParameters;
+
 #[derive(Debug, thiserror::Error, PartialEq)]
 pub enum InvalidClaims {
     #[error("missing issuance date")]
@@ -48,16 +50,16 @@ pub type ClaimsValidity = Result<(), InvalidClaims>;
 ///
 /// The `validate` function is also provided with the proof, as some claim type
 /// require information from the proof to be validated.
-pub trait ValidateClaims<E, P = ()> {
-    fn validate_claims(&self, _environment: &E, _proof: &P) -> ClaimsValidity {
+pub trait ValidateClaims<P = ()> {
+    fn validate_claims(&self, _params: &VerificationParameters, _proof: &P) -> ClaimsValidity {
         Ok(())
     }
 }
 
-impl<E, P> ValidateClaims<E, P> for () {}
+impl<P> ValidateClaims<P> for () {}
 
-impl<E, P> ValidateClaims<E, P> for [u8] {}
+impl<P> ValidateClaims<P> for [u8] {}
 
-impl<E, P> ValidateClaims<E, P> for Vec<u8> {}
+impl<P> ValidateClaims<P> for Vec<u8> {}
 
-impl<'a, E, P, T: ?Sized + ToOwned + ValidateClaims<E, P>> ValidateClaims<E, P> for Cow<'a, T> {}
+impl<'a, P, T: ?Sized + ToOwned + ValidateClaims<P>> ValidateClaims<P> for Cow<'a, T> {}

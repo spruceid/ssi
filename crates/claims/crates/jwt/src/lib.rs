@@ -68,11 +68,8 @@
 //! assert_eq!(jwt, "eyJhbGciOiJFUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJodHRwOi8vZXhhbXBsZS5vcmcvI2lzc3VlciIsImV4cCI6MTc0Njg4MTM1NiwiaWF0IjoxNzE1MzQyNzkwLCJuYW1lIjoiSm9obiBTbWl0aCJ9.zBfMZzfQuuSfzcZmnz0MjXwT1sP26qwVq2GZX3qL0DR3wRMVG-wbCu9jPJ48l-F_q7W253_VqMWpoLluHo-gpg")
 //! # })
 //! ```
-use serde::de::DeserializeOwned;
-use serde::Serialize;
-
-use ssi_jwk::{Algorithm, JWK};
-use ssi_jws::{Error, Header};
+pub use ssi_crypto;
+pub use ssi_jws;
 
 mod claims;
 mod datatype;
@@ -82,35 +79,35 @@ pub use claims::*;
 pub use datatype::*;
 pub use decoding::*;
 
-pub fn encode_sign<Claims: Serialize>(
-    algorithm: Algorithm,
-    claims: &Claims,
-    key: &JWK,
-) -> Result<String, Error> {
-    let payload = serde_json::to_string(claims)?;
-    let header = Header {
-        algorithm,
-        key_id: key.key_id.clone(),
-        type_: Some("JWT".to_string()),
-        ..Default::default()
-    };
-    ssi_jws::encode_sign_custom_header(&payload, key, &header)
-}
+// pub fn encode_sign<Claims: Serialize>(
+//     algorithm: Algorithm,
+//     claims: &Claims,
+//     key: &JWK,
+// ) -> Result<String, Error> {
+//     let payload = serde_json::to_string(claims)?;
+//     let header = Header {
+//         algorithm,
+//         key_id: key.key_id.clone(),
+//         type_: Some("JWT".to_string()),
+//         ..Default::default()
+//     };
+//     ssi_jws::encode_sign_custom_header(&payload, key, &header)
+// }
 
-pub fn encode_unsigned<Claims: Serialize>(claims: &Claims) -> Result<String, Error> {
-    let payload = serde_json::to_string(claims)?;
-    ssi_jws::encode_unsigned(&payload)
-}
+// pub fn encode_unsigned<Claims: Serialize>(claims: &Claims) -> Result<String, Error> {
+//     let payload = serde_json::to_string(claims)?;
+//     ssi_jws::encode_unsigned(&payload)
+// }
 
-pub fn decode_verify<Claims: DeserializeOwned>(jwt: &str, key: &JWK) -> Result<Claims, Error> {
-    let (_header, payload) = ssi_jws::decode_verify(jwt, key)?;
-    let claims = serde_json::from_slice(&payload)?;
-    Ok(claims)
-}
+// pub fn decode_verify<Claims: DeserializeOwned>(jwt: &str, key: &JWK) -> Result<Claims, Error> {
+//     let (_header, payload) = ssi_jws::decode_verify(jwt, key)?;
+//     let claims = serde_json::from_slice(&payload)?;
+//     Ok(claims)
+// }
 
-// for vc-test-suite
-pub fn decode_unverified<Claims: DeserializeOwned>(jwt: &str) -> Result<Claims, Error> {
-    let (_header, payload) = ssi_jws::decode_unverified(jwt)?;
-    let claims = serde_json::from_slice(&payload)?;
-    Ok(claims)
-}
+// // for vc-test-suite
+// pub fn decode_unverified<Claims: DeserializeOwned>(jwt: &str) -> Result<Claims, Error> {
+//     let (_header, payload) = ssi_jws::decode_unverified(jwt)?;
+//     let claims = serde_json::from_slice(&payload)?;
+//     Ok(claims)
+// }

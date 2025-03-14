@@ -12,7 +12,7 @@ use ssi_dids_core::{
     resolution::{self, Content, DIDMethodResolver, DerefError, Output, Parameter},
     DIDBuf, DIDMethod, DIDResolver, DIDURLBuf, Document, DID, DIDURL,
 };
-use ssi_jwk::{p256_parse, secp256k1_parse, Base64urlUInt, OctetParams, Params, JWK};
+use ssi_jwk::{Base64urlUInt, OkpParams, Params, JWK};
 use ssi_jws::{decode_unverified, decode_verify};
 use static_iref::iri;
 use std::{collections::BTreeMap, future::Future};
@@ -558,7 +558,7 @@ impl DIDTz {
                                     let pk = decode_public_key(public_key)?;
 
                                     JWK {
-                                        params: Params::OKP(OctetParams {
+                                        params: Params::Okp(OkpParams {
                                             curve,
                                             public_key: Base64urlUInt(pk),
                                             private_key: None,
@@ -575,14 +575,14 @@ impl DIDTz {
                                 }
                                 Prefix::TZ2 => {
                                     let pk = decode_public_key(public_key)?;
-                                    secp256k1_parse(&pk).map_err(|e| {
+                                    JWK::from_public_secp256k1_bytes(&pk).map_err(|e| {
                                         // Couldn't create JWK from secp256k1 public key: {e}
                                         UpdateError::InvalidPublicKey(public_key.to_owned(), e)
                                     })?
                                 }
                                 Prefix::TZ3 => {
                                     let pk = decode_public_key(public_key)?;
-                                    p256_parse(&pk).map_err(|e| {
+                                    JWK::from_public_p256_bytes(&pk).map_err(|e| {
                                         // Couldn't create JWK from P-256 public key: {e}
                                         UpdateError::InvalidPublicKey(public_key.to_owned(), e)
                                     })?
@@ -717,9 +717,9 @@ mod tests {
         .unwrap();
         // let public_key = pk.from_base58check().unwrap()[4..].to_vec();
         let private_key = bs58::decode(&sk).with_check(None).into_vec().unwrap()[4..].to_owned();
-        use ssi_jwk::ECParams;
+        use ssi_jwk::EcParams;
         let key = JWK {
-            params: ssi_jwk::Params::EC(ECParams {
+            params: ssi_jwk::Params::Ec(EcParams {
                 curve: Some("secp256k1".to_string()),
                 x_coordinate: None,
                 y_coordinate: None,
@@ -779,7 +779,7 @@ mod tests {
         // let public_key = pk.from_base58check().unwrap()[4..].to_vec();
         let private_key = bs58::decode(&sk).with_check(None).into_vec().unwrap()[4..].to_owned();
         let key = JWK {
-            params: ssi_jwk::Params::EC(ssi_jwk::ECParams {
+            params: ssi_jwk::Params::Ec(ssi_jwk::EcParams {
                 curve: Some("P-256".to_string()),
                 x_coordinate: None,
                 y_coordinate: None,

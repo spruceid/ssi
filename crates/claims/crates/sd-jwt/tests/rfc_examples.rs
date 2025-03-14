@@ -2,7 +2,7 @@ use std::sync::LazyLock;
 
 use serde::{Deserialize, Serialize};
 use serde_json::json;
-use ssi_claims_core::{ValidateClaims, VerificationParameters};
+use ssi_claims_core::ValidateClaims;
 use ssi_core::json_pointer;
 use ssi_jwk::JWK;
 use ssi_jws::{jws, Jws};
@@ -58,7 +58,7 @@ async fn rfc_a_1_example_2_verification() {
     }
 
     impl ClaimSet for Example2Claims {}
-    impl<E, P> ValidateClaims<E, P> for Example2Claims {}
+    impl<P> ValidateClaims<P> for Example2Claims {}
 
     const JWT: &Jws = jws!("eyJhbGciOiAiRVMyNTYiLCAidHlwIjogImV4YW1wbGUrc2Qtand0In0.eyJfc2QiOiBbIkM5aW5wNllvUmFFWFI0Mjd6WUpQN1FyazFXSF84YmR3T0FfWVVyVW5HUVUiLCAiS3VldDF5QWEwSElRdlluT1ZkNTloY1ZpTzlVZzZKMmtTZnFZUkJlb3d2RSIsICJNTWxkT0ZGekIyZDB1bWxtcFRJYUdlcmhXZFVfUHBZZkx2S2hoX2ZfOWFZIiwgIlg2WkFZT0lJMnZQTjQwVjd4RXhad1Z3ejd5Um1MTmNWd3Q1REw4Ukx2NGciLCAiWTM0em1JbzBRTExPdGRNcFhHd2pCZ0x2cjE3eUVoaFlUMEZHb2ZSLWFJRSIsICJmeUdwMFdUd3dQdjJKRFFsbjFsU2lhZW9iWnNNV0ExMGJRNTk4OS05RFRzIiwgIm9tbUZBaWNWVDhMR0hDQjB1eXd4N2ZZdW8zTUhZS08xNWN6LVJaRVlNNVEiLCAiczBCS1lzTFd4UVFlVTh0VmxsdE03TUtzSVJUckVJYTFQa0ptcXhCQmY1VSJdLCAiaXNzIjogImh0dHBzOi8vaXNzdWVyLmV4YW1wbGUuY29tIiwgImlhdCI6IDE2ODMwMDAwMDAsICJleHAiOiAxODgzMDAwMDAwLCAiYWRkcmVzcyI6IHsiX3NkIjogWyI2YVVoelloWjdTSjFrVm1hZ1FBTzN1MkVUTjJDQzFhSGhlWnBLbmFGMF9FIiwgIkF6TGxGb2JrSjJ4aWF1cFJFUHlvSnotOS1OU2xkQjZDZ2pyN2ZVeW9IemciLCAiUHp6Y1Z1MHFiTXVCR1NqdWxmZXd6a2VzRDl6dXRPRXhuNUVXTndrclEtayIsICJiMkRrdzBqY0lGOXJHZzhfUEY4WmN2bmNXN3p3Wmo1cnlCV3ZYZnJwemVrIiwgImNQWUpISVo4VnUtZjlDQ3lWdWIyVWZnRWs4anZ2WGV6d0sxcF9KbmVlWFEiLCAiZ2xUM2hyU1U3ZlNXZ3dGNVVEWm1Xd0JUdzMyZ25VbGRJaGk4aEdWQ2FWNCIsICJydkpkNmlxNlQ1ZWptc0JNb0d3dU5YaDlxQUFGQVRBY2k0MG9pZEVlVnNBIiwgInVOSG9XWWhYc1poVkpDTkUyRHF5LXpxdDd0NjlnSkt5NVFhRnY3R3JNWDQiXX0sICJfc2RfYWxnIjogInNoYS0yNTYifQ.H0uI6M5t7BDfAt_a3Rw5zq4IiYNtkMORENcQFXYkW1LURRp66baOXRcxb164snsUJneI-XLM2-COCTX1y7Sedw");
 
@@ -101,10 +101,8 @@ async fn rfc_a_1_example_2_verification() {
         ],
     };
 
-    let params = VerificationParameters::from_resolver(&*JWK);
-
     let (revealed, verification) = sd_jwt
-        .decode_reveal_verify::<Example2Claims, _>(&params)
+        .decode_reveal_verify::<Example2Claims>(&*JWK)
         .await
         .unwrap();
 
@@ -143,7 +141,7 @@ async fn rfc_a_1_example_2_verification() {
 
     let empty_sd_jwt = revealed.clone().cleared().into_encoded();
 
-    let (empty_revealed, verification) = empty_sd_jwt.decode_reveal_verify(&params).await.unwrap();
+    let (empty_revealed, verification) = empty_sd_jwt.decode_reveal_verify(&*JWK).await.unwrap();
 
     assert_eq!(verification, Ok(()));
 
@@ -170,7 +168,7 @@ async fn rfc_a_1_example_2_verification() {
         .retaining(&[json_pointer!("/sub")])
         .into_encoded();
 
-    let (sub_revealed, verification) = sub_sd_jwt.decode_reveal_verify(&params).await.unwrap();
+    let (sub_revealed, verification) = sub_sd_jwt.decode_reveal_verify(&*JWK).await.unwrap();
 
     assert_eq!(verification, Ok(()));
     assert_eq!(
@@ -190,7 +188,7 @@ async fn rfc_a_1_example_2_verification() {
         .into_encoded();
 
     let (country_revealed, verification) =
-        country_sd_jwt.decode_reveal_verify(&params).await.unwrap();
+        country_sd_jwt.decode_reveal_verify(&*JWK).await.unwrap();
 
     assert_eq!(verification, Ok(()));
 
@@ -320,7 +318,7 @@ async fn rfc_a_2_example_3_verification() {
     }
 
     impl ClaimSet for Example3Claims {}
-    impl<E, P> ValidateClaims<E, P> for Example3Claims {}
+    impl<P> ValidateClaims<P> for Example3Claims {}
 
     const JWT: &Jws = jws!("eyJhbGciOiAiRVMyNTYiLCAidHlwIjogImV4YW1wbGUrc2Qtand0In0.eyJfc2QiOiBbIi1hU3puSWQ5bVdNOG9jdVFvbENsbHN4VmdncTEtdkhXNE90bmhVdFZtV3ciLCAiSUticllObjN2QTdXRUZyeXN2YmRCSmpERFVfRXZRSXIwVzE4dlRScFVTZyIsICJvdGt4dVQxNG5CaXd6TkozTVBhT2l0T2w5cFZuWE9hRUhhbF94a3lOZktJIl0sICJpc3MiOiAiaHR0cHM6Ly9pc3N1ZXIuZXhhbXBsZS5jb20iLCAiaWF0IjogMTY4MzAwMDAwMCwgImV4cCI6IDE4ODMwMDAwMDAsICJ2ZXJpZmllZF9jbGFpbXMiOiB7InZlcmlmaWNhdGlvbiI6IHsiX3NkIjogWyI3aDRVRTlxU2N2REtvZFhWQ3VvS2ZLQkpwVkJmWE1GX1RtQUdWYVplM1NjIiwgInZUd2UzcmFISUZZZ0ZBM3hhVUQyYU14Rno1b0RvOGlCdTA1cUtsT2c5THciXSwgInRydXN0X2ZyYW1ld29yayI6ICJkZV9hbWwiLCAiZXZpZGVuY2UiOiBbeyIuLi4iOiAidFlKMFREdWN5WlpDUk1iUk9HNHFSTzV2a1BTRlJ4RmhVRUxjMThDU2wzayJ9XX0sICJjbGFpbXMiOiB7Il9zZCI6IFsiUmlPaUNuNl93NVpIYWFka1FNcmNRSmYwSnRlNVJ3dXJSczU0MjMxRFRsbyIsICJTXzQ5OGJicEt6QjZFYW5mdHNzMHhjN2NPYW9uZVJyM3BLcjdOZFJtc01vIiwgIldOQS1VTks3Rl96aHNBYjlzeVdPNklJUTF1SGxUbU9VOHI4Q3ZKMGNJTWsiLCAiV3hoX3NWM2lSSDliZ3JUQkppLWFZSE5DTHQtdmpoWDFzZC1pZ09mXzlsayIsICJfTy13SmlIM2VuU0I0Uk9IbnRUb1FUOEptTHR6LW1oTzJmMWM4OVhvZXJRIiwgImh2RFhod21HY0pRc0JDQTJPdGp1TEFjd0FNcERzYVUwbmtvdmNLT3FXTkUiXX19LCAiX3NkX2FsZyI6ICJzaGEtMjU2In0.BYUpdUIaUTNj5UlPBk6g0GhDp213yGD_HIMk8P45LwkSAfZgc_ayGnf9VC4gebeE-crDoonxf89Y7qsTA-4qdQ");
 
@@ -358,8 +356,6 @@ async fn rfc_a_2_example_3_verification() {
     const MSISDN_DISCLOSURE: &Disclosure =
         disclosure!("WyJreDVrRjE3Vi14MEptd1V4OXZndnR3IiwgIm1zaXNkbiIsICI0OTEyMzQ1Njc4OSJd");
 
-    let params = VerificationParameters::from_resolver(&*JWK);
-
     let (revealed, verification) = PartsRef {
         jwt: JWT,
         disclosures: vec![
@@ -381,7 +377,7 @@ async fn rfc_a_2_example_3_verification() {
             MSISDN_DISCLOSURE,
         ],
     }
-    .decode_reveal_verify(&params)
+    .decode_reveal_verify(&*JWK)
     .await
     .unwrap();
 

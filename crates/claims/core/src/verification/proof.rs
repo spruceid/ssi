@@ -1,3 +1,7 @@
+use ssi_crypto::Verifier;
+
+use super::VerificationParameters;
+
 #[derive(Debug, thiserror::Error)]
 pub enum ProofPreparationError {
     #[error("claims processing failed: {0}")]
@@ -84,6 +88,16 @@ impl ProofValidationError {
     }
 }
 
+impl From<ssi_crypto::VerificationError> for ProofValidationError {
+    fn from(value: ssi_crypto::VerificationError) -> Self {
+        match value {
+            ssi_crypto::VerificationError::KeyNotFound => Self::UnknownKey,
+            ssi_crypto::VerificationError::MalformedSignature => Self::InvalidSignature,
+            e => Self::other(e),
+        }
+    }
+}
+
 #[derive(Debug, thiserror::Error, PartialEq)]
 pub enum InvalidProof {
     /// Proof is missing.
@@ -111,8 +125,14 @@ impl From<std::convert::Infallible> for ProofValidationError {
 
 pub type ProofValidity = Result<(), InvalidProof>;
 
-/// Proof that can be validated against `T` claims with a verifier of type `V`.
-pub trait ValidateProof<V, T> {
+impl From<ssi_crypto::RejectedSignature> for InvalidProof {
+    fn from(_: ssi_crypto::RejectedSignature) -> Self {
+        Self::Signature
+    }
+}
+
+/// Proof that can be validated against claims of type `T`.
+pub trait ValidateProof<T> {
     /// Validates the input claim's proof using the given verifier.
     ///
     /// The returned value is a nested `Result`.
@@ -123,15 +143,17 @@ pub trait ValidateProof<V, T> {
     #[allow(async_fn_in_trait)]
     async fn validate_proof<'a>(
         &'a self,
-        verifier: &'a V,
+        verifier: impl Verifier,
+        params: &'a VerificationParameters,
         claims: &'a T,
     ) -> Result<ProofValidity, ProofValidationError>;
 }
 
-impl<V, T, P: ValidateProof<V, T>> ValidateProof<V, T> for Vec<P> {
+impl<T, P: ValidateProof<T>> ValidateProof<T> for Vec<P> {
     async fn validate_proof<'a>(
         &'a self,
-        verifier: &'a V,
+        verifier: impl Verifier,
+        params: &'a VerificationParameters,
         claims: &'a T,
     ) -> Result<ProofValidity, ProofValidationError> {
         if self.is_empty() {
@@ -139,7 +161,7 @@ impl<V, T, P: ValidateProof<V, T>> ValidateProof<V, T> for Vec<P> {
             Ok(Err(InvalidProof::Missing))
         } else {
             for p in self {
-                if let Err(e) = p.validate_proof(verifier, claims).await? {
+                if let Err(e) = p.validate_proof(&verifier, params, claims).await? {
                     return Ok(Err(e));
                 }
             }
