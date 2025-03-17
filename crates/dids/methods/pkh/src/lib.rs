@@ -1235,7 +1235,7 @@ mod tests {
             "../../../../../tests/secp256r1-2021-03-18.json"
         ))
         .unwrap();
-        let other_key_secp256k1 = JWK::generate_secp256k1();
+        let other_key_secp256k1 = JWK::generate_k256();
         let mut other_key_ed25519 = JWK::generate_ed25519().unwrap();
         let mut other_key_p256 = JWK::generate_p256();
 

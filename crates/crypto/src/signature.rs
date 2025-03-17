@@ -94,6 +94,10 @@ impl From<MalformedSignature> for Error {
 ///
 /// [RFC 3279 Section 2.2.3]: <https://www.rfc-editor.org/rfc/rfc3279#section-2.2.3>
 #[cfg(feature = "der")]
-pub fn decode_ecdsa_p256_signature_der(bytes: impl AsRef<[u8]>) -> Result<Box<[u8]>, MalformedSignature> {
-	p256::ecdsa::Signature::from_der(bytes.as_ref()).map(|s| s.to_bytes().to_vec().into_boxed_slice()).map_err(|_| MalformedSignature)
+pub fn decode_ecdsa_p256_signature_der(
+    bytes: impl AsRef<[u8]>,
+) -> Result<Box<[u8]>, MalformedSignature> {
+    p256::ecdsa::Signature::from_der(bytes.as_ref())
+        .map(|s| s.to_bytes().to_vec().into_boxed_slice())
+        .map_err(|_| MalformedSignature)
 }

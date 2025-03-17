@@ -165,7 +165,13 @@ pub enum SignatureFunction {
 
 impl SignatureFunction {
     pub fn is_rsa(self) -> bool {
-        matches!(self, Self::RsaSsaPssMgf1Sha256 | Self::RsaSsaPssMgf1Sha384 | Self::RsaSsaPssMgf1Sha512 | Self::RsaSsaPkcs1v1_5)
+        matches!(
+            self,
+            Self::RsaSsaPssMgf1Sha256
+                | Self::RsaSsaPssMgf1Sha384
+                | Self::RsaSsaPssMgf1Sha512
+                | Self::RsaSsaPkcs1v1_5
+        )
     }
 }
 
@@ -236,7 +242,7 @@ macro_rules! algorithms {
                     Self::None => None
                 }
             }
-            
+
             pub fn signature_function(&self) -> Option<SignatureFunction> {
                 match self {
                     $(

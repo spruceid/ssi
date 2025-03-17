@@ -5,7 +5,7 @@ use super::{KeyConversionError, PublicKey};
 impl PublicKey {
     /// Parses a DER-encoded X.509 `SubjectPublicKeyInfo` (SPKI) as defined in
     /// [RFC 5280 § 4.1.2.7] into a public key.
-    /// 
+    ///
     /// [RFC 5280 § 4.1.2.7]: <https://tools.ietf.org/html/rfc5280#section-4.1.2.7>
     pub fn from_spki_der_bytes(bytes: &[u8]) -> Result<Self, KeyConversionError> {
         let spki = spki::SubjectPublicKeyInfoOwned::from_der(bytes)
@@ -65,8 +65,7 @@ const OID_ECDSA: ObjectIdentifier = ObjectIdentifier::new_unwrap("1.2.840.10045.
 ///
 /// See: <https://www.rfc-editor.org/rfc/rfc5480#section-2.1.1.1>
 #[cfg(feature = "secp256r1")]
-const OID_ECDSA_CURVE_P256: ObjectIdentifier =
-    ObjectIdentifier::new_unwrap("1.2.840.10045.3.1.7");
+const OID_ECDSA_CURVE_P256: ObjectIdentifier = ObjectIdentifier::new_unwrap("1.2.840.10045.3.1.7");
 
 /// ECDSA P-384 (secp384r1) curve.
 ///

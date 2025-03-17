@@ -16,9 +16,9 @@ impl JWK {
             #[cfg(feature = "ed25519")]
             ssi_multicodec::ED25519_PRIV => Self::from_secret_ed25519_bytes(k),
             #[cfg(feature = "secp256k1")]
-            ssi_multicodec::SECP256K1_PUB => Self::from_public_secp256k1_bytes(k),
+            ssi_multicodec::SECP256K1_PUB => Self::from_public_k256_bytes(k),
             #[cfg(feature = "secp256k1")]
-            ssi_multicodec::SECP256K1_PRIV => Self::from_secret_secp256k1_bytes(k),
+            ssi_multicodec::SECP256K1_PRIV => Self::from_secret_k256_bytes(k),
             #[cfg(feature = "secp256r1")]
             ssi_multicodec::P256_PUB => Self::from_public_p256_bytes(k),
             #[cfg(feature = "secp256r1")]

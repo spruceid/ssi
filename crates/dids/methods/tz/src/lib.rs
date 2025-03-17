@@ -575,7 +575,7 @@ impl DIDTz {
                                 }
                                 Prefix::TZ2 => {
                                     let pk = decode_public_key(public_key)?;
-                                    JWK::from_public_secp256k1_bytes(&pk).map_err(|e| {
+                                    JWK::from_public_k256_bytes(&pk).map_err(|e| {
                                         // Couldn't create JWK from secp256k1 public key: {e}
                                         UpdateError::InvalidPublicKey(public_key.to_owned(), e)
                                     })?

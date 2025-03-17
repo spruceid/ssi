@@ -29,7 +29,7 @@ impl EcParams {
         match self.curve.as_deref()? {
             curve::P256 => Some(KeyType::P256),
             curve::P384 => Some(KeyType::P384),
-            curve::SECP_256K1 => Some(KeyType::K256),
+            curve::K256 => Some(KeyType::K256),
             _ => None,
         }
     }
@@ -63,13 +63,13 @@ impl TryFrom<&EcParams> for ssi_crypto::PublicKey {
     fn try_from(value: &EcParams) -> Result<Self, Self::Error> {
         match value.curve.as_deref().ok_or(KeyConversionError::Invalid)? {
             #[cfg(feature = "secp256k1")]
-            curve::SECP_256K1 => value.try_into().map(ssi_crypto::PublicKey::K256),
-            curve::P256 => {
-                todo!()
-            }
-            curve::P384 => {
-                todo!()
-            }
+            curve::K256 => value.try_into().map(ssi_crypto::PublicKey::K256),
+            
+            #[cfg(feature = "secp256r1")]
+            curve::P256 => value.try_into().map(ssi_crypto::PublicKey::P256),
+            
+            #[cfg(feature = "secp384r1")]
+            curve::P384 => value.try_into().map(ssi_crypto::PublicKey::P384),
             _ => Err(KeyConversionError::Unsupported),
         }
     }
@@ -88,15 +88,14 @@ impl TryFrom<&EcParams> for ssi_crypto::SecretKey {
 
     fn try_from(value: &EcParams) -> Result<Self, Self::Error> {
         match value.curve.as_deref().ok_or(KeyConversionError::Invalid)? {
-            curve::SECP_256K1 => {
-                todo!()
-            }
-            curve::P256 => {
-                todo!()
-            }
-            curve::P384 => {
-                todo!()
-            }
+            #[cfg(feature = "secp256k1")]
+            curve::K256 => value.try_into().map(ssi_crypto::SecretKey::K256),
+
+            #[cfg(feature = "secp256r1")]
+            curve::P256 => value.try_into().map(ssi_crypto::SecretKey::P256),
+
+            #[cfg(feature = "secp384r1")]
+            curve::P384 => value.try_into().map(ssi_crypto::SecretKey::P384),
             _ => Err(KeyConversionError::Unsupported),
         }
     }

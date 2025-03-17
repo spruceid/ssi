@@ -1,5 +1,7 @@
 use crate::{
-    hashes, key::{KeyConversionError, KeyMetadata}, AlgorithmInstance, Error, PublicKey, RejectedSignature, SigningKey, VerifyingKey
+    hashes,
+    key::{KeyConversionError, KeyMetadata},
+    AlgorithmInstance, Error, PublicKey, RejectedSignature, SigningKey, VerifyingKey,
 };
 use rsa::pkcs1::DecodeRsaPublicKey;
 pub use rsa::{RsaPrivateKey as RsaSecretKey, RsaPublicKey};
@@ -36,13 +38,17 @@ impl VerifyingKey for RsaPublicKey {
                 let key = rsa::pkcs1v15::VerifyingKey::<Sha256>::new(self.clone());
                 let signature = rsa::pkcs1v15::Signature::try_from(signature)
                     .map_err(|_| Error::SignatureMalformed)?;
-                Ok(key.verify(signing_bytes, &signature).map_err(|_| RejectedSignature::Mismatch))
+                Ok(key
+                    .verify(signing_bytes, &signature)
+                    .map_err(|_| RejectedSignature::Mismatch))
             }
             AlgorithmInstance::PS256 => {
                 let key = rsa::pss::VerifyingKey::<Sha256>::new(self.clone());
                 let signature = rsa::pss::Signature::try_from(signature)
                     .map_err(|_| Error::SignatureMalformed)?;
-                Ok(key.verify(signing_bytes, &signature).map_err(|_| RejectedSignature::Mismatch))
+                Ok(key
+                    .verify(signing_bytes, &signature)
+                    .map_err(|_| RejectedSignature::Mismatch))
             }
             other => Err(Error::AlgorithmUnsupported(other.algorithm())),
         }

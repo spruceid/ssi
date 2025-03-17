@@ -7,7 +7,7 @@ pub struct ION;
 
 impl Sidetree for ION {
     fn generate_key() -> JWK {
-        JWK::generate_secp256k1()
+        JWK::generate_k256()
     }
 
     fn validate_key(key: &JWK) -> bool {

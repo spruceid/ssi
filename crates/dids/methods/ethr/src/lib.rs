@@ -212,7 +212,7 @@ fn resolve_public_key(
     let pk_bytes = hex::decode(&public_key_hex[2..])
         .map_err(|_| Error::InvalidMethodSpecificId(method_specific_id.to_owned()))?;
 
-    let pk_jwk = JWK::from_public_secp256k1_bytes(&pk_bytes)
+    let pk_jwk = JWK::from_public_k256_bytes(&pk_bytes)
         .map_err(|_| Error::InvalidMethodSpecificId(method_specific_id.to_owned()))?;
 
     let account_address = ssi_jwk::eip155::hash_public_key_eip55(&pk_jwk)
@@ -539,7 +539,7 @@ mod tests {
         assert!(vc_bad_issuer.verify(&verifier).await.unwrap().is_err());
 
         // Check that proof JWK must match proof verificationMethod
-        let wrong_key = JWK::generate_secp256k1();
+        let wrong_key = JWK::generate_k256();
         let wrong_signer = SingleSecretSigner::new(wrong_key.clone()).into_local();
         let vc_wrong_key = suite
             .sign(

@@ -1,4 +1,7 @@
-use ssi_crypto::{key::{KeyConversionError, KeyGenerationFailed}, rand};
+use ssi_crypto::{
+    key::{KeyConversionError, KeyGenerationFailed},
+    rand,
+};
 
 use crate::{Base64urlUInt, OkpParams, Params, JWK};
 

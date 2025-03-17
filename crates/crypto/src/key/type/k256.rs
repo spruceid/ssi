@@ -1,5 +1,6 @@
 use crate::{
-    key::{KeyConversionError, KeyMetadata}, AlgorithmInstance, Error, PublicKey, RejectedSignature, SecretKey, SigningKey, VerifyingKey
+    key::{KeyConversionError, KeyMetadata},
+    AlgorithmInstance, Error, PublicKey, RejectedSignature, SecretKey, SigningKey, VerifyingKey,
 };
 pub use k256::{PublicKey as K256PublicKey, SecretKey as K256SecretKey};
 
@@ -47,7 +48,7 @@ impl VerifyingKey for K256PublicKey {
                 use k256::ecdsa::signature::Verifier;
                 let verifying_key = k256::ecdsa::VerifyingKey::from(self);
                 let sig = k256::ecdsa::Signature::try_from(signature)
-                	.map_err(|_| Error::SignatureMalformed)?;
+                    .map_err(|_| Error::SignatureMalformed)?;
                 let verification = verifying_key.verify(signing_bytes, &sig);
                 Ok(verification.map_err(|_| RejectedSignature::Mismatch))
             }

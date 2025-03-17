@@ -26,7 +26,7 @@ pub fn jwk_to_tezos_key(jwk: &JWK) -> Result<String, KeyConversionError> {
             }
             {
                 // TODO: p2sk
-                bytes = ec_params.to_public_secp256k1_bytes()?;
+                bytes = ec_params.to_public_k256_bytes()?;
                 (SPPK_PREFIX, bytes.as_ref())
             }
         }
@@ -94,7 +94,7 @@ pub fn jwk_from_tezos_key(tz_pk: &str) -> Result<JWK, DecodeTezosPkError> {
         }
         Some("sppk") => {
             let pk_bytes = bs58::decode(&tz_pk).with_check(None).into_vec()?[4..].to_owned();
-            let jwk = JWK::from_public_secp256k1_bytes(&pk_bytes)?;
+            let jwk = JWK::from_public_k256_bytes(&pk_bytes)?;
             (Algorithm::ESBlake2bK, jwk.params)
         }
         Some("p2pk") => {

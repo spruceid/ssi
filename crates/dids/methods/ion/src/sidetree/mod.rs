@@ -977,7 +977,7 @@ mod tests {
 
     impl Sidetree for Example {
         fn generate_key() -> JWK {
-            JWK::generate_secp256k1()
+            JWK::generate_k256()
         }
         fn validate_key(key: &JWK) -> bool {
             is_secp256k1(key)

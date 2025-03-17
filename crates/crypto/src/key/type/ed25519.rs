@@ -1,5 +1,7 @@
 use crate::{
-    key::{KeyConversionError, KeyMetadata}, AlgorithmInstance, Error, PublicKey, RejectedSignature, SecretKey, SignatureVerification, SigningKey, VerifyingKey
+    key::{KeyConversionError, KeyMetadata},
+    AlgorithmInstance, Error, PublicKey, RejectedSignature, SecretKey, SignatureVerification,
+    SigningKey, VerifyingKey,
 };
 pub use ed25519_dalek::{SigningKey as Ed25519SecretKey, VerifyingKey as Ed25519PublicKey};
 
@@ -38,7 +40,9 @@ impl VerifyingKey for Ed25519PublicKey {
                 let signature: ed25519_dalek::Signature = signature
                     .try_into()
                     .map_err(|_| Error::SignatureMalformed)?;
-                Ok(self.verify(signing_bytes, &signature).map_err(|_| RejectedSignature::Mismatch))
+                Ok(self
+                    .verify(signing_bytes, &signature)
+                    .map_err(|_| RejectedSignature::Mismatch))
             }
             AlgorithmInstance::EdBlake2b => {
                 todo!()

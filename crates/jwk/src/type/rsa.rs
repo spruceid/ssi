@@ -1,11 +1,11 @@
+use serde::{Deserialize, Serialize};
+use ssi_crypto::key::KeyConversionError;
 #[cfg(feature = "rsa")]
 use ssi_crypto::rsa::{
     self,
     pkcs1::{DecodeRsaPublicKey, EncodeRsaPublicKey},
-    traits::PublicKeyParts
+    traits::PublicKeyParts,
 };
-use serde::{Deserialize, Serialize};
-use ssi_crypto::key::KeyConversionError;
 use zeroize::{Zeroize, ZeroizeOnDrop};
 
 use crate::{Base64urlUInt, JWK};
@@ -141,12 +141,8 @@ impl RsaParams {
         for prime in self.other_primes_info.iter().flatten() {
             primes.push((&prime.prime_factor).into());
         }
-        rsa::RsaPrivateKey::from_components(
-            n.into(),
-            e.into(),
-            d.into(),
-            primes,
-        ).map_err(|_| KeyConversionError::Invalid)
+        rsa::RsaPrivateKey::from_components(n.into(), e.into(), d.into(), primes)
+            .map_err(|_| KeyConversionError::Invalid)
     }
 
     /// Validate key size is at least 2048 bits, per [RFC 7518 section 3.3](https://www.rfc-editor.org/rfc/rfc7518#section-3.3).

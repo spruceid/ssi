@@ -32,7 +32,7 @@ pub fn hash_public_key(jwk: &JWK) -> Result<String, KeyConversionError> {
             let curve = params.curve.as_ref().ok_or(KeyConversionError::Invalid)?;
             match &curve[..] {
                 "secp256k1" => {
-                    bytes = params.to_public_secp256k1_bytes()?;
+                    bytes = params.to_public_k256_bytes()?;
                     (&TZ2_HASH, bytes.as_ref())
                 }
                 "P-256" => {

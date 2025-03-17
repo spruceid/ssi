@@ -180,7 +180,7 @@ impl VerificationMethodType {
             #[cfg(feature = "secp256k1")]
             Self::EcdsaSecp256k1VerificationKey2019 => match encoded.codec() {
                 ssi_multicodec::SECP256K1_PUB => {
-                    match JWK::from_public_secp256k1_bytes(encoded.data()) {
+                    match JWK::from_public_k256_bytes(encoded.data()) {
                         Ok(jwk) => Ok(PublicKey::Jwk(Box::new(jwk))),
                         Err(_) => Err(Error::InvalidMethodSpecificId(id.to_owned())),
                     }
@@ -623,7 +623,7 @@ mod tests {
         let params = Parameters::from_resolver(&didkey);
 
         let mut rng = rand_chacha::ChaCha8Rng::seed_from_u64(2);
-        let key = JWK::generate_secp256k1_from(&mut rng);
+        let key = JWK::generate_k256_from(&mut rng);
         let did = DIDKey::generate(&key).unwrap();
 
         let cred = JsonCredential::new(
@@ -745,7 +745,7 @@ mod tests {
     #[async_std::test]
     #[cfg(feature = "secp256k1")]
     async fn fetch_jwk_secp256k1() {
-        let jwk = JWK::generate_secp256k1();
+        let jwk = JWK::generate_k256();
         fetch_jwk(jwk).await;
     }
 

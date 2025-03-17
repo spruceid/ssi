@@ -1,5 +1,6 @@
 use crate::{
-    key::{KeyConversionError, KeyMetadata}, AlgorithmInstance, Error, PublicKey, RejectedSignature, SecretKey, SigningKey, VerifyingKey
+    key::{KeyConversionError, KeyMetadata},
+    AlgorithmInstance, Error, PublicKey, RejectedSignature, SecretKey, SigningKey, VerifyingKey,
 };
 pub use p384::{PublicKey as P384PublicKey, SecretKey as P384SecretKey};
 
@@ -47,7 +48,7 @@ impl VerifyingKey for P384PublicKey {
                 use p384::ecdsa::signature::Verifier;
                 let verifying_key = p384::ecdsa::VerifyingKey::from(self);
                 let sig = p384::ecdsa::Signature::try_from(signature)
-                	.map_err(|_| Error::SignatureMalformed)?;
+                    .map_err(|_| Error::SignatureMalformed)?;
                 let verification = verifying_key.verify(signing_bytes, &sig);
                 Ok(verification.map_err(|_| RejectedSignature::Mismatch))
             }
