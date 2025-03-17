@@ -12,7 +12,7 @@ use ssi_crypto::key::KeyConversionError;
 const TZ1_HASH: [u8; 3] = [0x06, 0xa1, 0x9f];
 #[cfg(feature = "secp256k1")]
 const TZ2_HASH: [u8; 3] = [0x06, 0xa1, 0xa1];
-#[cfg(feature = "p256")]
+#[cfg(feature = "secp256r1")]
 const TZ3_HASH: [u8; 3] = [0x06, 0xa1, 0xa4];
 
 /// Hash a public key to produce a Tezos address.
@@ -89,7 +89,7 @@ mod tests {
         assert_eq!(hash, "tz28YZoayJjVz2bRgGeVjxE8NonMiJ3r2Wdu");
     }
 
-    #[cfg(feature = "p256")]
+    #[cfg(feature = "secp256r1")]
     #[test]
     fn hash_tz3() {
         // tz3

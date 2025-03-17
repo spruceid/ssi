@@ -7,6 +7,8 @@ use crate::{
     utils::is_url_safe_base64_char, DecodeError, DecodedJws, Header, InvalidJws, JwsSlice, JwsStr,
 };
 
+use super::JwsString;
+
 /// Creates a new static URL-safe JWS reference from a string literal.
 #[macro_export]
 macro_rules! jws {
@@ -339,6 +341,12 @@ impl TryFrom<String> for JwsBuf {
 
     fn try_from(value: String) -> Result<Self, Self::Error> {
         Self::new(value)
+    }
+}
+
+impl From<JwsBuf> for JwsString {
+    fn from(value: JwsBuf) -> Self {
+        unsafe { Self::new_unchecked(value.0.into_bytes()) }
     }
 }
 

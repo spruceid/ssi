@@ -1,138 +1,111 @@
-use ssi_crypto::Verifier;
+use ssi_crypto::{Error, RejectedSignature, SignatureVerification};
 
-use super::VerificationParameters;
+use super::Parameters;
 
-#[derive(Debug, thiserror::Error)]
-pub enum ProofPreparationError {
-    #[error("claims processing failed: {0}")]
-    Claims(String),
+// #[derive(Debug, thiserror::Error)]
+// pub enum ProofPreparationError {
+//     #[error("claims processing failed: {0}")]
+//     Claims(String),
 
-    #[error("proof processing failed: {0}")]
-    Proof(String),
+//     #[error("proof processing failed: {0}")]
+//     Proof(String),
 
-    #[error("{0}")]
-    Other(String),
-}
+//     #[error("{0}")]
+//     Other(String),
+// }
 
-#[derive(Debug, thiserror::Error)]
-pub enum ProofValidationError {
-    /// Input data could not be understood.
-    #[error("invalid input data: {0}")]
-    InvalidInputData(String),
+// #[derive(Debug, thiserror::Error)]
+// pub enum ProofValidationError {
+//     /// Input data could not be understood.
+//     #[error("invalid input data: {0}")]
+//     InvalidInputData(String),
 
-    #[error(transparent)]
-    Preparation(#[from] ProofPreparationError),
+//     #[error(transparent)]
+//     Preparation(#[from] ProofPreparationError),
 
-    /// Proof could not be understood.
-    #[error("invalid proof")]
-    InvalidProof,
+//     /// Proof could not be understood.
+//     #[error("invalid proof")]
+//     InvalidProof,
 
-    #[error("invalid proof options")]
-    InvalidProofOptions,
+//     #[error("invalid proof options")]
+//     InvalidProofOptions,
 
-    /// Key not found.
-    #[error("unknown key")]
-    UnknownKey,
+//     /// Key not found.
+//     #[error("unknown key")]
+//     UnknownKey,
 
-    /// Invalid key.
-    #[error("invalid key")]
-    InvalidKey,
+//     /// Invalid key.
+//     #[error("invalid key")]
+//     InvalidKey,
 
-    /// Missing public key.
-    #[error("missing public key")]
-    MissingPublicKey,
+//     /// Missing public key.
+//     #[error("missing public key")]
+//     MissingPublicKey,
 
-    /// More than one public key is provided.
-    #[error("ambiguous public key")]
-    AmbiguousPublicKey,
+//     /// More than one public key is provided.
+//     #[error("ambiguous public key")]
+//     AmbiguousPublicKey,
 
-    /// Unsupported controller scheme.
-    #[error("unsupported key controller `{0}`")]
-    UnsupportedKeyController(String),
+//     /// Unsupported controller scheme.
+//     #[error("unsupported key controller `{0}`")]
+//     UnsupportedKeyController(String),
 
-    /// Key controller was not found.
-    #[error("key controller `{0}` not found")]
-    KeyControllerNotFound(String),
+//     /// Key controller was not found.
+//     #[error("key controller `{0}` not found")]
+//     KeyControllerNotFound(String),
 
-    /// Key controller is invalid.
-    #[error("invalid key controller")]
-    InvalidKeyController,
+//     /// Key controller is invalid.
+//     #[error("invalid key controller")]
+//     InvalidKeyController,
 
-    /// Cryptographic key is not used correctly.
-    #[error("invalid use of key")]
-    InvalidKeyUse,
+//     /// Cryptographic key is not used correctly.
+//     #[error("invalid use of key")]
+//     InvalidKeyUse,
 
-    #[error("missing signature algorithm")]
-    MissingAlgorithm,
+//     #[error("missing signature algorithm")]
+//     MissingAlgorithm,
 
-    #[error("missing signature")]
-    MissingSignature,
+//     #[error("missing signature")]
+//     MissingSignature,
 
-    #[error("invalid signature")]
-    InvalidSignature,
+//     #[error("invalid signature")]
+//     InvalidSignature,
 
-    #[error("invalid verification method: {0}")]
-    InvalidVerificationMethod(String),
+//     #[error("invalid verification method: {0}")]
+//     InvalidVerificationMethod(String),
 
-    #[error("{0}")]
-    Other(String),
-}
+//     #[error("{0}")]
+//     Other(String),
+// }
 
-impl ProofValidationError {
-    pub fn input_data(e: impl ToString) -> Self {
-        Self::InvalidInputData(e.to_string())
-    }
+// impl ProofValidationError {
+//     pub fn input_data(e: impl ToString) -> Self {
+//         Self::InvalidInputData(e.to_string())
+//     }
 
-    pub fn other(e: impl ToString) -> Self {
-        Self::Other(e.to_string())
-    }
-}
+//     pub fn other(e: impl ToString) -> Self {
+//         Self::Other(e.to_string())
+//     }
+// }
 
-impl From<ssi_crypto::VerificationError> for ProofValidationError {
-    fn from(value: ssi_crypto::VerificationError) -> Self {
-        match value {
-            ssi_crypto::VerificationError::KeyNotFound => Self::UnknownKey,
-            ssi_crypto::VerificationError::MalformedSignature => Self::InvalidSignature,
-            e => Self::other(e),
-        }
-    }
-}
+// impl From<ssi_crypto::VerificationError> for ProofValidationError {
+//     fn from(value: ssi_crypto::VerificationError) -> Self {
+//         match value {
+//             ssi_crypto::VerificationError::KeyNotFound => Self::UnknownKey,
+//             ssi_crypto::VerificationError::MalformedSignature => Self::InvalidSignature,
+//             e => Self::other(e),
+//         }
+//     }
+// }
 
-#[derive(Debug, thiserror::Error, PartialEq)]
-pub enum InvalidProof {
-    /// Proof is missing.
-    #[error("missing proof")]
-    Missing,
-
-    #[error("invalid signature")]
-    Signature,
-
-    #[error("key mismatch")]
-    KeyMismatch,
-
-    #[error("algorithm mismatch")]
-    AlgorithmMismatch,
-
-    #[error("{0}")]
-    Other(String),
-}
-
-impl From<std::convert::Infallible> for ProofValidationError {
-    fn from(_value: std::convert::Infallible) -> Self {
-        unreachable!()
-    }
-}
-
-pub type ProofValidity = Result<(), InvalidProof>;
-
-impl From<ssi_crypto::RejectedSignature> for InvalidProof {
-    fn from(_: ssi_crypto::RejectedSignature) -> Self {
-        Self::Signature
-    }
-}
+// impl From<std::convert::Infallible> for ProofValidationError {
+//     fn from(_value: std::convert::Infallible) -> Self {
+//         unreachable!()
+//     }
+// }
 
 /// Proof that can be validated against claims of type `T`.
-pub trait ValidateProof<T> {
+pub trait ValidateProof<T, V> {
     /// Validates the input claim's proof using the given verifier.
     ///
     /// The returned value is a nested `Result`.
@@ -143,25 +116,25 @@ pub trait ValidateProof<T> {
     #[allow(async_fn_in_trait)]
     async fn validate_proof<'a>(
         &'a self,
-        verifier: impl Verifier,
-        params: &'a VerificationParameters,
+        verifier: &'a V,
         claims: &'a T,
-    ) -> Result<ProofValidity, ProofValidationError>;
+        params: &'a Parameters,
+    ) -> Result<SignatureVerification, Error>;
 }
 
-impl<T, P: ValidateProof<T>> ValidateProof<T> for Vec<P> {
+impl<T, V, P: ValidateProof<T, V>> ValidateProof<T, V> for Vec<P> {
     async fn validate_proof<'a>(
         &'a self,
-        verifier: impl Verifier,
-        params: &'a VerificationParameters,
+        verifier: &'a V,
         claims: &'a T,
-    ) -> Result<ProofValidity, ProofValidationError> {
+        params: &'a Parameters,
+    ) -> Result<SignatureVerification, Error> {
         if self.is_empty() {
             // No proof.
-            Ok(Err(InvalidProof::Missing))
+            Ok(Err(RejectedSignature::Missing))
         } else {
             for p in self {
-                if let Err(e) = p.validate_proof(&verifier, params, claims).await? {
+                if let Err(e) = p.validate_proof(verifier, claims, params).await? {
                     return Ok(Err(e));
                 }
             }

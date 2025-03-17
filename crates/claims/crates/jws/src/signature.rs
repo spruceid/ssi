@@ -1,4 +1,4 @@
-use ssi_crypto::{AlgorithmInstance, SignatureError, Signer};
+use ssi_crypto::{AlgorithmInstance, Error, Signer};
 use std::borrow::Cow;
 
 use crate::{DecodedJws, DecodedSigningBytes, Header, JwsBuf, JwsSignature};
@@ -24,9 +24,9 @@ pub trait JwsPayload {
     #[allow(async_fn_in_trait)]
     async fn sign_into_decoded(
         self,
-        algorithm_params: Option<AlgorithmInstance>,
         signer: impl Signer,
-    ) -> Result<DecodedJws<'static, Self>, SignatureError>
+        algorithm_params: Option<AlgorithmInstance>,
+    ) -> Result<DecodedJws<'static, Self>, Error>
     where
         Self: Sized,
     {
@@ -40,7 +40,7 @@ pub trait JwsPayload {
         let header = Header {
             algorithm: algorithm
                 .try_into()
-                .map_err(|_| SignatureError::UnsupportedAlgorithm(algorithm))?,
+                .map_err(|_| Error::AlgorithmUnsupported(algorithm))?,
             key_id: key_id
                 .as_deref()
                 .map(String::from_utf8_lossy)
@@ -51,8 +51,7 @@ pub trait JwsPayload {
         };
 
         let signing_bytes = header.encode_signing_bytes(&payload_bytes);
-        let signature =
-            JwsSignature::new(signer.sign_bytes(algorithm_params, &signing_bytes).await?);
+        let signature = JwsSignature::new(signer.sign(algorithm_params, &signing_bytes).await?);
 
         Ok(DecodedJws {
             signing_bytes: DecodedSigningBytes {
@@ -67,23 +66,38 @@ pub trait JwsPayload {
     #[allow(async_fn_in_trait)]
     async fn sign_to_decoded(
         &self,
-        algorithm_params: Option<AlgorithmInstance>,
         signer: impl Signer,
-    ) -> Result<DecodedJws<'static, &Self>, SignatureError> {
-        <&Self as JwsPayload>::sign_into_decoded(self, algorithm_params, signer).await
+        algorithm_params: Option<AlgorithmInstance>,
+    ) -> Result<DecodedJws<'static, &Self>, Error> {
+        <&Self as JwsPayload>::sign_into_decoded(self, signer, algorithm_params).await
     }
 
     /// Signs the payload and returns a compact JWS.
     #[allow(async_fn_in_trait)]
     async fn sign(
         &self,
-        algorithm_params: Option<AlgorithmInstance>,
         signer: impl Signer,
-    ) -> Result<JwsBuf, SignatureError> {
+        algorithm_params: Option<AlgorithmInstance>,
+    ) -> Result<JwsBuf, Error> {
         Ok(self
-            .sign_to_decoded(algorithm_params, signer)
+            .sign_to_decoded(signer, algorithm_params)
             .await?
             .into_encoded()
+            .into_url_safe()
+            .ok()
+            .unwrap())
+    }
+
+    #[allow(async_fn_in_trait)]
+    async fn sign_detached(
+        &self,
+        signer: impl Signer,
+        algorithm_params: Option<AlgorithmInstance>,
+    ) -> Result<JwsBuf, Error> {
+        Ok(self
+            .sign_to_decoded(signer, algorithm_params)
+            .await?
+            .into_encoded_detached()
             .into_url_safe()
             .ok()
             .unwrap())
@@ -145,13 +159,13 @@ impl JwsPayload for serde_json::Value {
 // /// header and sign bytes.
 // pub trait JwsSigner {
 //     #[allow(async_fn_in_trait)]
-//     async fn fetch_info(&self) -> Result<JwsSignerInfo, SignatureError>;
+//     async fn fetch_info(&self) -> Result<JwsSignerInfo, Error>;
 
 //     #[allow(async_fn_in_trait)]
-//     async fn sign_bytes(&self, signing_bytes: &[u8]) -> Result<Vec<u8>, SignatureError>;
+//     async fn sign_bytes(&self, signing_bytes: &[u8]) -> Result<Vec<u8>, Error>;
 
 //     #[allow(async_fn_in_trait)]
-//     async fn sign(&self, payload: impl JwsPayload) -> Result<JwsBuf, SignatureError> {
+//     async fn sign(&self, payload: impl JwsPayload) -> Result<JwsBuf, Error> {
 //         Ok(self
 //             .sign_into_decoded(payload)
 //             .await?
@@ -163,47 +177,47 @@ impl JwsPayload for serde_json::Value {
 // }
 
 // impl<'a, T: JwsSigner> JwsSigner for &'a T {
-//     async fn fetch_info(&self) -> Result<JwsSignerInfo, SignatureError> {
+//     async fn fetch_info(&self) -> Result<JwsSignerInfo, Error> {
 //         T::fetch_info(*self).await
 //     }
 
-//     async fn sign_bytes(&self, signing_bytes: &[u8]) -> Result<Vec<u8>, SignatureError> {
+//     async fn sign_bytes(&self, signing_bytes: &[u8]) -> Result<Vec<u8>, Error> {
 //         T::sign_bytes(*self, signing_bytes).await
 //     }
 
-//     async fn sign(&self, payload: impl JwsPayload) -> Result<JwsBuf, SignatureError> {
+//     async fn sign(&self, payload: impl JwsPayload) -> Result<JwsBuf, Error> {
 //         T::sign(*self, payload).await
 //     }
 // }
 
 // impl<'a, T: JwsSigner + Clone> JwsSigner for Cow<'a, T> {
-//     async fn fetch_info(&self) -> Result<JwsSignerInfo, SignatureError> {
+//     async fn fetch_info(&self) -> Result<JwsSignerInfo, Error> {
 //         T::fetch_info(self.as_ref()).await
 //     }
 
-//     async fn sign_bytes(&self, signing_bytes: &[u8]) -> Result<Vec<u8>, SignatureError> {
+//     async fn sign_bytes(&self, signing_bytes: &[u8]) -> Result<Vec<u8>, Error> {
 //         T::sign_bytes(self.as_ref(), signing_bytes).await
 //     }
 
-//     async fn sign(&self, payload: impl JwsPayload) -> Result<JwsBuf, SignatureError> {
+//     async fn sign(&self, payload: impl JwsPayload) -> Result<JwsBuf, Error> {
 //         T::sign(self.as_ref(), payload).await
 //     }
 // }
 
 // impl JwsSigner for JWK {
-//     async fn fetch_info(&self) -> Result<JwsSignerInfo, SignatureError> {
+//     async fn fetch_info(&self) -> Result<JwsSignerInfo, Error> {
 //         Ok(JwsSignerInfo {
 //             key_id: self.key_id.clone(),
 //             algorithm: self
 //                 .get_algorithm()
-//                 .ok_or(SignatureError::MissingAlgorithm)?,
+//                 .ok_or(Error::MissingAlgorithm)?,
 //         })
 //     }
 
-//     async fn sign_bytes(&self, signing_bytes: &[u8]) -> Result<Vec<u8>, SignatureError> {
+//     async fn sign_bytes(&self, signing_bytes: &[u8]) -> Result<Vec<u8>, Error> {
 //         let algorithm = self
 //             .get_algorithm()
-//             .ok_or(SignatureError::MissingAlgorithm)?;
+//             .ok_or(Error::MissingAlgorithm)?;
 //         crate::sign_bytes(algorithm, signing_bytes, self).map_err(Into::into)
 //     }
 // }
@@ -220,14 +234,14 @@ impl JwsPayload for serde_json::Value {
 // }
 
 // impl<'a> JwsSigner for JwkWithAlgorithm<'a> {
-//     async fn fetch_info(&self) -> Result<JwsSignerInfo, SignatureError> {
+//     async fn fetch_info(&self) -> Result<JwsSignerInfo, Error> {
 //         Ok(JwsSignerInfo {
 //             key_id: self.jwk.key_id.clone(),
 //             algorithm: self.algorithm,
 //         })
 //     }
 
-//     async fn sign_bytes(&self, signing_bytes: &[u8]) -> Result<Vec<u8>, SignatureError> {
+//     async fn sign_bytes(&self, signing_bytes: &[u8]) -> Result<Vec<u8>, Error> {
 //         crate::sign_bytes(self.algorithm, signing_bytes, self.jwk).map_err(Into::into)
 //     }
 // }

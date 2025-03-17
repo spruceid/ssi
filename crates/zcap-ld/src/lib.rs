@@ -18,8 +18,8 @@ use ssi_claims::{
         DataIntegrity, Proof, Proofs,
     },
     vc::syntax::{Context, RequiredContext},
-    ClaimsValidity, DateTimeProvider, Eip712TypesLoaderProvider, InvalidClaims, ResolverProvider,
-    SignatureEnvironment, SignatureError, ValidateClaims, VerificationParameters,
+    ClaimsValidity, DateTimeProvider, Eip712TypesLoaderProvider, InvalidClaims, Parameters,
+    ResolverProvider, SignatureEnvironment, SignatureError, ValidateClaims,
 };
 use ssi_json_ld::{JsonLdError, JsonLdLoaderProvider, JsonLdNodeObject, JsonLdObject, Loader};
 use ssi_rdf::{Interpretation, LdEnvironment, LinkedDataResource, LinkedDataSubject};
@@ -219,13 +219,13 @@ pub struct InvocationVerifier<'a, C, S, R, L1 = ssi_json_ld::ContextLoader, L2 =
 
 impl<'a, C, S, R> InvocationVerifier<'a, C, S, R> {
     pub fn from_resolver(resolver: R, delegation: &'a Delegation<C, S>) -> Self {
-        Self::from_verifier(VerificationParameters::from_resolver(resolver), delegation)
+        Self::from_verifier(Parameters::from_resolver(resolver), delegation)
     }
 }
 
 impl<'a, R, L1, L2, C, S> InvocationVerifier<'a, C, S, R, L1, L2> {
     pub fn from_verifier(
-        verifier: VerificationParameters<R, L1, L2>,
+        verifier: Parameters<R, L1, L2>,
         delegation: &'a Delegation<C, S>,
     ) -> Self {
         Self {
@@ -240,7 +240,7 @@ impl<'a, R, L1, L2, C, S> InvocationVerifier<'a, C, S, R, L1, L2> {
 
 impl<'v, 'a, R, L1, L2, C, S> InvocationVerifier<'a, C, S, &'v R, &'v L1, &'v L2> {
     pub fn from_verifier_ref(
-        verifier: &'v VerificationParameters<R, L1, L2>,
+        verifier: &'v Parameters<R, L1, L2>,
         delegation: &'a Delegation<C, S>,
     ) -> Self {
         Self {
@@ -317,7 +317,8 @@ where
 {
     type Error = JsonLdError;
 
-    type Expanded<I, V> = ssi_json_ld::ExpandedDocument<V::Iri, V::BlankId>
+    type Expanded<I, V>
+        = ssi_json_ld::ExpandedDocument<V::Iri, V::BlankId>
     where
         I: Interpretation,
         V: VocabularyMut,
@@ -443,7 +444,8 @@ where
 {
     type Error = JsonLdError;
 
-    type Expanded<I, V> = ssi_json_ld::ExpandedDocument<V::Iri, V::BlankId>
+    type Expanded<I, V>
+        = ssi_json_ld::ExpandedDocument<V::Iri, V::BlankId>
     where
         I: Interpretation,
         V: VocabularyMut,
@@ -481,9 +483,9 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
-    use ssi_claims::VerificationParameters;
+    use ssi_claims::Parameters;
     use ssi_data_integrity::DataIntegrity;
-    use ssi_dids_core::{example::ExampleDIDResolver, VerificationMethodDIDResolver};
+    use ssi_dids_core::{example::ExampleDIDResolver, DidVerificationMethodResolver};
     use ssi_jwk::JWK;
     use ssi_verification_methods::SingleSecretSigner;
     use static_iref::uri;
@@ -537,8 +539,8 @@ mod tests {
     async fn round_trip() {
         use ssi_data_integrity::ProofOptions;
 
-        let dk = VerificationMethodDIDResolver::new(ExampleDIDResolver::new());
-        let params = VerificationParameters::from_resolver(&dk);
+        let dk = DidVerificationMethodResolver::new(ExampleDIDResolver::new());
+        let params = Parameters::from_resolver(&dk);
 
         let alice_did = "did:example:foo";
         let alice_vm = UriBuf::new(format!("{}#key2", alice_did).into_bytes()).unwrap();

@@ -5,7 +5,7 @@ use std::borrow::Cow;
 pub use ssi_eip712::Eip712TypesLoaderProvider;
 pub use ssi_json_ld::JsonLdLoaderProvider;
 
-use super::VerificationParameters;
+use super::Parameters;
 
 #[derive(Debug, thiserror::Error, PartialEq)]
 pub enum InvalidClaims {
@@ -51,7 +51,7 @@ pub type ClaimsValidity = Result<(), InvalidClaims>;
 /// The `validate` function is also provided with the proof, as some claim type
 /// require information from the proof to be validated.
 pub trait ValidateClaims<P = ()> {
-    fn validate_claims(&self, _params: &VerificationParameters, _proof: &P) -> ClaimsValidity {
+    fn validate_claims(&self, _params: &Parameters, _proof: &P) -> ClaimsValidity {
         Ok(())
     }
 }

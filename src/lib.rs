@@ -300,8 +300,8 @@ pub use ssi_status as status;
 ///   - A DID resolver with support for various DID methods,
 ///   - A JSON-LD document loader recognizing popular JSON-LD contexts,
 ///   - the current date and time.
-pub type DefaultVerificationParameters = claims::VerificationParameters<
-    dids::VerificationMethodDIDResolver<dids::AnyDidMethod, verification_methods::AnyMethod>,
+pub type DefaultVerificationParameters = claims::Parameters<
+    dids::DidVerificationMethodResolver<dids::AnyDidMethod, verification_methods::AnyMethod>,
 >;
 
 /// Verification Methods.

@@ -3,9 +3,9 @@ use ssi::JWK;
 use ssi_claims::{
     data_integrity::{AnySuite, CryptographicSuite, ProofOptions},
     vc::v1::JsonCredential,
-    VerificationParameters,
+    Parameters,
 };
-use ssi_dids::{AnyDidMethod, VerificationMethodDIDResolver};
+use ssi_dids::{AnyDidMethod, DidVerificationMethodResolver};
 use ssi_verification_methods::{AnyMethod, SingleSecretSigner};
 use static_iref::iri;
 
@@ -18,7 +18,7 @@ async fn ed25519_signature_2020() {
       "d": "1onWu34oC29Y09qCRl0aD2FOp5y5obTqHZxQQRT3-bs"
     }))
     .unwrap();
-    let resolver = VerificationMethodDIDResolver::<_, AnyMethod>::new(AnyDidMethod::default());
+    let resolver = DidVerificationMethodResolver::<_, AnyMethod>::new(AnyDidMethod::default());
     let vc: JsonCredential = serde_json::from_value(json!({
       "@context": [
         "https://www.w3.org/2018/credentials/v1"
@@ -44,7 +44,7 @@ async fn ed25519_signature_2020() {
         .await
         .unwrap();
     signed_vc
-        .verify(VerificationParameters::from_resolver(resolver))
+        .verify(Parameters::from_resolver(resolver))
         .await
         .unwrap()
         .unwrap();

@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use crate::{DIDBuf, DIDResolver, DID};
+use crate::{DIDBuf, DidResolver, DID};
 
 use super::{Error, Options, Output};
 
@@ -28,7 +28,7 @@ impl StaticDIDResolver {
     }
 }
 
-impl DIDResolver for StaticDIDResolver {
+impl DidResolver for StaticDIDResolver {
     async fn resolve_representation<'a>(
         &'a self,
         did: &'a DID,

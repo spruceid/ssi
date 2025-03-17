@@ -10,7 +10,7 @@ use ssi_dids_core::{
     },
     resolution::Error,
     resolution::{self, Content, DIDMethodResolver, DerefError, Output, Parameter},
-    DIDBuf, DIDMethod, DIDResolver, DIDURLBuf, Document, DID, DIDURL,
+    DIDBuf, DIDMethod, DIDURLBuf, DidResolver, Document, DID, DIDURL,
 };
 use ssi_jwk::{Base64urlUInt, OkpParams, Params, JWK};
 use ssi_jws::{decode_unverified, decode_verify};

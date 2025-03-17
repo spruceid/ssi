@@ -345,7 +345,7 @@ impl From<VerificationMethod> for DIDVerificationMethod {
 
         Self {
             id: value.id,
-            type_: value.type_.name().to_owned(),
+            r#type: value.type_.name().to_owned(),
             controller: value.controller,
             properties,
         }
@@ -365,11 +365,11 @@ mod tests {
     use ssi_claims::{
         data_integrity::{AnyInputSuiteOptions, AnySuite},
         vc::{syntax::NonEmptyVec, v1::JsonCredential},
-        VerificationParameters,
+        Parameters,
     };
     use ssi_data_integrity::{CryptographicSuite, ProofOptions as SuiteOptions};
     use ssi_dids_core::{
-        did, resolution::Options, DIDResolver, VerificationMethodDIDResolver, DIDURL,
+        did, resolution::Options, DidResolver, DidVerificationMethodResolver, DIDURL,
     };
     use ssi_jwk::JWKResolver;
     use ssi_verification_methods::AnyMethod;
@@ -565,8 +565,8 @@ mod tests {
 
     #[async_std::test]
     async fn credential_prove_verify_did_key_ed25519() {
-        let didkey = VerificationMethodDIDResolver::new(DIDKey);
-        let params = VerificationParameters::from_resolver(&didkey);
+        let didkey = DidVerificationMethodResolver::new(DIDKey);
+        let params = Parameters::from_resolver(&didkey);
 
         let mut rng = rand_chacha::ChaCha8Rng::seed_from_u64(2);
         let key = JWK::generate_ed25519_from(&mut rng).unwrap();
@@ -619,8 +619,8 @@ mod tests {
     #[async_std::test]
     #[cfg(feature = "secp256k1")]
     async fn credential_prove_verify_did_key_secp256k1() {
-        let didkey = VerificationMethodDIDResolver::new(DIDKey);
-        let params = VerificationParameters::from_resolver(&didkey);
+        let didkey = DidVerificationMethodResolver::new(DIDKey);
+        let params = Parameters::from_resolver(&didkey);
 
         let mut rng = rand_chacha::ChaCha8Rng::seed_from_u64(2);
         let key = JWK::generate_secp256k1_from(&mut rng);
@@ -673,8 +673,8 @@ mod tests {
     #[async_std::test]
     #[cfg(feature = "secp256r1")]
     async fn credential_prove_verify_did_key_p256() {
-        let didkey = VerificationMethodDIDResolver::new(DIDKey);
-        let params = VerificationParameters::from_resolver(&didkey);
+        let didkey = DidVerificationMethodResolver::new(DIDKey);
+        let params = Parameters::from_resolver(&didkey);
 
         let mut rng = rand_chacha::ChaCha8Rng::seed_from_u64(2);
         let key = JWK::generate_p256_from(&mut rng);
@@ -725,8 +725,8 @@ mod tests {
 
     async fn fetch_jwk(jwk: JWK) {
         let did = DIDKey::generate(&jwk).unwrap();
-        let resolver: VerificationMethodDIDResolver<_, AnyMethod> =
-            VerificationMethodDIDResolver::new(DIDKey);
+        let resolver: DidVerificationMethodResolver<_, AnyMethod> =
+            DidVerificationMethodResolver::new(DIDKey);
         let vm = DIDKey
             .resolve_into_any_verification_method(&did)
             .await

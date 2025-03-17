@@ -1,6 +1,7 @@
 use super::r#type::KeyType;
-use crate::{AlgorithmInstance, SignatureError};
+use crate::{AlgorithmInstance, Error};
 
+#[derive(Default)]
 pub struct KeyMetadata {
     /// Identifier.
     pub id: Option<Vec<u8>>,
@@ -28,9 +29,9 @@ impl KeyMetadata {
     pub fn into_id_and_algorithm(
         self,
         algorithm: Option<AlgorithmInstance>,
-    ) -> Result<(Option<Vec<u8>>, AlgorithmInstance), SignatureError> {
+    ) -> Result<(Option<Vec<u8>>, AlgorithmInstance), Error> {
         let algorithm = infer_algorithm(algorithm, || self.algorithm, || self.r#type)
-            .ok_or(SignatureError::MissingAlgorithm)?;
+            .ok_or(Error::AlgorithmMissing)?;
         Ok((self.id, algorithm))
     }
 }

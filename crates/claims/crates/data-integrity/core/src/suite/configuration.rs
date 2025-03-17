@@ -1,16 +1,15 @@
 use std::marker::PhantomData;
 
-use ssi_claims_core::{ProofValidationError, SignatureError};
+use ssi_claims_core::ProofValidationError;
+use ssi_crypto::SignatureError;
 use ssi_json_ld::syntax::Context;
 
 use crate::{CryptographicSuite, ProofConfiguration, ProofOptions};
 
-pub type InputVerificationMethod<S> = <<S as CryptographicSuite>::Configuration as ConfigurationAlgorithm<S>>::InputVerificationMethod;
-
 pub type InputSuiteOptions<S> =
     <<S as CryptographicSuite>::Configuration as ConfigurationAlgorithm<S>>::InputSuiteOptions;
 
-pub type InputProofOptions<S> = ProofOptions<InputVerificationMethod<S>, InputSuiteOptions<S>>;
+pub type InputProofOptions<S> = ProofOptions<InputSuiteOptions<S>>;
 
 pub type InputSignatureOptions<S> =
     <<S as CryptographicSuite>::Configuration as ConfigurationAlgorithm<S>>::InputSignatureOptions;
@@ -65,9 +64,6 @@ impl From<ConfigurationError> for ProofValidationError {
 }
 
 pub trait ConfigurationAlgorithm<S: CryptographicSuite> {
-    /// Input type for the verification method.
-    type InputVerificationMethod;
-
     /// Input suite-specific proof options.
     ///
     /// These options are stored in the `proof` object.
@@ -81,14 +77,14 @@ pub trait ConfigurationAlgorithm<S: CryptographicSuite> {
     /// Input suite-specific verification options.
     ///
     /// These options do not appear in the `proof` object.
-    type InputVerificationOptions;
+    type InputVerificationOptions: 'static + Send + Sync;
 
     /// Document transformation options.
     type TransformationOptions;
 
     fn configure_signature(
         suite: &S,
-        proof_options: ProofOptions<Self::InputVerificationMethod, Self::InputSuiteOptions>,
+        proof_options: ProofOptions<Self::InputSuiteOptions>,
         signature_options: InputSignatureOptions<S>,
     ) -> Result<(ProofConfiguration<S>, Self::TransformationOptions), ConfigurationError>;
 
@@ -101,7 +97,6 @@ pub trait ConfigurationAlgorithm<S: CryptographicSuite> {
 pub struct NoConfiguration;
 
 impl<S: CryptographicSuite> ConfigurationAlgorithm<S> for NoConfiguration {
-    type InputVerificationMethod = S::VerificationMethod;
     type InputSuiteOptions = S::ProofOptions;
 
     type InputSignatureOptions = ();
@@ -112,7 +107,7 @@ impl<S: CryptographicSuite> ConfigurationAlgorithm<S> for NoConfiguration {
 
     fn configure_signature(
         suite: &S,
-        proof_options: ProofOptions<S::VerificationMethod, S::ProofOptions>,
+        proof_options: ProofOptions<S::ProofOptions>,
         _: InputSignatureOptions<S>,
     ) -> Result<(ProofConfiguration<S>, Self::TransformationOptions), ConfigurationError> {
         Ok((proof_options.into_configuration(suite.clone())?, ()))
@@ -132,7 +127,6 @@ impl<C, S: CryptographicSuite + Default> ConfigurationAlgorithm<S> for AddProofC
 where
     C: Default + Into<ssi_json_ld::syntax::Context>,
 {
-    type InputVerificationMethod = S::VerificationMethod;
     type InputSuiteOptions = S::ProofOptions;
     type InputSignatureOptions = ();
     type InputVerificationOptions = ();
@@ -140,7 +134,7 @@ where
 
     fn configure_signature(
         suite: &S,
-        options: ProofOptions<S::VerificationMethod, S::ProofOptions>,
+        options: ProofOptions<S::ProofOptions>,
         _: InputSignatureOptions<S>,
     ) -> Result<(ProofConfiguration<S>, Self::TransformationOptions), ConfigurationError> {
         let mut result = options.into_configuration(suite.clone())?;

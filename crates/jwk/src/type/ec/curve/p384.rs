@@ -1,3 +1,5 @@
+use ssi_crypto::{p384, rand};
+
 use super::P384;
 use crate::{Base64urlUInt, EcParams, KeyConversionError, JWK};
 

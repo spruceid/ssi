@@ -1,15 +1,17 @@
+use ssi_claims_core::VerificationParameters;
+use ssi_crypto::{SignatureError, Signer};
+use ssi_verification_methods::VerificationMethodIssuer;
+
 use crate::ProofConfigurationRef;
-use ssi_claims_core::SignatureError;
 
 use super::{CryptographicSuite, TransformationOptions};
 
-pub trait CryptographicSuiteSigning<T, C, R, S>: CryptographicSuite {
+pub trait CryptographicSuiteSigning<T>: CryptographicSuite {
     #[allow(async_fn_in_trait)]
     async fn generate_signature(
         &self,
-        context: &C,
-        resolver: R,
-        signer: S,
+        context: &VerificationParameters,
+        signer: impl VerificationMethodIssuer,
         claims: &T,
         proof_configuration: ProofConfigurationRef<'_, Self>,
         transformation_options: TransformationOptions<Self>,

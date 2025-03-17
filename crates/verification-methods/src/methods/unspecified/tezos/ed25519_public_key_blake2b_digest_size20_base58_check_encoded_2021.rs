@@ -8,7 +8,7 @@ use ssi_verification_methods_core::{VerificationMethodSet, VerifyBytesWithRecove
 use static_iref::iri;
 
 use crate::{
-    ExpectedType, GenericVerificationMethod, InvalidVerificationMethod, SigningMethod,
+    ExpectedType, GenericVerificationMethod, InvalidVerificationMethod,
     TypedVerificationMethod, VerificationMethod,
 };
 
@@ -156,16 +156,16 @@ impl TryFrom<GenericVerificationMethod>
     }
 }
 
-impl SigningMethod<JWK, ssi_crypto::algorithm::EdBlake2b>
-    for Ed25519PublicKeyBLAKE2BDigestSize20Base58CheckEncoded2021
-{
-    fn sign_bytes(
-        &self,
-        key: &JWK,
-        _algorithm: ssi_crypto::algorithm::EdBlake2b,
-        bytes: &[u8],
-    ) -> Result<Vec<u8>, MessageSignatureError> {
-        ssi_jws::sign_bytes(Algorithm::EdBlake2b, bytes, key)
-            .map_err(MessageSignatureError::signature_failed)
-    }
-}
+// impl SigningMethod<JWK, ssi_crypto::algorithm::EdBlake2b>
+//     for Ed25519PublicKeyBLAKE2BDigestSize20Base58CheckEncoded2021
+// {
+//     fn sign_bytes(
+//         &self,
+//         key: &JWK,
+//         _algorithm: ssi_crypto::algorithm::EdBlake2b,
+//         bytes: &[u8],
+//     ) -> Result<Vec<u8>, MessageSignatureError> {
+//         ssi_jws::sign_bytes(Algorithm::EdBlake2b, bytes, key)
+//             .map_err(MessageSignatureError::signature_failed)
+//     }
+// }

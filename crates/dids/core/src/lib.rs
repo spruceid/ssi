@@ -19,8 +19,8 @@ pub mod example;
 
 pub use did::*;
 pub use document::Document;
-pub use method_resolver::VerificationMethodDIDResolver;
-pub use resolution::{DIDMethodResolver, DIDResolver, StaticDIDResolver};
+pub use method_resolver::DidVerificationMethodResolver;
+pub use resolution::{DIDMethodResolver, DidResolver, StaticDIDResolver};
 
 pub use ssi_json_ld;
 

@@ -593,7 +593,10 @@ where
 }
 
 impl StatusMapEntrySet for AnyStatusListEntrySet {
-    type Entry<'a> = AnyStatusListReference<'a> where Self: 'a;
+    type Entry<'a>
+        = AnyStatusListReference<'a>
+    where
+        Self: 'a;
 
     fn get_entry(&self, purpose: crate::StatusPurpose<&str>) -> Option<Self::Entry<'_>> {
         match self {

@@ -22,8 +22,8 @@ use hyper::{
     Request, Response,
 };
 use hyper_util::rt::TokioIo;
-use ssi_claims_core::VerificationParameters;
-use ssi_dids::{VerificationMethodDIDResolver, DIDJWK};
+use ssi_claims_core::Parameters;
+use ssi_dids::{DidVerificationMethodResolver, DIDJWK};
 use ssi_status::{any::AnyStatusMap, FromBytes, FromBytesOptions};
 use std::{
     fs,
@@ -78,8 +78,7 @@ async fn run(args: Args) -> Result<(), Error> {
         Err(e) => return Err(Error::ReadFile(input, e)),
     };
 
-    let verifier =
-        VerificationParameters::from_resolver(VerificationMethodDIDResolver::new(DIDJWK));
+    let verifier = Parameters::from_resolver(DidVerificationMethodResolver::new(DIDJWK));
 
     let status_list = AnyStatusMap::from_bytes_with(
         &bytes,

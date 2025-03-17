@@ -1,4 +1,4 @@
-use ssi_crypto::key::{KeyConversionError, KeyGenerationFailed};
+use ssi_crypto::{key::{KeyConversionError, KeyGenerationFailed}, rand};
 
 use crate::{Base64urlUInt, OkpParams, Params, JWK};
 
@@ -26,7 +26,7 @@ impl OkpParams {
         #[cfg(not(feature = "ring"))]
         {
             let mut csprng = rand::rngs::OsRng {};
-            let secret = ed25519_dalek::SigningKey::generate(&mut csprng);
+            let secret = ssi_crypto::ed25519::SigningKey::generate(&mut csprng);
             let public = secret.verifying_key();
             Ok(Self {
                 curve: ED25519.to_string(),
@@ -39,7 +39,7 @@ impl OkpParams {
     pub fn generate_ed25519_from(
         rng: &mut (impl rand::CryptoRng + rand::RngCore),
     ) -> Result<JWK, KeyGenerationFailed> {
-        let secret = ed25519_dalek::SigningKey::generate(rng);
+        let secret = ssi_crypto::ed25519::SigningKey::generate(rng);
         let public = secret.verifying_key();
         Ok(JWK::from(Params::Okp(OkpParams {
             curve: ED25519.to_string(),
@@ -49,22 +49,28 @@ impl OkpParams {
     }
 
     pub fn from_public_ed25519_bytes(data: &[u8]) -> Result<JWK, KeyConversionError> {
-        let public_key =
-            ed25519_dalek::VerifyingKey::try_from(data).map_err(|_| KeyConversionError::Invalid)?;
+        let public_key = ssi_crypto::ed25519::VerifyingKey::try_from(data)
+            .map_err(|_| KeyConversionError::Invalid)?;
         Ok(public_key.into())
     }
 
     pub fn from_secret_ed25519_bytes(data: &[u8]) -> Result<JWK, KeyConversionError> {
-        let key: ed25519_dalek::SigningKey =
+        let key: ssi_crypto::ed25519::SigningKey =
             data.try_into().map_err(|_| KeyConversionError::Invalid)?;
         Ok(JWK::from(Params::Okp(OkpParams {
             curve: ED25519.to_string(),
-            public_key: Base64urlUInt(ed25519_dalek::VerifyingKey::from(&key).as_bytes().to_vec()),
+            public_key: Base64urlUInt(
+                ssi_crypto::ed25519::VerifyingKey::from(&key)
+                    .as_bytes()
+                    .to_vec(),
+            ),
             private_key: Some(Base64urlUInt(data.to_owned())),
         })))
     }
 
-    pub fn to_public_ed25519(&self) -> Result<ed25519_dalek::VerifyingKey, KeyConversionError> {
+    pub fn to_public_ed25519(
+        &self,
+    ) -> Result<ssi_crypto::ed25519::VerifyingKey, KeyConversionError> {
         if self.curve != *ED25519 {
             return Err(KeyConversionError::Unsupported);
         }
@@ -77,7 +83,7 @@ impl OkpParams {
             .map_err(|_| KeyConversionError::Invalid)
     }
 
-    pub fn to_secret_ed25519(&self) -> Result<ed25519_dalek::SigningKey, KeyConversionError> {
+    pub fn to_secret_ed25519(&self) -> Result<ssi_crypto::ed25519::SigningKey, KeyConversionError> {
         if self.curve != *ED25519 {
             return Err(KeyConversionError::Unsupported);
         }
@@ -145,7 +151,7 @@ impl JWK {
     }
 }
 
-impl TryFrom<&OkpParams> for ed25519_dalek::VerifyingKey {
+impl TryFrom<&OkpParams> for ssi_crypto::ed25519::VerifyingKey {
     type Error = KeyConversionError;
 
     fn try_from(params: &OkpParams) -> Result<Self, Self::Error> {
@@ -153,7 +159,7 @@ impl TryFrom<&OkpParams> for ed25519_dalek::VerifyingKey {
     }
 }
 
-impl TryFrom<&OkpParams> for ed25519_dalek::SigningKey {
+impl TryFrom<&OkpParams> for ssi_crypto::ed25519::SigningKey {
     type Error = KeyConversionError;
 
     fn try_from(params: &OkpParams) -> Result<Self, Self::Error> {
@@ -161,8 +167,8 @@ impl TryFrom<&OkpParams> for ed25519_dalek::SigningKey {
     }
 }
 
-impl From<ed25519_dalek::VerifyingKey> for JWK {
-    fn from(value: ed25519_dalek::VerifyingKey) -> Self {
+impl From<ssi_crypto::ed25519::VerifyingKey> for JWK {
+    fn from(value: ssi_crypto::ed25519::VerifyingKey) -> Self {
         JWK::from(Params::Okp(OkpParams {
             curve: ED25519.to_string(),
             public_key: Base64urlUInt(value.to_bytes().to_vec()),

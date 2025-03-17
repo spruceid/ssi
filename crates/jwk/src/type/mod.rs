@@ -18,9 +18,16 @@ use crate::JWK;
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Hash, Eq)]
 #[serde(tag = "kty")]
 pub enum Params {
+    #[serde(rename = "EC")]
     Ec(EcParams),
+
+    #[serde(rename = "RSA")]
     Rsa(RsaParams),
+
+    #[serde(rename = "oct")]
     Oct(OctParams),
+
+    #[serde(rename = "OKP")]
     Okp(OkpParams),
 }
 

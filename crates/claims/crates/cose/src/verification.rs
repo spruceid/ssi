@@ -1,9 +1,8 @@
 use coset::{Header, ProtectedHeader};
 use ssi_claims_core::{
-    ClaimsValidity, ProofValidationError, ProofValidity, ValidateClaims, ValidateProof,
-    VerifiableClaims, Verification, VerificationParameters,
+    ClaimsValidity, Parameters, ValidateClaims, ValidateProof, VerifiableClaims, Verification,
 };
-use ssi_crypto::Verifier;
+use ssi_crypto::{Error, SignatureVerification, Verifier};
 
 use crate::{
     algorithm::instantiate_algorithm, CoseSignatureBytes, DecodedCoseSign1, UnsignedCoseSign1,
@@ -11,10 +10,7 @@ use crate::{
 
 impl<T> DecodedCoseSign1<T> {
     /// Verify.
-    pub async fn verify(
-        &self,
-        verifier: impl Verifier,
-    ) -> Result<Verification, ProofValidationError>
+    pub async fn verify(&self, verifier: impl Verifier) -> Result<Verification, Error>
     where
         T: ValidateCoseHeader + ValidateClaims<CoseSignatureBytes>,
     {
@@ -25,8 +21,8 @@ impl<T> DecodedCoseSign1<T> {
     pub async fn verify_with(
         &self,
         verifier: impl Verifier,
-        params: &VerificationParameters,
-    ) -> Result<Verification, ProofValidationError>
+        params: &Parameters,
+    ) -> Result<Verification, Error>
     where
         T: ValidateCoseHeader + ValidateClaims<CoseSignatureBytes>,
     {
@@ -50,7 +46,7 @@ impl<T> VerifiableClaims for DecodedCoseSign1<T> {
 pub trait ValidateCoseHeader {
     fn validate_cose_headers(
         &self,
-        _params: &VerificationParameters,
+        _params: &Parameters,
         _protected: &ProtectedHeader,
         _unprotected: &Header,
     ) -> ClaimsValidity {
@@ -66,7 +62,7 @@ where
 {
     fn validate_claims(
         &self,
-        params: &VerificationParameters,
+        params: &Parameters,
         signature: &CoseSignatureBytes,
     ) -> ClaimsValidity {
         self.payload
@@ -75,17 +71,20 @@ where
     }
 }
 
-impl<T> ValidateProof<UnsignedCoseSign1<T>> for CoseSignatureBytes {
+impl<T, V> ValidateProof<UnsignedCoseSign1<T>, V> for CoseSignatureBytes
+where
+    V: Verifier,
+{
     async fn validate_proof<'a>(
         &'a self,
-        verifier: impl Verifier,
-        _params: &'a VerificationParameters,
+        verifier: &'a V,
         claims: &'a UnsignedCoseSign1<T>,
-    ) -> Result<ProofValidity, ProofValidationError> {
+        _params: &'a Parameters,
+    ) -> Result<SignatureVerification, Error> {
         let signing_bytes = claims.tbs_data(&[]);
 
         Ok(verifier
-            .verify_bytes(
+            .verify(
                 Some(&claims.protected.header.key_id),
                 claims
                     .protected

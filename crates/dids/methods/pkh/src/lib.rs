@@ -110,7 +110,7 @@ impl From<PkhVerificationMethod> for DIDVerificationMethod {
 
         Self {
             id: value.id,
-            type_: value.type_.name().to_owned(),
+            r#type: value.type_.name().to_owned(),
             controller: value.controller,
             properties,
         }
@@ -749,8 +749,8 @@ impl DIDPKH {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use ssi_claims::VerificationParameters;
-    use ssi_dids_core::{did, resolution::ErrorKind, DIDResolver, VerificationMethodDIDResolver};
+    use ssi_claims::Parameters;
+    use ssi_dids_core::{did, resolution::ErrorKind, DidResolver, DidVerificationMethodResolver};
 
     #[cfg(all(feature = "eip", feature = "tezos"))]
     fn test_generate(jwk_value: serde_json::Value, type_: &str, did_expected: &str) {
@@ -961,13 +961,13 @@ mod tests {
                 syntax::NonEmptyVec,
                 v1::{JsonCredential, JsonPresentation},
             },
-            VerificationParameters,
+            Parameters,
         };
         use ssi_verification_methods_core::{ProofPurpose, SingleSecretSigner};
         use static_iref::uri;
 
-        let didpkh = VerificationMethodDIDResolver::new(DIDPKH);
-        let params = VerificationParameters::from_resolver(&didpkh);
+        let didpkh = DidVerificationMethodResolver::new(DIDPKH);
+        let params = Parameters::from_resolver(&didpkh);
 
         // use ssi_vc::{Credential, Issuer, LinkedDataProofOptions, URI};
         let did = DIDPKH::generate(&key, type_).unwrap();
@@ -1097,13 +1097,13 @@ mod tests {
                 syntax::NonEmptyVec,
                 v1::{JsonCredential, JsonPresentation},
             },
-            VerificationParameters,
+            Parameters,
         };
         use ssi_verification_methods_core::{ProofPurpose, SingleSecretSigner};
         use static_iref::uri;
 
-        let didpkh = VerificationMethodDIDResolver::new(DIDPKH);
-        let verifier = VerificationParameters::from_resolver(&didpkh);
+        let didpkh = DidVerificationMethodResolver::new(DIDPKH);
+        let verifier = Parameters::from_resolver(&didpkh);
         let did = DIDPKH::generate(&key, type_).unwrap();
 
         eprintln!("did: {}", did);
@@ -1523,8 +1523,8 @@ mod tests {
 
         let vc = ssi_claims::vc::v1::data_integrity::any_credential_from_json_str(vc_str).unwrap();
 
-        let didpkh = VerificationMethodDIDResolver::new(DIDPKH);
-        let verifier = VerificationParameters::from_resolver(&didpkh);
+        let didpkh = DidVerificationMethodResolver::new(DIDPKH);
+        let verifier = Parameters::from_resolver(&didpkh);
         let verification_result = vc.verify(&verifier).await.unwrap();
         assert!(verification_result.is_ok());
 

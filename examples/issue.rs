@@ -7,9 +7,9 @@ use ssi_claims::{
     data_integrity::{AnySuite, CryptographicSuite, ProofOptions},
     jws::JwsPayload,
     vc::v1::ToJwtClaims,
-    VerificationParameters,
+    Parameters,
 };
-use ssi_dids::DIDResolver;
+use ssi_dids::DidResolver;
 use ssi_verification_methods::SingleSecretSigner;
 use static_iref::iri;
 
@@ -18,7 +18,7 @@ async fn issue(proof_format: &str) {
     let mut key: ssi::jwk::JWK = serde_json::from_str(key_str).unwrap();
     key.key_id = Some("did:example:foo#key1".to_string());
     let resolver = ssi::dids::example::ExampleDIDResolver::default().into_vm_resolver();
-    let params = VerificationParameters::from_resolver(&resolver);
+    let params = Parameters::from_resolver(&resolver);
     let signer = SingleSecretSigner::new(key.clone()).into_local();
 
     let vc: ssi::claims::vc::v1::SpecializedJsonCredential = serde_json::from_value(json!({

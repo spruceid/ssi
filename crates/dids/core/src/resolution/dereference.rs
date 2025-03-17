@@ -6,7 +6,7 @@ use crate::{
     DIDURLBuf, Fragment, PrimaryDIDURL, DIDURL,
 };
 
-use super::{DIDResolver, Error, Metadata, Output, Parameters, MEDIA_TYPE_URL};
+use super::{DidResolver, Error, Metadata, Output, Parameters, MEDIA_TYPE_URL};
 
 #[derive(Debug, thiserror::Error)]
 pub enum DerefError {
@@ -139,7 +139,7 @@ impl From<PrimaryContent> for Content {
 }
 
 /// [Dereferencing the Primary Resource](https://w3c-ccg.github.io/did-resolution/#dereferencing-algorithm-primary) - a subalgorithm of [DID URL dereferencing](https://w3c-ccg.github.io/did-resolution/#dereferencing-algorithm)
-pub(crate) async fn dereference_primary_resource<'a, R: ?Sized + DIDResolver>(
+pub(crate) async fn dereference_primary_resource<'a, R: ?Sized + DidResolver>(
     resolver: &'a R,
     primary_did_url: &'a PrimaryDIDURL,
     parameters: Parameters,

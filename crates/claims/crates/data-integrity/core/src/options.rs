@@ -1,14 +1,14 @@
 use std::collections::BTreeMap;
 
 use serde::{Deserialize, Serialize};
-use ssi_verification_methods::{ProofPurpose, ReferenceOrOwned};
+use ssi_verification_methods::{CowVerificationMethod, ProofPurpose};
 
 use crate::{suite::ConfigurationError, CryptographicSuite, ProofConfiguration};
 
 /// Proof options.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub struct ProofOptions<M, T> {
+pub struct ProofOptions<T> {
     #[serde(rename = "@context", skip_serializing_if = "Option::is_none")]
     pub context: Option<ssi_json_ld::syntax::Context>,
 
@@ -17,7 +17,7 @@ pub struct ProofOptions<M, T> {
     pub created: Option<xsd_types::DateTimeStamp>,
 
     /// Verification method.
-    pub verification_method: Option<ReferenceOrOwned<M>>,
+    pub verification_method: Option<CowVerificationMethod>,
 
     /// Purpose of the proof.
     #[serde(default)]
@@ -75,7 +75,7 @@ pub struct ProofOptions<M, T> {
     pub extra_properties: BTreeMap<String, json_syntax::Value>,
 }
 
-impl<M, T: Default> Default for ProofOptions<M, T> {
+impl<T: Default> Default for ProofOptions<T> {
     fn default() -> Self {
         Self {
             context: None,
@@ -92,10 +92,10 @@ impl<M, T: Default> Default for ProofOptions<M, T> {
     }
 }
 
-impl<M, T> ProofOptions<M, T> {
+impl<T> ProofOptions<T> {
     pub fn new(
         created: xsd_types::DateTimeStamp,
-        verification_method: ReferenceOrOwned<M>,
+        verification_method: CowVerificationMethod,
         proof_purpose: ProofPurpose,
         options: T,
     ) -> Self {
@@ -113,7 +113,7 @@ impl<M, T> ProofOptions<M, T> {
         }
     }
 
-    pub fn from_method_and_options(verification_method: ReferenceOrOwned<M>, options: T) -> Self {
+    pub fn from_method_and_options(verification_method: CowVerificationMethod, options: T) -> Self {
         Self {
             context: None,
             created: Some(xsd_types::DateTimeStamp::now_ms()),
@@ -128,24 +128,21 @@ impl<M, T> ProofOptions<M, T> {
         }
     }
 
-    pub fn from_method(verification_method: ReferenceOrOwned<M>) -> Self
+    pub fn from_method(verification_method: CowVerificationMethod) -> Self
     where
         T: Default,
     {
         Self::from_method_and_options(verification_method, Default::default())
     }
 
-    pub fn map<N, U>(
+    pub fn map<U>(
         self,
-        map_verification_method: impl FnOnce(M) -> N,
         map_options: impl FnOnce(T) -> U,
-    ) -> ProofOptions<N, U> {
+    ) -> ProofOptions<U> {
         ProofOptions {
             context: self.context,
             created: self.created,
-            verification_method: self
-                .verification_method
-                .map(|m| m.map(map_verification_method)),
+            verification_method: self.verification_method,
             proof_purpose: self.proof_purpose,
             expires: self.expires,
             domains: self.domains,
@@ -156,26 +153,21 @@ impl<M, T> ProofOptions<M, T> {
         }
     }
 
-    pub fn cast<N, U>(self) -> ProofOptions<N, U>
+    pub fn cast<U>(self) -> ProofOptions<U>
     where
-        M: Into<N>,
         T: Into<U>,
     {
-        self.map(Into::into, Into::into)
+        self.map(Into::into)
     }
 
-    pub fn try_map<N, U, E>(
+    pub fn try_map<U, E>(
         self,
-        map_verification_method: impl FnOnce(M) -> Result<N, E>,
         map_options: impl FnOnce(T) -> Result<U, E>,
-    ) -> Result<ProofOptions<N, U>, E> {
+    ) -> Result<ProofOptions<U>, E> {
         Ok(ProofOptions {
             context: self.context,
             created: self.created,
-            verification_method: self
-                .verification_method
-                .map(|m| m.try_map(map_verification_method))
-                .transpose()?,
+            verification_method: self.verification_method,
             proof_purpose: self.proof_purpose,
             expires: self.expires,
             domains: self.domains,
@@ -192,15 +184,13 @@ impl<M, T> ProofOptions<M, T> {
         f: impl FnOnce(T) -> S::ProofOptions,
     ) -> Result<ProofConfiguration<S>, ConfigurationError>
     where
-        S: CryptographicSuite<VerificationMethod = M>,
+        S: CryptographicSuite,
     {
         Ok(ProofConfiguration {
             context: self.context,
             type_,
             created: self.created,
-            verification_method: self
-                .verification_method
-                .ok_or(ConfigurationError::MissingVerificationMethod)?,
+            verification_method: self.verification_method,
             proof_purpose: self.proof_purpose,
             expires: self.expires,
             domains: self.domains,
@@ -216,7 +206,7 @@ impl<M, T> ProofOptions<M, T> {
         type_: S,
     ) -> Result<ProofConfiguration<S>, ConfigurationError>
     where
-        S: CryptographicSuite<VerificationMethod = M, ProofOptions = T>,
+        S: CryptographicSuite<ProofOptions = T>,
     {
         self.into_configuration_with(type_, |o| o)
     }

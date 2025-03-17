@@ -1,3 +1,5 @@
+use ssi_crypto::{p256, rand};
+
 use super::P256;
 use crate::{Base64urlUInt, EcParams, KeyConversionError, JWK};
 

@@ -1,6 +1,6 @@
 use serde::de::DeserializeOwned;
-use ssi_claims_core::{ProofValidationError, Verification};
-use ssi_crypto::Verifier;
+use ssi_claims_core::Verification;
+use ssi_crypto::{Error, Verifier};
 use ssi_jws::{DecodeError as JWSDecodeError, DecodedJws, JwsSlice, JwsStr, JwsString, JwsVec};
 
 use crate::{AnyClaims, JWTClaims};
@@ -14,9 +14,9 @@ pub enum DecodeError {
     Claims(#[from] serde_json::Error),
 }
 
-impl From<DecodeError> for ProofValidationError {
+impl From<DecodeError> for Error {
     fn from(value: DecodeError) -> Self {
-        Self::InvalidInputData(value.to_string())
+        Self::malformed_input(value)
     }
 }
 
@@ -39,10 +39,7 @@ pub trait ToDecodedJwt {
     ///
     /// This check the signature and the validity of registered claims.
     #[allow(async_fn_in_trait)]
-    async fn verify_jwt(
-        &self,
-        verifier: impl Verifier,
-    ) -> Result<Verification, ProofValidationError> {
+    async fn verify_jwt(&self, verifier: impl Verifier) -> Result<Verification, Error> {
         self.to_decoded_jwt()?.verify(verifier).await
     }
 }

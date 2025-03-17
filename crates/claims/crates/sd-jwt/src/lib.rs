@@ -32,8 +32,9 @@
 use rand::{CryptoRng, RngCore};
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use serde_json::Value;
-use ssi_claims_core::{ProofValidationError, SignatureError, ValidateClaims, Verification};
+use ssi_claims_core::{ValidateClaims, Verification};
 use ssi_core::BytesBuf;
+use ssi_jwk::ssi_crypto::Error;
 use ssi_jws::{DecodedJws, Jws, JwsPayload, JwsSignature, ValidateJwsHeader};
 use ssi_jwt::{
     ssi_crypto::{Signer, Verifier},
@@ -252,7 +253,7 @@ impl SdJwt {
     pub async fn decode_verify_concealed(
         &self,
         verifier: impl Verifier,
-    ) -> Result<(DecodedSdJwt, Verification), ProofValidationError> {
+    ) -> Result<(DecodedSdJwt, Verification), Error> {
         self.parts().decode_verify_concealed(verifier).await
     }
 
@@ -267,7 +268,7 @@ impl SdJwt {
     pub async fn decode_reveal_verify_any(
         &self,
         verifier: impl Verifier,
-    ) -> Result<(RevealedSdJwt, Verification), ProofValidationError> {
+    ) -> Result<(RevealedSdJwt, Verification), Error> {
         self.parts().decode_reveal_verify_any(verifier).await
     }
 
@@ -282,7 +283,7 @@ impl SdJwt {
     pub async fn decode_reveal_verify<T>(
         &self,
         verifier: impl Verifier,
-    ) -> Result<(RevealedSdJwt<T>, Verification), ProofValidationError>
+    ) -> Result<(RevealedSdJwt<T>, Verification), Error>
     where
         T: ClaimSet + DeserializeOwned + ValidateClaims<JwsSignature>,
     {
@@ -361,7 +362,7 @@ impl SdJwtBuf {
         sd_alg: SdAlg,
         pointers: &[impl Borrow<JsonPointer>],
         signer: impl Signer,
-    ) -> Result<Self, SignatureError> {
+    ) -> Result<Self, Error> {
         DecodedSdJwt::conceal_and_sign(claims, sd_alg, pointers, signer)
             .await
             .map(DecodedSdJwt::into_encoded)
@@ -374,7 +375,7 @@ impl SdJwtBuf {
         pointers: &[impl Borrow<JsonPointer>],
         signer: impl Signer,
         rng: impl CryptoRng + RngCore,
-    ) -> Result<Self, SignatureError> {
+    ) -> Result<Self, Error> {
         DecodedSdJwt::conceal_and_sign_with(claims, sd_alg, pointers, signer, rng)
             .await
             .map(DecodedSdJwt::into_encoded)
@@ -525,8 +526,8 @@ impl<'a> PartsRef<'a> {
     pub async fn decode_verify_concealed(
         self,
         verifier: impl Verifier,
-    ) -> Result<(DecodedSdJwt<'a>, Verification), ProofValidationError> {
-        let decoded = self.decode().map_err(ProofValidationError::input_data)?;
+    ) -> Result<(DecodedSdJwt<'a>, Verification), Error> {
+        let decoded = self.decode().map_err(Error::malformed_input)?;
         let verification = decoded.verify_concealed(verifier).await?;
         Ok((decoded, verification))
     }
@@ -542,8 +543,8 @@ impl<'a> PartsRef<'a> {
     pub async fn decode_reveal_verify_any(
         self,
         verifier: impl Verifier,
-    ) -> Result<(RevealedSdJwt<'a>, Verification), ProofValidationError> {
-        let decoded = self.decode().map_err(ProofValidationError::input_data)?;
+    ) -> Result<(RevealedSdJwt<'a>, Verification), Error> {
+        let decoded = self.decode().map_err(Error::malformed_input)?;
         decoded.reveal_verify_any(verifier).await
     }
 
@@ -558,11 +559,11 @@ impl<'a> PartsRef<'a> {
     pub async fn decode_reveal_verify<T>(
         self,
         verifier: impl Verifier,
-    ) -> Result<(RevealedSdJwt<'a, T>, Verification), ProofValidationError>
+    ) -> Result<(RevealedSdJwt<'a, T>, Verification), Error>
     where
         T: ClaimSet + DeserializeOwned + ValidateClaims<JwsSignature>,
     {
-        let decoded = self.decode().map_err(ProofValidationError::input_data)?;
+        let decoded = self.decode().map_err(Error::malformed_input)?;
         decoded.reveal_verify(verifier).await
     }
 }
@@ -617,10 +618,7 @@ impl<'a> DecodedSdJwt<'a> {
     ///
     /// No revealing the claims means only the registered JWT claims will be
     /// validated.
-    pub async fn verify_concealed(
-        &self,
-        verifier: impl Verifier,
-    ) -> Result<Verification, ProofValidationError> {
+    pub async fn verify_concealed(&self, verifier: impl Verifier) -> Result<Verification, Error> {
         self.jwt.verify(verifier).await
     }
 
@@ -634,10 +632,8 @@ impl<'a> DecodedSdJwt<'a> {
     pub async fn reveal_verify_any(
         self,
         verifier: impl Verifier,
-    ) -> Result<(RevealedSdJwt<'a>, Verification), ProofValidationError> {
-        let revealed = self
-            .reveal_any()
-            .map_err(ProofValidationError::input_data)?;
+    ) -> Result<(RevealedSdJwt<'a>, Verification), Error> {
+        let revealed = self.reveal_any().map_err(Error::malformed_input)?;
         let verification = revealed.verify(verifier).await?;
         Ok((revealed, verification))
     }
@@ -652,13 +648,11 @@ impl<'a> DecodedSdJwt<'a> {
     pub async fn reveal_verify<T>(
         self,
         verifier: impl Verifier,
-    ) -> Result<(RevealedSdJwt<'a, T>, Verification), ProofValidationError>
+    ) -> Result<(RevealedSdJwt<'a, T>, Verification), Error>
     where
         T: ClaimSet + DeserializeOwned + ValidateClaims<JwsSignature>,
     {
-        let revealed = self
-            .reveal::<T>()
-            .map_err(ProofValidationError::input_data)?;
+        let revealed = self.reveal::<T>().map_err(Error::malformed_input)?;
         let verification = revealed.verify(verifier).await?;
         Ok((revealed, verification))
     }
@@ -671,12 +665,12 @@ impl DecodedSdJwt<'static> {
         sd_alg: SdAlg,
         pointers: &[impl Borrow<JsonPointer>],
         signer: impl Signer,
-    ) -> Result<Self, SignatureError> {
+    ) -> Result<Self, Error> {
         let (payload, disclosures) =
-            SdJwtPayload::conceal(claims, sd_alg, pointers).map_err(SignatureError::other)?;
+            SdJwtPayload::conceal(claims, sd_alg, pointers).map_err(Error::internal)?;
 
         Ok(Self {
-            jwt: payload.sign_into_decoded(None, signer).await?,
+            jwt: payload.sign_into_decoded(signer, None).await?,
             disclosures,
         })
     }
@@ -688,12 +682,12 @@ impl DecodedSdJwt<'static> {
         pointers: &[impl Borrow<JsonPointer>],
         signer: impl Signer,
         rng: impl CryptoRng + RngCore,
-    ) -> Result<Self, SignatureError> {
-        let (payload, disclosures) = SdJwtPayload::conceal_with(claims, sd_alg, pointers, rng)
-            .map_err(SignatureError::other)?;
+    ) -> Result<Self, Error> {
+        let (payload, disclosures) =
+            SdJwtPayload::conceal_with(claims, sd_alg, pointers, rng).map_err(Error::internal)?;
 
         Ok(Self {
-            jwt: payload.sign_into_decoded(None, signer).await?,
+            jwt: payload.sign_into_decoded(signer, None).await?,
             disclosures,
         })
     }
@@ -745,10 +739,7 @@ impl<'a, T> RevealedSdJwt<'a, T> {
     }
 
     /// Verifies the SD-JWT, validating the revealed claims.
-    pub async fn verify(
-        &self,
-        verifier: impl Verifier,
-    ) -> Result<Verification, ProofValidationError>
+    pub async fn verify(&self, verifier: impl Verifier) -> Result<Verification, Error>
     where
         T: ClaimSet + ValidateClaims<JwsSignature>,
     {

@@ -4,8 +4,8 @@ use crate::{
 };
 pub use base64::DecodeError as Base64DecodeError;
 use base64::Engine;
-use ssi_claims_core::{ProofValidationError, Verification, VerificationParameters};
-use ssi_crypto::Verifier;
+use ssi_claims_core::{Parameters, Verification};
+use ssi_crypto::{Error, Verifier};
 use std::{borrow::Cow, ops::Deref};
 
 /// Borrowed JWS without any encoding guaranties.
@@ -234,10 +234,7 @@ impl JwsSlice {
     /// If the validation traits are implemented for `P`, they will be
     /// implemented for `&P` as well. This means the parameters can be passed
     /// by move *or* by reference.
-    pub async fn verify(
-        &self,
-        verifier: impl Verifier,
-    ) -> Result<Verification, ProofValidationError> {
+    pub async fn verify(&self, verifier: impl Verifier) -> Result<Verification, Error> {
         let jws = self.decode().unwrap();
         jws.verify(verifier).await
     }
@@ -245,8 +242,8 @@ impl JwsSlice {
     pub async fn verify_with(
         &self,
         verifier: impl Verifier,
-        params: &VerificationParameters,
-    ) -> Result<Verification, ProofValidationError> {
+        params: &Parameters,
+    ) -> Result<Verification, Error> {
         let jws = self.decode().unwrap();
         jws.verify_with(verifier, params).await
     }

@@ -299,7 +299,7 @@ impl AnyDidMethod {
     }
 }
 
-impl DIDResolver for AnyDidMethod {
+impl DidResolver for AnyDidMethod {
     async fn resolve_representation<'a>(
         &'a self,
         did: &'a DID,

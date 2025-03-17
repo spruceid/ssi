@@ -19,9 +19,9 @@ use ssi::{
 use ssi_claims::{
     data_integrity::AnyDataIntegrity,
     vc::{v1::ToJwtClaims, AnyJsonCredential},
-    VerificationParameters,
+    Parameters,
 };
-use ssi_dids::DIDResolver;
+use ssi_dids::DidResolver;
 use static_iref::{iri, uri};
 
 async fn verify(proof_format_in: &str, proof_format_out: &str, input_vc: &str) {
@@ -50,7 +50,7 @@ async fn verify(proof_format_in: &str, proof_format_out: &str, input_vc: &str) {
     let mut key: ssi::jwk::JWK = serde_json::from_str(key_str).unwrap();
     key.key_id = Some("did:example:foo#key2".to_string());
     let resolver = ssi::dids::example::ExampleDIDResolver::default().into_vm_resolver();
-    let verifier = VerificationParameters::from_resolver(&resolver);
+    let verifier = Parameters::from_resolver(&resolver);
     let signer = SingleSecretSigner::new(key.clone()).into_local();
 
     // let mut proof_options = ssi::vc::LinkedDataProofOptions::default();

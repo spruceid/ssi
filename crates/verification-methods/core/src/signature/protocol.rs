@@ -1,7 +1,6 @@
 use std::borrow::Cow;
 
-use ssi_claims_core::MessageSignatureError;
-use ssi_crypto::algorithm::{SignatureAlgorithmInstance, SignatureAlgorithmType};
+use ssi_crypto::Error;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct WithProtocol<A, P>(pub A, pub P);
@@ -12,17 +11,17 @@ impl<A, P> WithProtocol<A, P> {
     }
 }
 
-impl<A: SignatureAlgorithmType, P: Copy> SignatureAlgorithmType for WithProtocol<A, P> {
-    type Instance = WithProtocol<A::Instance, P>;
-}
+// impl<A: SignatureAlgorithmType, P: Copy> SignatureAlgorithmType for WithProtocol<A, P> {
+//     type Instance = WithProtocol<A::Instance, P>;
+// }
 
-impl<I: SignatureAlgorithmInstance, P: Copy> SignatureAlgorithmInstance for WithProtocol<I, P> {
-    type Algorithm = WithProtocol<I::Algorithm, P>;
+// impl<I: SignatureAlgorithmInstance, P: Copy> SignatureAlgorithmInstance for WithProtocol<I, P> {
+//     type Algorithm = WithProtocol<I::Algorithm, P>;
 
-    fn algorithm(&self) -> Self::Algorithm {
-        WithProtocol(self.0.algorithm(), self.1)
-    }
-}
+//     fn algorithm(&self) -> Self::Algorithm {
+//         WithProtocol(self.0.algorithm(), self.1)
+//     }
+// }
 
 /// Signature protocol.
 ///
@@ -50,11 +49,7 @@ pub trait SignatureProtocol<A>: Copy {
         Cow::Borrowed(bytes)
     }
 
-    fn encode_signature(
-        &self,
-        _algorithm: A,
-        signature: Vec<u8>,
-    ) -> Result<Vec<u8>, MessageSignatureError> {
+    fn encode_signature(&self, _algorithm: A, signature: Vec<u8>) -> Result<Vec<u8>, Error> {
         Ok(signature)
     }
 
@@ -102,11 +97,7 @@ impl Base58BtcMultibase {
 }
 
 impl<A> SignatureProtocol<A> for Base58BtcMultibase {
-    fn encode_signature(
-        &self,
-        _algorithm: A,
-        signature: Vec<u8>,
-    ) -> Result<Vec<u8>, MessageSignatureError> {
+    fn encode_signature(&self, _algorithm: A, signature: Vec<u8>) -> Result<Vec<u8>, Error> {
         Ok(Self::encode_signature(&signature))
     }
 
@@ -142,11 +133,7 @@ impl Base58Btc {
 impl<A> SignatureProtocol<A> for Base58Btc {
     /// Encode the signature in base58 (bitcoin alphabet) as required by this
     /// protocol.
-    fn encode_signature(
-        &self,
-        _algorithm: A,
-        signature: Vec<u8>,
-    ) -> Result<Vec<u8>, MessageSignatureError> {
+    fn encode_signature(&self, _algorithm: A, signature: Vec<u8>) -> Result<Vec<u8>, Error> {
         Ok(Self::encode_signature(&signature))
     }
 
@@ -209,11 +196,7 @@ impl<A> SignatureProtocol<A> for EthereumWallet {
         Cow::Owned(Self::prepare_message(bytes))
     }
 
-    fn encode_signature(
-        &self,
-        _algorithm: A,
-        signature: Vec<u8>,
-    ) -> Result<Vec<u8>, MessageSignatureError> {
+    fn encode_signature(&self, _algorithm: A, signature: Vec<u8>) -> Result<Vec<u8>, Error> {
         Ok(Self::encode_signature(&signature))
     }
 

@@ -1,6 +1,6 @@
 use core::convert::TryFrom;
 use ssi_jwk::{
-    ssi_crypto::{SignatureError, SigningKey},
+    ssi_crypto::{Error, SigningKey},
     Algorithm, Base64urlUInt, KeyConversionError, OkpParams, Params, JWK,
 };
 
@@ -123,7 +123,7 @@ pub enum SignTezosError {
     #[error("Unsupported algorithm for Tezos signing: {0:?}")]
     UnsupportedAlgorithm(Algorithm),
     #[error("Signing: {0}")]
-    Sign(#[from] SignatureError),
+    Sign(#[from] Error),
 }
 
 pub fn sign_tezos(data: &[u8], algorithm: Algorithm, key: &JWK) -> Result<String, SignTezosError> {
@@ -166,7 +166,7 @@ pub fn encode_tezos_signed_message(msg: &str) -> Result<Vec<u8>, EncodeTezosSign
 }
 
 #[derive(thiserror::Error, Debug)]
-pub enum DecodeTezosSignatureError {
+pub enum DecodeTezosError {
     #[error("Expected signature length {0} but found {1}")]
     SignatureLength(usize, usize),
     #[error("Unknown signature prefix: {0}")]
@@ -175,12 +175,10 @@ pub enum DecodeTezosSignatureError {
     Base58(#[from] bs58::decode::Error),
 }
 
-pub fn decode_tzsig(sig_bs58: &str) -> Result<(Algorithm, Vec<u8>), DecodeTezosSignatureError> {
+pub fn decode_tzsig(sig_bs58: &str) -> Result<(Algorithm, Vec<u8>), DecodeTezosError> {
     let tzsig = bs58::decode(&sig_bs58).with_check(None).into_vec()?;
     if tzsig.len() < 5 {
-        return Err(DecodeTezosSignatureError::SignaturePrefix(
-            sig_bs58.to_string(),
-        ));
+        return Err(DecodeTezosError::SignaturePrefix(sig_bs58.to_string()));
     }
     // sig_bs58 has been checked as base58. But use the non-panicking get function anyway, for good
     // measure.
@@ -188,14 +186,10 @@ pub fn decode_tzsig(sig_bs58: &str) -> Result<(Algorithm, Vec<u8>), DecodeTezosS
         Some("edsig") => (Algorithm::EdBlake2b, tzsig[5..].to_vec()),
         Some("spsig") => (Algorithm::ESBlake2bK, tzsig[5..].to_vec()),
         Some("p2sig") => (Algorithm::ESBlake2b, tzsig[4..].to_vec()),
-        _ => {
-            return Err(DecodeTezosSignatureError::SignaturePrefix(
-                sig_bs58.to_string(),
-            ))
-        }
+        _ => return Err(DecodeTezosError::SignaturePrefix(sig_bs58.to_string())),
     };
     if sig.len() != 64 {
-        return Err(DecodeTezosSignatureError::SignatureLength(64, sig.len()));
+        return Err(DecodeTezosError::SignatureLength(64, sig.len()));
     }
     Ok((algorithm, sig))
 }

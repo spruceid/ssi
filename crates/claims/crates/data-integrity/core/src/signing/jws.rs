@@ -1,10 +1,10 @@
 use std::{borrow::Cow, marker::PhantomData};
 
-use ssi_claims_core::{ProofValidationError, SignatureError};
-use ssi_crypto::algorithm::{SignatureAlgorithmInstance, SignatureAlgorithmType};
-use ssi_jwk::{Algorithm, JWK};
-use ssi_jws::{DecodedJws, JwsSignature, JwsString};
-use ssi_verification_methods::{MessageSigner, VerifyBytes, VerifyBytesWithRecoveryJwk};
+use ssi_claims_core::ProofValidationError;
+use ssi_crypto::{AlgorithmInstance, SignatureError, Signer, Verifier};
+use ssi_jwk::{Algorithm, VerifyingKey, JWK};
+use ssi_jws::{DecodedJws, JwsPayload, JwsSignature, JwsString};
+use ssi_verification_methods::VerificationMethod;
 
 use crate::{
     suite::standard::{
@@ -12,8 +12,6 @@ use crate::{
     },
     CryptographicSuite, ProofConfigurationRef, ProofRef,
 };
-
-use super::AlgorithmSelection;
 
 #[derive(
     Debug,
@@ -30,8 +28,8 @@ pub struct DetachedJwsSignature {
 }
 
 impl DetachedJwsSignature {
-    pub fn new(jws: JwsString) -> Self {
-        Self { jws }
+    pub fn new(jws: impl Into<JwsString>) -> Self {
+        Self { jws: jws.into() }
     }
 
     /// Decodes the signature for the given message.
@@ -56,17 +54,12 @@ impl DetachedJwsSignature {
         ))
     }
 
-    pub async fn sign_detached<A: SignatureAlgorithmType + Into<Algorithm>, S: MessageSigner<A>>(
+    pub async fn sign_detached(
+        signer: impl Signer,
+        algorithm_instance: Option<AlgorithmInstance>,
         payload: &[u8],
-        signer: S,
-        key_id: Option<String>,
-        algorithm_instance: A::Instance,
     ) -> Result<Self, SignatureError> {
-        let header = ssi_jws::Header::new_unencoded(algorithm_instance.algorithm().into(), key_id);
-        let signing_bytes = header.encode_signing_bytes(payload);
-        let signature = signer.sign(algorithm_instance, &signing_bytes).await?;
-        let jws = ssi_jws::JwsString::encode_detached(header, &signature);
-        Ok(Self::new(jws))
+        payload.sign_detached(signer, algorithm_instance).await.map(Self::new)
     }
 }
 
@@ -82,46 +75,41 @@ impl super::AlterSignature for DetachedJwsSignature {
     }
 }
 
-pub struct DetachedJwsSigning<A>(PhantomData<A>);
+pub struct DetachedJwsSigning;
 
-impl<A> SignatureAndVerificationAlgorithm for DetachedJwsSigning<A> {
+impl SignatureAndVerificationAlgorithm for DetachedJwsSigning {
     type Signature = DetachedJwsSignature;
 }
 
-impl<A, S, T> SignatureAlgorithm<S, T> for DetachedJwsSigning<A>
+impl<S> SignatureAlgorithm<S> for DetachedJwsSigning
 where
     S: CryptographicSuite,
-    S::PreparedClaims: AsRef<[u8]>,
-    A: SignatureAlgorithmType
-        + AlgorithmSelection<S::VerificationMethod, S::ProofOptions>
-        + Into<Algorithm>,
-    T: MessageSigner<A>,
+    S::PreparedClaims: AsRef<[u8]>
 {
     async fn sign(
-        verification_method: &S::VerificationMethod,
-        signer: T,
+        verification_method: &VerificationMethod,
+        signer: impl Signer,
         prepared_claims: S::PreparedClaims,
         proof_configuration: ProofConfigurationRef<'_, S>,
     ) -> Result<Self::Signature, SignatureError> {
         DetachedJwsSignature::sign_detached(
-            prepared_claims.as_ref(),
             signer,
-            None,
-            A::select_algorithm(verification_method, proof_configuration.options)?,
+            None, // A::select_algorithm(verification_method, proof_configuration.options)?,
+            prepared_claims.as_ref(),
         )
         .await
     }
 }
 
-impl<A, S> VerificationAlgorithm<S> for DetachedJwsSigning<A>
+impl<S> VerificationAlgorithm<S> for DetachedJwsSigning
 where
     S: CryptographicSuite<Signature = DetachedJwsSignature>,
-    S::PreparedClaims: AsRef<[u8]>,
-    S::VerificationMethod: VerifyBytes<A>,
-    A: TryFrom<Algorithm>,
+    S::PreparedClaims: AsRef<[u8]>
 {
     fn verify(
-        method: &S::VerificationMethod,
+        &self,
+        verifier: impl VerifyingKey,
+        method: &VerificationMethod,
         prepared_claims: S::PreparedClaims,
         proof: ProofRef<S>,
     ) -> Result<ssi_claims_core::ProofValidity, ProofValidationError> {
@@ -148,46 +136,44 @@ where
     }
 }
 
-pub struct DetachedJwsRecoverySigning<A>(PhantomData<A>);
+pub struct DetachedJwsRecoverySigning;
 
-impl<A> SignatureAndVerificationAlgorithm for DetachedJwsRecoverySigning<A> {
+impl SignatureAndVerificationAlgorithm for DetachedJwsRecoverySigning {
     type Signature = DetachedJwsSignature;
 }
 
-impl<A, S, T> SignatureAlgorithm<S, T> for DetachedJwsRecoverySigning<A>
+impl<S> SignatureAlgorithm<S> for DetachedJwsRecoverySigning
 where
     S: CryptographicSuite,
     S::PreparedClaims: AsRef<[u8]>,
-    S::ProofOptions: RecoverPublicJwk,
-    A: Clone + Into<Algorithm> + AlgorithmSelection<S::VerificationMethod, S::ProofOptions>,
-    T: MessageSigner<A>,
+    S::ProofOptions: RecoverPublicJwk
 {
     async fn sign(
-        verification_method: &S::VerificationMethod,
-        signer: T,
+        verification_method: &VerificationMethod,
+        signer: impl Signer,
         prepared_claims: S::PreparedClaims,
         proof_configuration: ProofConfigurationRef<'_, S>,
     ) -> Result<Self::Signature, SignatureError> {
         DetachedJwsSignature::sign_detached(
-            prepared_claims.as_ref(),
             signer,
-            proof_configuration.options.public_jwk().key_id.clone(),
-            A::select_algorithm(verification_method, proof_configuration.options)?,
+            None, // A::select_algorithm(verification_method, proof_configuration.options)?,
+            prepared_claims.as_ref(),
+            // proof_configuration.options.public_jwk().key_id.clone(),
         )
         .await
     }
 }
 
-impl<A, S> VerificationAlgorithm<S> for DetachedJwsRecoverySigning<A>
+impl<S> VerificationAlgorithm<S> for DetachedJwsRecoverySigning
 where
     S: CryptographicSuite<Signature = DetachedJwsSignature>,
     S::PreparedClaims: AsRef<[u8]>,
-    S::ProofOptions: RecoverPublicJwk,
-    S::VerificationMethod: VerifyBytesWithRecoveryJwk<A>,
-    A: TryFrom<ssi_jwk::Algorithm>,
+    S::ProofOptions: RecoverPublicJwk
 {
     fn verify(
-        verification_method: &S::VerificationMethod,
+        &self,
+        verifier: impl VerifyingKey,
+        verification_method: &VerificationMethod,
         prepared_claims: S::PreparedClaims,
         proof: ProofRef<S>,
     ) -> Result<ssi_claims_core::ProofValidity, ProofValidationError> {

@@ -5,7 +5,7 @@ use bitvec::prelude::Lsb0;
 use bitvec::vec::BitVec;
 use iref::UriBuf;
 use serde::{Deserialize, Serialize};
-use ssi_claims_core::VerificationParameters;
+use ssi_claims_core::Parameters;
 use ssi_data_integrity::AnyDataIntegrity;
 use ssi_json_ld::STATUS_LIST_2021_V1_CONTEXT;
 use ssi_verification_methods::{AnyMethod, VerificationMethodResolver};
@@ -178,7 +178,7 @@ impl CredentialStatus for StatusList2021Entry {
             )));
         }
 
-        let params = VerificationParameters::from_resolver(resolver);
+        let params = Parameters::from_resolver(resolver);
         let vc_result = status_list_credential.verify(params).await?;
 
         if let Err(e) = vc_result {

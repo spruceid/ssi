@@ -1,42 +1,34 @@
 use std::{borrow::Cow, marker::PhantomData};
 
-use crate::{document::Document, resolution, DIDResolver, DID, DIDURL};
+use crate::{document::Document, resolution, DidResolver, DID, DIDURL};
 use iref::Iri;
-use ssi_claims_core::ProofValidationError;
-use ssi_jwk::{JWKResolver, JWK};
+use ssi_crypto::Verifier;
+use ssi_jwk::JWK;
 use ssi_verification_methods_core::{
-    ControllerError, ControllerProvider, GenericVerificationMethod, InvalidVerificationMethod,
-    MaybeJwkVerificationMethod, ProofPurposes, ReferenceOrOwnedRef, VerificationMethod,
-    VerificationMethodResolutionError, VerificationMethodResolver, VerificationMethodSet,
+    ControllerError, ControllerProvider, ProofPurposes, VerificationMethod,
 };
 
-pub struct VerificationMethodDIDResolver<T, M> {
+pub struct DidVerificationMethodResolver<T> {
     resolver: T,
     options: resolution::Options,
-    method: PhantomData<M>,
 }
 
-impl<T: Default, M> Default for VerificationMethodDIDResolver<T, M> {
+impl<T: Default> Default for DidVerificationMethodResolver<T> {
     fn default() -> Self {
         Self::new(T::default())
     }
 }
 
-impl<T, M> VerificationMethodDIDResolver<T, M> {
+impl<T> DidVerificationMethodResolver<T> {
     pub fn new(resolver: T) -> Self {
         Self {
             resolver,
             options: resolution::Options::default(),
-            method: PhantomData,
         }
     }
 
     pub fn new_with_options(resolver: T, options: resolution::Options) -> Self {
-        Self {
-            resolver,
-            options,
-            method: PhantomData,
-        }
+        Self { resolver, options }
     }
 
     pub fn resolver(&self) -> &T {
@@ -57,7 +49,7 @@ impl ssi_verification_methods_core::Controller for Document {
     }
 }
 
-impl<T: DIDResolver, M> DIDResolver for VerificationMethodDIDResolver<T, M> {
+impl<T: DidResolver> DidResolver for DidVerificationMethodResolver<T> {
     async fn resolve_representation<'a>(
         &'a self,
         did: &'a DID,
@@ -67,8 +59,11 @@ impl<T: DIDResolver, M> DIDResolver for VerificationMethodDIDResolver<T, M> {
     }
 }
 
-impl<T: DIDResolver, M> ControllerProvider for VerificationMethodDIDResolver<T, M> {
-    type Controller<'a> = Document where Self: 'a;
+impl<T: DidResolver> ControllerProvider for DidVerificationMethodResolver<T> {
+    type Controller<'a>
+        = Document
+    where
+        Self: 'a;
 
     async fn get_controller<'a>(
         &'a self,
@@ -79,7 +74,7 @@ impl<T: DIDResolver, M> ControllerProvider for VerificationMethodDIDResolver<T, 
                 Ok(did) => match self.resolver.resolve_with(did, self.options.clone()).await {
                     Ok(output) => Ok(Some(output.document.into_document())),
                     Err(resolution::Error::NotFound) => Ok(None),
-                    Err(e) => Err(ControllerError::InternalError(e.to_string())),
+                    Err(e) => Err(ControllerError::internal(e)),
                 },
                 Err(_) => Err(ControllerError::Invalid),
             }
@@ -90,12 +85,15 @@ impl<T: DIDResolver, M> ControllerProvider for VerificationMethodDIDResolver<T, 
 }
 
 // #[async_trait]
-impl<T: DIDResolver, M> VerificationMethodResolver for VerificationMethodDIDResolver<T, M>
-where
-    M: VerificationMethod,
-    M: TryFrom<GenericVerificationMethod, Error = InvalidVerificationMethod>,
-{
-    type Method = M;
+impl<T: DidResolver> Verifier for DidVerificationMethodResolver<T> {
+    type VerifyingKey = VerificationMethod;
+
+    async fn get_verifying_key(
+        &self,
+        id: Option<&[u8]>,
+    ) -> Result<Option<Self::VerifyingKey>, ssi_crypto::Error> {
+        todo!()
+    }
 
     async fn resolve_verification_method_with(
         &self,
@@ -156,7 +154,7 @@ where
     }
 }
 
-impl<T: DIDResolver, M> JWKResolver for VerificationMethodDIDResolver<T, M>
+impl<T: DidResolver, M> JWKResolver for DidVerificationMethodResolver<T, M>
 where
     M: MaybeJwkVerificationMethod
         + VerificationMethodSet

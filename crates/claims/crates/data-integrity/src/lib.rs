@@ -2,17 +2,17 @@ pub use ssi_core::{JsonPointer, JsonPointerBuf};
 pub use ssi_data_integrity_core::*;
 pub use ssi_data_integrity_suites as suites;
 
-mod any;
-pub use any::*;
+// mod any;
+// pub use any::*;
 
-#[cfg(test)]
-mod core_tests;
+// #[cfg(test)]
+// mod core_tests;
 
-/// Any Data-Integrity proof known by this library.
-pub type AnyProof = Proof<AnySuite>;
+// /// Any Data-Integrity proof known by this library.
+// pub type AnyProof = Proof<AnySuite>;
 
-/// List of any Data-Integrity proof known by this library.
-pub type AnyProofs = Proofs<AnySuite>;
+// /// List of any Data-Integrity proof known by this library.
+// pub type AnyProofs = Proofs<AnySuite>;
 
-/// Data-Integrity-secured claims with any cryptographic suite.
-pub type AnyDataIntegrity<T = DataIntegrityDocument> = DataIntegrity<T, AnySuite>;
+// /// Data-Integrity-secured claims with any cryptographic suite.
+// pub type AnyDataIntegrity<T = DataIntegrityDocument> = DataIntegrity<T, AnySuite>;

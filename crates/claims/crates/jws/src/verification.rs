@@ -1,21 +1,16 @@
 use crate::{DecodedJws, DecodedSigningBytes, Header};
 use base64::{engine::general_purpose::URL_SAFE_NO_PAD, Engine};
 use ssi_claims_core::{
-    ClaimsValidity, ProofValidationError, ProofValidity, ValidateClaims, ValidateProof,
-    VerifiableClaims, VerificationParameters,
+    ClaimsValidity, Parameters, ValidateClaims, ValidateProof, VerifiableClaims,
 };
-use ssi_crypto::Verifier;
+use ssi_crypto::{Error, SignatureVerification, Verifier};
 use std::{
     borrow::{Borrow, Cow},
     ops::Deref,
 };
 
 pub trait ValidateJwsHeader {
-    fn validate_jws_header(
-        &self,
-        _env: &VerificationParameters,
-        _header: &Header,
-    ) -> ClaimsValidity {
+    fn validate_jws_header(&self, _env: &Parameters, _header: &Header) -> ClaimsValidity {
         Ok(())
     }
 }
@@ -23,7 +18,7 @@ pub trait ValidateJwsHeader {
 impl ValidateJwsHeader for [u8] {}
 
 impl<'a, T: ?Sized + ToOwned + ValidateJwsHeader> ValidateJwsHeader for Cow<'a, T> {
-    fn validate_jws_header(&self, env: &VerificationParameters, header: &Header) -> ClaimsValidity {
+    fn validate_jws_header(&self, env: &Parameters, header: &Header) -> ClaimsValidity {
         self.as_ref().validate_jws_header(env, header)
     }
 }
@@ -31,11 +26,7 @@ impl<'a, T: ?Sized + ToOwned + ValidateJwsHeader> ValidateJwsHeader for Cow<'a, 
 impl<'a, T: ValidateClaims<JwsSignature> + ValidateJwsHeader> ValidateClaims<JwsSignature>
     for DecodedSigningBytes<'a, T>
 {
-    fn validate_claims(
-        &self,
-        env: &VerificationParameters,
-        signature: &JwsSignature,
-    ) -> ClaimsValidity {
+    fn validate_claims(&self, env: &Parameters, signature: &JwsSignature) -> ClaimsValidity {
         self.payload.validate_jws_header(env, &self.header)?;
         self.payload.validate_claims(env, signature)
     }
@@ -113,21 +104,23 @@ impl<'a, T> VerifiableClaims for DecodedJws<'a, T> {
     }
 }
 
-impl<'b, T> ValidateProof<DecodedSigningBytes<'b, T>> for JwsSignature {
+impl<'b, T, V> ValidateProof<DecodedSigningBytes<'b, T>, V> for JwsSignature
+where
+    V: Verifier,
+{
     async fn validate_proof<'a>(
         &'a self,
-        verifier: impl Verifier,
-        _params: &'a VerificationParameters,
+        verifier: &'a V,
         claims: &'a DecodedSigningBytes<'b, T>,
-    ) -> Result<ProofValidity, ProofValidationError> {
-        Ok(verifier
-            .verify_bytes(
+        _params: &'a Parameters,
+    ) -> Result<SignatureVerification, Error> {
+        verifier
+            .verify(
                 claims.header.key_id.as_ref().map(String::as_bytes),
                 Some(claims.header.algorithm.into()),
                 &claims.bytes,
                 &self.0,
             )
-            .await?
-            .map_err(Into::into))
+            .await
     }
 }

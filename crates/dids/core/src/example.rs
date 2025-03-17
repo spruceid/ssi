@@ -2,7 +2,7 @@ use crate::{
     did,
     document::representation::MediaType,
     resolution::{Error, Options, Output},
-    DIDResolver, StaticDIDResolver, DID,
+    DidResolver, StaticDIDResolver, DID,
 };
 
 const DOC_JSON_FOO: &str = include_str!("../tests/vectors/did-example-foo.json");
@@ -81,7 +81,7 @@ impl Default for ExampleDIDResolver {
     }
 }
 
-impl DIDResolver for ExampleDIDResolver {
+impl DidResolver for ExampleDIDResolver {
     async fn resolve_representation<'a>(
         &'a self,
         did: &'a DID,

@@ -150,9 +150,9 @@ mod tests {
     use ssi_claims::{
         data_integrity::{AnySuite, CryptographicSuite, ProofOptions},
         vc::{syntax::NonEmptyVec, v1::JsonCredential},
-        VerificationParameters,
+        Parameters,
     };
-    use ssi_dids_core::{did, DIDResolver, Document, VerificationMethodDIDResolver};
+    use ssi_dids_core::{did, DidResolver, DidVerificationMethodResolver, Document};
     use ssi_jwk::JWK;
     use ssi_verification_methods_core::{ProofPurpose, SingleSecretSigner};
     use static_iref::{iri, uri};
@@ -253,8 +253,8 @@ mod tests {
 
     #[tokio::test]
     async fn credential_prove_verify_did_web() {
-        let didweb = VerificationMethodDIDResolver::new(DIDWeb);
-        let params = VerificationParameters::from_resolver(&didweb);
+        let didweb = DidVerificationMethodResolver::new(DIDWeb);
+        let params = Parameters::from_resolver(&didweb);
 
         let (url, shutdown) = web_server().unwrap();
         PROXY.with(|proxy| {

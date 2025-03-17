@@ -4,8 +4,8 @@ use base64::Engine;
 use rand::{thread_rng, CryptoRng, RngCore};
 use serde::Serialize;
 use serde_json::Value;
-use ssi_claims_core::SignatureError;
 use ssi_core::JsonPointer;
+use ssi_jwk::ssi_crypto::Error;
 use ssi_jwt::{ssi_crypto::Signer, JWTClaims};
 
 use crate::{
@@ -61,7 +61,7 @@ pub trait ConcealJwtClaims {
         sd_alg: SdAlg,
         pointers: &[impl Borrow<JsonPointer>],
         signer: impl Signer,
-    ) -> Result<SdJwtBuf, SignatureError>;
+    ) -> Result<SdJwtBuf, Error>;
 
     /// Conceals and signs these JWT claims with the given `rng`.
     #[allow(async_fn_in_trait)]
@@ -71,7 +71,7 @@ pub trait ConcealJwtClaims {
         pointers: &[impl Borrow<JsonPointer>],
         signer: impl Signer,
         rng: impl CryptoRng + RngCore,
-    ) -> Result<SdJwtBuf, SignatureError>;
+    ) -> Result<SdJwtBuf, Error>;
 }
 
 impl<T: Serialize> ConcealJwtClaims for JWTClaims<T> {
@@ -97,7 +97,7 @@ impl<T: Serialize> ConcealJwtClaims for JWTClaims<T> {
         sd_alg: SdAlg,
         pointers: &[impl Borrow<JsonPointer>],
         signer: impl Signer,
-    ) -> Result<SdJwtBuf, SignatureError> {
+    ) -> Result<SdJwtBuf, Error> {
         SdJwtBuf::conceal_and_sign(self, sd_alg, pointers, signer).await
     }
 
@@ -107,7 +107,7 @@ impl<T: Serialize> ConcealJwtClaims for JWTClaims<T> {
         pointers: &[impl Borrow<JsonPointer>],
         signer: impl Signer,
         rng: impl CryptoRng + RngCore,
-    ) -> Result<SdJwtBuf, SignatureError> {
+    ) -> Result<SdJwtBuf, Error> {
         SdJwtBuf::conceal_and_sign_with(self, sd_alg, pointers, signer, rng).await
     }
 }

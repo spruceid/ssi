@@ -1,20 +1,20 @@
 use std::{borrow::Cow, collections::HashMap, sync::Arc};
 
-use iref::{Iri, IriBuf};
-use ssi_claims_core::{MessageSignatureError, ProofValidationError, SignatureError};
-use ssi_crypto::algorithm::SignatureAlgorithmType;
+use iref::{Iri, IriBuf, UriBuf};
+use serde::{Deserialize, Serialize};
+use ssi_crypto::{Error, Issuer, Verifier};
 use ssi_jwk::JWK;
 use static_iref::iri;
 
 mod controller;
-mod methods;
-mod reference;
+// mod methods;
+// mod reference;
 mod signature;
 mod verification;
 
 pub use controller::*;
-pub use methods::*;
-pub use reference::*;
+// pub use methods::*;
+// pub use reference::*;
 pub use signature::*;
 pub use verification::*;
 
@@ -39,294 +39,328 @@ impl From<String> for ExpectedType {
 }
 
 /// Verification method.
-pub trait VerificationMethod: Clone {
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct VerificationMethod {
     /// Identifier of the verification method.
-    fn id(&self) -> &Iri;
+    pub id: IriBuf,
+
+    /// Verification method type.
+    #[serde(rename = "type")]
+    pub r#type: String,
 
     /// Returns the IRI of the verification method controller.
-    fn controller(&self) -> Option<&Iri>; // Should be an URI.
+    pub controller: UriBuf,
+
+    /// Other properties.
+    #[serde(flatten)]
+    pub properties: HashMap<String, serde_json::Value>,
 }
 
-#[derive(Debug, thiserror::Error)]
-pub enum VerificationMethodResolutionError {
-    #[error("unknown key")]
-    UnknownKey,
-
-    /// Invalid key identifier.
-    #[error("invalid key id `{0}`")]
-    InvalidKeyId(String),
-
-    /// Not a verification method.
-    #[error("id `{0}` is not referring to a verification method")]
-    NotAVerificationMethod(String),
-
-    /// Unsupported key identifier.
-    #[error("unsupported key id `{0}`")]
-    UnsupportedKeyId(String),
-
-    #[error("missing verification method")]
-    MissingVerificationMethod,
-
-    #[error(transparent)]
-    InvalidVerificationMethod(#[from] InvalidVerificationMethod),
-
-    /// Verifier internal error.
-    #[error("internal error: {0}")]
-    InternalError(String),
+pub trait GetVerificationMethod {
+    fn get_verification_method(&self) -> VerificationMethod;
 }
 
-impl From<VerificationMethodResolutionError> for ProofValidationError {
-    fn from(value: VerificationMethodResolutionError) -> Self {
-        match value {
-            VerificationMethodResolutionError::MissingVerificationMethod => Self::MissingPublicKey,
-            e => Self::Other(e.to_string()),
+pub trait VerificationMethodIssuer: Issuer<Signer: GetVerificationMethod> {}
+
+impl<T: Issuer<Signer: GetVerificationMethod>> VerificationMethodIssuer for T {}
+
+pub trait VerificationMethodVerifier: Verifier<VerifyingKey: GetVerificationMethod> {}
+
+impl<T: Verifier<VerifyingKey: GetVerificationMethod>> VerificationMethodVerifier for T {}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(untagged)]
+pub enum CowVerificationMethod {
+    Ref(IriBuf),
+    Owned(VerificationMethod),
+}
+
+impl CowVerificationMethod {
+    pub fn id(&self) -> &Iri {
+        match self {
+            Self::Ref(r) => r,
+            Self::Owned(o) => &o.id,
         }
     }
 }
 
-impl From<VerificationMethodResolutionError> for SignatureError {
-    fn from(value: VerificationMethodResolutionError) -> Self {
-        match value {
-            VerificationMethodResolutionError::MissingVerificationMethod => Self::MissingSigner,
-            e => Self::other(e),
-        }
-    }
-}
+// #[derive(Debug, thiserror::Error)]
+// pub enum VerificationMethodResolutionError {
+//     #[error("unknown key")]
+//     UnknownKey,
 
-pub trait VerificationMethodSet: VerificationMethod {
-    type TypeSet: VerificationMethodTypeSet;
+//     /// Invalid key identifier.
+//     #[error("invalid key id `{0}`")]
+//     InvalidKeyId(String),
 
-    fn type_set() -> Self::TypeSet;
-}
+//     /// Not a verification method.
+//     #[error("id `{0}` is not referring to a verification method")]
+//     NotAVerificationMethod(String),
 
-pub trait VerificationMethodTypeSet: 'static + Send + Sync {
-    fn pick(&self) -> Option<&str>;
-    fn contains(&self, ty: &str) -> bool;
-}
+//     /// Unsupported key identifier.
+//     #[error("unsupported key id `{0}`")]
+//     UnsupportedKeyId(String),
 
-impl VerificationMethodTypeSet for &'static str {
-    fn contains(&self, ty: &str) -> bool {
-        ty == *self
-    }
+//     #[error("missing verification method")]
+//     MissingVerificationMethod,
 
-    fn pick(&self) -> Option<&str> {
-        Some(self)
-    }
-}
+//     #[error(transparent)]
+//     InvalidVerificationMethod(#[from] InvalidVerificationMethod),
 
-impl VerificationMethodTypeSet for &'static [&'static str] {
-    fn contains(&self, ty: &str) -> bool {
-        self.iter().any(|&t| t == ty)
-    }
+//     /// Verifier internal error.
+//     #[error("internal error: {0}")]
+//     InternalError(String),
+// }
 
-    fn pick(&self) -> Option<&str> {
-        self.first().copied()
-    }
-}
+// impl From<VerificationMethodResolutionError> for ProofValidationError {
+//     fn from(value: VerificationMethodResolutionError) -> Self {
+//         match value {
+//             VerificationMethodResolutionError::MissingVerificationMethod => Self::MissingPublicKey,
+//             e => Self::Other(e.to_string()),
+//         }
+//     }
+// }
 
-#[derive(Default)]
-pub struct ResolutionOptions {
-    /// Accepted verification method types.
-    pub accept: Option<Box<dyn VerificationMethodTypeSet>>,
-}
+// impl From<VerificationMethodResolutionError> for Error {
+//     fn from(value: VerificationMethodResolutionError) -> Self {
+//         Self::other(value)
+//     }
+// }
 
-pub trait VerificationMethodResolver {
-    /// Verification method type.
-    type Method: Clone;
+// pub trait VerificationMethodSet: VerificationMethod {
+//     type TypeSet: VerificationMethodTypeSet;
 
-    /// Resolve the verification method reference.
-    #[allow(async_fn_in_trait)]
-    async fn resolve_verification_method_with(
-        &self,
-        issuer: Option<&Iri>,
-        method: Option<ReferenceOrOwnedRef<'_, Self::Method>>,
-        options: ResolutionOptions,
-    ) -> Result<Cow<Self::Method>, VerificationMethodResolutionError>;
+//     fn type_set() -> Self::TypeSet;
+// }
 
-    /// Resolve the verification method reference with the default options.
-    #[allow(async_fn_in_trait)]
-    async fn resolve_verification_method(
-        &self,
-        issuer: Option<&Iri>,
-        method: Option<ReferenceOrOwnedRef<'_, Self::Method>>,
-    ) -> Result<Cow<Self::Method>, VerificationMethodResolutionError> {
-        self.resolve_verification_method_with(issuer, method, Default::default())
-            .await
-    }
-}
+// pub trait VerificationMethodTypeSet: 'static + Send + Sync {
+//     fn pick(&self) -> Option<&str>;
+//     fn contains(&self, ty: &str) -> bool;
+// }
 
-impl<'t, T: VerificationMethodResolver> VerificationMethodResolver for &'t T {
-    type Method = T::Method;
+// impl VerificationMethodTypeSet for &'static str {
+//     fn contains(&self, ty: &str) -> bool {
+//         ty == *self
+//     }
 
-    async fn resolve_verification_method_with(
-        &self,
-        issuer: Option<&Iri>,
-        method: Option<ReferenceOrOwnedRef<'_, T::Method>>,
-        options: ResolutionOptions,
-    ) -> Result<Cow<T::Method>, VerificationMethodResolutionError> {
-        T::resolve_verification_method_with(self, issuer, method, options).await
-    }
-}
+//     fn pick(&self) -> Option<&str> {
+//         Some(self)
+//     }
+// }
 
-impl<M: VerificationMethod> VerificationMethodResolver for HashMap<IriBuf, M> {
-    type Method = M;
+// impl VerificationMethodTypeSet for &'static [&'static str] {
+//     fn contains(&self, ty: &str) -> bool {
+//         self.iter().any(|&t| t == ty)
+//     }
 
-    async fn resolve_verification_method_with(
-        &self,
-        _issuer: Option<&Iri>,
-        method: Option<ReferenceOrOwnedRef<'_, Self::Method>>,
-        _options: ResolutionOptions,
-    ) -> Result<Cow<Self::Method>, VerificationMethodResolutionError> {
-        match method {
-            Some(ReferenceOrOwnedRef::Owned(method)) => Ok(Cow::Owned(method.clone())),
-            Some(ReferenceOrOwnedRef::Reference(iri)) => match self.get(iri) {
-                Some(method) => Ok(Cow::Borrowed(method)),
-                None => Err(VerificationMethodResolutionError::UnknownKey),
-            },
-            None => Err(VerificationMethodResolutionError::MissingVerificationMethod),
-        }
-    }
-}
+//     fn pick(&self) -> Option<&str> {
+//         self.first().copied()
+//     }
+// }
 
-pub trait SigningMethod<S, A: SignatureAlgorithmType>: VerificationMethod {
-    fn sign_bytes(
-        &self,
-        secret: &S,
-        algorithm: A::Instance,
-        bytes: &[u8],
-    ) -> Result<Vec<u8>, MessageSignatureError>;
+// #[derive(Default)]
+// pub struct ResolutionOptions {
+//     /// Accepted verification method types.
+//     pub accept: Option<Box<dyn VerificationMethodTypeSet>>,
+// }
 
-    fn sign_bytes_multi(
-        &self,
-        secret: &S,
-        algorithm: A::Instance,
-        messages: &[Vec<u8>],
-    ) -> Result<Vec<u8>, MessageSignatureError> {
-        match messages.split_first() {
-            Some((message, [])) => self.sign_bytes(secret, algorithm, message),
-            // Some(_) => Err(MessageSignatureError::TooManyMessages),
-            Some(_) => todo!(),
-            None => Err(MessageSignatureError::MissingMessage),
-        }
-    }
-}
+// pub trait VerificationMethodResolver {
+//     /// Verification method type.
+//     type Method: Clone;
 
-pub struct MethodWithSecret<M: VerificationMethod, S> {
-    pub method: M,
-    pub secret: Arc<S>,
-}
+//     /// Resolve the verification method reference.
+//     #[allow(async_fn_in_trait)]
+//     async fn resolve_verification_method_with(
+//         &self,
+//         issuer: Option<&Iri>,
+//         method: Option<ReferenceOrOwnedRef<'_, Self::Method>>,
+//         options: ResolutionOptions,
+//     ) -> Result<Cow<Self::Method>, VerificationMethodResolutionError>;
 
-impl<M: VerificationMethod, S> MethodWithSecret<M, S> {
-    pub fn new(method: M, secret: Arc<S>) -> Self {
-        Self { method, secret }
-    }
-}
+//     /// Resolve the verification method reference with the default options.
+//     #[allow(async_fn_in_trait)]
+//     async fn resolve_verification_method(
+//         &self,
+//         issuer: Option<&Iri>,
+//         method: Option<ReferenceOrOwnedRef<'_, Self::Method>>,
+//     ) -> Result<Cow<Self::Method>, VerificationMethodResolutionError> {
+//         self.resolve_verification_method_with(issuer, method, Default::default())
+//             .await
+//     }
+// }
 
-impl<A: SignatureAlgorithmType, M: SigningMethod<S, A>, S> MessageSigner<A>
-    for MethodWithSecret<M, S>
-{
-    async fn sign(
-        self,
-        algorithm: A::Instance,
-        message: &[u8],
-    ) -> Result<Vec<u8>, MessageSignatureError> {
-        self.method.sign_bytes(&self.secret, algorithm, message)
-    }
+// impl<'t, T: VerificationMethodResolver> VerificationMethodResolver for &'t T {
+//     type Method = T::Method;
 
-    async fn sign_multi(
-        self,
-        algorithm: <A as SignatureAlgorithmType>::Instance,
-        messages: &[Vec<u8>],
-    ) -> Result<Vec<u8>, MessageSignatureError> {
-        self.method
-            .sign_bytes_multi(&self.secret, algorithm, messages)
-    }
-}
+//     async fn resolve_verification_method_with(
+//         &self,
+//         issuer: Option<&Iri>,
+//         method: Option<ReferenceOrOwnedRef<'_, T::Method>>,
+//         options: ResolutionOptions,
+//     ) -> Result<Cow<T::Method>, VerificationMethodResolutionError> {
+//         T::resolve_verification_method_with(self, issuer, method, options).await
+//     }
+// }
 
-pub trait TypedVerificationMethod: VerificationMethod {
-    fn expected_type() -> Option<ExpectedType>;
+// impl<M: VerificationMethod> VerificationMethodResolver for HashMap<IriBuf, M> {
+//     type Method = M;
 
-    fn type_match(ty: &str) -> bool;
+//     async fn resolve_verification_method_with(
+//         &self,
+//         _issuer: Option<&Iri>,
+//         method: Option<ReferenceOrOwnedRef<'_, Self::Method>>,
+//         _options: ResolutionOptions,
+//     ) -> Result<Cow<Self::Method>, VerificationMethodResolutionError> {
+//         match method {
+//             Some(ReferenceOrOwnedRef::Owned(method)) => Ok(Cow::Owned(method.clone())),
+//             Some(ReferenceOrOwnedRef::Reference(iri)) => match self.get(iri) {
+//                 Some(method) => Ok(Cow::Borrowed(method)),
+//                 None => Err(VerificationMethodResolutionError::UnknownKey),
+//             },
+//             None => Err(VerificationMethodResolutionError::MissingVerificationMethod),
+//         }
+//     }
+// }
 
-    fn type_(&self) -> &str;
-}
+// pub trait SigningMethod<S>: VerificationMethod {
+//     fn sign_bytes(
+//         &self,
+//         secret: &S,
+//         algorithm: AlgorithmInstance,
+//         bytes: &[u8],
+//     ) -> Result<Vec<u8>, MessageError>;
 
-pub trait LinkedDataVerificationMethod {
-    fn quads(&self, quads: &mut Vec<rdf_types::Quad>) -> rdf_types::Object;
-}
+//     fn sign_bytes_multi(
+//         &self,
+//         secret: &S,
+//         algorithm: AlgorithmInstance,
+//         messages: &[Vec<u8>],
+//     ) -> Result<Vec<u8>, MessageError> {
+//         match messages.split_first() {
+//             Some((message, [])) => self.sign_bytes(secret, algorithm, message),
+//             // Some(_) => Err(MessageError::TooManyMessages),
+//             Some(_) => todo!(),
+//             None => Err(MessageError::MissingMessage),
+//         }
+//     }
+// }
 
-impl<'a, T: LinkedDataVerificationMethod> LinkedDataVerificationMethod for &'a T {
-    fn quads(&self, quads: &mut Vec<rdf_types::Quad>) -> rdf_types::Object {
-        T::quads(*self, quads)
-    }
-}
+// pub struct MethodWithSecret<M: VerificationMethod, S> {
+//     pub method: M,
+//     pub secret: Arc<S>,
+// }
 
-#[derive(Debug, thiserror::Error)]
-pub enum InvalidVerificationMethod {
-    #[error("invalid verification method IRI `{0}`")]
-    InvalidIri(String),
+// impl<M: VerificationMethod, S> MethodWithSecret<M, S> {
+//     pub fn new(method: M, secret: Arc<S>) -> Self {
+//         Self { method, secret }
+//     }
+// }
 
-    #[error("invalid verification method type IRI `{0}`")]
-    InvalidTypeIri(IriBuf),
+// impl<M: SigningMethod<S>, S> MessageSigner
+//     for MethodWithSecret<M, S>
+// {
+//     async fn sign(
+//         self,
+//         algorithm: AlgorithmInstance,
+//         message: &[u8],
+//     ) -> Result<Vec<u8>, MessageError> {
+//         self.method.sign_bytes(&self.secret, algorithm, message)
+//     }
 
-    #[error("invalid verification method type name `{0}`, expected `{1}`")]
-    InvalidTypeName(String, String),
+//     async fn sign_multi(
+//         self,
+//         algorithm: AlgorithmInstance,
+//         messages: &[Vec<u8>],
+//     ) -> Result<Vec<u8>, MessageError> {
+//         self.method
+//             .sign_bytes_multi(&self.secret, algorithm, messages)
+//     }
+// }
 
-    #[error("missing verification method required property `{0}`")]
-    MissingProperty(String),
+// pub trait TypedVerificationMethod: VerificationMethod {
+//     fn expected_type() -> Option<ExpectedType>;
 
-    #[error("invalid verification method property `{0}`")]
-    InvalidProperty(String),
+//     fn type_match(ty: &str) -> bool;
 
-    #[error("ambiguous public key")]
-    AmbiguousPublicKey,
+//     fn type_(&self) -> &str;
+// }
 
-    #[error("unsupported method type `{0}`")]
-    UnsupportedMethodType(String),
-}
+// pub trait LinkedDataVerificationMethod {
+//     fn quads(&self, quads: &mut Vec<rdf_types::Quad>) -> rdf_types::Object;
+// }
 
-impl InvalidVerificationMethod {
-    pub fn invalid_type_iri(iri: &Iri) -> Self {
-        Self::InvalidTypeIri(iri.to_owned())
-    }
+// impl<'a, T: LinkedDataVerificationMethod> LinkedDataVerificationMethod for &'a T {
+//     fn quads(&self, quads: &mut Vec<rdf_types::Quad>) -> rdf_types::Object {
+//         T::quads(*self, quads)
+//     }
+// }
 
-    pub fn invalid_type_name(name: &str, expected: &str) -> Self {
-        Self::InvalidTypeName(name.to_owned(), expected.to_owned())
-    }
+// #[derive(Debug, thiserror::Error)]
+// pub enum InvalidVerificationMethod {
+//     #[error("invalid verification method IRI `{0}`")]
+//     InvalidIri(String),
 
-    pub fn missing_property(name: &str) -> Self {
-        Self::MissingProperty(name.to_owned())
-    }
+//     #[error("invalid verification method type IRI `{0}`")]
+//     InvalidTypeIri(IriBuf),
 
-    pub fn invalid_property(name: &str) -> Self {
-        Self::InvalidProperty(name.to_owned())
-    }
-}
+//     #[error("invalid verification method type name `{0}`, expected `{1}`")]
+//     InvalidTypeName(String, String),
 
-impl From<InvalidVerificationMethod> for ProofValidationError {
-    fn from(_value: InvalidVerificationMethod) -> Self {
-        Self::InvalidKey
-    }
-}
+//     #[error("missing verification method required property `{0}`")]
+//     MissingProperty(String),
 
-impl From<InvalidVerificationMethod> for SignatureError {
-    fn from(value: InvalidVerificationMethod) -> Self {
-        Self::other(value)
-    }
-}
+//     #[error("invalid verification method property `{0}`")]
+//     InvalidProperty(String),
 
-/// Verification method that can be turned into a JSON Web Key.
-pub trait JwkVerificationMethod: VerificationMethod {
-    fn to_jwk(&self) -> Cow<JWK>;
-}
+//     #[error("ambiguous public key")]
+//     AmbiguousPublicKey,
 
-/// Verification method that *may* be turned into a JSON Web Key.
-pub trait MaybeJwkVerificationMethod: VerificationMethod {
-    fn try_to_jwk(&self) -> Option<Cow<JWK>>;
-}
+//     #[error("unsupported method type `{0}`")]
+//     UnsupportedMethodType(String),
+// }
 
-impl<M: JwkVerificationMethod> MaybeJwkVerificationMethod for M {
-    fn try_to_jwk(&self) -> Option<Cow<JWK>> {
-        Some(M::to_jwk(self))
-    }
-}
+// impl InvalidVerificationMethod {
+//     pub fn invalid_type_iri(iri: &Iri) -> Self {
+//         Self::InvalidTypeIri(iri.to_owned())
+//     }
+
+//     pub fn invalid_type_name(name: &str, expected: &str) -> Self {
+//         Self::InvalidTypeName(name.to_owned(), expected.to_owned())
+//     }
+
+//     pub fn missing_property(name: &str) -> Self {
+//         Self::MissingProperty(name.to_owned())
+//     }
+
+//     pub fn invalid_property(name: &str) -> Self {
+//         Self::InvalidProperty(name.to_owned())
+//     }
+// }
+
+// impl From<InvalidVerificationMethod> for ProofValidationError {
+//     fn from(_value: InvalidVerificationMethod) -> Self {
+//         Self::InvalidKey
+//     }
+// }
+
+// impl From<InvalidVerificationMethod> for Error {
+//     fn from(value: InvalidVerificationMethod) -> Self {
+//         Self::other(value)
+//     }
+// }
+
+// /// Verification method that can be turned into a JSON Web Key.
+// pub trait JwkVerificationMethod: VerificationMethod {
+//     fn to_jwk(&self) -> Cow<JWK>;
+// }
+
+// /// Verification method that *may* be turned into a JSON Web Key.
+// pub trait MaybeJwkVerificationMethod: VerificationMethod {
+//     fn try_to_jwk(&self) -> Option<Cow<JWK>>;
+// }
+
+// impl<M: JwkVerificationMethod> MaybeJwkVerificationMethod for M {
+//     fn try_to_jwk(&self) -> Option<Cow<JWK>> {
+//         Some(M::to_jwk(self))
+//     }
+// }

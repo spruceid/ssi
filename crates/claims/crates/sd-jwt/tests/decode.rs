@@ -92,7 +92,7 @@ static UNDISCLOSED_CLAIMS: LazyLock<Value> = LazyLock::new(|| {
 });
 
 async fn test_standard_sd_jwt() -> JwsBuf {
-    (*UNDISCLOSED_CLAIMS).sign(None, &*JWK).await.unwrap()
+    (*UNDISCLOSED_CLAIMS).sign(&*JWK, None).await.unwrap()
 }
 
 // *Claim email*:

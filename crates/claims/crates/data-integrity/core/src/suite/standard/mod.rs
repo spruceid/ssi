@@ -2,9 +2,10 @@
 use std::borrow::Cow;
 
 use ssi_claims_core::{
-    ProofValidationError, ProofValidity, ResolverProvider, ResourceProvider, SignatureError,
+    ProofValidationError, ProofValidity, VerificationParameters
 };
-use ssi_verification_methods::{Signer, VerificationMethodResolver, VerificationMethodSet};
+use ssi_crypto::{Issuer, SignatureError, Signer, Verifier};
+use ssi_verification_methods::{GetVerificationMethod, VerificationMethod, VerificationMethodIssuer, VerificationMethodVerifierRegistry};
 
 use crate::{CryptographicSuite, ProofConfigurationRef, ProofRef, TypeRef};
 
@@ -22,7 +23,7 @@ pub use verification::*;
 
 use super::{
     ConfigurationAlgorithm, CryptographicSuiteSigning, CryptographicSuiteVerification,
-    InputVerificationOptions, TransformationOptions,
+    TransformationOptions,
 };
 
 // mod test_bbs;
@@ -43,9 +44,6 @@ pub trait StandardCryptographicSuite: Clone {
     /// Hashing algorithm result.
     type Hashing: HashingAlgorithm<Self>;
 
-    /// Verification method.
-    type VerificationMethod: VerificationMethodSet;
-
     /// Signature (and verification) algorithm.
     type SignatureAlgorithm: SignatureAndVerificationAlgorithm + VerificationAlgorithm<Self>;
 
@@ -56,19 +54,19 @@ pub trait StandardCryptographicSuite: Clone {
     fn type_(&self) -> TypeRef;
 
     #[allow(async_fn_in_trait)]
-    async fn transform<T, C>(
+    async fn transform<T>(
         &self,
-        context: &C,
+        // context: &C,
         unsecured_document: &T,
         proof_configuration: ProofConfigurationRef<'_, Self>,
-        verification_method: &Self::VerificationMethod,
+        verification_method: &VerificationMethod,
         transformation_options: TransformationOptions<Self>,
     ) -> Result<TransformedData<Self>, TransformationError>
     where
-        Self::Transformation: TypedTransformationAlgorithm<Self, T, C>,
+        Self::Transformation: TypedTransformationAlgorithm<Self, T>,
     {
         Self::Transformation::transform(
-            context,
+            // context,
             unsecured_document,
             proof_configuration,
             verification_method,
@@ -81,7 +79,7 @@ pub trait StandardCryptographicSuite: Clone {
         &self,
         transformed_document: TransformedData<Self>,
         proof_configuration: ProofConfigurationRef<'_, Self>,
-        verification_method: &Self::VerificationMethod,
+        verification_method: &VerificationMethod,
     ) -> Result<HashedData<Self>, HashingError> {
         Self::Hashing::hash(
             transformed_document,
@@ -99,9 +97,6 @@ impl<S: StandardCryptographicSuite> CryptographicSuite for S {
     /// the input options.
     type Configuration = S::Configuration;
 
-    /// Verification method.
-    type VerificationMethod = S::VerificationMethod;
-
     /// Cryptography suite options used to generate the proof.
     type ProofOptions = S::ProofOptions;
 
@@ -117,38 +112,33 @@ impl<S: StandardCryptographicSuite> CryptographicSuite for S {
     }
 }
 
-impl<C, E, R, T, S: StandardCryptographicSuite> CryptographicSuiteSigning<C, E, R, T> for S
+impl<C, S: StandardCryptographicSuite> CryptographicSuiteSigning<C> for S
 where
-    R: VerificationMethodResolver<Method = Self::VerificationMethod>,
-    T: Signer<<Self as StandardCryptographicSuite>::VerificationMethod>,
-    S::Transformation: TypedTransformationAlgorithm<Self, C, E>,
-    S::SignatureAlgorithm: SignatureAlgorithm<S, T::MessageSigner>,
+    S::Transformation: TypedTransformationAlgorithm<Self, C>,
+    S::SignatureAlgorithm: SignatureAlgorithm<S>,
 {
     async fn generate_signature(
         &self,
-        context: &E,
-        resolver: R,
-        signers: T,
+        context: &VerificationParameters,
+        signers: impl VerificationMethodIssuer,
         claims: &C,
         proof_configuration: ProofConfigurationRef<'_, Self>,
         transformation_options: TransformationOptions<Self>,
     ) -> Result<Self::Signature, SignatureError> {
-        let options = ssi_verification_methods::ResolutionOptions {
-            accept: Some(Box::new(Self::VerificationMethod::type_set())),
-        };
+        // let options = ssi_verification_methods::ResolutionOptions {
+        //     accept: Some(Box::new(Self::VerificationMethod::type_set())),
+        // };
 
         // Resolve the verification method.
-        let method = resolver
-            .resolve_verification_method_with(
-                None,
-                Some(proof_configuration.verification_method),
-                options,
-            )
+        let signer = signers
+            .require_key(Some(proof_configuration.verification_method.id().as_bytes()))
             .await?;
+
+        let method = signer.get_verification_method();
 
         let transformed = self
             .transform(
-                context,
+                // context,
                 claims,
                 proof_configuration,
                 &method,
@@ -158,45 +148,38 @@ where
 
         let hashed = self.hash(transformed, proof_configuration, &method)?;
 
-        // Find a signer for this verification method.
-        let signer = signers
-            .for_method(Cow::Borrowed(&method))
-            .await?
-            .ok_or(SignatureError::MissingSigner)?;
-
         S::SignatureAlgorithm::sign(&method, signer, hashed, proof_configuration).await
     }
 }
 
-impl<S: StandardCryptographicSuite, C, V> CryptographicSuiteVerification<C, V> for S
+impl<S: StandardCryptographicSuite, C> CryptographicSuiteVerification<C> for S
 where
-    V: ResolverProvider + ResourceProvider<InputVerificationOptions<S>>,
-    V::Resolver: VerificationMethodResolver<Method = S::VerificationMethod>,
-    S::Transformation: TypedTransformationAlgorithm<Self, C, V>,
+    S::Transformation: TypedTransformationAlgorithm<Self, C>,
     S::SignatureAlgorithm: VerificationAlgorithm<S>,
 {
     async fn verify_proof(
         &self,
-        verifier: &V,
+        verifier_registry: impl VerificationMethodVerifierRegistry,
         claims: &C,
         proof: ProofRef<'_, Self>,
         transformation_options: TransformationOptions<S>,
     ) -> Result<ProofValidity, ProofValidationError> {
-        let options = ssi_verification_methods::ResolutionOptions {
-            accept: Some(Box::new(Self::VerificationMethod::type_set())),
-        };
+        // let options = ssi_verification_methods::ResolutionOptions {
+        //     accept: Some(Box::new(Self::VerificationMethod::type_set())),
+        // };
 
         // Resolve the verification method.
-        let method = verifier
-            .resolver()
-            .resolve_verification_method_with(None, Some(proof.verification_method), options)
+        let signer = verifier_registry
+            .require_key(Some(proof_configuration.verification_method.id().as_bytes()))
             .await?;
+
+        let method = signer.get_verification_method();
 
         let proof_configuration = proof.configuration();
 
         let transformed = self
             .transform(
-                verifier,
+                // verifier,
                 claims,
                 proof_configuration,
                 &method,

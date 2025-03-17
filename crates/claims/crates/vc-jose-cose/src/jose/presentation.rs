@@ -106,7 +106,7 @@ impl<E, P, T: ValidateClaims<E, P>> ValidateClaims<E, P> for JoseVp<T> {
 #[cfg(test)]
 mod tests {
     use serde_json::json;
-    use ssi_claims_core::VerificationParameters;
+    use ssi_claims_core::Parameters;
     use ssi_jwk::JWK;
     use ssi_jws::{JwsSlice, JwsVec};
     use ssi_vc::{enveloped::EnvelopedVerifiableCredential, v2::syntax::JsonPresentation};
@@ -115,7 +115,7 @@ mod tests {
 
     async fn verify(input: &JwsSlice, key: &JWK) {
         let vp = JoseVp::decode_any(input).unwrap();
-        let params = VerificationParameters::from_resolver(key);
+        let params = Parameters::from_resolver(key);
         let result = vp.verify(params).await.unwrap();
         assert_eq!(result, Ok(()))
     }

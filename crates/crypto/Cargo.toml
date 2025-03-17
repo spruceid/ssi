@@ -9,7 +9,7 @@ repository = "https://github.com/spruceid/ssi/"
 documentation = "https://docs.rs/ssi-crypto/"
 
 [features]
-default = ["rsa", "secp256k1", "secp256r1", "ripemd-160"]
+default = ["rsa", "secp256k1", "secp256r1", "secp384r1", "ripemd-160", "der"]
 rsa = ["dep:rsa"]
 ed25519 = ["ed25519-dalek", "blake2"]
 secp256k1 = ["k256", "getrandom", "keccak"]
@@ -19,6 +19,7 @@ bbs = ["dep:bbs", "pairing-plus", "rand_old", "getrandom", "sha2_old", "hkdf"]
 ripemd-160 = ["ripemd160", "secp256k1"]
 keccak = ["keccak-hash"]
 ring = ["dep:ring"]
+der = ["dep:ecdsa", "ecdsa/der"]
 
 [dependencies]
 anyhow.workspace = true
@@ -28,6 +29,7 @@ ssi-bbs.workspace = true
 bbs = { version = "=0.4.1", optional = true }
 bs58 = { workspace = true, features = ["check"] }
 digest = "0.9"
+ecdsa = { version = "0.16.9", optional = true }
 ed25519-dalek = { workspace = true, optional = true, features = ["rand_core"] }
 getrandom = { workspace = true, optional = true } # Required for wasm targets.
 hex.workspace = true
@@ -43,7 +45,7 @@ rand.workspace = true
 rand_old = { package = "rand", version = "0.7", optional = true }
 ring = { version = "0.16", optional = true }
 ripemd160 = { version = "0.9", optional = true }
-rsa = { workspace = true, optional = true }
+rsa = { workspace = true, optional = true, features = ["sha2"] }
 serde = { workspace = true, features = ["derive"] }
 sha2 = { workspace = true }
 sha2_old = { package = "sha2", version = "0.8", optional = true }

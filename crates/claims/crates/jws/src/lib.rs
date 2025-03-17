@@ -106,10 +106,8 @@ pub use base64::DecodeError as Base64DecodeError;
 use base64::Engine;
 // pub use error::Error;
 use serde::{Deserialize, Serialize};
-use ssi_claims_core::{
-    ProofValidationError, ValidateClaims, VerifiableClaims, Verification, VerificationParameters,
-};
-use ssi_crypto::Verifier;
+use ssi_claims_core::{Parameters, ValidateClaims, VerifiableClaims, Verification};
+use ssi_crypto::{Error, Verifier};
 use ssi_jwk::{Algorithm, Base64urlUInt, JWK};
 use std::{borrow::Cow, collections::BTreeMap};
 
@@ -230,6 +228,16 @@ impl<'a, T> DecodedJws<'a, T> {
         .unwrap()
     }
 
+    pub fn into_encoded_detached(self) -> JwsVec {
+        let mut encoded_header = self.signing_bytes.bytes.into_owned();
+        if let Some(i) = encoded_header.iter().copied().position(|c| c == b'.') {
+            encoded_header.truncate(i + 1);
+        }
+
+        JwsVec::from_signing_bytes_and_signature(encoded_header, self.signature.encode().as_bytes())
+            .unwrap()
+    }
+
     /// Verify the JWS signature.
     ///
     /// This will check the signature and the validity of the decoded payload.
@@ -254,10 +262,7 @@ impl<'a, T> DecodedJws<'a, T> {
     /// If the validation traits are implemented for `P`, they will be
     /// implemented for `&P` as well. This means the parameters can be passed
     /// by move *or* by reference.
-    pub async fn verify(
-        &self,
-        verifier: impl Verifier,
-    ) -> Result<Verification, ProofValidationError>
+    pub async fn verify(&self, verifier: impl Verifier) -> Result<Verification, Error>
     where
         T: ValidateJwsHeader + ValidateClaims<JwsSignature>,
     {
@@ -267,8 +272,8 @@ impl<'a, T> DecodedJws<'a, T> {
     pub async fn verify_with(
         &self,
         verifier: impl Verifier,
-        params: &VerificationParameters,
-    ) -> Result<Verification, ProofValidationError>
+        params: &Parameters,
+    ) -> Result<Verification, Error>
     where
         T: ValidateJwsHeader + ValidateClaims<JwsSignature>,
     {

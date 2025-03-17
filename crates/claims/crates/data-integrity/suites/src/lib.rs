@@ -1,7 +1,8 @@
 //! Data Integrity Cryptographic Suites.
-pub mod eip712;
+// pub mod eip712;
 
 mod suites;
+
 #[allow(unused_imports)]
 pub use suites::*;
 

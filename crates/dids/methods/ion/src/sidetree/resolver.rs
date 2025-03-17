@@ -3,7 +3,7 @@ use std::marker::PhantomData;
 use iref::Uri;
 use ssi_dids_core::{
     resolution::{self, DIDMethodResolver, Error, HTTPDIDResolver, Output},
-    DIDBuf, DIDMethod, DIDResolver,
+    DIDBuf, DIDMethod, DidResolver,
 };
 
 use super::Sidetree;

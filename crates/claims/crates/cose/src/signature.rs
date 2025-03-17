@@ -4,7 +4,7 @@ use coset::{
     CborSerializable, ContentType, CoseSign1, Header, Label, ProtectedHeader,
     TaggedCborSerializable,
 };
-use ssi_crypto::{SignatureError, Signer};
+use ssi_crypto::{Error, Signer};
 
 use crate::{algorithm::cose_algorithm, CoseSign1BytesBuf};
 
@@ -66,11 +66,7 @@ pub trait CosePayload {
     /// The `tagged` flag specifies if the COSE object should be tagged or
     /// not.
     #[allow(async_fn_in_trait)]
-    async fn sign(
-        &self,
-        signer: impl Signer,
-        tagged: bool,
-    ) -> Result<CoseSign1BytesBuf, SignatureError> {
+    async fn sign(&self, signer: impl Signer, tagged: bool) -> Result<CoseSign1BytesBuf, Error> {
         self.sign_with(signer, None, tagged).await
     }
 
@@ -80,7 +76,7 @@ pub trait CosePayload {
         signer: impl Signer,
         additional_data: Option<&[u8]>,
         tagged: bool,
-    ) -> Result<CoseSign1BytesBuf, SignatureError> {
+    ) -> Result<CoseSign1BytesBuf, Error> {
         let metadata = signer.key_metadata();
 
         let (key_id, algorithm_params) = metadata.into_id_and_algorithm(None)?;
@@ -107,7 +103,7 @@ pub trait CosePayload {
 
         let tbs = result.tbs_data(additional_data.unwrap_or_default());
 
-        result.signature = signer.sign_bytes(algorithm_params, &tbs).await?.into_vec();
+        result.signature = signer.sign(algorithm_params, &tbs).await?.into_vec();
 
         Ok(if tagged {
             result.to_tagged_vec().unwrap().into()

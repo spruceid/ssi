@@ -262,7 +262,7 @@ impl SigningKey for JWK {
         &self,
         algorithm: impl Into<ssi_crypto::AlgorithmInstance>,
         signing_bytes: &[u8],
-    ) -> Result<Box<[u8]>, ssi_crypto::SignatureError> {
+    ) -> Result<Box<[u8]>, ssi_crypto::Error> {
         let secret_key: ssi_crypto::SecretKey = self.try_into()?;
         secret_key.sign_bytes(algorithm, signing_bytes)
     }
@@ -277,39 +277,58 @@ impl ssi_crypto::Signer for JWK {
         )
     }
 
-    async fn sign_bytes(
+    async fn sign(
         &self,
         algorithm: ssi_crypto::AlgorithmInstance,
         signing_bytes: &[u8],
-    ) -> Result<Box<[u8]>, ssi_crypto::SignatureError> {
+    ) -> Result<Box<[u8]>, ssi_crypto::Error> {
         <Self as SigningKey>::sign_bytes(self, algorithm, signing_bytes)
     }
 }
 
 impl VerifyingKey for JWK {
+    fn key_metadata(&self) -> ssi_crypto::key::KeyMetadata {
+        ssi_crypto::key::KeyMetadata::new(
+            self.key_id.clone().map(String::into_bytes),
+            self.r#type(),
+            self.algorithm.map(Into::into),
+        )
+    }
+
     fn verify_bytes(
         &self,
         algorithm: impl Into<ssi_crypto::AlgorithmInstance>,
         signing_bytes: &[u8],
         signature: &[u8],
-    ) -> Result<ssi_crypto::Verification, ssi_crypto::VerificationError> {
+    ) -> Result<ssi_crypto::SignatureVerification, ssi_crypto::Error> {
         let public_key: ssi_crypto::PublicKey = self.try_into()?;
         public_key.verify_bytes(algorithm, signing_bytes, signature)
     }
 }
 
 impl ssi_crypto::Verifier for JWK {
-    async fn verify_bytes(
+    type VerifyingKey = Self;
+
+    async fn get_verifying_key_with(
+        &self,
+        _key_id: Option<&[u8]>,
+        _options: &ssi_crypto::Options,
+    ) -> Result<Option<Self::VerifyingKey>, ssi_crypto::Error> {
+        Ok(Some(self.clone()))
+    }
+
+    async fn verify_with(
         &self,
         _key_id: Option<&[u8]>,
         algorithm: Option<ssi_crypto::AlgorithmInstance>,
         signing_bytes: &[u8],
         signature: &[u8],
-    ) -> Result<ssi_crypto::Verification, ssi_crypto::VerificationError> {
+        _options: &ssi_crypto::Options,
+    ) -> Result<ssi_crypto::SignatureVerification, ssi_crypto::Error> {
         let algorithm = algorithm
             .or_else(|| self.algorithm.map(Into::into))
             .or_else(|| self.r#type().and_then(|ty| ty.default_algorithm_params()))
-            .ok_or(ssi_crypto::VerificationError::MissingAlgorithm)?;
+            .ok_or(ssi_crypto::Error::AlgorithmMissing)?;
         <Self as VerifyingKey>::verify_bytes(self, algorithm, signing_bytes, signature)
     }
 }

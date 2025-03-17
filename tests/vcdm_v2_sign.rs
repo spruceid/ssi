@@ -3,9 +3,9 @@ use ssi::JWK;
 use ssi_claims::{
     data_integrity::{AnySuite, CryptographicSuite, ProofOptions},
     vc::v2::JsonCredential,
-    VerificationParameters,
+    Parameters,
 };
-use ssi_dids::{AnyDidMethod, VerificationMethodDIDResolver};
+use ssi_dids::{AnyDidMethod, DidVerificationMethodResolver};
 use ssi_verification_methods::{AnyMethod, SingleSecretSigner};
 use static_iref::iri;
 
@@ -20,7 +20,7 @@ async fn ecdsa_secp256r1_2020() {
         "d": "g-jUBRnfkbsxOQhtrBZd9l_ElOAw8BoJufTFUut2uHI"
     }))
     .unwrap();
-    let resolver = VerificationMethodDIDResolver::<_, AnyMethod>::new(AnyDidMethod::default());
+    let resolver = DidVerificationMethodResolver::<_, AnyMethod>::new(AnyDidMethod::default());
     let vc: JsonCredential = serde_json::from_value(json!({
       "@context": [
         "https://www.w3.org/ns/credentials/v2"
@@ -45,7 +45,7 @@ async fn ecdsa_secp256r1_2020() {
         .await
         .unwrap();
     signed_vc
-        .verify(VerificationParameters::from_resolver(resolver))
+        .verify(Parameters::from_resolver(resolver))
         .await
         .unwrap()
         .unwrap();
@@ -62,7 +62,7 @@ async fn ecdsa_rdfc_2019_p256() {
         "d": "g-jUBRnfkbsxOQhtrBZd9l_ElOAw8BoJufTFUut2uHI"
     }))
     .unwrap();
-    let resolver = VerificationMethodDIDResolver::<_, AnyMethod>::new(AnyDidMethod::default());
+    let resolver = DidVerificationMethodResolver::<_, AnyMethod>::new(AnyDidMethod::default());
     let vc: JsonCredential = serde_json::from_value(json!({
       "@context": [
         "https://www.w3.org/ns/credentials/v2"
@@ -87,7 +87,7 @@ async fn ecdsa_rdfc_2019_p256() {
         .await
         .unwrap();
     signed_vc
-        .verify(VerificationParameters::from_resolver(resolver))
+        .verify(Parameters::from_resolver(resolver))
         .await
         .unwrap()
         .unwrap();
@@ -104,7 +104,7 @@ async fn ecdsa_rdfc_2019_p384() {
         "d": "qCiwiC8sASQ3chYPN8BodDImdVbn-didbDeQdQAnGJYoRWryN3xF1xX96w6SJTx6"
     }))
     .unwrap();
-    let resolver = VerificationMethodDIDResolver::<_, AnyMethod>::new(AnyDidMethod::default());
+    let resolver = DidVerificationMethodResolver::<_, AnyMethod>::new(AnyDidMethod::default());
     let vc: JsonCredential = serde_json::from_value(json!({
       "@context": [
         "https://www.w3.org/ns/credentials/v2"
@@ -129,7 +129,7 @@ async fn ecdsa_rdfc_2019_p384() {
         .await
         .unwrap();
     signed_vc
-        .verify(VerificationParameters::from_resolver(resolver))
+        .verify(Parameters::from_resolver(resolver))
         .await
         .unwrap()
         .unwrap();
@@ -143,7 +143,7 @@ async fn bbs_2023() {
     let jwk = JWK::generate_bls12381g2();
     let did_url = ssi::dids::DIDKey::generate_url(&jwk).unwrap();
 
-    let resolver = VerificationMethodDIDResolver::<_, AnyMethod>::new(AnyDidMethod::default());
+    let resolver = DidVerificationMethodResolver::<_, AnyMethod>::new(AnyDidMethod::default());
     let vc: JsonCredential = serde_json::from_value(json!({
         "@context": [
             "https://www.w3.org/ns/credentials/v2",
@@ -175,7 +175,7 @@ async fn bbs_2023() {
         .await
         .unwrap();
 
-    let params = VerificationParameters::from_resolver(&resolver);
+    let params = Parameters::from_resolver(&resolver);
     let mut selection = ssi::claims::data_integrity::AnySelectionOptions::default();
     selection.selective_pointers = vec![
         "/id".parse().unwrap(),

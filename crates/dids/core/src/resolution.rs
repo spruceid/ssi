@@ -5,7 +5,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     document::{self, representation, DIDVerificationMethod, InvalidData},
-    DIDMethod, Document, PrimaryDIDURL, VerificationMethodDIDResolver, DID, DIDURL,
+    DIDMethod, DidVerificationMethodResolver, Document, PrimaryDIDURL, DID, DIDURL,
 };
 
 mod composition;
@@ -116,7 +116,7 @@ pub trait DIDResolverByMethod {
     }
 }
 
-impl<T: DIDResolverByMethod> DIDResolver for T {
+impl<T: DIDResolverByMethod> DidResolver for T {
     async fn resolve_representation<'a>(
         &'a self,
         did: &'a DID,
@@ -144,7 +144,7 @@ impl<T: DIDResolverByMethod> DIDResolver for T {
 /// by grouping various DID method implementations.
 ///
 /// [`AnyDidMethod`]: <../dids/struct.AnyDidMethod.html>
-pub trait DIDResolver {
+pub trait DidResolver {
     /// Resolves a DID representation.
     ///
     /// Fetches the DID document representation referenced by the input DID
@@ -302,11 +302,11 @@ pub trait DIDResolver {
     /// To resolve a verification method, the output resolver will first
     /// resolve the DID using the given `options` then pull the referenced
     /// method from the DID document.
-    fn into_vm_resolver_with<M>(self, options: Options) -> VerificationMethodDIDResolver<Self, M>
+    fn into_vm_resolver_with<M>(self, options: Options) -> DidVerificationMethodResolver<Self, M>
     where
         Self: Sized,
     {
-        VerificationMethodDIDResolver::new_with_options(self, options)
+        DidVerificationMethodResolver::new_with_options(self, options)
     }
 
     /// Turns this DID resolver into a verification method resolver.
@@ -317,11 +317,11 @@ pub trait DIDResolver {
     /// This is equivalent to calling
     /// [`into_vm_resolver_with`](DIDResolver::into_vm_resolver_with)
     /// with the default options.
-    fn into_vm_resolver<M>(self) -> VerificationMethodDIDResolver<Self, M>
+    fn into_vm_resolver<M>(self) -> DidVerificationMethodResolver<Self, M>
     where
         Self: Sized,
     {
-        VerificationMethodDIDResolver::new(self)
+        DidVerificationMethodResolver::new(self)
     }
 }
 
@@ -464,7 +464,7 @@ pub struct Parameters {
 
     /// Expected public key format (non-standard option).
     ///
-    /// Defined by <https://w3c-ccg.github.io/did-method-key>.
+    /// Defined by <https://w3c-ccg.github.io/did-key-spec/>.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub public_key_format: Option<String>,
 

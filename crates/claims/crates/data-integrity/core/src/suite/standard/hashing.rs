@@ -1,4 +1,5 @@
-use ssi_claims_core::{ProofValidationError, SignatureError};
+use ssi_claims_core::ProofValidationError;
+use ssi_crypto::SignatureError;
 
 use crate::ProofConfigurationRef;
 

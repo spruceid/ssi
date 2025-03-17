@@ -16,9 +16,9 @@
 use clap::{Parser, Subcommand};
 use core::fmt;
 use iref::UriBuf;
-use ssi_claims_core::VerificationParameters;
+use ssi_claims_core::Parameters;
 use ssi_data_integrity::{AnySuite, ProofOptions};
-use ssi_dids::{VerificationMethodDIDResolver, DIDJWK};
+use ssi_dids::{DidVerificationMethodResolver, DIDJWK};
 use ssi_jwk::JWK;
 use ssi_status::{
     any::AnyStatusMap, bitstring_status_list, EncodedStatusMap, FromBytes, FromBytesOptions,
@@ -124,9 +124,8 @@ impl Command {
                     Err(e) => return Err(Error::ReadFile(source, e)),
                 };
 
-                let verifier = VerificationParameters::from_resolver(
-                    VerificationMethodDIDResolver::new(DIDJWK),
-                );
+                let verifier =
+                    Parameters::from_resolver(DidVerificationMethodResolver::new(DIDJWK));
                 let status_list = AnyStatusMap::from_bytes_with(
                     &bytes,
                     &media_type,
@@ -177,7 +176,7 @@ async fn create_bitstring_status_list(
             use ssi_data_integrity::CryptographicSuite;
             let jwk = read_jwk(&path)?;
             let did = DIDJWK::generate_url(&jwk.to_public());
-            let resolver = VerificationMethodDIDResolver::new(DIDJWK);
+            let resolver = DidVerificationMethodResolver::new(DIDJWK);
             let signer = SingleSecretSigner::new(jwk.clone()).into_local();
             let verification_method = ReferenceOrOwned::Reference(did.into());
             let suite = AnySuite::pick(&jwk, Some(&verification_method)).unwrap();

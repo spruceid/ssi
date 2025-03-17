@@ -1,10 +1,10 @@
-use crate::DIDResolver;
+use crate::DidResolver;
 
 use super::{DIDMethodResolver, Error};
 
 macro_rules! define_composition {
 	($($n:tt: $ty:ident),*) => {
-		impl<$($ty : DIDMethodResolver,)*> DIDResolver for ($($ty,)*) {
+		impl<$($ty : DIDMethodResolver,)*> DidResolver for ($($ty,)*) {
 			async fn resolve_representation<'a>(
 				&'a self,
 				did: &'a crate::DID,

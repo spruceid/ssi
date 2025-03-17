@@ -10,8 +10,8 @@ use ssi::{
     jwk::JWK,
     verification_methods::SingleSecretSigner,
 };
-use ssi_claims::{vc::syntax::NonEmptyVec, VerificationParameters};
-use ssi_dids::DIDResolver;
+use ssi_claims::{vc::syntax::NonEmptyVec, Parameters};
+use ssi_dids::DidResolver;
 use static_iref::{iri, uri};
 
 #[async_std::main]
@@ -22,7 +22,7 @@ async fn main() {
 
     // DID resolver.
     let resolver = ssi::dids::example::ExampleDIDResolver::default().into_vm_resolver();
-    let params = VerificationParameters::from_resolver(&resolver);
+    let params = Parameters::from_resolver(&resolver);
 
     let mut rl = RevocationList2020::default();
     rl.set_status(1, true).unwrap();

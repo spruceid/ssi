@@ -136,6 +136,7 @@ use serde::{Deserialize, Serialize};
 
 pub mod bbs;
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum SignatureFunction {
     /// BBS.
     Bbs,
@@ -160,6 +161,12 @@ pub enum SignatureFunction {
 
     /// RSASSA-PKCS1 v1.5
     RsaSsaPkcs1v1_5,
+}
+
+impl SignatureFunction {
+    pub fn is_rsa(self) -> bool {
+        matches!(self, Self::RsaSsaPssMgf1Sha256 | Self::RsaSsaPssMgf1Sha384 | Self::RsaSsaPssMgf1Sha512 | Self::RsaSsaPkcs1v1_5)
+    }
 }
 
 /// Digest function.
@@ -218,6 +225,33 @@ macro_rules! algorithms {
                         Self::$id => $name,
                     )*
                     Self::None => "none"
+                }
+            }
+
+            pub fn digest_function(&self) -> Option<DigestFunction> {
+                match self {
+                    $(
+                        Self::$id => Some(DigestFunction::$digest),
+                    )*
+                    Self::None => None
+                }
+            }
+            
+            pub fn signature_function(&self) -> Option<SignatureFunction> {
+                match self {
+                    $(
+                        Self::$id => Some(SignatureFunction::$signature),
+                    )*
+                    Self::None => None
+                }
+            }
+
+            pub fn functions(&self) -> Option<(SignatureFunction, DigestFunction)> {
+                match self {
+                    $(
+                        Self::$id => Some((SignatureFunction::$signature, DigestFunction::$digest)),
+                    )*
+                    Self::None => None
                 }
             }
         }
@@ -331,12 +365,12 @@ algorithms! {
     /// ECDSA using secp256k1 (K-256) and Keccak-256.
     ///
     /// Like `ES256K` but using Keccak-256 instead of SHA-256.
-    ESKeccakK: "ESKeccakK" (Keccak, EcDsa),
+    ESKeccakK: "ESKeccakK" (Keccak256, EcDsa),
 
     /// ECDSA using secp256k1 (K-256) and Keccak-256 with a recovery bit.
     ///
     /// Like `ES256K-R` but using Keccak-256 instead of SHA-256.
-    ESKeccakKR: "ESKeccakKR" (Keccack, EcDsa),
+    ESKeccakKR: "ESKeccakKR" (Keccak256, EcDsa),
 
     /// ECDSA using P-256 and Blake2b.
     ESBlake2b: "ESBlake2b" (Blake2b, EcDsa),

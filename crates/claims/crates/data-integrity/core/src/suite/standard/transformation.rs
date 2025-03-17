@@ -1,6 +1,8 @@
 use linked_data::IntoQuadsError;
 use serde::Serialize;
-use ssi_claims_core::{ProofValidationError, SignatureError};
+use ssi_claims_core::{ProofValidationError, VerificationParameters};
+use ssi_crypto::SignatureError;
+use ssi_verification_methods::VerificationMethod;
 
 use crate::{
     suite::TransformationOptions, ConfigurationExpansionError, CryptographicSuite,
@@ -70,15 +72,15 @@ pub trait TransformationAlgorithm<S: CryptographicSuite> {
     type Output;
 }
 
-pub trait TypedTransformationAlgorithm<S: CryptographicSuite, T, C>:
+pub trait TypedTransformationAlgorithm<S: CryptographicSuite, T>:
     TransformationAlgorithm<S>
 {
     #[allow(async_fn_in_trait)]
     async fn transform(
-        context: &C,
+        // context: &VerificationParameters,
         data: &T,
         proof_configuration: ProofConfigurationRef<S>,
-        verification_method: &S::VerificationMethod,
+        verification_method: &VerificationMethod,
         transformation_options: TransformationOptions<S>,
     ) -> Result<Self::Output, TransformationError>;
 }
@@ -89,11 +91,11 @@ impl<S: CryptographicSuite> TransformationAlgorithm<S> for JsonObjectTransformat
     type Output = json_syntax::Object;
 }
 
-impl<S: StandardCryptographicSuite, T: Serialize, C> TypedTransformationAlgorithm<S, T, C>
+impl<S: StandardCryptographicSuite, T: Serialize> TypedTransformationAlgorithm<S, T>
     for JsonObjectTransformation
 {
     async fn transform(
-        _context: &C,
+        _context: &VerificationParameters,
         data: &T,
         _options: ProofConfigurationRef<'_, S>,
         _verification_method: &S::VerificationMethod,

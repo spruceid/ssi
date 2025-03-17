@@ -19,7 +19,7 @@ use ssi_caips::caip10::{BlockchainAccountId, BlockchainAccountIdParseError};
 use ssi_dids_core::{
     document::{DIDVerificationMethod, Resource},
     resolution::{Content, DerefOutput},
-    DIDBuf, DIDResolver, DIDURLBuf, Document,
+    DIDBuf, DIDURLBuf, DidResolver, Document,
 };
 use ssi_jwk::{Algorithm, JWK};
 use ssi_jws::{decode_jws_parts, sign_bytes, split_jws, verify_bytes, Header, JwsSignature};
@@ -58,7 +58,7 @@ impl Default for UcanCodec {
 }
 
 impl<F, A> Ucan<F, A> {
-    pub async fn verify_signature(&self, resolver: &impl DIDResolver) -> Result<(), Error>
+    pub async fn verify_signature(&self, resolver: &impl DidResolver) -> Result<(), Error>
     where
         F: Serialize,
         A: Serialize,
@@ -486,7 +486,7 @@ impl UcanRevocation {
     }
     pub async fn verify_signature(
         &self,
-        resolver: &impl DIDResolver,
+        resolver: &impl DidResolver,
         algorithm: Algorithm,
         jwk: Option<&JWK>,
     ) -> Result<(), Error> {

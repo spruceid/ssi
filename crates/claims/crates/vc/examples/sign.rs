@@ -3,7 +3,7 @@
 use iref::{Iri, IriBuf, Uri, UriBuf};
 use linked_data::{LinkedDataResource, LinkedDataSubject};
 use rand_chacha::rand_core::SeedableRng;
-use ssi_claims_core::{SignatureError, VerificationParameters};
+use ssi_claims_core::{Parameters, SignatureError};
 use ssi_data_integrity::{suites::Ed25519Signature2020, CryptographicSuite, ProofOptions};
 use ssi_json_ld::{Expandable, Loader};
 use ssi_rdf::{Interpretation, LdEnvironment, VocabularyMut};
@@ -83,7 +83,8 @@ impl ssi_vc::v1::Credential for Credential {
 
 impl Expandable for Credential {
     type Error = std::convert::Infallible;
-    type Expanded<I, V> = Self
+    type Expanded<I, V>
+        = Self
     where
         I: Interpretation,
         V: VocabularyMut,
@@ -173,7 +174,7 @@ async fn main() {
 
     // Verify the generated verifiable credential.
     verifiable_credential
-        .verify(VerificationParameters::from_resolver(keyring))
+        .verify(Parameters::from_resolver(keyring))
         .await
         .expect("verification failed")
         .expect("invalid proof");

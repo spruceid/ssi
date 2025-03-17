@@ -122,13 +122,13 @@ impl<E, P, T: ValidateClaims<E, P>> ValidateClaims<E, P> for CoseVp<T> {
 mod tests {
     use super::CoseVp;
     use serde_json::json;
-    use ssi_claims_core::VerificationParameters;
+    use ssi_claims_core::Parameters;
     use ssi_cose::{key::CoseKeyGenerate, CoseKey, CoseSign1Bytes, CoseSign1BytesBuf};
     use ssi_vc::{enveloped::EnvelopedVerifiableCredential, v2::syntax::JsonPresentation};
 
     async fn verify(input: &CoseSign1Bytes, key: &CoseKey) {
         let vp = CoseVp::decode_any(input, true).unwrap();
-        let params = VerificationParameters::from_resolver(key);
+        let params = Parameters::from_resolver(key);
         let result = vp.verify(params).await.unwrap();
         assert_eq!(result, Ok(()))
     }

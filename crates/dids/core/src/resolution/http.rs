@@ -3,7 +3,7 @@ use reqwest::{header, StatusCode};
 
 use crate::{
     document::{self, representation::MediaType},
-    DIDResolver, DID,
+    DidResolver, DID,
 };
 
 use super::{Error, Metadata, Output};
@@ -52,7 +52,7 @@ pub enum InternalError {
     InvalidContentType,
 }
 
-impl DIDResolver for HTTPDIDResolver {
+impl DidResolver for HTTPDIDResolver {
     /// Resolve a DID over HTTP(S), using the [DID Resolution HTTP(S) Binding](https://w3c-ccg.github.io/did-resolution/#bindings-https).
     async fn resolve_representation<'a>(
         &'a self,

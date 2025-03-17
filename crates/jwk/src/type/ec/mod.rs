@@ -29,7 +29,7 @@ impl EcParams {
         match self.curve.as_deref()? {
             curve::P256 => Some(KeyType::P256),
             curve::P384 => Some(KeyType::P384),
-            curve::SECP_256K1 => Some(KeyType::Secp256k1),
+            curve::SECP_256K1 => Some(KeyType::K256),
             _ => None,
         }
     }

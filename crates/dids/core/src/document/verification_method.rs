@@ -1,7 +1,7 @@
 use std::collections::BTreeMap;
 
 use serde::{Deserialize, Serialize};
-use ssi_verification_methods_core::GenericVerificationMethod;
+use ssi_verification_methods_core::VerificationMethod;
 
 use crate::{DIDBuf, DIDURLBuf, DIDURLReference, DIDURLReferenceBuf, DID, DIDURL};
 
@@ -91,7 +91,7 @@ pub struct DIDVerificationMethod {
     /// Should be registered in [DID Specification
     /// registries - Verification method types](https://www.w3.org/TR/did-spec-registries/#verification-method-types).
     #[serde(rename = "type")]
-    pub type_: String,
+    pub r#type: String,
 
     // Note: different than when the DID Document is the subject:
     //    The value of the controller property, which identifies the
@@ -110,24 +110,24 @@ pub struct DIDVerificationMethod {
 impl DIDVerificationMethod {
     pub fn new(
         id: DIDURLBuf,
-        type_: String,
+        r#type: String,
         controller: DIDBuf,
         properties: BTreeMap<String, serde_json::Value>,
     ) -> Self {
         Self {
             id,
-            type_,
+            r#type,
             controller,
             properties,
         }
     }
 }
 
-impl From<DIDVerificationMethod> for GenericVerificationMethod {
+impl From<DIDVerificationMethod> for VerificationMethod {
     fn from(value: DIDVerificationMethod) -> Self {
-        GenericVerificationMethod {
+        VerificationMethod {
             id: value.id.into(),
-            type_: value.type_,
+            r#type: value.r#type,
             controller: value.controller.into(),
             properties: value.properties,
         }

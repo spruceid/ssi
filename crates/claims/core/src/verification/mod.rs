@@ -19,14 +19,15 @@
 //!     trait.
 //!   - Proof validation: the claims verified against the proof using the
 //!     [`ValidateProof`] trait.
+use ssi_crypto::{Error, RejectedSignature};
+
 mod claims;
+mod proof;
 
 pub use claims::*;
-mod proof;
 pub use proof::*;
-mod parameters;
-pub use parameters::*;
-use ssi_crypto::Verifier;
+
+use crate::Parameters;
 
 /// Verifiable Claims.
 ///
@@ -49,12 +50,12 @@ pub trait VerifiableClaims {
     /// The `params` argument provides all the verification parameters required
     /// to validate the claims and proof.
     #[allow(async_fn_in_trait)]
-    async fn verify(&self, verifier: impl Verifier) -> Result<Verification, ProofValidationError>
+    async fn verify<V>(&self, verifier: V) -> Result<Verification, Error>
     where
         Self::Claims: ValidateClaims<Self::Proof>,
-        Self::Proof: ValidateProof<Self::Claims>,
+        Self::Proof: ValidateProof<Self::Claims, V>,
     {
-        let params = VerificationParameters::default();
+        let params = Parameters::default();
         self.verify_with(verifier, &params).await
     }
 
@@ -63,19 +64,15 @@ pub trait VerifiableClaims {
     /// The `params` argument provides all the verification parameters required
     /// to validate the claims and proof.
     #[allow(async_fn_in_trait)]
-    async fn verify_with(
-        &self,
-        verifier: impl Verifier,
-        params: &VerificationParameters,
-    ) -> Result<Verification, ProofValidationError>
+    async fn verify_with<V>(&self, verifier: V, params: &Parameters) -> Result<Verification, Error>
     where
         Self::Claims: ValidateClaims<Self::Proof>,
-        Self::Proof: ValidateProof<Self::Claims>,
+        Self::Proof: ValidateProof<Self::Claims, V>,
     {
         match self.claims().validate_claims(params, self.proof()) {
             Ok(_) => self
                 .proof()
-                .validate_proof(verifier, params, self.claims())
+                .validate_proof(&verifier, self.claims(), params)
                 .await
                 .map(|r| r.map_err(Invalid::Proof)),
             Err(e) => {
@@ -107,5 +104,5 @@ pub enum Invalid {
     Claims(#[from] InvalidClaims),
 
     #[error("invalid proof: {0}")]
-    Proof(#[from] InvalidProof),
+    Proof(#[from] RejectedSignature),
 }

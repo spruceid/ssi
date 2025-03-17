@@ -1,18 +1,32 @@
-use crate::{
-    key::{KeyConversionError, KeyMetadata},
-    Algorithm, AlgorithmInstance, SecretKey,
-};
+use std::sync::Arc;
+
+use crate::{key::KeyMetadata, AlgorithmInstance, Error};
+
+/// Issuer.
+pub trait Issuer {
+    type Signer: Signer;
+
+    #[allow(async_fn_in_trait)]
+    async fn key(&self, key_id: Option<&[u8]>) -> Result<Option<Self::Signer>, Error>;
+
+    #[allow(async_fn_in_trait)]
+    async fn require_key(&self, key_id: Option<&[u8]>) -> Result<Self::Signer, Error> {
+        self.key(key_id)
+            .await?
+            .ok_or_else(|| Error::KeyNotFound(key_id.map(|id| id.to_vec())))
+    }
+}
 
 /// Signer.
 pub trait Signer {
     fn key_metadata(&self) -> KeyMetadata;
 
     #[allow(async_fn_in_trait)]
-    async fn sign_bytes(
+    async fn sign(
         &self,
         algorithm: AlgorithmInstance,
         signing_bytes: &[u8],
-    ) -> Result<Box<[u8]>, SignatureError>;
+    ) -> Result<Box<[u8]>, Error>;
 }
 
 impl<'a, T: Signer> Signer for &'a T {
@@ -20,33 +34,40 @@ impl<'a, T: Signer> Signer for &'a T {
         T::key_metadata(*self)
     }
 
-    async fn sign_bytes(
+    async fn sign(
         &self,
         algorithm: AlgorithmInstance,
         signing_bytes: &[u8],
-    ) -> Result<Box<[u8]>, SignatureError> {
-        T::sign_bytes(*&self, algorithm, signing_bytes).await
+    ) -> Result<Box<[u8]>, Error> {
+        T::sign(*&self, algorithm, signing_bytes).await
     }
 }
 
-#[derive(Debug, thiserror::Error)]
-pub enum SignatureError {
-    #[error("key conversion failed: {0}")]
-    KeyConversion(#[from] KeyConversionError),
+impl<T: Signer> Signer for Box<T> {
+    fn key_metadata(&self) -> KeyMetadata {
+        T::key_metadata(&*self)
+    }
 
-    #[error("missing algorithm")]
-    MissingAlgorithm,
-
-    #[error("unsupported algorithm `{0}`")]
-    UnsupportedAlgorithm(Algorithm),
-
-    #[error(transparent)]
-    Other(#[from] anyhow::Error),
+    async fn sign(
+        &self,
+        algorithm: AlgorithmInstance,
+        signing_bytes: &[u8],
+    ) -> Result<Box<[u8]>, Error> {
+        T::sign(&*self, algorithm, signing_bytes).await
+    }
 }
 
-impl SignatureError {
-    pub fn other(e: impl 'static + Send + Sync + std::error::Error) -> Self {
-        Self::Other(e.into())
+impl<T: Signer> Signer for Arc<T> {
+    fn key_metadata(&self) -> KeyMetadata {
+        T::key_metadata(&*self)
+    }
+
+    async fn sign(
+        &self,
+        algorithm: AlgorithmInstance,
+        signing_bytes: &[u8],
+    ) -> Result<Box<[u8]>, Error> {
+        T::sign(&*self, algorithm, signing_bytes).await
     }
 }
 
@@ -55,32 +76,24 @@ pub trait SigningKey {
         &self,
         algorithm: impl Into<AlgorithmInstance>,
         signing_bytes: &[u8],
-    ) -> Result<Box<[u8]>, SignatureError>;
+    ) -> Result<Box<[u8]>, Error>;
 }
 
-impl SigningKey for SecretKey {
-    fn sign_bytes(
-        &self,
-        algorithm: impl Into<AlgorithmInstance>,
-        signing_bytes: &[u8],
-    ) -> Result<Box<[u8]>, SignatureError> {
-        match self {
-            Self::Symmetric(key) => key.sign_bytes(algorithm, signing_bytes),
+#[derive(Debug, thiserror::Error)]
+#[error("malformed signature")]
+pub struct MalformedSignature;
 
-            #[cfg(feature = "ed25519")]
-            Self::Ed25519(key) => key.sign_bytes(algorithm, signing_bytes),
-
-            #[cfg(feature = "rsa")]
-            Self::Rsa(key) => key.sign_bytes(algorithm, signing_bytes),
-
-            #[cfg(feature = "secp256r1")]
-            Self::P256(key) => key.sign_bytes(algorithm, signing_bytes),
-
-            #[cfg(feature = "secp384r1")]
-            Self::P384(key) => key.sign_bytes(algorithm, signing_bytes),
-
-            #[cfg(feature = "secp256k1")]
-            Self::K256(key) => key.sign_bytes(algorithm, signing_bytes),
-        }
+impl From<MalformedSignature> for Error {
+    fn from(_value: MalformedSignature) -> Self {
+        Error::SignatureMalformed
     }
+}
+
+/// Decode DER-encoded ECDSA P-256 signature as defined by ANSI X9.62–2005 and
+/// [RFC 3279 Section 2.2.3].
+///
+/// [RFC 3279 Section 2.2.3]: <https://www.rfc-editor.org/rfc/rfc3279#section-2.2.3>
+#[cfg(feature = "der")]
+pub fn decode_ecdsa_p256_signature_der(bytes: impl AsRef<[u8]>) -> Result<Box<[u8]>, MalformedSignature> {
+	p256::ecdsa::Signature::from_der(bytes.as_ref()).map(|s| s.to_bytes().to_vec().into_boxed_slice()).map_err(|_| MalformedSignature)
 }

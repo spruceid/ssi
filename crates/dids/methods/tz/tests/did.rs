@@ -11,9 +11,9 @@ use ssi_claims::{
         syntax::NonEmptyVec,
         v1::{JsonCredential, JsonPresentation},
     },
-    VerificationParameters,
+    Parameters,
 };
-use ssi_dids_core::{did, resolution::Options, DIDResolver, VerificationMethodDIDResolver};
+use ssi_dids_core::{did, resolution::Options, DidResolver, DidVerificationMethodResolver};
 use ssi_jwk::JWK;
 use ssi_jws::JwsString;
 use ssi_verification_methods_core::{ProofPurpose, SingleSecretSigner};
@@ -215,10 +215,10 @@ async fn credential_prove_verify_did_tz1() {
 		.mount(&mock_server)
 		.await;
 
-    let didtz = VerificationMethodDIDResolver::new(DIDTz::new(Some(
+    let didtz = DidVerificationMethodResolver::new(DIDTz::new(Some(
         UriBuf::new(mock_server.uri().into_bytes()).unwrap(),
     )));
-    let params = VerificationParameters::from_resolver(&didtz);
+    let params = Parameters::from_resolver(&didtz);
 
     let did = did!("did:tz:delphinet:tz1WvvbEGpBXGeTVbLiR6DYBe1izmgiYuZbq").to_owned();
     let vc = DataIntegrity::new(
@@ -335,8 +335,8 @@ async fn credential_prove_verify_did_tz2() {
         })),
     );
 
-    let didtz = VerificationMethodDIDResolver::new(DIDTZ);
-    let params = VerificationParameters::from_resolver(&didtz);
+    let didtz = DidVerificationMethodResolver::new(DIDTZ);
+    let params = Parameters::from_resolver(&didtz);
     let signer = SingleSecretSigner::new(key.clone()).into_local();
 
     let issuance_date = cred.issuance_date.clone().unwrap();
@@ -433,8 +433,8 @@ async fn credential_prove_verify_did_tz3() {
         })),
     );
 
-    let didtz = VerificationMethodDIDResolver::new(DIDTZ);
-    let params = VerificationParameters::from_resolver(&didtz);
+    let didtz = DidVerificationMethodResolver::new(DIDTZ);
+    let params = Parameters::from_resolver(&didtz);
     let signer = SingleSecretSigner::new(key.clone()).into_local();
 
     let issuance_date = cred.issuance_date.clone().unwrap();

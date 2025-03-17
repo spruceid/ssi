@@ -1,87 +1,110 @@
-use crate::{key::KeyConversionError, Algorithm, AlgorithmInstance, PublicKey};
+use crate::{key::KeyMetadata, AlgorithmInstance, Error, Options};
 
 pub trait Verifier {
+    type VerifyingKey: VerifyingKey;
+
     #[allow(async_fn_in_trait)]
-    async fn verify_bytes(
+    async fn get_verifying_key_with(
+        &self,
+        id: Option<&[u8]>,
+        options: &Options,
+    ) -> Result<Option<Self::VerifyingKey>, Error>;
+
+    #[allow(async_fn_in_trait)]
+    async fn get_verifying_key(
+        &self,
+        id: Option<&[u8]>,
+    ) -> Result<Option<Self::VerifyingKey>, Error> {
+        let options = Options::default();
+        self.get_verifying_key_with(id, &options).await
+    }
+
+    #[allow(async_fn_in_trait)]
+    async fn require_verifying_key_with(
+        &self,
+        id: Option<&[u8]>,
+        options: &Options,
+    ) -> Result<Self::VerifyingKey, Error> {
+        self.get_verifying_key_with(id, options)
+            .await?
+            .ok_or_else(|| Error::KeyNotFound(id.map(|id| id.to_vec())))
+    }
+
+    #[allow(async_fn_in_trait)]
+    async fn require_verifying_key(&self, id: Option<&[u8]>) -> Result<Self::VerifyingKey, Error> {
+        let options = Options::default();
+        self.require_verifying_key_with(id, &options).await
+    }
+
+    #[allow(async_fn_in_trait)]
+    async fn verify_with(
         &self,
         key_id: Option<&[u8]>,
         algorithm: Option<AlgorithmInstance>,
         signing_bytes: &[u8],
         signature: &[u8],
-    ) -> Result<Verification, VerificationError>;
+        options: &Options,
+    ) -> Result<SignatureVerification, Error> {
+        let key = self.require_verifying_key_with(key_id, options).await?;
+        let (_, algorithm) = key.key_metadata().into_id_and_algorithm(algorithm)?;
+        key.verify_bytes(algorithm, signing_bytes, signature)
+    }
+
+    #[allow(async_fn_in_trait)]
+    async fn verify(
+        &self,
+        key_id: Option<&[u8]>,
+        algorithm: Option<AlgorithmInstance>,
+        signing_bytes: &[u8],
+        signature: &[u8],
+    ) -> Result<SignatureVerification, Error> {
+        let options = Options::default();
+        self.verify_with(key_id, algorithm, signing_bytes, signature, &options)
+            .await
+    }
 }
 
 impl<'a, T: Verifier> Verifier for &'a T {
-    async fn verify_bytes(
+    type VerifyingKey = T::VerifyingKey;
+
+    async fn get_verifying_key_with(
+        &self,
+        key_id: Option<&[u8]>,
+        options: &Options,
+    ) -> Result<Option<Self::VerifyingKey>, Error> {
+        T::get_verifying_key_with(*&self, key_id, options).await
+    }
+
+    async fn verify_with(
         &self,
         key_id: Option<&[u8]>,
         algorithm: Option<AlgorithmInstance>,
         signing_bytes: &[u8],
         signature: &[u8],
-    ) -> Result<Verification, VerificationError> {
-        T::verify_bytes(*self, key_id, algorithm, signing_bytes, signature).await
+        options: &Options,
+    ) -> Result<SignatureVerification, Error> {
+        T::verify_with(*self, key_id, algorithm, signing_bytes, signature, options).await
     }
-}
-
-pub type Verification = Result<(), RejectedSignature>;
-
-#[derive(Debug, thiserror::Error)]
-#[error("rejected signature")]
-pub struct RejectedSignature;
-
-#[derive(Debug, thiserror::Error)]
-pub enum VerificationError {
-    #[error("key conversion failed: {0}")]
-    KeyConversion(#[from] KeyConversionError),
-
-    #[error("verifying key not found")]
-    KeyNotFound,
-
-    #[error("missing algorithm")]
-    MissingAlgorithm,
-
-    #[error("unsupported algorithm `{0}`")]
-    UnsupportedAlgorithm(Algorithm),
-
-    #[error("malformed signature")]
-    MalformedSignature,
 }
 
 pub trait VerifyingKey {
+    fn key_metadata(&self) -> KeyMetadata;
+
     fn verify_bytes(
         &self,
         algorithm: impl Into<AlgorithmInstance>,
         signing_bytes: &[u8],
         signature: &[u8],
-    ) -> Result<Verification, VerificationError>;
+    ) -> Result<SignatureVerification, Error>;
 }
 
-impl VerifyingKey for PublicKey {
-    fn verify_bytes(
-        &self,
-        algorithm: impl Into<AlgorithmInstance>,
-        signing_bytes: &[u8],
-        signature: &[u8],
-    ) -> Result<Verification, VerificationError> {
-        match self {
-            Self::Symmetric => Err(VerificationError::UnsupportedAlgorithm(
-                algorithm.into().algorithm(),
-            )),
+pub type SignatureVerification = Result<(), RejectedSignature>;
 
-            #[cfg(feature = "ed25519")]
-            Self::Ed25519(key) => key.verify_bytes(algorithm, signing_bytes, signature),
+#[derive(Debug, thiserror::Error, PartialEq)]
+pub enum RejectedSignature {
+    #[error("missing signature")]
+    Missing,
 
-            #[cfg(feature = "rsa")]
-            Self::Rsa(key) => key.verify_bytes(algorithm, signing_bytes, signature),
-
-            #[cfg(feature = "secp256r1")]
-            Self::P256(key) => key.verify_bytes(algorithm, signing_bytes, signature),
-
-            #[cfg(feature = "secp384r1")]
-            Self::P384(key) => key.verify_bytes(algorithm, signing_bytes, signature),
-
-            #[cfg(feature = "secp256k1")]
-            Self::K256(key) => key.verify_bytes(algorithm, signing_bytes, signature),
-        }
-    }
+    #[error("signature mismatch")]
+    Mismatch,
 }

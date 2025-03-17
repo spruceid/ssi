@@ -1,54 +1,129 @@
-//! Verifiable Credential Data Integrity 1.0 core implementation.
-//!
-//! See: <https://www.w3.org/TR/vc-data-integrity/>
+// //! Verifiable Credential Data Integrity 1.0 core implementation.
+// //!
+// //! See: <https://www.w3.org/TR/vc-data-integrity/>
+// use std::ops::{Deref, DerefMut};
+
+// pub mod canonicalization;
+// mod de;
+// mod decode;
+// mod document;
+// pub mod hashing;
+// mod options;
+// pub mod signing;
+pub mod primitives;
+mod proof;
+mod suite;
+
 use std::ops::{Deref, DerefMut};
 
-pub mod canonicalization;
-mod de;
-mod decode;
-mod document;
-pub mod hashing;
-mod options;
-mod proof;
-pub mod signing;
-pub mod suite;
-
-pub use decode::*;
 use educe::Educe;
-pub use options::ProofOptions;
-pub use proof::value_or_array;
-pub use proof::*;
 use serde::Serialize;
-use ssi_claims_core::{
-    ProofValidationError, ValidateClaims, ValidateProof, VerifiableClaims, Verification,
-};
-pub use suite::{
-    CloneCryptographicSuite, CryptographicSuite, DebugCryptographicSuite,
-    DeserializeCryptographicSuite, SerializeCryptographicSuite, StandardCryptographicSuite,
-};
-use suite::{CryptographicSuiteSelect, SelectionError};
+use ssi_claims_core::{Parameters, ValidateClaims, VerifiableClaims, Verification};
+use ssi_crypto::{Error, Signer};
+use ssi_verification_methods::{VerificationMethodIssuer, VerificationMethodVerifier};
+// pub use decode::*;
+// use educe::Educe;
+// pub use options::ProofOptions;
+// pub use proof::value_or_array;
+// pub use proof::*;
+// use serde::Serialize;
+// use ssi_claims_core::{
+//     ProofValidationError, ValidateClaims, ValidateProof, VerifiableClaims, Verification, VerificationParameters,
+// };
+// use ssi_crypto::Verifier;
+pub use proof::*;
+pub use suite::*;
+// use suite::{CryptographicSuiteSelect, SelectionError};
 
-pub use document::*;
-#[doc(hidden)]
-pub use ssi_rdf;
+// pub use document::*;
+// #[doc(hidden)]
+// pub use ssi_rdf;
 
 /// Data-Integrity-secured document.
 #[derive(Educe, Serialize)]
-#[serde(bound(serialize = "T: Serialize, S: SerializeCryptographicSuite"))]
-#[educe(Debug(bound("T: std::fmt::Debug, S: DebugCryptographicSuite")))]
-#[educe(Clone(bound("T: Clone, S: CloneCryptographicSuite")))]
+#[serde(bound(serialize = "T: Serialize"))]
+#[educe(Debug(bound("T: std::fmt::Debug, S: std::fmt::Debug")))]
+#[educe(Clone(bound("T: Clone, S: Clone")))]
 pub struct DataIntegrity<T, S: CryptographicSuite> {
     #[serde(flatten)]
     pub claims: T,
 
-    #[serde(rename = "proof", skip_serializing_if = "Proofs::is_empty")]
+    #[serde(rename = "proof", skip_serializing_if = "<[Proof<S>]>::is_empty")]
     pub proofs: Proofs<S>,
 }
 
 impl<T, S: CryptographicSuite> DataIntegrity<T, S> {
     /// Create new Data-Integrity-secured claims by providing the proofs.
     pub fn new(claims: T, proofs: Proofs<S>) -> Self {
-        Self { claims, proofs }
+        Self {
+            claims,
+            proofs: proofs.into(),
+        }
+    }
+
+    /// Generates a verifiable document secured with this cryptographic suite.
+    pub async fn sign_with(
+        issuer: impl VerificationMethodIssuer,
+        claims: T,
+        configuration: Proof<S>,
+        params: &Parameters,
+    ) -> Result<Self, Error>
+    where
+        S: CryptographicSuiteFor<T>,
+    {
+        let key = issuer
+            .require_key(Some(configuration.verification_method.id().as_bytes()))
+            .await?;
+
+        let prepared =
+            S::prepare(&claims, configuration.as_ref(), key.key_metadata(), params).await?;
+        let proof = S::generate_proof(key, prepared, configuration, params).await?;
+        Ok(DataIntegrity::new(claims, Proofs::new(proof)))
+    }
+
+    pub async fn sign(
+        issuer: impl VerificationMethodIssuer,
+        claims: T,
+        configuration: Proof<S>,
+    ) -> Result<Self, Error>
+    where
+        S: CryptographicSuiteFor<T>,
+    {
+        let params = Parameters::default();
+        Self::sign_with(issuer, claims, configuration, &params).await
+    }
+
+    /// Select a subset of claims to disclose.
+    pub async fn select_with(
+        &self,
+        options: S::SelectionOptions,
+        params: &Parameters,
+    ) -> Result<DataIntegrity<ssi_json_ld::syntax::Object, S>, Error>
+    where
+        S: CryptographicSuiteSelect<T>,
+    {
+        match self.proofs.split_first() {
+            Some((proof, [])) => {
+                proof
+                    .r#type
+                    .select(&self.claims, proof.as_ref(), options, params)
+                    .await
+            }
+            Some(_) => Err(Error::SignatureTooMany),
+            None => Err(Error::SignatureMissing),
+        }
+    }
+
+    /// Select a subset of claims to disclose.
+    pub async fn select(
+        &self,
+        options: S::SelectionOptions,
+    ) -> Result<DataIntegrity<ssi_json_ld::syntax::Object, S>, Error>
+    where
+        S: CryptographicSuiteSelect<T>,
+    {
+        let params = Parameters::default();
+        Self::select_with(&self, options, &params).await
     }
 
     /// Verify the claims and proofs.
@@ -67,39 +142,27 @@ impl<T, S: CryptographicSuite> DataIntegrity<T, S> {
     /// If the validation traits are implemented for `P`, they will be
     /// implemented for `&P` as well. This means the parameters can be passed
     /// by move *or* by reference.
-    pub async fn verify<P>(&self, params: P) -> Result<Verification, ProofValidationError>
+    pub async fn verify_with(
+        &self,
+        verifier: impl VerificationMethodVerifier,
+        params: &Parameters,
+    ) -> Result<Verification, Error>
     where
-        T: ValidateClaims<P, Proofs<S>>,
-        Proofs<S>: ValidateProof<P, T>,
+        T: ValidateClaims<Proofs<S>>,
+        S: CryptographicSuiteFor<T>,
     {
-        VerifiableClaims::verify(self, params).await
+        VerifiableClaims::verify_with(self, verifier, params).await
     }
 
-    /// Select a subset of claims to disclose.
-    ///
-    /// The `params` argument is similar to the verification parameters of the
-    /// `verify` function. It must provides resources necessary to the selection
-    /// of claims. This depends on the cryptosuite type `S`, but probably
-    /// includes a verification method resolver.
-    /// Using `ssi::claims::VerificationParameters` will work in most cases.
-    pub async fn select<P>(
+    pub async fn verify(
         &self,
-        params: P,
-        options: S::SelectionOptions,
-    ) -> Result<DataIntegrity<ssi_json_ld::syntax::Object, S>, SelectionError>
+        verifier: impl VerificationMethodVerifier,
+    ) -> Result<Verification, Error>
     where
-        S: CryptographicSuiteSelect<T, P>,
+        T: ValidateClaims<Proofs<S>>,
+        S: CryptographicSuiteFor<T>,
     {
-        match self.proofs.split_first() {
-            Some((proof, [])) => {
-                proof
-                    .suite()
-                    .select(&self.claims, proof.borrowed(), params, options)
-                    .await
-            }
-            Some(_) => Err(SelectionError::AmbiguousProof),
-            None => Err(SelectionError::MissingProof),
-        }
+        VerifiableClaims::verify(self, verifier).await
     }
 
     pub fn map<U>(self, f: impl FnOnce(T) -> U) -> DataIntegrity<U, S> {

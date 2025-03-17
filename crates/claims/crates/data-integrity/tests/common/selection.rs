@@ -4,7 +4,7 @@ use std::collections::HashMap;
 use iref::IriBuf;
 use json_syntax::Print;
 use serde::Deserialize;
-use ssi_claims_core::VerificationParameters;
+use ssi_claims_core::Parameters;
 use ssi_data_integrity::{AnyDataIntegrity, AnySelectionOptions};
 use ssi_verification_methods::AnyMethod;
 
@@ -20,7 +20,7 @@ pub struct SelectionTest {
 
 impl SelectionTest {
     pub async fn run(mut self) {
-        let params = VerificationParameters::from_resolver(self.verification_methods);
+        let params = Parameters::from_resolver(self.verification_methods);
 
         let vc = self.input.select(params, self.options).await.unwrap();
 

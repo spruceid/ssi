@@ -327,7 +327,7 @@ impl From<VerificationMethod> for DIDVerificationMethod {
                 public_key_jwk,
             } => Self {
                 id,
-                type_: "EcdsaSecp256k1VerificationKey2019".to_owned(),
+                r#type: "EcdsaSecp256k1VerificationKey2019".to_owned(),
                 controller,
                 properties: [(
                     "publicKeyJwk".into(),
@@ -342,7 +342,7 @@ impl From<VerificationMethod> for DIDVerificationMethod {
                 blockchain_account_id,
             } => Self {
                 id,
-                type_: "EcdsaSecp256k1RecoveryMethod2020".to_owned(),
+                r#type: "EcdsaSecp256k1RecoveryMethod2020".to_owned(),
                 controller,
                 properties: [(
                     "blockchainAccountId".into(),
@@ -357,7 +357,7 @@ impl From<VerificationMethod> for DIDVerificationMethod {
                 blockchain_account_id,
             } => Self {
                 id,
-                type_: "Eip712Method2021".to_owned(),
+                r#type: "Eip712Method2021".to_owned(),
                 controller,
                 properties: [(
                     "blockchainAccountId".into(),
@@ -384,9 +384,9 @@ mod tests {
             syntax::NonEmptyVec,
             v1::{JsonCredential, JsonPresentation},
         },
-        VerificationParameters,
+        Parameters,
     };
-    use ssi_dids_core::{did, DIDResolver};
+    use ssi_dids_core::{did, DidResolver};
     use ssi_jwk::JWK;
     use ssi_verification_methods_core::{ProofPurpose, ReferenceOrOwned, SingleSecretSigner};
     use static_iref::uri;
@@ -477,7 +477,7 @@ mod tests {
 
     async fn credential_prove_verify_did_ethr2(eip712: bool) {
         let didethr = DIDEthr.into_vm_resolver();
-        let verifier = VerificationParameters::from_resolver(&didethr);
+        let verifier = Parameters::from_resolver(&didethr);
         let key: JWK = serde_json::from_value(json!({
             "alg": "ES256K-R",
             "kty": "EC",
@@ -602,7 +602,7 @@ mod tests {
         .unwrap();
         // eprintln!("vc {:?}", vc);
         assert!(vc
-            .verify(VerificationParameters::from_resolver(didethr))
+            .verify(Parameters::from_resolver(didethr))
             .await
             .unwrap()
             .is_ok())

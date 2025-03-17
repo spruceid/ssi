@@ -1,7 +1,7 @@
 use std::convert::TryFrom;
 
 use crate::{Params, JWK};
-use ssi_crypto::{hashes::ripemd160, key::KeyConversionError};
+use ssi_crypto::{hashes::ripemd160, k256, key::KeyConversionError};
 
 /// Compute a hash of a public key as an ripemd160 hash.
 pub fn hash_public_key(jwk: &JWK, version: u8) -> Result<String, KeyConversionError> {

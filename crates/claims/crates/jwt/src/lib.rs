@@ -68,6 +68,7 @@
 //! assert_eq!(jwt, "eyJhbGciOiJFUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJodHRwOi8vZXhhbXBsZS5vcmcvI2lzc3VlciIsImV4cCI6MTc0Njg4MTM1NiwiaWF0IjoxNzE1MzQyNzkwLCJuYW1lIjoiSm9obiBTbWl0aCJ9.zBfMZzfQuuSfzcZmnz0MjXwT1sP26qwVq2GZX3qL0DR3wRMVG-wbCu9jPJ48l-F_q7W253_VqMWpoLluHo-gpg")
 //! # })
 //! ```
+pub use ssi_claims_core;
 pub use ssi_crypto;
 pub use ssi_jws;
 

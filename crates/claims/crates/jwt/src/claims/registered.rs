@@ -1,6 +1,6 @@
 use super::{Claim, InvalidClaimValue, JWTClaims};
 use crate::{CastClaim, ClaimSet, InfallibleClaimSet, NumericDate, StringOrUri};
-use ssi_claims_core::{ClaimsValidity, ValidateClaims, VerificationParameters};
+use ssi_claims_core::{ClaimsValidity, Parameters, ValidateClaims};
 use ssi_core::OneOrMany;
 use ssi_jws::JwsPayload;
 use std::{borrow::Cow, collections::BTreeMap};
@@ -88,7 +88,7 @@ impl JwsPayload for RegisteredClaims {
 }
 
 impl<P> ValidateClaims<P> for RegisteredClaims {
-    fn validate_claims(&self, env: &VerificationParameters, _proof: &P) -> ClaimsValidity {
+    fn validate_claims(&self, env: &Parameters, _proof: &P) -> ClaimsValidity {
         ClaimSet::validate_registered_claims(self, env)
     }
 }

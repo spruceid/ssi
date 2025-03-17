@@ -229,7 +229,7 @@ impl<T> InfallibleClaimSet for SdJwtVc<T> {}
 #[cfg(test)]
 mod tests {
     use serde_json::json;
-    use ssi_claims_core::VerificationParameters;
+    use ssi_claims_core::Parameters;
     use ssi_jwk::JWK;
     use ssi_sd_jwt::{json_pointer, SdAlg, SdJwt, SdJwtBuf};
     use ssi_vc::v2::JsonCredential;
@@ -238,7 +238,7 @@ mod tests {
 
     async fn verify(input: &SdJwt, key: &JWK) {
         let vc = SdJwtVc::decode_reveal_any(input).unwrap();
-        let params = VerificationParameters::from_resolver(key);
+        let params = Parameters::from_resolver(key);
         let result = vc.verify(params).await.unwrap();
         assert_eq!(result, Ok(()))
     }

@@ -1,9 +1,10 @@
 use std::marker::PhantomData;
 
 use multibase::Base;
-use ssi_claims_core::{ProofValidationError, ProofValidity, SignatureError};
-use ssi_crypto::algorithm::SignatureAlgorithmInstance;
-use ssi_verification_methods::{MessageSigner, VerifyBytes};
+use ssi_claims_core::{ProofValidationError, ProofValidity};
+use ssi_crypto::{key::metadata::infer_algorithm, AlgorithmInstance, SignatureError, Signer, Verifier};
+use ssi_jwk::VerifyingKey;
+use ssi_verification_methods::VerificationMethod;
 
 use crate::{
     suite::standard::{
@@ -11,8 +12,6 @@ use crate::{
     },
     CryptographicSuite, ProofConfigurationRef, ProofRef,
 };
-
-use super::AlgorithmSelection;
 
 /// Common signature format where the proof value is multibase-encoded.
 #[derive(
@@ -32,7 +31,7 @@ pub struct MultibaseSignature {
 }
 
 impl MultibaseSignature {
-    pub fn new(signature: Vec<u8>, base: Base) -> Self {
+    pub fn new(signature: Box<[u8]>, base: Base) -> Self {
         Self {
             proof_value: multibase::encode(base, signature),
         }
@@ -71,28 +70,26 @@ impl StaticBase for Base58Btc {
     const BASE: Base = Base::Base58Btc;
 }
 
-pub struct MultibaseSigning<A, B>(PhantomData<(A, B)>);
+pub struct MultibaseSigning<B>(AlgorithmInstance, PhantomData<B>);
 
-impl<A, B> SignatureAndVerificationAlgorithm for MultibaseSigning<A, B> {
+impl<B> SignatureAndVerificationAlgorithm for MultibaseSigning<B> {
     type Signature = MultibaseSignature;
 }
 
-impl<A, B, S, T> SignatureAlgorithm<S, T> for MultibaseSigning<A, B>
+impl<B, S> SignatureAlgorithm<S> for MultibaseSigning<B>
 where
     S: CryptographicSuite,
     S::PreparedClaims: AsRef<[u8]>,
-    A: AlgorithmSelection<S::VerificationMethod, S::ProofOptions>,
     B: StaticBase,
-    T: MessageSigner<A>,
 {
     async fn sign(
-        verification_method: &S::VerificationMethod,
-        signer: T,
+        verification_method: &VerificationMethod,
+        signer: impl Signer,
         prepared_claims: S::PreparedClaims,
         proof_configuration: ProofConfigurationRef<'_, S>,
     ) -> Result<Self::Signature, SignatureError> {
-        let algorithm = A::select_algorithm(verification_method, proof_configuration.options)?;
-
+        // let algorithm = A::select_algorithm(verification_method, proof_configuration.options)?;
+        let (_, algorithm) = signer.key_metadata().into_id_and_algorithm(None)?;
         Ok(MultibaseSignature::new(
             signer.sign(algorithm, prepared_claims.as_ref()).await?,
             B::BASE,
@@ -100,24 +97,24 @@ where
     }
 }
 
-impl<A, B, S> VerificationAlgorithm<S> for MultibaseSigning<A, B>
+impl<B, S> VerificationAlgorithm<S> for MultibaseSigning<B>
 where
     S: CryptographicSuite<Signature = MultibaseSignature>,
     S::PreparedClaims: AsRef<[u8]>,
-    S::VerificationMethod: VerifyBytes<A>,
-    A: AlgorithmSelection<S::VerificationMethod, S::ProofOptions>,
     B: StaticBase,
 {
     fn verify(
-        verification_method: &S::VerificationMethod,
+        &self,
+        verifier: impl VerifyingKey,
+        verification_method: &VerificationMethod,
         prepared_claims: S::PreparedClaims,
         proof: ProofRef<S>,
     ) -> Result<ProofValidity, ProofValidationError> {
-        let algorithm_instance = A::select_algorithm(verification_method, proof.options)?;
-
+        // let algorithm = verifier.key_metadata().into_id_and_algorithm(None);
+        // let algorithm_instance = A::select_algorithm(verification_method, proof.options)?;
         let (_, signature_bytes) = proof.signature.decode()?; // Should we check the base?
-        verification_method.verify_bytes(
-            algorithm_instance.algorithm(),
+        verifier.verify_bytes(
+            self.0.clone(),
             prepared_claims.as_ref(),
             &signature_bytes,
         )

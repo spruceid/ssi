@@ -13,7 +13,7 @@ use ssi::{
         data_integrity::{AnySuite, CryptographicSuite, ProofOptions},
         vc::v1::JsonCredential,
     },
-    dids::{DIDResolver, DIDJWK},
+    dids::{DidResolver, DIDJWK},
     verification_methods::SingleSecretSigner,
     JWK,
 };

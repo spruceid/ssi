@@ -181,7 +181,7 @@ fn resolve_method_representation(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use ssi_dids_core::{resolution, DIDResolver, DIDURL};
+    use ssi_dids_core::{resolution, DidResolver, DIDURL};
 
     #[async_std::test]
     async fn p256_roundtrip() {

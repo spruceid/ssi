@@ -7,8 +7,7 @@ use coset::{
 use ssi_crypto::{
     key::{metadata::infer_algorithm, KeyConversionError, KeyMetadata},
     rand::{CryptoRng, RngCore},
-    PublicKey, SecretKey, SignatureError, Signer, SigningKey, VerificationError, Verifier,
-    VerifyingKey,
+    Error, PublicKey, SecretKey, Signer, SigningKey, Verifier, VerifyingKey,
 };
 
 use crate::algorithm::instantiate_algorithm;
@@ -41,7 +40,7 @@ impl CoseKey {
                     .ok()?;
 
                 match iana::EllipticCurve::from_i64(crv)? {
-                    iana::EllipticCurve::Secp256k1 => Some(ssi_crypto::KeyType::Secp256k1),
+                    iana::EllipticCurve::Secp256k1 => Some(ssi_crypto::KeyType::K256),
                     iana::EllipticCurve::P_256 => Some(ssi_crypto::KeyType::P256),
                     iana::EllipticCurve::P_384 => Some(ssi_crypto::KeyType::P384),
                     _ => None,
@@ -73,12 +72,12 @@ impl CoseKey {
 
     #[cfg(feature = "secp256r1")]
     pub fn generate_p256() -> Self {
-        Self::encode_secret(&ssi_crypto::SecretKey::generate_p256()).unwrap()
+        Self::encode_secret(&ssi_crypto::SecretKey::generate_ecdsa_p256()).unwrap()
     }
 
     #[cfg(feature = "secp256r1")]
     pub fn generate_p256_from(rng: &mut (impl RngCore + CryptoRng)) -> Self {
-        Self::encode_secret(&ssi_crypto::SecretKey::generate_p256_from(rng)).unwrap()
+        Self::encode_secret(&ssi_crypto::SecretKey::generate_ecdsa_p256_from(rng)).unwrap()
     }
 
     #[cfg(feature = "secp384r1")]
@@ -134,7 +133,7 @@ impl CoseKey {
                         match iana::EllipticCurve::from_i64(crv) {
                             #[cfg(feature = "ed25519")]
                             Some(iana::EllipticCurve::Ed25519) => {
-                                ssi_crypto::PublicKey::new_ed25519(x).map_err(Into::into)
+                                ssi_crypto::PublicKey::from_ed25519_bytes(x).map_err(Into::into)
                             }
                             _ => Err(KeyConversionError::Unsupported),
                         }
@@ -158,11 +157,11 @@ impl CoseKey {
                         match iana::EllipticCurve::from_i64(crv) {
                             #[cfg(feature = "secp256k1")]
                             Some(iana::EllipticCurve::Secp256k1) => {
-                                ssi_crypto::PublicKey::new_secp256k1(x, y).map_err(Into::into)
+                                ssi_crypto::PublicKey::new_ecdsa_k256(x, y).map_err(Into::into)
                             }
                             #[cfg(feature = "secp256r1")]
                             Some(iana::EllipticCurve::P_256) => {
-                                ssi_crypto::PublicKey::new_p256(x, y).map_err(Into::into)
+                                ssi_crypto::PublicKey::new_ecdsa_p256(x, y).map_err(Into::into)
                             }
                             #[cfg(feature = "secp384r1")]
                             Some(iana::EllipticCurve::P_384) => {
@@ -216,7 +215,7 @@ impl CoseKey {
                             }
                             #[cfg(feature = "secp256r1")]
                             Some(iana::EllipticCurve::P_256) => {
-                                ssi_crypto::SecretKey::new_p256(d).map_err(Into::into)
+                                ssi_crypto::SecretKey::new_ecdsa_p256(d).map_err(Into::into)
                             }
                             #[cfg(feature = "secp384r1")]
                             Some(iana::EllipticCurve::P_384) => {
@@ -415,18 +414,14 @@ impl CborSerializable for CoseKey {}
 
 impl Signer for CoseKey {
     fn key_metadata(&self) -> KeyMetadata {
-        KeyMetadata {
-            id: Some(self.key_id.clone()),
-            r#type: self.r#type(),
-            algorithm: self.alg.as_ref().and_then(instantiate_algorithm),
-        }
+        VerifyingKey::key_metadata(self)
     }
 
-    async fn sign_bytes(
+    async fn sign(
         &self,
         algorithm: ssi_crypto::AlgorithmInstance,
         signing_bytes: &[u8],
-    ) -> Result<Box<[u8]>, SignatureError> {
+    ) -> Result<Box<[u8]>, Error> {
         let secret_key = self.decode_secret()?;
         secret_key
             .sign_bytes(algorithm, signing_bytes)
@@ -434,23 +429,52 @@ impl Signer for CoseKey {
     }
 }
 
+impl VerifyingKey for CoseKey {
+    fn key_metadata(&self) -> KeyMetadata {
+        KeyMetadata {
+            id: Some(self.key_id.clone()),
+            r#type: self.r#type(),
+            algorithm: self.alg.as_ref().and_then(instantiate_algorithm),
+        }
+    }
+
+    fn verify_bytes(
+        &self,
+        algorithm: impl Into<ssi_crypto::AlgorithmInstance>,
+        signing_bytes: &[u8],
+        signature: &[u8],
+    ) -> Result<ssi_crypto::SignatureVerification, Error> {
+        let public_key = self.decode_public()?;
+        public_key.verify_bytes(algorithm, signing_bytes, signature)
+    }
+}
+
 impl Verifier for CoseKey {
-    async fn verify_bytes(
+    type VerifyingKey = Self;
+
+    async fn get_verifying_key_with(
+        &self,
+        _key_id: Option<&[u8]>,
+        _options: &ssi_crypto::Options,
+    ) -> Result<Option<Self::VerifyingKey>, Error> {
+        Ok(Some(self.clone()))
+    }
+
+    async fn verify_with(
         &self,
         _key_id: Option<&[u8]>,
         algorithm: Option<ssi_crypto::AlgorithmInstance>,
         signing_bytes: &[u8],
         signature: &[u8],
-    ) -> Result<ssi_crypto::Verification, ssi_crypto::VerificationError> {
-        let public_key = self.decode_public()?;
+        _options: &ssi_crypto::Options,
+    ) -> Result<ssi_crypto::SignatureVerification, ssi_crypto::Error> {
         let algorithm = infer_algorithm(
             algorithm,
             || self.alg.as_ref().and_then(instantiate_algorithm),
             || self.r#type(),
         )
-        .ok_or(VerificationError::MissingAlgorithm)?;
-
-        public_key.verify_bytes(algorithm, signing_bytes, signature)
+        .ok_or(Error::AlgorithmMissing)?;
+        VerifyingKey::verify_bytes(self, algorithm, signing_bytes, signature)
     }
 }
 

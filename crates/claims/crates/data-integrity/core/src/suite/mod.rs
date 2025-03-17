@@ -1,165 +1,96 @@
-use ssi_claims_core::{
-    ProofPreparationError, ProofValidationError, SignatureEnvironment, SignatureError,
-};
-use ssi_verification_methods::VerificationMethod;
-
-mod signature;
-pub use signature::*;
-
-mod verification;
-pub use verification::*;
-
-use crate::{DataIntegrity, ProofConfiguration, TypeRef};
-
-mod configuration;
-pub use configuration::*;
-
-pub mod bounds;
-pub use bounds::{
-    CloneCryptographicSuite, DebugCryptographicSuite, DeserializeCryptographicSuite,
-    DeserializeCryptographicSuiteOwned, SerializeCryptographicSuite,
-};
-
-use self::standard::{HashingError, TransformationError};
-
-pub mod standard;
-pub use standard::StandardCryptographicSuite;
+use serde::{Deserialize, Serialize};
+use ssi_claims_core::Parameters;
+use ssi_crypto::{key::KeyMetadata, Error, SignatureVerification, Signer};
+use ssi_jwk::VerifyingKey;
 
 mod sd;
 pub use sd::*;
 
+use crate::proof::{Proof, ProofRef};
+
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+pub struct CryptographicSuiteType {
+    #[serde(rename = "type")]
+    pub r#type: String,
+
+    #[serde(rename = "cryptosuite")]
+    pub crypto_suite: Option<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize)]
+pub struct CryptographicSuiteTypeRef<'a> {
+    #[serde(rename = "type")]
+    pub r#type: &'a str,
+
+    #[serde(rename = "cryptosuite")]
+    pub crypto_suite: Option<&'a str>,
+}
+
 /// Cryptographic suite.
 ///
 /// See: <https://www.w3.org/TR/vc-data-integrity/#cryptographic-suites>
-pub trait CryptographicSuite: Clone {
+pub trait CryptographicSuite: Sized {
+    fn from_type(r#type: CryptographicSuiteTypeRef) -> Option<Self>;
+
+    fn r#type(&self) -> CryptographicSuiteTypeRef;
+
+    fn strip_proof_value(proof: &mut ProofRef<Self>) {
+        proof.proof_value = None;
+    }
+}
+
+pub trait StaticCryptographicSuite: Default {
+    const CRYPTO_SUITE: &str;
+}
+
+impl<T: StaticCryptographicSuite> CryptographicSuite for T {
+    fn from_type(r#type: CryptographicSuiteTypeRef) -> Option<Self> {
+        if r#type.r#type == "DataIntegrityProof" && r#type.crypto_suite == Some(Self::CRYPTO_SUITE)
+        {
+            Some(Self::default())
+        } else {
+            None
+        }
+    }
+
+    fn r#type(&self) -> CryptographicSuiteTypeRef {
+        CryptographicSuiteTypeRef {
+            r#type: "DataIntegrityProof",
+            crypto_suite: Some(Self::CRYPTO_SUITE),
+        }
+    }
+}
+
+pub trait CryptographicSuiteFor<T>: CryptographicSuite {
     /// How prepared claims are stored.
     ///
     /// This is the output of the hashing algorithm.
     type PreparedClaims;
 
-    /// Configuration algorithm, used to generate the proof configuration from
-    /// the input options.
-    ///
-    /// Most cryptographic suites will just use the input options as proof
-    /// configuration. Some suites may also use this step to add a custom
-    /// `@context` definition to the proof.
-    type Configuration: ConfigurationAlgorithm<Self>;
-
-    /// Verification method.
-    type VerificationMethod: VerificationMethod;
-
-    /// Suite-specific proof options used to generate the proof.
-    type ProofOptions;
-
-    /// Signature type.
-    ///
-    /// For cryptographic suites conforming to the most recent iteration of
-    /// the Data-Integrity specification, this will be `proofValue`.
-    type Signature: AsRef<str>;
-
-    /// Returns the cryptographic suite type.
-    fn type_(&self) -> TypeRef;
-
-    /// Generates a proof configuration from input options.
-    fn configure_signature(
-        &self,
-        proof_options: InputProofOptions<Self>,
-        signature_options: InputSignatureOptions<Self>,
-    ) -> Result<(ProofConfiguration<Self>, TransformationOptions<Self>), ConfigurationError> {
-        Self::Configuration::configure_signature(self, proof_options, signature_options)
-    }
-
-    /// Generates a proof configuration from input options.
-    fn configure_verification(
-        &self,
-        verification_options: &InputVerificationOptions<Self>,
-    ) -> Result<TransformationOptions<Self>, ConfigurationError> {
-        Self::Configuration::configure_verification(self, verification_options)
-    }
-
-    /// Generates a verifiable document secured with this cryptographic suite.
+    /// Prepare the claims for signature or verification.
     #[allow(async_fn_in_trait)]
-    async fn sign_with<T, C, R, S>(
-        &self,
-        context: C,
-        unsecured_document: T,
-        resolver: R,
-        signer: S,
-        proof_options: InputProofOptions<Self>,
-        signature_options: InputSignatureOptions<Self>,
-    ) -> Result<DataIntegrity<T, Self>, SignatureError>
-    where
-        Self: CryptographicSuiteSigning<T, C, R, S>,
-    {
-        let (proof_configuration, transformation_options) =
-            self.configure_signature(proof_options, signature_options)?;
-        let proof_configuration_ref = proof_configuration.borrowed();
-        let signature = self
-            .generate_signature(
-                &context,
-                resolver,
-                signer,
-                &unsecured_document,
-                proof_configuration_ref,
-                transformation_options,
-            )
-            .await?;
+    async fn prepare(
+        claims: &T,
+        configuration: ProofRef<Self>,
+        key_metadata: KeyMetadata,
+        params: &Parameters,
+    ) -> Result<Self::PreparedClaims, Error>;
 
-        let proof = proof_configuration.into_proof(signature);
-        Ok(DataIntegrity::new(unsecured_document, proof.into()))
-    }
-
-    /// Generates a verifiable document secured with this cryptographic suite.
+    /// Prepare the claims for signature or verification.
     #[allow(async_fn_in_trait)]
-    async fn sign<T, R, S>(
-        &self,
-        unsecured_document: T,
-        resolver: R,
-        signer: S,
-        proof_options: InputProofOptions<Self>,
-    ) -> Result<DataIntegrity<T, Self>, SignatureError>
-    where
-        Self: CryptographicSuiteSigning<T, SignatureEnvironment, R, S>,
-        InputSignatureOptions<Self>: Default,
-    {
-        self.sign_with(
-            SignatureEnvironment::default(),
-            unsecured_document,
-            resolver,
-            signer,
-            proof_options,
-            Default::default(),
-        )
-        .await
-    }
-}
+    async fn generate_proof(
+        issuer: impl Signer,
+        claims: Self::PreparedClaims,
+        configuration: Proof<Self>,
+        params: &Parameters,
+    ) -> Result<Proof<Self>, Error>;
 
-#[derive(Debug, thiserror::Error)]
-pub enum ClaimsPreparationError {
-    #[error("proof configuration failed: {0}")]
-    Configuration(#[from] ConfigurationError),
-
-    #[error("claims transformation failed: {0}")]
-    Transformation(#[from] TransformationError),
-
-    #[error("hashing failed: {0}")]
-    Hashing(#[from] HashingError),
-}
-
-impl From<ClaimsPreparationError> for SignatureError {
-    fn from(value: ClaimsPreparationError) -> Self {
-        Self::other(value)
-    }
-}
-
-impl From<ClaimsPreparationError> for ProofValidationError {
-    fn from(value: ClaimsPreparationError) -> Self {
-        Self::Other(value.to_string())
-    }
-}
-
-impl From<ClaimsPreparationError> for ProofPreparationError {
-    fn from(value: ClaimsPreparationError) -> Self {
-        Self::Claims(value.to_string())
-    }
+    /// Prepare the claims for signature or verification.
+    #[allow(async_fn_in_trait)]
+    async fn verify_proof(
+        verifier: impl VerifyingKey,
+        claims: Self::PreparedClaims,
+        proof: ProofRef<Self>,
+        params: &Parameters,
+    ) -> Result<SignatureVerification, Error>;
 }

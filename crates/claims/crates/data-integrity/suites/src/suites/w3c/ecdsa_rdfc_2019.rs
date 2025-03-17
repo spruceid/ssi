@@ -1,23 +1,18 @@
 //! `ecdsa-rdfc-2019` cryptosuite implementation.
 //!
 //! See: <https://www.w3.org/TR/vc-di-ecdsa/#ecdsa-rdfc-2019>
-use ssi_crypto::algorithm::ES256OrES384;
-use ssi_data_integrity_core::{
-    canonicalization::{
-        CanonicalClaimsAndConfiguration, CanonicalizeClaimsAndConfiguration,
-        HashCanonicalClaimsAndConfiguration,
-    },
-    signing::{Base58Btc, MultibaseSigning},
-    suite::{
-        standard::{HashingAlgorithm, HashingError},
-        NoConfiguration,
-    },
-    CryptosuiteStr, ProofConfigurationRef, StandardCryptographicSuite, TypeRef,
+use multibase::Base;
+use ssi_crypto::{
+    algorithm::DigestFunction, key::KeyMetadata, AlgorithmInstance, Error, KeyType,
+    SignatureVerification, Signer,
 };
-use ssi_verification_methods::{multikey::DecodedMultikey, Multikey};
-use static_iref::iri;
+use ssi_data_integrity_core::{CryptographicSuiteFor, Proof, ProofRef, StaticCryptographicSuite};
+use ssi_jwk::VerifyingKey;
 
-use crate::try_from_type;
+use ssi_data_integrity_core::primitives::{
+    multibase::{multibase_signing, multibase_verification},
+    rdf::canonicalize_json_ld_claims_and_configuration,
+};
 
 /// The `ecdsa-rdfc-2019` cryptosuite.
 ///
@@ -25,81 +20,54 @@ use crate::try_from_type;
 #[derive(Debug, Default, Clone, Copy)]
 pub struct EcdsaRdfc2019;
 
-impl EcdsaRdfc2019 {
-    pub const NAME: &'static str = "DataIntegrityProof";
-
-    pub const IRI: &'static iref::Iri = iri!("https://w3id.org/security#DataIntegrityProof");
+impl StaticCryptographicSuite for EcdsaRdfc2019 {
+    const CRYPTO_SUITE: &str = "ecdsa-rdfc-2019";
 }
 
-impl StandardCryptographicSuite for EcdsaRdfc2019 {
-    type Configuration = NoConfiguration;
+impl<T> CryptographicSuiteFor<T> for EcdsaRdfc2019 {
+    type PreparedClaims = (Box<[u8]>, AlgorithmInstance);
 
-    type Transformation = CanonicalizeClaimsAndConfiguration;
+    async fn prepare(
+        claims: &T,
+        configuration: ProofRef<'_, Self>,
+        key_metadata: KeyMetadata,
+        params: &ssi_claims_core::Parameters,
+    ) -> Result<Self::PreparedClaims, Error> {
+        let (digest, algorithm) = match key_metadata.r#type {
+            Some(KeyType::P256) => (DigestFunction::Sha256, AlgorithmInstance::ES256),
+            Some(KeyType::P384) => (DigestFunction::Sha384, AlgorithmInstance::PS384),
+            _ => return Err(Error::KeyUnsupported),
+        };
 
-    type Hashing = EcdsaRdfc2019HashingAlgorithm;
+        let hash = canonicalize_json_ld_claims_and_configuration(claims, configuration, params)
+            .await?
+            .hash(digest);
 
-    type VerificationMethod = Multikey;
-
-    type SignatureAlgorithm = MultibaseSigning<ES256OrES384, Base58Btc>;
-
-    type ProofOptions = ();
-
-    fn type_(&self) -> TypeRef {
-        TypeRef::DataIntegrityProof(CryptosuiteStr::new("ecdsa-rdfc-2019").unwrap())
+        Ok((hash, algorithm))
     }
-}
 
-try_from_type!(EcdsaRdfc2019);
-
-pub struct EcdsaRdfc2019HashingAlgorithm;
-
-impl HashingAlgorithm<EcdsaRdfc2019> for EcdsaRdfc2019HashingAlgorithm {
-    type Output = EcdsaRdfc2019Hash;
-
-    fn hash(
-        input: CanonicalClaimsAndConfiguration,
-        proof_configuration: ProofConfigurationRef<EcdsaRdfc2019>,
-        verification_method: &Multikey,
-    ) -> Result<Self::Output, HashingError> {
-        match verification_method
-            .public_key
-            .decode()
-            .map_err(|_| HashingError::InvalidKey)?
-        {
-            #[cfg(feature = "secp256r1")]
-            DecodedMultikey::P256(_) => {
-                HashCanonicalClaimsAndConfiguration::<k256::sha2::Sha256>::hash(
-                    input,
-                    proof_configuration,
-                    verification_method,
-                )
-                .map(EcdsaRdfc2019Hash::Sha256)
-            }
-            #[cfg(feature = "secp384r1")]
-            DecodedMultikey::P384(_) => {
-                HashCanonicalClaimsAndConfiguration::<k256::sha2::Sha384>::hash(
-                    input,
-                    proof_configuration,
-                    verification_method,
-                )
-                .map(EcdsaRdfc2019Hash::Sha384)
-            }
-            _ => Err(HashingError::InvalidKey),
-        }
+    async fn generate_proof(
+        signer: impl Signer,
+        (claims, algorithm): Self::PreparedClaims,
+        configuration: Proof<Self>,
+        _params: &ssi_claims_core::Parameters,
+    ) -> Result<Proof<Self>, Error> {
+        multibase_signing(
+            signer,
+            claims,
+            configuration,
+            Some(algorithm),
+            Base::Base58Btc,
+        )
+        .await
     }
-}
 
-#[derive(Debug, Clone, Copy)]
-pub enum EcdsaRdfc2019Hash {
-    Sha256([u8; 64]),
-    Sha384([u8; 96]),
-}
-
-impl AsRef<[u8]> for EcdsaRdfc2019Hash {
-    fn as_ref(&self) -> &[u8] {
-        match self {
-            Self::Sha256(b) => b.as_ref(),
-            Self::Sha384(b) => b.as_ref(),
-        }
+    async fn verify_proof(
+        verifier: impl VerifyingKey,
+        (claims, algorithm): Self::PreparedClaims,
+        proof: ProofRef<'_, Self>,
+        _params: &ssi_claims_core::Parameters,
+    ) -> Result<SignatureVerification, Error> {
+        multibase_verification(verifier, claims, proof, Some(algorithm)).await
     }
 }

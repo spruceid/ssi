@@ -12,6 +12,7 @@ documentation = "https://docs.rs/ssi-verification-methods/"
 bbs = ["ssi-jwk/bbs", "ssi-bbs"]
 
 [dependencies]
+anyhow.workspace = true
 ssi-core.workspace = true
 ssi-crypto.workspace = true
 ssi-claims-core.workspace = true

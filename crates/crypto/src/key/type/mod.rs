@@ -22,7 +22,7 @@ pub enum KeyType {
     Symmetric,
     Rsa,
     Ed25519,
-    Secp256k1,
+    K256,
     P256,
     P384,
 }
@@ -33,7 +33,7 @@ impl KeyType {
             Self::Symmetric => Some(AlgorithmInstance::HS512),
             Self::Rsa => Some(AlgorithmInstance::RS256),
             Self::Ed25519 => Some(AlgorithmInstance::EdDsa),
-            Self::Secp256k1 => Some(AlgorithmInstance::ES256K),
+            Self::K256 => Some(AlgorithmInstance::ES256K),
             Self::P256 => Some(AlgorithmInstance::ES256),
             Self::P384 => Some(AlgorithmInstance::ES384),
         }
