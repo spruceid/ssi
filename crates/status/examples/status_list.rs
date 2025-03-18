@@ -94,11 +94,13 @@ impl Command {
 
                 let jwk = read_jwk(&key)?;
 
-                let mut header = ssi_jws::Header::default();
-                header.algorithm = jwk.algorithm.unwrap();
-                header.type_ = Some("vc+ld+json+jwt".to_owned());
-                header.content_type = Some("vc+ld+json".to_owned());
-                header.key_id = Some(DIDJWK::generate_url(&jwk.to_public()).into_string());
+                let header = ssi_jws::Header {
+                    algorithm: jwk.algorithm.unwrap(),
+                    type_: Some("vc+ld+json+jwt".to_owned()),
+                    content_type: Some("vc+ld+json".to_owned()),
+                    key_id: Some(DIDJWK::generate_url(&jwk.to_public()).into_string()),
+                    ..Default::default()
+                };
 
                 let signing_bytes = header.encode_signing_bytes(&bytes);
                 let signature =

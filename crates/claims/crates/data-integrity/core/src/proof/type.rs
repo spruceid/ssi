@@ -102,7 +102,7 @@ impl<'a> TypeRef<'a> {
     }
 }
 
-impl<'a> Serialize for TypeRef<'a> {
+impl Serialize for TypeRef<'_> {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
         S: serde::Serializer,

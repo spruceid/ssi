@@ -29,7 +29,7 @@ pub trait JwsPayload {
     }
 }
 
-impl<'a, P: ?Sized + JwsPayload> JwsPayload for &'a P {
+impl<P: ?Sized + JwsPayload> JwsPayload for &P {
     fn typ(&self) -> Option<&str> {
         P::typ(*self)
     }
@@ -134,7 +134,7 @@ pub trait JwsSigner {
     }
 }
 
-impl<'a, T: JwsSigner> JwsSigner for &'a T {
+impl<T: JwsSigner> JwsSigner for &T {
     async fn fetch_info(&self) -> Result<JwsSignerInfo, SignatureError> {
         T::fetch_info(*self).await
     }
@@ -148,7 +148,7 @@ impl<'a, T: JwsSigner> JwsSigner for &'a T {
     }
 }
 
-impl<'a, T: JwsSigner + Clone> JwsSigner for Cow<'a, T> {
+impl<T: JwsSigner + Clone> JwsSigner for Cow<'_, T> {
     async fn fetch_info(&self) -> Result<JwsSignerInfo, SignatureError> {
         T::fetch_info(self.as_ref()).await
     }
@@ -191,7 +191,7 @@ impl<'a> JwkWithAlgorithm<'a> {
     }
 }
 
-impl<'a> JwsSigner for JwkWithAlgorithm<'a> {
+impl JwsSigner for JwkWithAlgorithm<'_> {
     async fn fetch_info(&self) -> Result<JwsSignerInfo, SignatureError> {
         Ok(JwsSignerInfo {
             key_id: self.jwk.key_id.clone(),

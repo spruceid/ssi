@@ -28,7 +28,7 @@ pub struct InvalidJsonPointer<T = String>(pub T);
 #[repr(transparent)]
 pub struct JsonPointer(str);
 
-impl<'a> Default for &'a JsonPointer {
+impl Default for &JsonPointer {
     fn default() -> Self {
         JsonPointer::ROOT
     }

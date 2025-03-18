@@ -188,10 +188,16 @@ pub struct EmptyObject;
 #[derive(Debug, thiserror::Error)]
 pub enum RemoveUniqueError {
     #[error(transparent)]
-    DuplicateEntry(#[from] Duplicate<Entry>),
+    DuplicateEntry(Box<Duplicate<Entry>>),
 
     #[error("empty object")]
     EmptyObject,
+}
+
+impl From<Duplicate<Entry>> for RemoveUniqueError {
+    fn from(value: Duplicate<Entry>) -> Self {
+        Self::DuplicateEntry(Box::new(value))
+    }
 }
 
 impl Deref for NonEmptyObject {

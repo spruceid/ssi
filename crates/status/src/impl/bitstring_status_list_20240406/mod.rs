@@ -528,7 +528,7 @@ pub struct BitStringIter<'a> {
     index: usize,
 }
 
-impl<'a> Iterator for BitStringIter<'a> {
+impl Iterator for BitStringIter<'_> {
     type Item = u8;
 
     fn next(&mut self) -> Option<Self::Item> {
@@ -552,7 +552,7 @@ impl StatusMap for StatusList {
         _status_size: Option<StatusSize>,
         key: Self::Key,
     ) -> Result<Option<u8>, StatusSizeError> {
-        Ok(self.bit_string.get(key).map(Into::into))
+        Ok(self.bit_string.get(key))
     }
 }
 
@@ -630,8 +630,8 @@ mod tests {
             values[i] = value;
         }
 
-        for i in 0..len {
-            assert_eq!(bit_string.get(i), Some(values[i]))
+        for (i, item) in values.into_iter().enumerate().take(len) {
+            assert_eq!(bit_string.get(i), Some(item))
         }
     }
 

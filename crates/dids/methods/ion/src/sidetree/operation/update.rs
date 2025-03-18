@@ -49,7 +49,6 @@ impl SidetreeOperation for UpdateOperation {
     /// The [DID Suffix](UpdateOperation::did_suffix) is **not** verified
     /// by this function. The correspondence of the reveal value's hash to the previous update
     /// commitment is not checked either, since that is not known from this function.
-
     fn partial_verify<S: Sidetree>(
         self,
     ) -> Result<PartiallyVerifiedUpdateOperation, PartialVerificationError> {

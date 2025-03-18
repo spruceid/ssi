@@ -239,7 +239,7 @@ fn as_concealed_array_item(item: &serde_json::Value) -> Option<&str> {
 #[cfg(test)]
 mod tests {
     use serde_json::json;
-    use std::cell::LazyCell;
+    use std::sync::LazyLock;
 
     use crate::SdJwt;
 
@@ -267,7 +267,7 @@ mod tests {
         "a2x4RjVqTVlsR1RQVW92TU5JdkNBIiwgImNvdW50cnkiLCAiSlAiXQ~"
     );
 
-    const DISCLOSED_CLAIMS: LazyCell<serde_json::Value> = LazyCell::new(|| {
+    static DISCLOSED_CLAIMS: LazyLock<serde_json::Value> = LazyLock::new(|| {
         json!({
             "iss": "https://example.com/issuer",
             "iat": 1683000000,

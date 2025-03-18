@@ -582,7 +582,7 @@ impl<'a> PartsRef<'a> {
     }
 }
 
-impl<'a> fmt::Display for PartsRef<'a> {
+impl fmt::Display for PartsRef<'_> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         self.jwt.fmt(f)?;
         f.write_char('~')?;

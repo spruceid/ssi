@@ -102,8 +102,6 @@ impl VerificationAlgorithm<RsaSignature2018> for RsaSignatureAlgorithm {
         let signature = base64::prelude::BASE64_STANDARD
             .decode(&proof.signature.signature_value)
             .map_err(|_| ProofValidationError::InvalidSignature)?;
-        method
-            .verify_bytes(&prepared_claims, &signature)
-            .map(Into::into)
+        method.verify_bytes(&prepared_claims, &signature)
     }
 }

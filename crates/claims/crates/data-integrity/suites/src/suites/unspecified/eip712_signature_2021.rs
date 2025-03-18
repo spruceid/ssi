@@ -273,9 +273,7 @@ impl VerificationAlgorithm<Eip712Signature2021> for Eip712SignatureAlgorithm {
         proof: ssi_data_integrity_core::ProofRef<Eip712Signature2021>,
     ) -> Result<ProofValidity, ProofValidationError> {
         let signature_bytes = proof.signature.decode()?;
-        method
-            .verify_bytes(prepared_claims.as_slice(), &signature_bytes)
-            .map(Into::into)
+        method.verify_bytes(prepared_claims.as_slice(), &signature_bytes)
     }
 }
 

@@ -101,8 +101,7 @@ where
     }
 }
 
-impl<'a, 'de, D: serde::de::MapAccess<'de>, S> serde::Deserializer<'de>
-    for &'a mut Deserializer<'de, D, S>
+impl<'de, D: serde::de::MapAccess<'de>, S> serde::Deserializer<'de> for &mut Deserializer<'de, D, S>
 where
     S: DeserializeCryptographicSuite<'de>,
 {

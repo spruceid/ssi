@@ -191,13 +191,11 @@ impl VerificationAlgorithm<TezosJcsSignature2021> for TezosJcsSignatureAlgorithm
             .transpose()?;
 
         let (algorithm, signature_bytes) = proof.signature.decode()?;
-        method
-            .verify_bytes(
-                public_key_jwk.as_ref(),
-                &prepared_claims,
-                algorithm,
-                &signature_bytes,
-            )
-            .map(Into::into)
+        method.verify_bytes(
+            public_key_jwk.as_ref(),
+            &prepared_claims,
+            algorithm,
+            &signature_bytes,
+        )
     }
 }

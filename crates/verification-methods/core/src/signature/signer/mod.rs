@@ -22,7 +22,7 @@ pub trait Signer<M: VerificationMethod> {
     ) -> Result<Option<Self::MessageSigner>, SignatureError>;
 }
 
-impl<'s, M: VerificationMethod, S: Signer<M>> Signer<M> for &'s S {
+impl<M: VerificationMethod, S: Signer<M>> Signer<M> for &S {
     type MessageSigner = S::MessageSigner;
 
     async fn for_method(

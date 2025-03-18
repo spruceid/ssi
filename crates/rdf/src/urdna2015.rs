@@ -583,7 +583,7 @@ mod tests {
                     .map(LexicalQuad::as_lexical_quad_ref),
             )
             .into_nquads();
-            if &normalized == &expected_str {
+            if normalized == expected_str {
                 passed += 1;
             } else {
                 let changes = difference::Changeset::new(&normalized, &expected_str, "\n");

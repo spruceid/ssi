@@ -164,7 +164,7 @@ impl<T> JwsParts<T> {
     }
 }
 
-impl<'a, T: ?Sized + ToOwned> JwsParts<Cow<'a, T>> {
+impl<T: ?Sized + ToOwned> JwsParts<Cow<'_, T>> {
     pub fn into_owned(self) -> JwsParts<T::Owned> {
         JwsParts::new(self.header, self.payload.into_owned(), self.signature)
     }
@@ -263,7 +263,7 @@ impl<'a, T> DecodedJws<'a, T> {
     }
 }
 
-impl<'a, 'b, T: ?Sized + ToOwned> DecodedJws<'a, &'b T> {
+impl<T: ?Sized + ToOwned> DecodedJws<'_, &T> {
     pub fn to_owned(&self) -> DecodedJws<'static, T::Owned> {
         DecodedJws {
             signing_bytes: self.signing_bytes.to_owned(),
@@ -272,7 +272,7 @@ impl<'a, 'b, T: ?Sized + ToOwned> DecodedJws<'a, &'b T> {
     }
 }
 
-impl<'a, 'b, T: ?Sized + ToOwned> DecodedJws<'a, Cow<'b, T>> {
+impl<T: ?Sized + ToOwned> DecodedJws<'_, Cow<'_, T>> {
     pub fn into_owned(self) -> DecodedJws<'static, T::Owned> {
         DecodedJws::new(self.signing_bytes.into_owned(), self.signature)
     }
@@ -320,7 +320,7 @@ impl<'a, T> DecodedSigningBytes<'a, T> {
     }
 }
 
-impl<'a, 'b, T: ?Sized + ToOwned> DecodedSigningBytes<'a, &'b T> {
+impl<T: ?Sized + ToOwned> DecodedSigningBytes<'_, &T> {
     pub fn to_owned(&self) -> DecodedSigningBytes<'static, T::Owned> {
         DecodedSigningBytes {
             bytes: Cow::Owned(self.bytes.as_ref().to_owned()),
@@ -330,7 +330,7 @@ impl<'a, 'b, T: ?Sized + ToOwned> DecodedSigningBytes<'a, &'b T> {
     }
 }
 
-impl<'a, 'b, T: ?Sized + ToOwned> DecodedSigningBytes<'a, Cow<'b, T>> {
+impl<T: ?Sized + ToOwned> DecodedSigningBytes<'_, Cow<'_, T>> {
     pub fn into_owned(self) -> DecodedSigningBytes<'static, T::Owned> {
         DecodedSigningBytes {
             bytes: Cow::Owned(self.bytes.into_owned()),
@@ -704,8 +704,7 @@ pub fn verify_bytes_warnable(
         JWKParams::RSA(rsa_params) => {
             rsa_params.validate_key_size()?;
             use rsa::PublicKey;
-            let public_key =
-                rsa::RsaPublicKey::try_from(rsa_params).map_err(ssi_jwk::Error::from)?;
+            let public_key = rsa::RsaPublicKey::try_from(rsa_params)?;
             let padding;
             let hashed;
             match algorithm {
@@ -1313,6 +1312,6 @@ mod tests {
         decode_verify(&jws, &key).unwrap();
 
         const JWS: &str = "eyJhbGciOiJFUzM4NCJ9.eyJpc3MiOiJkaWQ6ZXhhbXBsZTpmb28iLCJ2cCI6eyJAY29udGV4dCI6WyJodHRwczovL3d3dy53My5vcmcvMjAxOC9jcmVkZW50aWFscy92MSJdLCJ0eXBlIjoiVmVyaWZpYWJsZVByZXNlbnRhdGlvbiJ9fQ.2vpBSFN7DxuS57epgq_e7-NyNiJ5eOOrExmi65C_wtZOC2-9i6fVvMnfUig7QmgiirznAg1wr_b7_kH-bbMCI5Pdf8pAnxQg3LL9I9OhzttyG06qAl9L7BE6aNS-aqnf";
-        decode_verify(&JWS, &key).unwrap();
+        decode_verify(JWS, &key).unwrap();
     }
 }

@@ -503,7 +503,7 @@ pub struct BitStringIter<'a> {
     index: usize,
 }
 
-impl<'a> Iterator for BitStringIter<'a> {
+impl Iterator for BitStringIter<'_> {
     type Item = u8;
 
     fn next(&mut self) -> Option<Self::Item> {
@@ -593,7 +593,10 @@ where
 }
 
 impl StatusMapEntrySet for AnyStatusListEntrySet {
-    type Entry<'a> = AnyStatusListReference<'a> where Self: 'a;
+    type Entry<'a>
+        = AnyStatusListReference<'a>
+    where
+        Self: 'a;
 
     fn get_entry(&self, purpose: crate::StatusPurpose<&str>) -> Option<Self::Entry<'_>> {
         match self {
@@ -606,7 +609,7 @@ pub enum AnyStatusListReference<'a> {
     Json(&'a json::StatusListReference),
 }
 
-impl<'a> StatusMapEntry for AnyStatusListReference<'a> {
+impl StatusMapEntry for AnyStatusListReference<'_> {
     type Key = usize;
     type StatusSize = StatusSize;
 
@@ -666,8 +669,8 @@ mod tests {
 
         assert!(decoded.len() >= len);
 
-        for i in 0..len {
-            assert_eq!(decoded.get(i), Some(values[i]))
+        for (i, item) in values.into_iter().enumerate().take(len) {
+            assert_eq!(decoded.get(i), Some(item))
         }
     }
 
@@ -682,8 +685,8 @@ mod tests {
             values[i] = value;
         }
 
-        for i in 0..len {
-            assert_eq!(bit_string.get(i), Some(values[i]))
+        for (i, item) in values.into_iter().enumerate().take(len) {
+            assert_eq!(bit_string.get(i), Some(item))
         }
     }
 

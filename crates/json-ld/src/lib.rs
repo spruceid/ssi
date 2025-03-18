@@ -22,7 +22,7 @@ pub trait JsonLdLoaderProvider {
     fn loader(&self) -> &Self::Loader;
 }
 
-impl<'a, E: JsonLdLoaderProvider> JsonLdLoaderProvider for &'a E {
+impl<E: JsonLdLoaderProvider> JsonLdLoaderProvider for &E {
     type Loader = E::Loader;
 
     fn loader(&self) -> &Self::Loader {
@@ -155,7 +155,7 @@ pub struct JsonLdTypes<'a> {
     non_static: Cow<'a, [String]>,
 }
 
-impl<'a> Default for JsonLdTypes<'a> {
+impl Default for JsonLdTypes<'_> {
     fn default() -> Self {
         Self::new(&[], Cow::Owned(vec![]))
     }
@@ -185,7 +185,7 @@ impl<'a> JsonLdTypes<'a> {
     }
 }
 
-impl<'a> From<&'static &'static str> for JsonLdTypes<'a> {
+impl From<&'static &'static str> for JsonLdTypes<'_> {
     fn from(value: &'static &'static str) -> Self {
         Self::new(std::slice::from_ref(value), Cow::Owned(vec![]))
     }
@@ -197,7 +197,7 @@ impl<'a> From<&'a [String]> for JsonLdTypes<'a> {
     }
 }
 
-impl<'a> From<Vec<String>> for JsonLdTypes<'a> {
+impl From<Vec<String>> for JsonLdTypes<'_> {
     fn from(value: Vec<String>) -> Self {
         Self::new(&[], Cow::Owned(value))
     }
@@ -209,7 +209,7 @@ impl<'a> From<Cow<'a, [String]>> for JsonLdTypes<'a> {
     }
 }
 
-impl<'a> serde::Serialize for JsonLdTypes<'a> {
+impl serde::Serialize for JsonLdTypes<'_> {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
         S: serde::Serializer,

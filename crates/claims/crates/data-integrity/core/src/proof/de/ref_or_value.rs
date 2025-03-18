@@ -26,7 +26,7 @@ impl<'de, T: DeserializeTyped<'de, C>, C> DeserializeTyped<'de, C> for RefOrValu
     {
         struct Visitor<'a, T, C>(&'a C, PhantomData<T>);
 
-        impl<'a, 'de, T: DeserializeTyped<'de, C>, C> serde::de::Visitor<'de> for Visitor<'a, T, C> {
+        impl<'de, T: DeserializeTyped<'de, C>, C> serde::de::Visitor<'de> for Visitor<'_, T, C> {
             type Value = RefOrValue<T>;
 
             fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {

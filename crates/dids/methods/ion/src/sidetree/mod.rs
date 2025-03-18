@@ -682,7 +682,6 @@ pub struct ServiceEndpointEntry {
 #[serde(rename_all = "camelCase")]
 pub struct DocumentState {
     /// Public key entries
-
     #[serde(skip_serializing_if = "Option::is_none")]
     pub public_keys: Option<Vec<PublicKeyEntry>>,
 

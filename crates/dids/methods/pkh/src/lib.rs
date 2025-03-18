@@ -982,7 +982,7 @@ mod tests {
             })),
         );
 
-        let issuance_date = cred.issuance_date.clone().unwrap();
+        let issuance_date = cred.issuance_date.unwrap();
         let created_date =
             xsd_types::DateTimeStamp::new(issuance_date.date_time, issuance_date.offset.unwrap());
         let issue_options = ProofOptions::new(
@@ -1074,7 +1074,7 @@ mod tests {
 
         // Test that holder is verified.
         let mut vp_bad_holder = vp.clone();
-        vp_bad_holder.holder = Some(uri!("did:pkh:example:bad").to_owned().into());
+        vp_bad_holder.holder = Some(uri!("did:pkh:example:bad").to_owned());
 
         // It should fail.
         assert!(vp_bad_holder.verify(&params).await.unwrap().is_err());
@@ -1115,7 +1115,7 @@ mod tests {
                 "id": "did:example:foo"
             })),
         );
-        let issuance_date = cred.issuance_date.clone().unwrap();
+        let issuance_date = cred.issuance_date.unwrap();
         let created_date =
             xsd_types::DateTimeStamp::new(issuance_date.date_time, issuance_date.offset.unwrap());
         let issue_options = ProofOptions::new(
@@ -1142,7 +1142,7 @@ mod tests {
         // test that issuer property is used for verification
         let mut vc_bad_issuer = vc.clone();
         vc_bad_issuer.issuer = uri!("did:pkh:example:bad").to_owned().into();
-        assert!(!vc_bad_issuer.verify(&verifier).await.unwrap().is_ok());
+        assert!(vc_bad_issuer.verify(&verifier).await.unwrap().is_err());
 
         // Check that proof JWK must match proof verificationMethod.
         let wrong_signer = SingleSecretSigner::new(wrong_key.clone()).into_local();
@@ -1188,7 +1188,7 @@ mod tests {
 
         // Test that holder is verified.
         let mut vp_bad_holder = vp.clone();
-        vp_bad_holder.holder = Some(uri!("did:pkh:example:bad").to_owned().into());
+        vp_bad_holder.holder = Some(uri!("did:pkh:example:bad").to_owned());
         // It should fail.
         assert!(vp_bad_holder.verify(&verifier).await.unwrap().is_err());
     }
