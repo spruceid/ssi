@@ -64,7 +64,7 @@ pub trait Verifier {
     }
 }
 
-impl<'a, T: Verifier> Verifier for &'a T {
+impl<T: Verifier> Verifier for &T {
     type VerifyingKey = T::VerifyingKey;
 
     async fn get_verifying_key_with(
@@ -72,7 +72,7 @@ impl<'a, T: Verifier> Verifier for &'a T {
         key_id: Option<&[u8]>,
         options: &Options,
     ) -> Result<Option<Self::VerifyingKey>, Error> {
-        T::get_verifying_key_with(*&self, key_id, options).await
+        T::get_verifying_key_with(self, key_id, options).await
     }
 
     async fn verify_with(

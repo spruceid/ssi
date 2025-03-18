@@ -29,7 +29,7 @@ pub trait Signer {
     ) -> Result<Box<[u8]>, Error>;
 }
 
-impl<'a, T: Signer> Signer for &'a T {
+impl<T: Signer> Signer for &T {
     fn key_metadata(&self) -> KeyMetadata {
         T::key_metadata(*self)
     }
@@ -39,13 +39,13 @@ impl<'a, T: Signer> Signer for &'a T {
         algorithm: AlgorithmInstance,
         signing_bytes: &[u8],
     ) -> Result<Box<[u8]>, Error> {
-        T::sign(*&self, algorithm, signing_bytes).await
+        T::sign(self, algorithm, signing_bytes).await
     }
 }
 
 impl<T: Signer> Signer for Box<T> {
     fn key_metadata(&self) -> KeyMetadata {
-        T::key_metadata(&*self)
+        T::key_metadata(self)
     }
 
     async fn sign(
@@ -53,13 +53,13 @@ impl<T: Signer> Signer for Box<T> {
         algorithm: AlgorithmInstance,
         signing_bytes: &[u8],
     ) -> Result<Box<[u8]>, Error> {
-        T::sign(&*self, algorithm, signing_bytes).await
+        T::sign(self, algorithm, signing_bytes).await
     }
 }
 
 impl<T: Signer> Signer for Arc<T> {
     fn key_metadata(&self) -> KeyMetadata {
-        T::key_metadata(&*self)
+        T::key_metadata(self)
     }
 
     async fn sign(
@@ -67,7 +67,7 @@ impl<T: Signer> Signer for Arc<T> {
         algorithm: AlgorithmInstance,
         signing_bytes: &[u8],
     ) -> Result<Box<[u8]>, Error> {
-        T::sign(&*self, algorithm, signing_bytes).await
+        T::sign(self, algorithm, signing_bytes).await
     }
 }
 

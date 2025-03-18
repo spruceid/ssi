@@ -704,7 +704,7 @@ pub fn verify_bytes_warnable(
         JWKParams::RSA(rsa_params) => {
             rsa_params.validate_key_size()?;
             let public_key =
-                rsa::RsaPublicKey::try_from(rsa_params).map_err(ssi_jwk::Error::from)?;
+                rsa::RsaPublicKey::try_from(rsa_params)?;
             match algorithm {
                 Algorithm::RS256 => {
                     let key = rsa::pkcs1v15::VerifyingKey::<sha2::Sha256>::new(public_key);
