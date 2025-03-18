@@ -673,7 +673,7 @@ mod tests {
             key_id: Some(format!("{}#blockchainAccountId", did)),
             ..ssi_tzkey::jwk_from_tezos_key(sk).unwrap()
         };
-        let jws = encode_sign(ssi_jwk::Algorithm::EdDSA, JSON_PATCH, &key).unwrap();
+        let jws = encode_sign(ssi_jwk::Algorithm::EdDsa, JSON_PATCH, &key).unwrap();
         let json_update = Updates::SignedIetfJsonPatch(vec![jws.clone()]);
         DIDTZ
             .tier3_updates(Prefix::TZ1, &mut doc, json_update)

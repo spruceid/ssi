@@ -27,7 +27,7 @@ impl AnySuite {
             Algorithm::ES384 => Some(Self::JsonWebSignature2020),
             #[cfg(feature = "aleo")]
             Algorithm::AleoTestnet1Signature => Some(Self::AleoSignature2021),
-            Algorithm::EdDSA | Algorithm::EdBlake2b => match verification_method {
+            Algorithm::EdDsa | Algorithm::EdBlake2b => match verification_method {
                 #[cfg(feature = "solana")]
                 Some(vm)
                     if (vm.id().starts_with("did:sol:") || vm.id().starts_with("did:pkh:sol:"))

@@ -14,7 +14,7 @@ pub fn instantiate_algorithm(algorithm: &Algorithm) -> Option<AlgorithmInstance>
         Algorithm::Assigned(iana::Algorithm::PS256) => Some(AlgorithmInstance::PS256),
         Algorithm::Assigned(iana::Algorithm::PS384) => Some(AlgorithmInstance::PS384),
         Algorithm::Assigned(iana::Algorithm::PS512) => Some(AlgorithmInstance::PS512),
-        Algorithm::Assigned(iana::Algorithm::EdDSA) => Some(AlgorithmInstance::EdDSA),
+        Algorithm::Assigned(iana::Algorithm::EdDSA) => Some(AlgorithmInstance::EdDsa),
         Algorithm::Assigned(iana::Algorithm::ES256K) => Some(AlgorithmInstance::ES256K),
         Algorithm::Assigned(iana::Algorithm::ES256) => Some(AlgorithmInstance::ES256),
         Algorithm::Assigned(iana::Algorithm::ES384) => Some(AlgorithmInstance::ES384),

@@ -54,12 +54,13 @@ impl CoseSigner for CoseKey {
         let algorithm = preferred_algorithm(self).ok_or(SignatureError::MissingAlgorithm)?;
         let secret_key = self.decode_secret()?;
         secret_key
-            .sign(
+            .sign_message(
                 instantiate_algorithm(&algorithm).ok_or_else(|| {
                     SignatureError::UnsupportedAlgorithm(algorithm_name(&algorithm))
                 })?,
                 signing_bytes,
             )
+            .map(Into::into)
             .map_err(Into::into)
     }
 }
@@ -82,14 +83,8 @@ pub enum KeyDecodingError {
     InvalidKey,
 }
 
-impl From<ssi_crypto::key::InvalidPublicKey> for KeyDecodingError {
-    fn from(_value: ssi_crypto::key::InvalidPublicKey) -> Self {
-        Self::InvalidKey
-    }
-}
-
-impl From<ssi_crypto::key::InvalidSecretKey> for KeyDecodingError {
-    fn from(_value: ssi_crypto::key::InvalidSecretKey) -> Self {
+impl From<ssi_crypto::key::KeyConversionError> for KeyDecodingError {
+    fn from(_value: ssi_crypto::key::KeyConversionError) -> Self {
         Self::InvalidKey
     }
 }
@@ -156,7 +151,7 @@ impl CoseKeyDecode for CoseKey {
                         match iana::EllipticCurve::from_i64(crv) {
                             #[cfg(feature = "ed25519")]
                             Some(iana::EllipticCurve::Ed25519) => {
-                                ssi_crypto::PublicKey::new_ed25519(x).map_err(Into::into)
+                                ssi_crypto::PublicKey::from_ed25519_bytes(x).map_err(Into::into)
                             }
                             _ => Err(KeyDecodingError::UnsupportedParam(EC2_CRV, crv.into())),
                         }
@@ -180,15 +175,15 @@ impl CoseKeyDecode for CoseKey {
                         match iana::EllipticCurve::from_i64(crv) {
                             #[cfg(feature = "secp256k1")]
                             Some(iana::EllipticCurve::Secp256k1) => {
-                                ssi_crypto::PublicKey::new_secp256k1(x, y).map_err(Into::into)
+                                ssi_crypto::PublicKey::new_ecdsa_k256(x, y).map_err(Into::into)
                             }
                             #[cfg(feature = "secp256r1")]
                             Some(iana::EllipticCurve::P_256) => {
-                                ssi_crypto::PublicKey::new_p256(x, y).map_err(Into::into)
+                                ssi_crypto::PublicKey::new_ecdsa_p256(x, y).map_err(Into::into)
                             }
                             #[cfg(feature = "secp384r1")]
                             Some(iana::EllipticCurve::P_384) => {
-                                ssi_crypto::PublicKey::new_p384(x, y).map_err(Into::into)
+                                ssi_crypto::PublicKey::new_ecdsa_p384(x, y).map_err(Into::into)
                             }
                             _ => Err(KeyDecodingError::UnsupportedParam(EC2_CRV, crv.into())),
                         }
@@ -238,11 +233,11 @@ impl CoseKeyDecode for CoseKey {
                             }
                             #[cfg(feature = "secp256r1")]
                             Some(iana::EllipticCurve::P_256) => {
-                                ssi_crypto::SecretKey::new_p256(d).map_err(Into::into)
+                                ssi_crypto::SecretKey::new_ecdsa_p256(d).map_err(Into::into)
                             }
                             #[cfg(feature = "secp384r1")]
                             Some(iana::EllipticCurve::P_384) => {
-                                ssi_crypto::SecretKey::new_p384(d).map_err(Into::into)
+                                ssi_crypto::SecretKey::new_ecdsa_p384(d).map_err(Into::into)
                             }
                             _ => Err(KeyDecodingError::UnsupportedParam(EC2_CRV, crv.into())),
                         }
@@ -302,7 +297,7 @@ impl CoseKeyEncode for CoseKey {
                 ..Default::default()
             }),
             #[cfg(feature = "secp256k1")]
-            PublicKey::Secp256k1(key) => {
+            PublicKey::K256(key) => {
                 use ssi_crypto::k256::elliptic_curve::sec1::ToEncodedPoint;
                 let encoded_point = key.to_encoded_point(false);
                 Ok(Self {
@@ -363,7 +358,7 @@ impl CoseKeyEncode for CoseKey {
                 })
             }
             #[cfg(feature = "secp256k1")]
-            SecretKey::Secp256k1(key) => {
+            SecretKey::K256(key) => {
                 use ssi_crypto::k256::elliptic_curve::sec1::ToEncodedPoint;
                 let public_key = key.public_key();
                 let encoded_point = public_key.to_encoded_point(false);
@@ -464,22 +459,22 @@ impl CoseKeyGenerate for CoseKey {
 
     #[cfg(feature = "secp256r1")]
     fn generate_p256() -> Self {
-        Self::encode_secret(&ssi_crypto::SecretKey::generate_p256()).unwrap()
+        Self::encode_secret(&ssi_crypto::SecretKey::generate_ecdsa_p256()).unwrap()
     }
 
     #[cfg(feature = "secp256r1")]
     fn generate_p256_from(rng: &mut (impl RngCore + CryptoRng)) -> Self {
-        Self::encode_secret(&ssi_crypto::SecretKey::generate_p256_from(rng)).unwrap()
+        Self::encode_secret(&ssi_crypto::SecretKey::generate_ecdsa_p256_from(rng)).unwrap()
     }
 
     #[cfg(feature = "secp384r1")]
     fn generate_p384() -> Self {
-        Self::encode_secret(&ssi_crypto::SecretKey::generate_p384()).unwrap()
+        Self::encode_secret(&ssi_crypto::SecretKey::generate_ecdsa_p384()).unwrap()
     }
 
     #[cfg(feature = "secp384r1")]
     fn generate_p384_from(rng: &mut (impl RngCore + CryptoRng)) -> Self {
-        Self::encode_secret(&ssi_crypto::SecretKey::generate_p384_from(rng)).unwrap()
+        Self::encode_secret(&ssi_crypto::SecretKey::generate_ecdsa_p384_from(rng)).unwrap()
     }
 }
 
@@ -553,7 +548,7 @@ mod tests {
         let input = hex::decode("a401022008215820394fd5a1e33b8a67d5fa9ddca42d261219dde202e65bbf07bf2f671e157ac41f225820199d7db667e74905c8371168b815c267db76243fbfd387fa5f2d8a691099a89a").unwrap();
         let cose_key = CoseKey::from_slice(&input).unwrap();
         let key = cose_key.decode_public().unwrap();
-        assert!(matches!(key, PublicKey::Secp256k1(_)));
+        assert!(matches!(key, PublicKey::K256(_)));
         assert_eq!(
             CoseKey::encode_public_with_id(&key, cose_key.key_id.clone()).unwrap(),
             cose_key
@@ -577,7 +572,7 @@ mod tests {
         let input = hex::decode("a501022008215820394fd5a1e33b8a67d5fa9ddca42d261219dde202e65bbf07bf2f671e157ac41f225820199d7db667e74905c8371168b815c267db76243fbfd387fa5f2d8a691099a89a2358203e0fada8be75e5e47ab4c1c91c3f8f9185d1e18a2a16b3400a1eb33c9cdf8b96").unwrap();
         let cose_key = CoseKey::from_slice(&input).unwrap();
         let key = cose_key.decode_secret().unwrap();
-        assert!(matches!(key, SecretKey::Secp256k1(_)));
+        assert!(matches!(key, SecretKey::K256(_)));
         assert_eq!(
             CoseKey::encode_secret_with_id(&key, cose_key.key_id.clone()).unwrap(),
             cose_key

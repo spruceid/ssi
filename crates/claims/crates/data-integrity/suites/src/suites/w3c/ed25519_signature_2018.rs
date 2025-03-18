@@ -31,7 +31,7 @@ impl StandardCryptographicSuite for Ed25519Signature2018 {
 
     type VerificationMethod = Ed25519VerificationKey2018;
 
-    type SignatureAlgorithm = DetachedJwsSigning<ssi_crypto::algorithm::EdDSA>;
+    type SignatureAlgorithm = DetachedJwsSigning<ssi_crypto::algorithm::EdDsa>;
 
     type ProofOptions = ();
 

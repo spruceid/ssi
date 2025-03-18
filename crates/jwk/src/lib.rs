@@ -380,7 +380,7 @@ impl JWK {
                 return Some(Algorithm::PS256);
             }
             Params::OKP(okp_params) if okp_params.curve == "Ed25519" => {
-                return Some(Algorithm::EdDSA);
+                return Some(Algorithm::EdDsa);
             }
             #[cfg(feature = "aleo")]
             Params::OKP(okp_params) if okp_params.curve == crate::aleo::OKP_CURVE => {
@@ -506,7 +506,7 @@ impl JWK {
                 format!(r#"{{"k":"{}","kty":"oct"}}"#, String::from(k))
             }
         };
-        let hash = ssi_crypto::hashes::sha256::sha256(json_string.as_bytes());
+        let hash = ssi_crypto::hash::sha256(json_string.as_bytes());
         let thumbprint = String::from(Base64urlUInt(hash.to_vec()));
         Ok(thumbprint)
     }
@@ -768,7 +768,10 @@ impl TryFrom<&RSAParams> for rsa::RsaPrivateKey {
         for prime in params.other_primes_info.iter().flatten() {
             primes.push((&prime.prime_factor).into());
         }
-        Ok(Self::from_components(n.into(), e.into(), d.into(), primes))
+        Self::from_components(n.into(), e.into(), d.into(), primes)
+            // NOTE it's not the correct error type, but it'll be replaced soon
+            //      anyway.
+            .map_err(|_| Error::InvalidCoordinates)
     }
 }
 

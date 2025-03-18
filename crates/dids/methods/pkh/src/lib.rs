@@ -1396,8 +1396,8 @@ mod tests {
             None,
         )
         .await;
-        key_ed25519.algorithm = Some(Algorithm::EdDSA);
-        other_key_ed25519.algorithm = Some(Algorithm::EdDSA);
+        key_ed25519.algorithm = Some(Algorithm::EdDsa);
+        other_key_ed25519.algorithm = Some(Algorithm::EdDsa);
 
         // TODO
         // println!("did:pkh:tz:tz2");
@@ -1485,8 +1485,8 @@ mod tests {
             AnySuite::TezosSignature2021,
         )
         .await;
-        key_ed25519.algorithm = Some(Algorithm::EdDSA);
-        other_key_ed25519.algorithm = Some(Algorithm::EdDSA);
+        key_ed25519.algorithm = Some(Algorithm::EdDsa);
+        other_key_ed25519.algorithm = Some(Algorithm::EdDsa);
 
         /* https://github.com/spruceid/ssi/issues/194
         println!("did:pkh:tz:tz2 - TezosMethod2021");

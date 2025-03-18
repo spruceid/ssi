@@ -166,7 +166,7 @@ algorithms! {
     ///  - `Ed448`
     ///
     /// See: <https://www.rfc-editor.org/rfc/rfc8037>
-    EdDSA: "EdDSA",
+    EdDsa: "EdDSA",
 
     /// EdDSA using SHA-256 and Blake2b as pre-hash function.
     EdBlake2b: "EdBlake2b", // TODO Blake2b is supposed to replace SHA-256

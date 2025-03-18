@@ -95,7 +95,7 @@ impl<M, O> AlgorithmSelection<M, O> for algorithm::ES256 {
     }
 }
 
-impl<M, O> AlgorithmSelection<M, O> for algorithm::EdDSA {
+impl<M, O> AlgorithmSelection<M, O> for algorithm::EdDsa {
     fn select_algorithm(
         _verification_method: &M,
         _options: &O,

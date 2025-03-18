@@ -1,67 +1,103 @@
-use crate::{Algorithm, AlgorithmInstance, SecretKey};
+use std::sync::Arc;
 
-#[derive(Debug, thiserror::Error)]
-pub enum SignatureError {
-    #[error("unsupported algorithm `{0}`")]
-    UnsupportedAlgorithm(Algorithm),
+use crate::{key::KeyMetadata, AlgorithmInstance, Error};
 
-    #[error("secret key is not compatible with the signature algorithm")]
-    IncompatibleKey,
+/// Issuer.
+pub trait Issuer {
+    type Signer: Signer;
+
+    #[allow(async_fn_in_trait)]
+    async fn signer(&self, key_id: Option<&[u8]>) -> Result<Option<Self::Signer>, Error>;
+
+    #[allow(async_fn_in_trait)]
+    async fn require_signer(&self, key_id: Option<&[u8]>) -> Result<Self::Signer, Error> {
+        self.signer(key_id)
+            .await?
+            .ok_or_else(|| Error::KeyNotFound(key_id.map(|id| id.to_vec())))
+    }
 }
 
-impl AlgorithmInstance {
-    #[allow(unused)]
-    pub fn sign(&self, key: &SecretKey, signing_bytes: &[u8]) -> Result<Vec<u8>, SignatureError> {
-        match self {
-            #[cfg(feature = "ed25519")]
-            Self::EdDSA => match key {
-                SecretKey::Ed25519(key) => {
-                    use ed25519_dalek::Signer;
-                    Ok(key.sign(signing_bytes).to_bytes().to_vec())
-                }
-                #[allow(unreachable_patterns)]
-                _ => Err(SignatureError::IncompatibleKey),
-            },
-            #[cfg(feature = "secp256k1")]
-            Self::ES256K => {
-                match key {
-                    SecretKey::Secp256k1(key) => {
-                        use k256::ecdsa::{signature::Signer, Signature};
-                        let signing_key = k256::ecdsa::SigningKey::from(key);
-                        let signature: Signature = signing_key.try_sign(signing_bytes).unwrap(); // Uses SHA-256 by default.
-                        Ok(signature.to_bytes().to_vec())
-                    }
-                    #[allow(unreachable_patterns)]
-                    _ => Err(SignatureError::IncompatibleKey),
-                }
-            }
-            #[cfg(feature = "secp256r1")]
-            Self::ES256 => {
-                match key {
-                    SecretKey::P256(key) => {
-                        use p256::ecdsa::{signature::Signer, Signature};
-                        let signing_key = p256::ecdsa::SigningKey::from(key);
-                        let signature: Signature = signing_key.try_sign(signing_bytes).unwrap(); // Uses SHA-256 by default.
-                        Ok(signature.to_bytes().to_vec())
-                    }
-                    #[allow(unreachable_patterns)]
-                    _ => Err(SignatureError::IncompatibleKey),
-                }
-            }
-            #[cfg(feature = "secp384r1")]
-            Self::ES384 => {
-                match key {
-                    SecretKey::P384(key) => {
-                        use p384::ecdsa::{signature::Signer, Signature};
-                        let signing_key = p384::ecdsa::SigningKey::from(key);
-                        let signature: Signature = signing_key.try_sign(signing_bytes).unwrap(); // Uses SHA-384 by default.
-                        Ok(signature.to_bytes().to_vec())
-                    }
-                    #[allow(unreachable_patterns)]
-                    _ => Err(SignatureError::IncompatibleKey),
-                }
-            }
-            other => Err(SignatureError::UnsupportedAlgorithm(other.algorithm())),
-        }
+/// Signer.
+pub trait Signer {
+    fn key_metadata(&self) -> KeyMetadata;
+
+    #[allow(async_fn_in_trait)]
+    async fn sign(
+        &self,
+        algorithm: AlgorithmInstance,
+        signing_bytes: &[u8],
+    ) -> Result<Box<[u8]>, Error>;
+}
+
+impl<'a, T: Signer> Signer for &'a T {
+    fn key_metadata(&self) -> KeyMetadata {
+        T::key_metadata(*self)
     }
+
+    async fn sign(
+        &self,
+        algorithm: AlgorithmInstance,
+        signing_bytes: &[u8],
+    ) -> Result<Box<[u8]>, Error> {
+        T::sign(*&self, algorithm, signing_bytes).await
+    }
+}
+
+impl<T: Signer> Signer for Box<T> {
+    fn key_metadata(&self) -> KeyMetadata {
+        T::key_metadata(&*self)
+    }
+
+    async fn sign(
+        &self,
+        algorithm: AlgorithmInstance,
+        signing_bytes: &[u8],
+    ) -> Result<Box<[u8]>, Error> {
+        T::sign(&*self, algorithm, signing_bytes).await
+    }
+}
+
+impl<T: Signer> Signer for Arc<T> {
+    fn key_metadata(&self) -> KeyMetadata {
+        T::key_metadata(&*self)
+    }
+
+    async fn sign(
+        &self,
+        algorithm: AlgorithmInstance,
+        signing_bytes: &[u8],
+    ) -> Result<Box<[u8]>, Error> {
+        T::sign(&*self, algorithm, signing_bytes).await
+    }
+}
+
+pub trait SigningKey {
+    fn sign_message(
+        &self,
+        algorithm: impl Into<AlgorithmInstance>,
+        signing_bytes: &[u8],
+    ) -> Result<Box<[u8]>, Error>;
+}
+
+#[derive(Debug, thiserror::Error)]
+#[error("malformed signature")]
+pub struct MalformedSignature;
+
+impl From<MalformedSignature> for Error {
+    fn from(_value: MalformedSignature) -> Self {
+        Error::SignatureMalformed
+    }
+}
+
+/// Decode DER-encoded ECDSA P-256 signature as defined by ANSI X9.62–2005 and
+/// [RFC 3279 Section 2.2.3].
+///
+/// [RFC 3279 Section 2.2.3]: <https://www.rfc-editor.org/rfc/rfc3279#section-2.2.3>
+#[cfg(feature = "der")]
+pub fn decode_ecdsa_p256_signature_der(
+    bytes: impl AsRef<[u8]>,
+) -> Result<Box<[u8]>, MalformedSignature> {
+    p256::ecdsa::Signature::from_der(bytes.as_ref())
+        .map(|s| s.to_bytes().to_vec().into_boxed_slice())
+        .map_err(|_| MalformedSignature)
 }

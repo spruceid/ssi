@@ -31,7 +31,7 @@ impl StandardCryptographicSuite for EdDsaRdfc2022 {
 
     type VerificationMethod = Multikey;
 
-    type SignatureAlgorithm = MultibaseSigning<ssi_crypto::algorithm::EdDSA, Base58Btc>;
+    type SignatureAlgorithm = MultibaseSigning<ssi_crypto::algorithm::EdDsa, Base58Btc>;
 
     type ProofOptions = ();
 

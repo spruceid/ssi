@@ -109,7 +109,7 @@ impl Ed25519VerificationKey2020 {
                 Ok(signature.to_bytes().to_vec())
             }
             SecretKeyRef::Jwk(secret_key) => {
-                let algorithm = ssi_jwk::Algorithm::EdDSA;
+                let algorithm = ssi_jwk::Algorithm::EdDsa;
                 let key_algorithm = secret_key.algorithm.unwrap_or(algorithm);
                 if !algorithm.is_compatible_with(key_algorithm) {
                     return Err(MessageSignatureError::InvalidSecretKey);
@@ -187,34 +187,34 @@ impl JwkVerificationMethod for Ed25519VerificationKey2020 {
     }
 }
 
-impl SigningMethod<ed25519_dalek::SigningKey, ssi_crypto::algorithm::EdDSA>
+impl SigningMethod<ed25519_dalek::SigningKey, ssi_crypto::algorithm::EdDsa>
     for Ed25519VerificationKey2020
 {
     fn sign_bytes(
         &self,
         secret: &ed25519_dalek::SigningKey,
-        _algorithm: ssi_crypto::algorithm::EdDSA,
+        _algorithm: ssi_crypto::algorithm::EdDsa,
         message: &[u8],
     ) -> Result<Vec<u8>, MessageSignatureError> {
         self.sign_bytes(secret, message)
     }
 }
 
-impl SigningMethod<JWK, ssi_crypto::algorithm::EdDSA> for Ed25519VerificationKey2020 {
+impl SigningMethod<JWK, ssi_crypto::algorithm::EdDsa> for Ed25519VerificationKey2020 {
     fn sign_bytes(
         &self,
         secret_key: &JWK,
-        _algorithm: ssi_crypto::algorithm::EdDSA,
+        _algorithm: ssi_crypto::algorithm::EdDsa,
         message: &[u8],
     ) -> Result<Vec<u8>, MessageSignatureError> {
         self.sign_bytes(secret_key, message)
     }
 }
 
-impl VerifyBytes<ssi_crypto::algorithm::EdDSA> for Ed25519VerificationKey2020 {
+impl VerifyBytes<ssi_crypto::algorithm::EdDsa> for Ed25519VerificationKey2020 {
     fn verify_bytes(
         &self,
-        _: ssi_crypto::algorithm::EdDSA,
+        _: ssi_crypto::algorithm::EdDsa,
         signing_bytes: &[u8],
         signature: &[u8],
     ) -> Result<ProofValidity, ProofValidationError> {

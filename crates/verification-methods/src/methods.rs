@@ -130,7 +130,7 @@ impl SigningMethod<JWK, ssi_crypto::Algorithm> for AnyMethod {
             }
             #[cfg(feature = "ed25519")]
             Self::Ed25519VerificationKey2020(m) => match algorithm {
-                ssi_crypto::AlgorithmInstance::EdDSA => m.sign_bytes(secret, bytes),
+                ssi_crypto::AlgorithmInstance::EdDsa => m.sign_bytes(secret, bytes),
                 _ => Err(MessageSignatureError::UnsupportedAlgorithm(
                     algorithm.algorithm().to_string(),
                 )),
@@ -300,7 +300,7 @@ impl SigningMethod<JWK, ssi_crypto::Algorithm> for AnyJwkMethod {
             }
             #[cfg(feature = "ed25519")]
             Self::Ed25519VerificationKey2020(m) => match algorithm {
-                ssi_crypto::AlgorithmInstance::EdDSA => m.sign_bytes(secret, bytes),
+                ssi_crypto::AlgorithmInstance::EdDsa => m.sign_bytes(secret, bytes),
                 _ => Err(MessageSignatureError::UnsupportedAlgorithm(
                     algorithm.algorithm().to_string(),
                 )),
