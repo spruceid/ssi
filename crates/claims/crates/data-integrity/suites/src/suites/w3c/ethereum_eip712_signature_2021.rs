@@ -354,8 +354,6 @@ where
         proof: ProofRef<S>,
     ) -> Result<ProofValidity, ProofValidationError> {
         let signature_bytes = proof.signature.decode()?;
-        method
-            .verify_bytes(prepared_claims.as_ref(), &signature_bytes)
-            .map(Into::into)
+        method.verify_bytes(prepared_claims.as_ref(), &signature_bytes)
     }
 }

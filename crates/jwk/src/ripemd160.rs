@@ -26,7 +26,7 @@ mod tests {
         let pk_bytes = hex::decode(pk_hex).unwrap();
         let pk = k256::PublicKey::from_sec1_bytes(&pk_bytes).unwrap();
         let jwk = JWK {
-            params: Params::EC(ECParams::try_from(&pk).unwrap()),
+            params: Params::EC(ECParams::from(&pk)),
             public_key_use: None,
             key_operations: None,
             algorithm: None,

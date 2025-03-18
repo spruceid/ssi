@@ -18,14 +18,14 @@ pub trait ValidateJwsHeader<E> {
 
 impl<E> ValidateJwsHeader<E> for [u8] {}
 
-impl<'a, E, T: ?Sized + ToOwned + ValidateJwsHeader<E>> ValidateJwsHeader<E> for Cow<'a, T> {
+impl<E, T: ?Sized + ToOwned + ValidateJwsHeader<E>> ValidateJwsHeader<E> for Cow<'_, T> {
     fn validate_jws_header(&self, env: &E, header: &Header) -> ClaimsValidity {
         self.as_ref().validate_jws_header(env, header)
     }
 }
 
-impl<'a, E, T: ValidateClaims<E, JwsSignature> + ValidateJwsHeader<E>>
-    ValidateClaims<E, JwsSignature> for DecodedSigningBytes<'a, T>
+impl<E, T: ValidateClaims<E, JwsSignature> + ValidateJwsHeader<E>> ValidateClaims<E, JwsSignature>
+    for DecodedSigningBytes<'_, T>
 {
     fn validate_claims(&self, env: &E, signature: &JwsSignature) -> ClaimsValidity {
         self.payload.validate_jws_header(env, &self.header)?;

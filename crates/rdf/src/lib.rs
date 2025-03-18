@@ -107,7 +107,7 @@ where
 /// Wrapper to display an RDF Quad as an N-Quads statement.
 pub struct NQuadsStatement<'a>(pub &'a LexicalQuad);
 
-impl<'a> fmt::Display for NQuadsStatement<'a> {
+impl fmt::Display for NQuadsStatement<'_> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         writeln!(f, "{} .", self.0)
     }

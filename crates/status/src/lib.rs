@@ -131,7 +131,7 @@ pub trait StatusMapEntry {
     fn key(&self) -> Self::Key;
 }
 
-impl<'a, E: StatusMapEntry> StatusMapEntry for &'a E {
+impl<E: StatusMapEntry> StatusMapEntry for &E {
     type Key = E::Key;
     type StatusSize = E::StatusSize;
 

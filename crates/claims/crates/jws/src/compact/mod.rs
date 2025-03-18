@@ -11,7 +11,7 @@ pub use url_safe::*;
 #[error("invalid JWS")]
 pub struct InvalidJws<B = String>(pub B);
 
-impl<'a> InvalidJws<&'a [u8]> {
+impl InvalidJws<&[u8]> {
     pub fn into_owned(self) -> InvalidJws<Vec<u8>> {
         InvalidJws(self.0.to_owned())
     }

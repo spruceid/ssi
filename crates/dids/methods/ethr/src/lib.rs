@@ -587,7 +587,7 @@ mod tests {
 
         // test that holder is verified
         let mut vp_bad_holder = vp;
-        vp_bad_holder.holder = Some(uri!("did:pkh:example:bad").to_owned().into());
+        vp_bad_holder.holder = Some(uri!("did:pkh:example:bad").to_owned());
 
         // It should fail.
         assert!(vp_bad_holder.verify(&verifier).await.unwrap().is_err());

@@ -33,9 +33,7 @@ impl<'de, D: serde::de::MapAccess<'de>> ClaimsDeserializer<D> {
     }
 }
 
-impl<'a, 'de, D: serde::de::MapAccess<'de>> serde::de::MapAccess<'de>
-    for &'a mut ClaimsDeserializer<D>
-{
+impl<'de, D: serde::de::MapAccess<'de>> serde::de::MapAccess<'de> for &mut ClaimsDeserializer<D> {
     type Error = D::Error;
 
     fn next_key_seed<K>(&mut self, seed: K) -> Result<Option<K::Value>, Self::Error>
@@ -63,9 +61,7 @@ impl<'a, 'de, D: serde::de::MapAccess<'de>> serde::de::MapAccess<'de>
     }
 }
 
-impl<'a, 'de, D: serde::de::MapAccess<'de>> serde::Deserializer<'de>
-    for &'a mut ClaimsDeserializer<D>
-{
+impl<'de, D: serde::de::MapAccess<'de>> serde::Deserializer<'de> for &mut ClaimsDeserializer<D> {
     type Error = D::Error;
 
     fn deserialize_map<V>(self, visitor: V) -> Result<V::Value, Self::Error>

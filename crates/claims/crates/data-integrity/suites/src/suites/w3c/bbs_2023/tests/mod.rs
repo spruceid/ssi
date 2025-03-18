@@ -52,7 +52,8 @@ impl<E, P> ValidateClaims<E, P> for JsonCredential {
 impl ssi_json_ld::Expandable for JsonCredential {
     type Error = JsonLdError;
 
-    type Expanded<I, V> = ssi_json_ld::ExpandedDocument<V::Iri, V::BlankId>
+    type Expanded<I, V>
+        = ssi_json_ld::ExpandedDocument<V::Iri, V::BlankId>
     where
         I: Interpretation,
         V: VocabularyMut,

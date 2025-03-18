@@ -137,14 +137,12 @@ impl VerificationAlgorithm<TezosSignature2021> for TezosSignatureAlgorithm {
     ) -> Result<ProofValidity, ProofValidationError> {
         // AnyBlake2b
         let (algorithm, signature_bytes) = proof.signature.decode()?;
-        method
-            .verify_bytes(
-                proof.options.public_key_jwk.as_deref(),
-                &prepared_claims,
-                algorithm,
-                &signature_bytes,
-            )
-            .map(Into::into)
+        method.verify_bytes(
+            proof.options.public_key_jwk.as_deref(),
+            &prepared_claims,
+            algorithm,
+            &signature_bytes,
+        )
     }
 }
 

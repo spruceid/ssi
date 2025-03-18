@@ -15,7 +15,7 @@ use crate::{
 };
 
 pub enum AnyStatusMap {
-    BitstringStatusList(BitstringStatusListCredential),
+    BitstringStatusList(Box<BitstringStatusListCredential>),
     TokenStatusList(StatusListToken),
 }
 
@@ -67,6 +67,7 @@ where
             | "application/vc+ld+json" => {
                 BitstringStatusListCredential::from_bytes_with(bytes, media_type, verifier, options)
                     .await
+                    .map(Box::new)
                     .map(AnyStatusMap::BitstringStatusList)
                     .map_err(FromBytesError::BitstringStatusList)
             }
@@ -155,7 +156,7 @@ pub enum AnyDecodedStatusMapIter<'a> {
     TokenStatusList(token_status_list::BitStringIter<'a>),
 }
 
-impl<'a> Iterator for AnyDecodedStatusMapIter<'a> {
+impl Iterator for AnyDecodedStatusMapIter<'_> {
     type Item = u8;
 
     fn next(&mut self) -> Option<Self::Item> {
@@ -179,7 +180,7 @@ pub enum EntrySetFromBytesError {
 }
 
 pub enum AnyEntrySet {
-    BitstringStatusList(BitstringStatusListEntrySetCredential),
+    BitstringStatusList(Box<BitstringStatusListEntrySetCredential>),
     TokenStatusList(token_status_list::AnyStatusListEntrySet),
 }
 
@@ -213,6 +214,7 @@ where
                     bytes, media_type, params, options,
                 )
                 .await
+                .map(Box::new)
                 .map(Self::BitstringStatusList)
                 .map_err(Into::into)
             }
@@ -224,7 +226,10 @@ where
 }
 
 impl StatusMapEntrySet for AnyEntrySet {
-    type Entry<'a> = AnyStatusMapEntryRef<'a> where Self: 'a;
+    type Entry<'a>
+        = AnyStatusMapEntryRef<'a>
+    where
+        Self: 'a;
 
     fn get_entry(&self, purpose: crate::StatusPurpose<&str>) -> Option<Self::Entry<'_>> {
         match self {
@@ -243,7 +248,7 @@ pub enum AnyStatusMapEntryRef<'a> {
     TokenStatusList(token_status_list::AnyStatusListReference<'a>),
 }
 
-impl<'a> StatusMapEntry for AnyStatusMapEntryRef<'a> {
+impl StatusMapEntry for AnyStatusMapEntryRef<'_> {
     type Key = usize;
     type StatusSize = u8;
 

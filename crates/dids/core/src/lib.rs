@@ -33,6 +33,6 @@ pub trait DIDMethod {
     const DID_METHOD_NAME: &'static str;
 }
 
-impl<'a, M: DIDMethod> DIDMethod for &'a M {
+impl<M: DIDMethod> DIDMethod for &M {
     const DID_METHOD_NAME: &'static str = M::DID_METHOD_NAME;
 }

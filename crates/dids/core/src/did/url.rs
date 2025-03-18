@@ -572,7 +572,7 @@ impl<'de> Deserialize<'de> for DIDURLBuf {
     {
         struct Visitor;
 
-        impl<'de> serde::de::Visitor<'de> for Visitor {
+        impl serde::de::Visitor<'_> for Visitor {
             type Value = DIDURLBuf;
 
             fn expecting(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {

@@ -11,7 +11,7 @@ pub enum DIDURLReference<'a> {
     Relative(&'a RelativeDIDURL),
 }
 
-impl<'a> DIDURLReference<'a> {
+impl DIDURLReference<'_> {
     pub fn resolve(&self, base_id: &DID) -> Cow<DIDURL> {
         match self {
             Self::Absolute(a) => Cow::Borrowed(a),

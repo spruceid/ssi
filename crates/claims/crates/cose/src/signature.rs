@@ -72,7 +72,7 @@ pub trait CoseSigner {
     }
 }
 
-impl<'a, T: CoseSigner> CoseSigner for &'a T {
+impl<T: CoseSigner> CoseSigner for &T {
     async fn fetch_info(&self) -> Result<CoseSignerInfo, SignatureError> {
         T::fetch_info(*self).await
     }

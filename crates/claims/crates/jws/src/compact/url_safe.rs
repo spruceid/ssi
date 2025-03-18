@@ -175,7 +175,7 @@ impl PartialEq<String> for Jws {
     }
 }
 
-impl<'a> PartialEq<String> for &'a Jws {
+impl PartialEq<String> for &Jws {
     fn eq(&self, other: &String) -> bool {
         self.as_str() == other
     }
@@ -349,7 +349,7 @@ impl<'de> serde::Deserialize<'de> for JwsBuf {
     {
         struct Visitor;
 
-        impl<'de> serde::de::Visitor<'de> for Visitor {
+        impl serde::de::Visitor<'_> for Visitor {
             type Value = JwsBuf;
 
             fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
@@ -399,7 +399,7 @@ impl PartialEq<JwsBuf> for str {
     }
 }
 
-impl<'a> PartialEq<JwsBuf> for &'a str {
+impl PartialEq<JwsBuf> for &str {
     fn eq(&self, other: &JwsBuf) -> bool {
         *self == other.as_str()
     }

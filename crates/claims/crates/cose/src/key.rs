@@ -24,7 +24,7 @@ pub trait CoseKeyResolver {
     ) -> Result<Cow<CoseKey>, ProofValidationError>;
 }
 
-impl<'a, T: CoseKeyResolver> CoseKeyResolver for &'a T {
+impl<T: CoseKeyResolver> CoseKeyResolver for &T {
     async fn fetch_public_cose_key(
         &self,
         id: Option<&[u8]>,

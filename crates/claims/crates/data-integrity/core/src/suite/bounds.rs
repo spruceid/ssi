@@ -270,7 +270,7 @@ pub struct VerificationMethodRefOf<'a, S: CryptographicSuite>(
     pub ReferenceOrOwnedRef<'a, S::VerificationMethod>,
 );
 
-impl<'a, S: DebugCryptographicSuite> fmt::Debug for VerificationMethodRefOf<'a, S> {
+impl<S: DebugCryptographicSuite> fmt::Debug for VerificationMethodRefOf<'_, S> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         S::fmt_verification_method_ref(&self.0, f)
     }
@@ -289,7 +289,7 @@ impl<'de, T: DeserializeCryptographicSuite<'de>> DeserializeTyped<'de, T> for Op
 
 pub struct OptionsRefOf<'a, S: CryptographicSuite>(pub &'a S::ProofOptions);
 
-impl<'a, S: DebugCryptographicSuite> fmt::Debug for OptionsRefOf<'a, S> {
+impl<S: DebugCryptographicSuite> fmt::Debug for OptionsRefOf<'_, S> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         S::fmt_proof_options(self.0, f)
     }
@@ -308,7 +308,7 @@ impl<'de, T: DeserializeCryptographicSuite<'de>> DeserializeTyped<'de, T> for Si
 
 pub struct SignatureRefOf<'a, S: CryptographicSuite>(pub &'a S::Signature);
 
-impl<'a, S: DebugCryptographicSuite> fmt::Debug for SignatureRefOf<'a, S> {
+impl<S: DebugCryptographicSuite> fmt::Debug for SignatureRefOf<'_, S> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         S::fmt_signature(self.0, f)
     }

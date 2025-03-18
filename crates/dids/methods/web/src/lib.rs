@@ -13,7 +13,7 @@ use std::cell::RefCell;
 
 #[cfg(test)]
 thread_local! {
-  static PROXY: RefCell<Option<String>> = RefCell::new(None);
+  static PROXY: RefCell<Option<String>> = const { RefCell::new(None) };
 }
 
 #[derive(Debug, thiserror::Error)]

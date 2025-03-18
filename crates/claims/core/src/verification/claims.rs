@@ -60,4 +60,4 @@ impl<E, P> ValidateClaims<E, P> for [u8] {}
 
 impl<E, P> ValidateClaims<E, P> for Vec<u8> {}
 
-impl<'a, E, P, T: ?Sized + ToOwned + ValidateClaims<E, P>> ValidateClaims<E, P> for Cow<'a, T> {}
+impl<E, P, T: ?Sized + ToOwned + ValidateClaims<E, P>> ValidateClaims<E, P> for Cow<'_, T> {}

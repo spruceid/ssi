@@ -128,7 +128,7 @@ impl<'de> serde::Deserialize<'de> for ClaimKind {
     }
 }
 
-impl<'a> ClaimKind<&'a str> {
+impl ClaimKind<&str> {
     pub fn into_owned(self) -> ClaimKind {
         match self {
             Self::Registered(r) => ClaimKind::Registered(r),

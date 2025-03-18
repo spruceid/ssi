@@ -83,7 +83,8 @@ impl ssi_vc::v1::Credential for Credential {
 
 impl Expandable for Credential {
     type Error = std::convert::Infallible;
-    type Expanded<I, V> = Self
+    type Expanded<I, V>
+        = Self
     where
         I: Interpretation,
         V: VocabularyMut,

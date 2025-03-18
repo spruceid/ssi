@@ -200,7 +200,7 @@ pub trait TargetCapabilityProvider {
     fn target_capability(&self) -> &Delegation<Self::Caveat, Self::AdditionalProperties>;
 }
 
-impl<'a, E: TargetCapabilityProvider> TargetCapabilityProvider for &'a E {
+impl<E: TargetCapabilityProvider> TargetCapabilityProvider for &E {
     type Caveat = E::Caveat;
     type AdditionalProperties = E::AdditionalProperties;
 
@@ -253,13 +253,13 @@ impl<'v, 'a, R, L1, L2, C, S> InvocationVerifier<'a, C, S, &'v R, &'v L1, &'v L2
     }
 }
 
-impl<'a, C, S, R, L1, L2> DateTimeProvider for InvocationVerifier<'a, C, S, R, L1, L2> {
+impl<C, S, R, L1, L2> DateTimeProvider for InvocationVerifier<'_, C, S, R, L1, L2> {
     fn date_time(&self) -> DateTime<Utc> {
         self.date_time.unwrap_or_else(Utc::now)
     }
 }
 
-impl<'a, C, S, R, L1, L2> ResolverProvider for InvocationVerifier<'a, C, S, R, L1, L2> {
+impl<C, S, R, L1, L2> ResolverProvider for InvocationVerifier<'_, C, S, R, L1, L2> {
     type Resolver = R;
 
     fn resolver(&self) -> &Self::Resolver {
@@ -267,8 +267,8 @@ impl<'a, C, S, R, L1, L2> ResolverProvider for InvocationVerifier<'a, C, S, R, L
     }
 }
 
-impl<'a, C, S, R, L1: ssi_json_ld::Loader, L2> JsonLdLoaderProvider
-    for InvocationVerifier<'a, C, S, R, L1, L2>
+impl<C, S, R, L1: ssi_json_ld::Loader, L2> JsonLdLoaderProvider
+    for InvocationVerifier<'_, C, S, R, L1, L2>
 {
     type Loader = L1;
 
@@ -277,8 +277,8 @@ impl<'a, C, S, R, L1: ssi_json_ld::Loader, L2> JsonLdLoaderProvider
     }
 }
 
-impl<'a, C, S, R, L1, L2: ssi_eip712::TypesLoader> Eip712TypesLoaderProvider
-    for InvocationVerifier<'a, C, S, R, L1, L2>
+impl<C, S, R, L1, L2: ssi_eip712::TypesLoader> Eip712TypesLoaderProvider
+    for InvocationVerifier<'_, C, S, R, L1, L2>
 {
     type Loader = L2;
 
@@ -287,7 +287,7 @@ impl<'a, C, S, R, L1, L2: ssi_eip712::TypesLoader> Eip712TypesLoaderProvider
     }
 }
 
-impl<'a, C, S, R, L1, L2> TargetCapabilityProvider for InvocationVerifier<'a, C, S, R, L1, L2> {
+impl<C, S, R, L1, L2> TargetCapabilityProvider for InvocationVerifier<'_, C, S, R, L1, L2> {
     type Caveat = C;
     type AdditionalProperties = S;
 
@@ -317,7 +317,8 @@ where
 {
     type Error = JsonLdError;
 
-    type Expanded<I, V> = ssi_json_ld::ExpandedDocument<V::Iri, V::BlankId>
+    type Expanded<I, V>
+        = ssi_json_ld::ExpandedDocument<V::Iri, V::BlankId>
     where
         I: Interpretation,
         V: VocabularyMut,
@@ -443,7 +444,8 @@ where
 {
     type Error = JsonLdError;
 
-    type Expanded<I, V> = ssi_json_ld::ExpandedDocument<V::Iri, V::BlankId>
+    type Expanded<I, V>
+        = ssi_json_ld::ExpandedDocument<V::Iri, V::BlankId>
     where
         I: Interpretation,
         V: VocabularyMut,

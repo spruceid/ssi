@@ -126,7 +126,7 @@ pub trait ResolverProvider {
     fn resolver(&self) -> &Self::Resolver;
 }
 
-impl<'a, E: ResolverProvider> ResolverProvider for &'a E {
+impl<E: ResolverProvider> ResolverProvider for &E {
     type Resolver = E::Resolver;
 
     fn resolver(&self) -> &Self::Resolver {
@@ -142,7 +142,7 @@ pub trait DateTimeProvider {
     fn date_time(&self) -> DateTime<Utc>;
 }
 
-impl<'a, E: DateTimeProvider> DateTimeProvider for &'a E {
+impl<E: DateTimeProvider> DateTimeProvider for &E {
     fn date_time(&self) -> DateTime<Utc> {
         E::date_time(*self)
     }

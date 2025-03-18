@@ -206,7 +206,7 @@ async fn credential_prove_verify_did_tz1() {
         .mount(&mock_server)
         .await;
     Mock::given(method("GET"))
-		.and(path(&format!("v1/contracts/{}/storage", "KT1ACXxefCq3zVG9cth4whZqS1XYK9Qsn8Gi")))
+		.and(path(format!("v1/contracts/{}/storage", "KT1ACXxefCq3zVG9cth4whZqS1XYK9Qsn8Gi")))
 		.respond_with(
 		ResponseTemplate::new(200)
 		.set_body_json(json!({"verification_method": "did:tz:delphinet:tz1WvvbEGpBXGeTVbLiR6DYBe1izmgiYuZbq#blockchainAccountId",
@@ -339,7 +339,7 @@ async fn credential_prove_verify_did_tz2() {
     let params = VerificationParameters::from_resolver(&didtz);
     let signer = SingleSecretSigner::new(key.clone()).into_local();
 
-    let issuance_date = cred.issuance_date.clone().unwrap();
+    let issuance_date = cred.issuance_date.unwrap();
     let created_date =
         xsd_types::DateTimeStamp::new(issuance_date.date_time, issuance_date.offset.unwrap());
     let vc_issue_options = SuiteOptions::new(
@@ -437,7 +437,7 @@ async fn credential_prove_verify_did_tz3() {
     let params = VerificationParameters::from_resolver(&didtz);
     let signer = SingleSecretSigner::new(key.clone()).into_local();
 
-    let issuance_date = cred.issuance_date.clone().unwrap();
+    let issuance_date = cred.issuance_date.unwrap();
     let created_date =
         xsd_types::DateTimeStamp::new(issuance_date.date_time, issuance_date.offset.unwrap());
     let vc_issue_options = SuiteOptions::new(

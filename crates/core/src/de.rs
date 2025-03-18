@@ -25,7 +25,7 @@ impl<'a, T, U> WithType<'a, T, U> {
     }
 }
 
-impl<'a, 'de, T, U: DeserializeTyped<'de, T>> DeserializeSeed<'de> for WithType<'a, T, U> {
+impl<'de, T, U: DeserializeTyped<'de, T>> DeserializeSeed<'de> for WithType<'_, T, U> {
     type Value = U;
 
     fn deserialize<D>(self, deserializer: D) -> Result<Self::Value, D::Error>

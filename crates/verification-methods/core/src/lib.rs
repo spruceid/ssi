@@ -155,7 +155,7 @@ pub trait VerificationMethodResolver {
     }
 }
 
-impl<'t, T: VerificationMethodResolver> VerificationMethodResolver for &'t T {
+impl<T: VerificationMethodResolver> VerificationMethodResolver for &T {
     type Method = T::Method;
 
     async fn resolve_verification_method_with(
@@ -255,7 +255,7 @@ pub trait LinkedDataVerificationMethod {
     fn quads(&self, quads: &mut Vec<rdf_types::Quad>) -> rdf_types::Object;
 }
 
-impl<'a, T: LinkedDataVerificationMethod> LinkedDataVerificationMethod for &'a T {
+impl<T: LinkedDataVerificationMethod> LinkedDataVerificationMethod for &T {
     fn quads(&self, quads: &mut Vec<rdf_types::Quad>) -> rdf_types::Object {
         T::quads(*self, quads)
     }

@@ -20,7 +20,7 @@ pub trait JWKResolver {
     ) -> Result<Cow<JWK>, ProofValidationError>;
 }
 
-impl<'a, T: JWKResolver> JWKResolver for &'a T {
+impl<T: JWKResolver> JWKResolver for &T {
     async fn fetch_public_jwk(
         &self,
         key_id: Option<&str>,

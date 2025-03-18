@@ -40,7 +40,7 @@ impl TypesLoader for () {
     }
 }
 
-impl<'a, T: TypesLoader> TypesLoader for &'a T {
+impl<T: TypesLoader> TypesLoader for &T {
     async fn fetch_types(&self, uri: &Uri) -> Result<Types, TypesFetchError> {
         T::fetch_types(*self, uri).await
     }
@@ -52,7 +52,7 @@ pub trait Eip712TypesLoaderProvider {
     fn eip712_types(&self) -> &Self::Loader;
 }
 
-impl<'a, E: Eip712TypesLoaderProvider> Eip712TypesLoaderProvider for &'a E {
+impl<E: Eip712TypesLoaderProvider> Eip712TypesLoaderProvider for &E {
     type Loader = E::Loader;
 
     fn eip712_types(&self) -> &Self::Loader {

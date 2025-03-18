@@ -345,7 +345,7 @@ pub trait DIDMethodResolver: DIDMethod {
     ) -> Result<Output<Vec<u8>>, Error>;
 }
 
-impl<'a, T: DIDMethodResolver> DIDMethodResolver for &'a T {
+impl<T: DIDMethodResolver> DIDMethodResolver for &T {
     fn method_name(&self) -> &str {
         T::method_name(*self)
     }

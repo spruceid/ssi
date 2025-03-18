@@ -80,23 +80,22 @@ pub struct EmbeddedProofConfigurationRef<'d, 'a, S: CryptographicSuite> {
     proof: ProofConfigurationRef<'a, S>,
 }
 
-impl<'d, 'a, S: CryptographicSuite> JsonLdObject for EmbeddedProofConfigurationRef<'d, 'a, S> {
+impl<S: CryptographicSuite> JsonLdObject for EmbeddedProofConfigurationRef<'_, '_, S> {
     fn json_ld_context(&self) -> Option<Cow<ssi_json_ld::syntax::Context>> {
         self.context.as_deref().map(Cow::Borrowed)
     }
 }
 
-impl<'d, 'a, S: CryptographicSuite> JsonLdNodeObject for EmbeddedProofConfigurationRef<'d, 'a, S> {
+impl<S: CryptographicSuite> JsonLdNodeObject for EmbeddedProofConfigurationRef<'_, '_, S> {
     fn json_ld_type(&self) -> JsonLdTypes {
         self.type_.reborrow()
     }
 }
 
-impl<'d, 'a, S: SerializeCryptographicSuite> Expandable
-    for EmbeddedProofConfigurationRef<'d, 'a, S>
-{
+impl<S: SerializeCryptographicSuite> Expandable for EmbeddedProofConfigurationRef<'_, '_, S> {
     type Error = ConfigurationExpansionError;
-    type Expanded<I, V> = ExpandedEmbeddedProofConfiguration<V::Iri, V::BlankId>
+    type Expanded<I, V>
+        = ExpandedEmbeddedProofConfiguration<V::Iri, V::BlankId>
     where
         I: Interpretation,
         V: VocabularyMut,

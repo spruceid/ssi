@@ -691,12 +691,11 @@ mod tests {
         for case in cases {
             let ucan = match Ucan::decode(&case.token) {
                 Ok(u) => u,
-                Err(e) => Err(e).unwrap(),
+                Err(e) => panic!("{:?}", e),
             };
 
-            match ucan.verify_signature(&DIDKey).await {
-                Err(e) => Err(e).unwrap(),
-                _ => {}
+            if let Err(e) = ucan.verify_signature(&DIDKey).await {
+                panic!("{:?}", e)
             };
 
             assert_eq!(ucan.payload, case.assertions.payload);
@@ -714,7 +713,7 @@ mod tests {
                     if u.payload.validate_time(None).is_ok()
                         && u.verify_signature(&DIDKey).await.is_ok()
                     {
-                        assert!(false, "{}", case.comment);
+                        panic!("{}", case.comment);
                     }
                 }
                 Err(_e) => {}
