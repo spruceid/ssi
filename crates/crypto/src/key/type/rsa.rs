@@ -1,5 +1,5 @@
 use crate::{
-    hashes,
+    hash,
     key::{KeyConversionError, KeyMetadata},
     AlgorithmInstance, Error, PublicKey, RejectedSignature, SigningKey, VerifyingKey,
 };
@@ -56,7 +56,7 @@ impl VerifyingKey for RsaPublicKey {
 }
 
 impl SigningKey for RsaSecretKey {
-    fn sign_bytes(
+    fn sign_message(
         &self,
         algorithm: impl Into<AlgorithmInstance>,
         signing_bytes: &[u8],
@@ -64,7 +64,7 @@ impl SigningKey for RsaSecretKey {
         match algorithm.into() {
             AlgorithmInstance::RS256 => {
                 let padding = rsa::Pkcs1v15Sign::new::<Sha256>();
-                let digest_in = hashes::sha256::sha256(signing_bytes);
+                let digest_in = hash::sha256::sha256(signing_bytes);
                 self.sign(padding, &digest_in)
                     .map(Vec::into_boxed_slice)
                     .map_err(Error::internal)
@@ -72,7 +72,7 @@ impl SigningKey for RsaSecretKey {
             AlgorithmInstance::PS256 => {
                 let mut rng = rand::rngs::OsRng {};
                 let padding = rsa::Pss::new_with_salt::<Sha256>(32);
-                let digest_in = hashes::sha256::sha256(signing_bytes);
+                let digest_in = hash::sha256::sha256(signing_bytes);
                 self.sign_with_rng(&mut rng, padding, &digest_in)
                     .map(Vec::into_boxed_slice)
                     .map_err(Error::internal)

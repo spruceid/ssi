@@ -1,15 +1,6 @@
 // //! Verifiable Credential Data Integrity 1.0 core implementation.
 // //!
 // //! See: <https://www.w3.org/TR/vc-data-integrity/>
-// use std::ops::{Deref, DerefMut};
-
-// pub mod canonicalization;
-// mod de;
-// mod decode;
-// mod document;
-// pub mod hashing;
-// mod options;
-// pub mod signing;
 pub mod primitives;
 mod proof;
 mod suite;
@@ -18,26 +9,15 @@ use std::ops::{Deref, DerefMut};
 
 use educe::Educe;
 use serde::Serialize;
-use ssi_claims_core::{Parameters, ValidateClaims, VerifiableClaims, Verification};
+use ssi_claims_core::{Options, ValidateClaims, VerifiableClaims, Verification};
 use ssi_crypto::{Error, Signer};
 use ssi_verification_methods::{VerificationMethodIssuer, VerificationMethodVerifier};
-// pub use decode::*;
-// use educe::Educe;
-// pub use options::ProofOptions;
-// pub use proof::value_or_array;
-// pub use proof::*;
-// use serde::Serialize;
-// use ssi_claims_core::{
-//     ProofValidationError, ValidateClaims, ValidateProof, VerifiableClaims, Verification, VerificationParameters,
-// };
-// use ssi_crypto::Verifier;
+
 pub use proof::*;
 pub use suite::*;
-// use suite::{CryptographicSuiteSelect, SelectionError};
 
-// pub use document::*;
-// #[doc(hidden)]
-// pub use ssi_rdf;
+#[doc(hidden)]
+pub use ssi_rdf;
 
 /// Data-Integrity-secured document.
 #[derive(Educe, Serialize)]
@@ -66,13 +46,13 @@ impl<T, S: CryptographicSuite> DataIntegrity<T, S> {
         issuer: impl VerificationMethodIssuer,
         claims: T,
         configuration: Proof<S>,
-        params: &Parameters,
+        params: &Options,
     ) -> Result<Self, Error>
     where
         S: CryptographicSuiteFor<T>,
     {
         let key = issuer
-            .require_key(Some(configuration.verification_method.id().as_bytes()))
+            .require_signer(Some(configuration.verification_method.id().as_bytes()))
             .await?;
 
         let prepared =
@@ -89,7 +69,7 @@ impl<T, S: CryptographicSuite> DataIntegrity<T, S> {
     where
         S: CryptographicSuiteFor<T>,
     {
-        let params = Parameters::default();
+        let params = Options::default();
         Self::sign_with(issuer, claims, configuration, &params).await
     }
 
@@ -97,7 +77,7 @@ impl<T, S: CryptographicSuite> DataIntegrity<T, S> {
     pub async fn select_with(
         &self,
         options: S::SelectionOptions,
-        params: &Parameters,
+        params: &Options,
     ) -> Result<DataIntegrity<ssi_json_ld::syntax::Object, S>, Error>
     where
         S: CryptographicSuiteSelect<T>,
@@ -122,7 +102,7 @@ impl<T, S: CryptographicSuite> DataIntegrity<T, S> {
     where
         S: CryptographicSuiteSelect<T>,
     {
-        let params = Parameters::default();
+        let params = Options::default();
         Self::select_with(&self, options, &params).await
     }
 
@@ -145,7 +125,7 @@ impl<T, S: CryptographicSuite> DataIntegrity<T, S> {
     pub async fn verify_with(
         &self,
         verifier: impl VerificationMethodVerifier,
-        params: &Parameters,
+        params: &Options,
     ) -> Result<Verification, Error>
     where
         T: ValidateClaims<Proofs<S>>,

@@ -1,9 +1,10 @@
-use std::{borrow::Cow, collections::HashMap, sync::Arc};
+use std::{borrow::Cow, collections::BTreeMap};
 
 use iref::{Iri, IriBuf, UriBuf};
 use serde::{Deserialize, Serialize};
+use ssi_core::OneOrMany;
 use ssi_crypto::{Error, Issuer, Verifier};
-use ssi_jwk::JWK;
+use ssi_jwk::VerifyingKey;
 use static_iref::iri;
 
 mod controller;
@@ -53,7 +54,7 @@ pub struct VerificationMethod {
 
     /// Other properties.
     #[serde(flatten)]
-    pub properties: HashMap<String, serde_json::Value>,
+    pub properties: BTreeMap<String, serde_json::Value>,
 }
 
 pub trait GetVerificationMethod {
@@ -82,6 +83,14 @@ impl CowVerificationMethod {
             Self::Owned(o) => &o.id,
         }
     }
+}
+
+pub struct Accept(pub OneOrMany<Cow<'static, str>>);
+
+pub trait VerificationMethodInterpreter {
+    type VerifyingKey: VerifyingKey;
+
+    fn interpret(&self, vm: VerificationMethod) -> Result<Self::VerifyingKey, Error>;
 }
 
 // #[derive(Debug, thiserror::Error)]

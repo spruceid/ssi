@@ -204,28 +204,28 @@ pub enum KeyConversionError {
 pub struct KeyGenerationFailed;
 
 impl SigningKey for SecretKey {
-    fn sign_bytes(
+    fn sign_message(
         &self,
         algorithm: impl Into<AlgorithmInstance>,
         signing_bytes: &[u8],
     ) -> Result<Box<[u8]>, Error> {
         match self {
-            Self::Symmetric(key) => key.sign_bytes(algorithm, signing_bytes),
+            Self::Symmetric(key) => key.sign_message(algorithm, signing_bytes),
 
             #[cfg(feature = "ed25519")]
-            Self::Ed25519(key) => key.sign_bytes(algorithm, signing_bytes),
+            Self::Ed25519(key) => key.sign_message(algorithm, signing_bytes),
 
             #[cfg(feature = "rsa")]
-            Self::Rsa(key) => key.sign_bytes(algorithm, signing_bytes),
+            Self::Rsa(key) => key.sign_message(algorithm, signing_bytes),
 
             #[cfg(feature = "secp256r1")]
-            Self::P256(key) => key.sign_bytes(algorithm, signing_bytes),
+            Self::P256(key) => key.sign_message(algorithm, signing_bytes),
 
             #[cfg(feature = "secp384r1")]
-            Self::P384(key) => key.sign_bytes(algorithm, signing_bytes),
+            Self::P384(key) => key.sign_message(algorithm, signing_bytes),
 
             #[cfg(feature = "secp256k1")]
-            Self::K256(key) => key.sign_bytes(algorithm, signing_bytes),
+            Self::K256(key) => key.sign_message(algorithm, signing_bytes),
         }
     }
 }
@@ -240,6 +240,6 @@ impl Signer for SecretKey {
         algorithm: AlgorithmInstance,
         signing_bytes: &[u8],
     ) -> Result<Box<[u8]>, Error> {
-        SigningKey::sign_bytes(self, algorithm, signing_bytes)
+        SigningKey::sign_message(self, algorithm, signing_bytes)
     }
 }

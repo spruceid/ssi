@@ -106,7 +106,7 @@ pub use base64::DecodeError as Base64DecodeError;
 use base64::Engine;
 // pub use error::Error;
 use serde::{Deserialize, Serialize};
-use ssi_claims_core::{Parameters, ValidateClaims, VerifiableClaims, Verification};
+use ssi_claims_core::{Options, ValidateClaims, VerifiableClaims, Verification};
 use ssi_crypto::{Error, Verifier};
 use ssi_jwk::{Algorithm, Base64urlUInt, JWK};
 use std::{borrow::Cow, collections::BTreeMap};
@@ -242,25 +242,25 @@ impl<'a, T> DecodedJws<'a, T> {
     ///
     /// This will check the signature and the validity of the decoded payload.
     ///
-    /// The `params` argument provides all the verification parameters required
+    /// The `params` argument provides all the verification Options required
     /// to validate the claims and proof.
     ///
-    /// # What verification parameters should I use?
+    /// # What verification Options should I use?
     ///
     /// It really depends on the claims type, but `P` must at least provide
     /// a `JWKResolver` through the `ResolverProvider` trait.
     /// Notable implementors are:
-    /// - [`VerificationParameters`](ssi_claims_core::VerificationParameters):
-    ///   A good default providing many other common verification parameters that
+    /// - [`VerificationOptions`](ssi_claims_core::VerificationOptions):
+    ///   A good default providing many other common verification Options that
     ///   are not necessary here.
     /// - [`JWK`]: allows you to put a JWK as `params`, which
     ///   will resolve into itself. Can be useful if you don't need key resolution
     ///   because you know in advance what key was used to sign the JWS.
     ///
-    /// # Passing the parameters by reference
+    /// # Passing the Options by reference
     ///
     /// If the validation traits are implemented for `P`, they will be
-    /// implemented for `&P` as well. This means the parameters can be passed
+    /// implemented for `&P` as well. This means the Options can be passed
     /// by move *or* by reference.
     pub async fn verify(&self, verifier: impl Verifier) -> Result<Verification, Error>
     where
@@ -272,7 +272,7 @@ impl<'a, T> DecodedJws<'a, T> {
     pub async fn verify_with(
         &self,
         verifier: impl Verifier,
-        params: &Parameters,
+        params: &Options,
     ) -> Result<Verification, Error>
     where
         T: ValidateJwsHeader + ValidateClaims<JwsSignature>,
@@ -451,7 +451,7 @@ impl Header {
     /// Unencoded means the payload will not be base64 encoded
     /// when the `encode_signing_bytes` function is called.
     /// This is done by setting the `b64` header parameter to `true`,
-    /// while adding `b64` to the list of critical parameters the
+    /// while adding `b64` to the list of critical Options the
     /// receiver must understand to decode the JWS.
     pub fn new_unencoded(algorithm: Algorithm, key_id: Option<String>) -> Self {
         Self {
@@ -589,7 +589,7 @@ impl Header {
 
 // /// Decode JWS parts (JOSE header, payload, and signature) into useful values.
 // /// The payload argument is bytes since it may be unencoded if the b64:false header parameter is used; otherwise it must be a base64url-encoded string. Header and signature are always expected to be base64url-encoded.
-// /// "crit" (critical) header parameters are checked and disallowed if unrecognized/unsupported.
+// /// "crit" (critical) header Options are checked and disallowed if unrecognized/unsupported.
 // pub fn decode_jws_parts(
 //     header_b64: &str,
 //     payload_enc: &[u8],

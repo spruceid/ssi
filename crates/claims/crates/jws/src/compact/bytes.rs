@@ -4,7 +4,7 @@ use crate::{
 };
 pub use base64::DecodeError as Base64DecodeError;
 use base64::Engine;
-use ssi_claims_core::{Parameters, Verification};
+use ssi_claims_core::{Options, Verification};
 use ssi_crypto::{Error, Verifier};
 use std::{borrow::Cow, ops::Deref};
 
@@ -242,7 +242,7 @@ impl JwsSlice {
     pub async fn verify_with(
         &self,
         verifier: impl Verifier,
-        params: &Parameters,
+        params: &Options,
     ) -> Result<Verification, Error> {
         let jws = self.decode().unwrap();
         jws.verify_with(verifier, params).await

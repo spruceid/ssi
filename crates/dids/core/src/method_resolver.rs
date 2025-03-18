@@ -1,34 +1,35 @@
-use std::{borrow::Cow, marker::PhantomData};
-
-use crate::{document::Document, resolution, DidResolver, DID, DIDURL};
-use iref::Iri;
+use crate::{
+    document::Document,
+    resolution::{self, DerefError},
+    DidResolver, DID, DIDURL,
+};
 use ssi_crypto::Verifier;
-use ssi_jwk::JWK;
 use ssi_verification_methods_core::{
-    ControllerError, ControllerProvider, ProofPurposes, VerificationMethod,
+    Accept, ControllerError, ControllerProvider, ProofPurposes, VerificationMethodInterpreter,
 };
 
-pub struct DidVerificationMethodResolver<T> {
+#[derive(Debug, Default)]
+pub struct DidVerificationMethodResolver<T, I> {
     resolver: T,
+    interpreter: I,
     options: resolution::Options,
 }
 
-impl<T: Default> Default for DidVerificationMethodResolver<T> {
-    fn default() -> Self {
-        Self::new(T::default())
-    }
-}
-
-impl<T> DidVerificationMethodResolver<T> {
-    pub fn new(resolver: T) -> Self {
+impl<T, I> DidVerificationMethodResolver<T, I> {
+    pub fn new(resolver: T, interpreter: I) -> Self {
         Self {
             resolver,
             options: resolution::Options::default(),
+            interpreter,
         }
     }
 
-    pub fn new_with_options(resolver: T, options: resolution::Options) -> Self {
-        Self { resolver, options }
+    pub fn new_with_options(resolver: T, interpreter: I, options: resolution::Options) -> Self {
+        Self {
+            resolver,
+            interpreter,
+            options,
+        }
     }
 
     pub fn resolver(&self) -> &T {
@@ -49,7 +50,7 @@ impl ssi_verification_methods_core::Controller for Document {
     }
 }
 
-impl<T: DidResolver> DidResolver for DidVerificationMethodResolver<T> {
+impl<T: DidResolver, I> DidResolver for DidVerificationMethodResolver<T, I> {
     async fn resolve_representation<'a>(
         &'a self,
         did: &'a DID,
@@ -59,7 +60,7 @@ impl<T: DidResolver> DidResolver for DidVerificationMethodResolver<T> {
     }
 }
 
-impl<T: DidResolver> ControllerProvider for DidVerificationMethodResolver<T> {
+impl<T: DidResolver, I> ControllerProvider for DidVerificationMethodResolver<T, I> {
     type Controller<'a>
         = Document
     where
@@ -84,103 +85,41 @@ impl<T: DidResolver> ControllerProvider for DidVerificationMethodResolver<T> {
     }
 }
 
-// #[async_trait]
-impl<T: DidResolver> Verifier for DidVerificationMethodResolver<T> {
-    type VerifyingKey = VerificationMethod;
+impl<T: DidResolver, I: VerificationMethodInterpreter> Verifier
+    for DidVerificationMethodResolver<T, I>
+{
+    type VerifyingKey = I::VerifyingKey;
 
-    async fn get_verifying_key(
+    async fn get_verifying_key_with(
         &self,
         id: Option<&[u8]>,
+        options: &ssi_crypto::Options,
     ) -> Result<Option<Self::VerifyingKey>, ssi_crypto::Error> {
-        todo!()
-    }
-
-    async fn resolve_verification_method_with(
-        &self,
-        _issuer: Option<&iref::Iri>,
-        method: Option<ReferenceOrOwnedRef<'_, M>>,
-        options: ssi_verification_methods_core::ResolutionOptions,
-    ) -> Result<Cow<M>, VerificationMethodResolutionError> {
         let mut deref_options = self.options.clone();
 
-        if let Some(set) = options.accept {
-            if let Some(ty) = set.pick() {
-                deref_options.parameters.public_key_format = Some(ty.to_owned());
+        if let Some(Accept(vm_types)) = options.get() {
+            if let Some(ty) = vm_types.first() {
+                deref_options.parameters.public_key_format = Some(ty.as_ref().to_owned());
             }
         }
 
-        match method {
-            Some(method) => {
-                if method.id().scheme().as_str() == "did" {
-                    match DIDURL::new(method.id().as_bytes()) {
-                        Ok(url) => {
-                            match self.resolver.dereference_with(url, deref_options).await {
-                                Ok(deref) => match deref.content.into_verification_method() {
-                                    Ok(any_method) => {
-                                        Ok(Cow::Owned(M::try_from(any_method.into())?))
-                                    }
-                                    Err(_) => {
-                                        // The IRI is not referring to a verification method.
-                                        Err(VerificationMethodResolutionError::NotAVerificationMethod(
-                                            method.id().to_string(),
-                                        ))
-                                    }
-                                },
-                                Err(e) => {
-                                    // Dereferencing failed for some reason.
-                                    Err(VerificationMethodResolutionError::InternalError(
-                                        e.to_string(),
-                                    ))
-                                }
-                            }
-                            // ResolveVerificationMethod::dereference(&self.resolver, url, options)
-                        }
-                        Err(_) => {
-                            // The IRI is not a valid DID URL.
-                            Err(VerificationMethodResolutionError::InvalidKeyId(
-                                method.id().to_string(),
-                            ))
-                        }
-                    }
-                } else {
-                    // Not a DID scheme.
-                    Err(VerificationMethodResolutionError::UnsupportedKeyId(
-                        method.id().to_string(),
-                    ))
-                }
-            }
-            None => Err(VerificationMethodResolutionError::MissingVerificationMethod),
-        }
-    }
-}
+        let Some(id) = id else { return Ok(None) };
 
-impl<T: DidResolver, M> JWKResolver for DidVerificationMethodResolver<T, M>
-where
-    M: MaybeJwkVerificationMethod
-        + VerificationMethodSet
-        + TryFrom<GenericVerificationMethod, Error = InvalidVerificationMethod>,
-{
-    async fn fetch_public_jwk(
-        &self,
-        key_id: Option<&str>,
-    ) -> Result<Cow<JWK>, ProofValidationError> {
-        let vm = match key_id {
-            Some(id) => match Iri::new(id) {
-                Ok(iri) => Some(ReferenceOrOwnedRef::Reference(iri)),
-                Err(_) => return Err(ProofValidationError::MissingPublicKey),
-            },
-            None => None,
+        let Ok(did_url) = DIDURL::new(id) else {
+            return Ok(None);
         };
 
-        let options = ssi_verification_methods_core::ResolutionOptions {
-            accept: Some(Box::new(M::type_set())),
+        let deref = match self.resolver.dereference_with(did_url, deref_options).await {
+            Ok(deref) => deref,
+            Err(DerefError::NotFound) => return Ok(None),
+            Err(e) => return Err(ssi_crypto::Error::internal(e)),
         };
 
-        self.resolve_verification_method_with(None, vm, options)
-            .await?
-            .try_to_jwk()
-            .map(Cow::into_owned)
-            .map(Cow::Owned)
-            .ok_or(ProofValidationError::MissingPublicKey)
+        let vm = deref
+            .content
+            .into_verification_method()
+            .map_err(|_| ssi_crypto::Error::KeyInvalid)?;
+
+        self.interpreter.interpret(vm.into()).map(Some)
     }
 }

@@ -15,20 +15,20 @@ use ssi_rdf::{
 mod contexts;
 pub use contexts::*;
 
-/// Type that provides a JSON-LD document loader.
-pub trait JsonLdLoaderProvider {
-    type Loader: json_ld::Loader;
+// /// Type that provides a JSON-LD document loader.
+// pub trait JsonLdLoaderProvider {
+//     type Loader: json_ld::Loader;
 
-    fn loader(&self) -> &Self::Loader;
-}
+//     fn loader(&self) -> &Self::Loader;
+// }
 
-impl<'a, E: JsonLdLoaderProvider> JsonLdLoaderProvider for &'a E {
-    type Loader = E::Loader;
+// impl<'a, E: JsonLdLoaderProvider> JsonLdLoaderProvider for &'a E {
+//     type Loader = E::Loader;
 
-    fn loader(&self) -> &Self::Loader {
-        E::loader(*self)
-    }
-}
+//     fn loader(&self) -> &Self::Loader {
+//         E::loader(*self)
+//     }
+// }
 
 #[derive(Debug, thiserror::Error)]
 pub enum JsonLdError {
@@ -52,7 +52,7 @@ impl CompactJsonLd {
 
 /// JSON-LD-Expandable value.
 pub trait Expandable: Sized {
-    type Error: std::fmt::Display;
+    type Error: 'static + Send + Sync + std::error::Error;
 
     type Expanded<I: Interpretation, V: Vocabulary>: LinkedData<I, V>
     where

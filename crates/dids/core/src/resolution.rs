@@ -302,11 +302,15 @@ pub trait DidResolver {
     /// To resolve a verification method, the output resolver will first
     /// resolve the DID using the given `options` then pull the referenced
     /// method from the DID document.
-    fn into_vm_resolver_with<M>(self, options: Options) -> DidVerificationMethodResolver<Self, M>
+    fn into_vm_resolver_with<I>(
+        self,
+        interpreter: I,
+        options: Options,
+    ) -> DidVerificationMethodResolver<Self, I>
     where
         Self: Sized,
     {
-        DidVerificationMethodResolver::new_with_options(self, options)
+        DidVerificationMethodResolver::new_with_options(self, interpreter, options)
     }
 
     /// Turns this DID resolver into a verification method resolver.
@@ -317,11 +321,11 @@ pub trait DidResolver {
     /// This is equivalent to calling
     /// [`into_vm_resolver_with`](DIDResolver::into_vm_resolver_with)
     /// with the default options.
-    fn into_vm_resolver<M>(self) -> DidVerificationMethodResolver<Self, M>
+    fn into_vm_resolver<I>(self, interpreter: I) -> DidVerificationMethodResolver<Self, I>
     where
         Self: Sized,
     {
-        DidVerificationMethodResolver::new(self)
+        DidVerificationMethodResolver::new(self, interpreter)
     }
 }
 

@@ -1,7 +1,7 @@
 pub use chrono;
 
-mod parameters;
-pub use parameters::*;
+pub mod options;
+pub use options::Options;
 
 mod verification;
 pub use verification::*;

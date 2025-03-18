@@ -219,7 +219,7 @@ impl JWK {
                 format!(r#"{{"k":"{}","kty":"oct"}}"#, String::from(k))
             }
         };
-        let hash = ssi_crypto::hashes::sha256::sha256(json_string.as_bytes());
+        let hash = ssi_crypto::hash::sha256::sha256(json_string.as_bytes());
         let thumbprint = String::from(Base64urlUInt(hash.to_vec()));
         Ok(thumbprint)
     }
@@ -258,13 +258,13 @@ impl TryFrom<JWK> for ssi_crypto::SecretKey {
 }
 
 impl SigningKey for JWK {
-    fn sign_bytes(
+    fn sign_message(
         &self,
         algorithm: impl Into<ssi_crypto::AlgorithmInstance>,
         signing_bytes: &[u8],
     ) -> Result<Box<[u8]>, ssi_crypto::Error> {
         let secret_key: ssi_crypto::SecretKey = self.try_into()?;
-        secret_key.sign_bytes(algorithm, signing_bytes)
+        secret_key.sign_message(algorithm, signing_bytes)
     }
 }
 
@@ -282,7 +282,7 @@ impl ssi_crypto::Signer for JWK {
         algorithm: ssi_crypto::AlgorithmInstance,
         signing_bytes: &[u8],
     ) -> Result<Box<[u8]>, ssi_crypto::Error> {
-        <Self as SigningKey>::sign_bytes(self, algorithm, signing_bytes)
+        <Self as SigningKey>::sign_message(self, algorithm, signing_bytes)
     }
 }
 

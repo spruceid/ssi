@@ -3,10 +3,11 @@
 //! See: <https://www.w3.org/TR/vc-di-ecdsa/#ecdsa-rdfc-2019>
 use multibase::Base;
 use ssi_crypto::{
-    algorithm::DigestFunction, key::KeyMetadata, AlgorithmInstance, Error, KeyType,
-    SignatureVerification, Signer,
+    key::KeyMetadata, AlgorithmInstance, Error, HashFunction, KeyType, SignatureVerification,
+    Signer,
 };
 use ssi_data_integrity_core::{CryptographicSuiteFor, Proof, ProofRef, StaticCryptographicSuite};
+use ssi_json_ld::{Expandable, JsonLdNodeObject};
 use ssi_jwk::VerifyingKey;
 
 use ssi_data_integrity_core::primitives::{
@@ -24,18 +25,21 @@ impl StaticCryptographicSuite for EcdsaRdfc2019 {
     const CRYPTO_SUITE: &str = "ecdsa-rdfc-2019";
 }
 
-impl<T> CryptographicSuiteFor<T> for EcdsaRdfc2019 {
+impl<T> CryptographicSuiteFor<T> for EcdsaRdfc2019
+where
+    T: JsonLdNodeObject + Expandable,
+{
     type PreparedClaims = (Box<[u8]>, AlgorithmInstance);
 
     async fn prepare(
         claims: &T,
         configuration: ProofRef<'_, Self>,
         key_metadata: KeyMetadata,
-        params: &ssi_claims_core::Parameters,
+        params: &ssi_claims_core::Options,
     ) -> Result<Self::PreparedClaims, Error> {
         let (digest, algorithm) = match key_metadata.r#type {
-            Some(KeyType::P256) => (DigestFunction::Sha256, AlgorithmInstance::ES256),
-            Some(KeyType::P384) => (DigestFunction::Sha384, AlgorithmInstance::PS384),
+            Some(KeyType::P256) => (HashFunction::Sha256, AlgorithmInstance::ES256),
+            Some(KeyType::P384) => (HashFunction::Sha384, AlgorithmInstance::PS384),
             _ => return Err(Error::KeyUnsupported),
         };
 
@@ -50,7 +54,7 @@ impl<T> CryptographicSuiteFor<T> for EcdsaRdfc2019 {
         signer: impl Signer,
         (claims, algorithm): Self::PreparedClaims,
         configuration: Proof<Self>,
-        _params: &ssi_claims_core::Parameters,
+        _params: &ssi_claims_core::Options,
     ) -> Result<Proof<Self>, Error> {
         multibase_signing(
             signer,
@@ -66,7 +70,7 @@ impl<T> CryptographicSuiteFor<T> for EcdsaRdfc2019 {
         verifier: impl VerifyingKey,
         (claims, algorithm): Self::PreparedClaims,
         proof: ProofRef<'_, Self>,
-        _params: &ssi_claims_core::Parameters,
+        _params: &ssi_claims_core::Options,
     ) -> Result<SignatureVerification, Error> {
         multibase_verification(verifier, claims, proof, Some(algorithm)).await
     }

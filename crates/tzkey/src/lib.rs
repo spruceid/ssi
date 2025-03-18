@@ -127,7 +127,7 @@ pub enum SignTezosError {
 }
 
 pub fn sign_tezos(data: &[u8], algorithm: Algorithm, key: &JWK) -> Result<String, SignTezosError> {
-    let sig = key.sign_bytes(algorithm, data)?;
+    let sig = key.sign_message(algorithm, data)?;
     let mut sig_prefixed = Vec::new();
     const EDSIG_PREFIX: [u8; 5] = [9, 245, 205, 134, 18];
     const SPSIG_PREFIX: [u8; 5] = [13, 115, 101, 19, 63];

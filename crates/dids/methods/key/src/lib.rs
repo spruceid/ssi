@@ -38,7 +38,7 @@ impl DIDKey {
     }
 }
 
-pub type GenerateError = ssi_jwk::ToMulticodecError;
+pub type GenerateError = ssi_jwk::KeyConversionError;
 
 impl DIDMethod for DIDKey {
     const DID_METHOD_NAME: &'static str = "key";
@@ -365,7 +365,6 @@ mod tests {
     use ssi_claims::{
         data_integrity::{AnyInputSuiteOptions, AnySuite},
         vc::{syntax::NonEmptyVec, v1::JsonCredential},
-        Parameters,
     };
     use ssi_data_integrity::{CryptographicSuite, ProofOptions as SuiteOptions};
     use ssi_dids_core::{

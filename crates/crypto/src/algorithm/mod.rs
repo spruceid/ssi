@@ -130,8 +130,8 @@
 //!         </tr>
 //!     </tbody>
 //! </table>
+use crate::HashFunction;
 use core::fmt;
-
 use serde::{Deserialize, Serialize};
 
 pub mod bbs;
@@ -175,24 +175,6 @@ impl SignatureFunction {
     }
 }
 
-/// Digest function.
-pub enum DigestFunction {
-    /// SHA-256
-    Sha256,
-
-    /// SHA-384
-    Sha384,
-
-    /// SHA-512
-    Sha512,
-
-    /// Blake2b
-    Blake2b,
-
-    /// Keccak-256
-    Keccak256,
-}
-
 macro_rules! algorithms {
     ($(
         $(#[doc = $doc:tt])*
@@ -234,10 +216,10 @@ macro_rules! algorithms {
                 }
             }
 
-            pub fn digest_function(&self) -> Option<DigestFunction> {
+            pub fn digest_function(&self) -> Option<HashFunction> {
                 match self {
                     $(
-                        Self::$id => Some(DigestFunction::$digest),
+                        Self::$id => Some(HashFunction::$digest),
                     )*
                     Self::None => None
                 }
@@ -252,10 +234,10 @@ macro_rules! algorithms {
                 }
             }
 
-            pub fn functions(&self) -> Option<(SignatureFunction, DigestFunction)> {
+            pub fn functions(&self) -> Option<(SignatureFunction, HashFunction)> {
                 match self {
                     $(
-                        Self::$id => Some((SignatureFunction::$signature, DigestFunction::$digest)),
+                        Self::$id => Some((SignatureFunction::$signature, HashFunction::$digest)),
                     )*
                     Self::None => None
                 }

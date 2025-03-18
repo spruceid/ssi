@@ -1,5 +1,5 @@
 use serde::{Deserialize, Serialize};
-use ssi_claims_core::Parameters;
+use ssi_claims_core::Options;
 use ssi_crypto::{key::KeyMetadata, Error, SignatureVerification, Signer};
 use ssi_jwk::VerifyingKey;
 
@@ -43,6 +43,7 @@ pub trait StaticCryptographicSuite: Default {
     const CRYPTO_SUITE: &str;
 }
 
+#[diagnostic::do_not_recommend]
 impl<T: StaticCryptographicSuite> CryptographicSuite for T {
     fn from_type(r#type: CryptographicSuiteTypeRef) -> Option<Self> {
         if r#type.r#type == "DataIntegrityProof" && r#type.crypto_suite == Some(Self::CRYPTO_SUITE)
@@ -73,7 +74,7 @@ pub trait CryptographicSuiteFor<T>: CryptographicSuite {
         claims: &T,
         configuration: ProofRef<Self>,
         key_metadata: KeyMetadata,
-        params: &Parameters,
+        params: &Options,
     ) -> Result<Self::PreparedClaims, Error>;
 
     /// Prepare the claims for signature or verification.
@@ -82,7 +83,7 @@ pub trait CryptographicSuiteFor<T>: CryptographicSuite {
         issuer: impl Signer,
         claims: Self::PreparedClaims,
         configuration: Proof<Self>,
-        params: &Parameters,
+        params: &Options,
     ) -> Result<Proof<Self>, Error>;
 
     /// Prepare the claims for signature or verification.
@@ -91,6 +92,6 @@ pub trait CryptographicSuiteFor<T>: CryptographicSuite {
         verifier: impl VerifyingKey,
         claims: Self::PreparedClaims,
         proof: ProofRef<Self>,
-        params: &Parameters,
+        params: &Options,
     ) -> Result<SignatureVerification, Error>;
 }

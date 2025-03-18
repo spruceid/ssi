@@ -7,14 +7,26 @@ pub trait Issuer {
     type Signer: Signer;
 
     #[allow(async_fn_in_trait)]
-    async fn key(&self, key_id: Option<&[u8]>) -> Result<Option<Self::Signer>, Error>;
+    async fn signer(&self, key_id: Option<&[u8]>) -> Result<Option<Self::Signer>, Error>;
 
     #[allow(async_fn_in_trait)]
-    async fn require_key(&self, key_id: Option<&[u8]>) -> Result<Self::Signer, Error> {
-        self.key(key_id)
+    async fn require_signer(&self, key_id: Option<&[u8]>) -> Result<Self::Signer, Error> {
+        self.signer(key_id)
             .await?
             .ok_or_else(|| Error::KeyNotFound(key_id.map(|id| id.to_vec())))
     }
+}
+
+/// Digest signer.
+pub trait DigestSigner {
+    fn key_metadata(&self) -> KeyMetadata;
+
+    #[allow(async_fn_in_trait)]
+    async fn sign_digest(
+        &self,
+        algorithm: AlgorithmInstance,
+        digest: &[u8],
+    ) -> Result<Box<[u8]>, Error>;
 }
 
 /// Signer.
@@ -72,7 +84,13 @@ impl<T: Signer> Signer for Arc<T> {
 }
 
 pub trait SigningKey {
-    fn sign_bytes(
+    fn sign_digest(
+        &self,
+        algorithm: impl Into<AlgorithmInstance>,
+        signing_bytes: &[u8],
+    ) -> Result<Box<[u8]>, Error>;
+
+    fn sign_message(
         &self,
         algorithm: impl Into<AlgorithmInstance>,
         signing_bytes: &[u8],

@@ -1,5 +1,6 @@
 use std::{
     any::{Any, TypeId},
+    borrow::Cow,
     collections::HashMap,
 };
 
@@ -9,6 +10,14 @@ pub struct Options(HashMap<TypeId, Box<dyn Send + Sync + Any>>);
 impl Options {
     pub fn get<T: 'static + Send + Sync>(&self) -> Option<&T> {
         self.0.get(&TypeId::of::<T>()).map(downcast_ref)
+    }
+
+    pub fn get_or_default<T: 'static + Default + Clone + Send + Sync>(&self) -> Cow<T> {
+        self.0
+            .get(&TypeId::of::<T>())
+            .map(downcast_ref)
+            .map(Cow::Borrowed)
+            .unwrap_or_else(|| Cow::Owned(T::default()))
     }
 
     pub fn get_mut<T: 'static + Send + Sync>(&mut self) -> Option<&mut T> {

@@ -10,7 +10,7 @@ pub use matching::*;
 mod any;
 pub use any::*;
 use serde::{de::DeserializeOwned, Serialize};
-use ssi_claims_core::{ClaimsValidity, InvalidClaims, Parameters};
+use ssi_claims_core::{options::GetCurrentDataTime, ClaimsValidity, InvalidClaims, Options};
 
 #[derive(Debug, thiserror::Error)]
 #[error("invalid claim value")]
@@ -51,8 +51,8 @@ pub trait ClaimSet {
         Ok(None)
     }
 
-    fn validate_registered_claims(&self, env: &Parameters) -> ClaimsValidity {
-        let now = env.date_time;
+    fn validate_registered_claims(&self, env: &Options) -> ClaimsValidity {
+        let now = env.date_time();
 
         if let Some(iat) = self.try_get::<IssuedAt>().map_err(InvalidClaims::other)? {
             let valid_from: chrono::DateTime<Utc> = iat.0.into();

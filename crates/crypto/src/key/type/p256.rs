@@ -79,7 +79,7 @@ impl SecretKey {
 }
 
 impl SigningKey for P256SecretKey {
-    fn sign_bytes(
+    fn sign_message(
         &self,
         algorithm: impl Into<AlgorithmInstance>,
         signing_bytes: &[u8],

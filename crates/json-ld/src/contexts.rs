@@ -4,7 +4,13 @@ use json_ld::{
 };
 use json_syntax::Parse;
 use static_iref::iri;
-use std::collections::HashMap;
+use std::{
+    collections::HashMap,
+    future::Future,
+    pin::Pin,
+    process::Output,
+    sync::{LazyLock, OnceLock},
+};
 use thiserror::Error;
 
 pub const CREDENTIALS_V1_CONTEXT: &Iri = iri!("https://www.w3.org/2018/credentials/v1");
@@ -242,6 +248,30 @@ macro_rules! iri_match {
             $default => $de
         }
     };
+}
+
+static DEFAULT_LOADER: LazyLock<ContextLoader> = LazyLock::new(|| ContextLoader::default());
+
+#[derive(Default, Clone)]
+pub enum JsonLdContextLoader {
+    #[default]
+    Default,
+    Custom(ContextLoader),
+}
+
+impl JsonLdContextLoader {
+    pub fn get(&self) -> &ContextLoader {
+        match self {
+            Self::Default => &DEFAULT_LOADER,
+            Self::Custom(custom) => custom,
+        }
+    }
+}
+
+impl Loader for JsonLdContextLoader {
+    async fn load(&self, url: &Iri) -> json_ld::LoadingResult {
+        self.get().load(url).await
+    }
 }
 
 /// Error raised when an unknown context is loaded with [`StaticLoader`] or

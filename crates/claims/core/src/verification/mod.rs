@@ -19,15 +19,13 @@
 //!     trait.
 //!   - Proof validation: the claims verified against the proof using the
 //!     [`ValidateProof`] trait.
-use ssi_crypto::{Error, RejectedSignature};
+use ssi_crypto::{Error, Options, RejectedSignature};
 
 mod claims;
 mod proof;
 
 pub use claims::*;
 pub use proof::*;
-
-use crate::Parameters;
 
 /// Verifiable Claims.
 ///
@@ -55,7 +53,7 @@ pub trait VerifiableClaims {
         Self::Claims: ValidateClaims<Self::Proof>,
         Self::Proof: ValidateProof<Self::Claims, V>,
     {
-        let params = Parameters::default();
+        let params = Options::default();
         self.verify_with(verifier, &params).await
     }
 
@@ -64,7 +62,7 @@ pub trait VerifiableClaims {
     /// The `params` argument provides all the verification parameters required
     /// to validate the claims and proof.
     #[allow(async_fn_in_trait)]
-    async fn verify_with<V>(&self, verifier: V, params: &Parameters) -> Result<Verification, Error>
+    async fn verify_with<V>(&self, verifier: V, params: &Options) -> Result<Verification, Error>
     where
         Self::Claims: ValidateClaims<Self::Proof>,
         Self::Proof: ValidateProof<Self::Claims, V>,

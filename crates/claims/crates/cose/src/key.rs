@@ -424,7 +424,7 @@ impl Signer for CoseKey {
     ) -> Result<Box<[u8]>, Error> {
         let secret_key = self.decode_secret()?;
         secret_key
-            .sign_bytes(algorithm, signing_bytes)
+            .sign_message(algorithm, signing_bytes)
             .map_err(Into::into)
     }
 }

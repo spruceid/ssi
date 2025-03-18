@@ -1,8 +1,6 @@
 use crate::{DecodedJws, DecodedSigningBytes, Header};
 use base64::{engine::general_purpose::URL_SAFE_NO_PAD, Engine};
-use ssi_claims_core::{
-    ClaimsValidity, Parameters, ValidateClaims, ValidateProof, VerifiableClaims,
-};
+use ssi_claims_core::{ClaimsValidity, Options, ValidateClaims, ValidateProof, VerifiableClaims};
 use ssi_crypto::{Error, SignatureVerification, Verifier};
 use std::{
     borrow::{Borrow, Cow},
@@ -10,7 +8,7 @@ use std::{
 };
 
 pub trait ValidateJwsHeader {
-    fn validate_jws_header(&self, _env: &Parameters, _header: &Header) -> ClaimsValidity {
+    fn validate_jws_header(&self, _env: &Options, _header: &Header) -> ClaimsValidity {
         Ok(())
     }
 }
@@ -18,7 +16,7 @@ pub trait ValidateJwsHeader {
 impl ValidateJwsHeader for [u8] {}
 
 impl<'a, T: ?Sized + ToOwned + ValidateJwsHeader> ValidateJwsHeader for Cow<'a, T> {
-    fn validate_jws_header(&self, env: &Parameters, header: &Header) -> ClaimsValidity {
+    fn validate_jws_header(&self, env: &Options, header: &Header) -> ClaimsValidity {
         self.as_ref().validate_jws_header(env, header)
     }
 }
@@ -26,7 +24,7 @@ impl<'a, T: ?Sized + ToOwned + ValidateJwsHeader> ValidateJwsHeader for Cow<'a, 
 impl<'a, T: ValidateClaims<JwsSignature> + ValidateJwsHeader> ValidateClaims<JwsSignature>
     for DecodedSigningBytes<'a, T>
 {
-    fn validate_claims(&self, env: &Parameters, signature: &JwsSignature) -> ClaimsValidity {
+    fn validate_claims(&self, env: &Options, signature: &JwsSignature) -> ClaimsValidity {
         self.payload.validate_jws_header(env, &self.header)?;
         self.payload.validate_claims(env, signature)
     }
@@ -112,7 +110,7 @@ where
         &'a self,
         verifier: &'a V,
         claims: &'a DecodedSigningBytes<'b, T>,
-        _params: &'a Parameters,
+        _params: &'a Options,
     ) -> Result<SignatureVerification, Error> {
         verifier
             .verify(

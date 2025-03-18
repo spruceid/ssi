@@ -64,10 +64,10 @@ impl TryFrom<&EcParams> for ssi_crypto::PublicKey {
         match value.curve.as_deref().ok_or(KeyConversionError::Invalid)? {
             #[cfg(feature = "secp256k1")]
             curve::K256 => value.try_into().map(ssi_crypto::PublicKey::K256),
-            
+
             #[cfg(feature = "secp256r1")]
             curve::P256 => value.try_into().map(ssi_crypto::PublicKey::P256),
-            
+
             #[cfg(feature = "secp384r1")]
             curve::P384 => value.try_into().map(ssi_crypto::PublicKey::P384),
             _ => Err(KeyConversionError::Unsupported),

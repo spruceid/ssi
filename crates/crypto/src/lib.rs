@@ -18,7 +18,7 @@ pub use p384;
 pub use rand;
 
 pub mod algorithm;
-pub mod hashes;
+pub mod hash;
 pub mod key;
 mod options;
 mod recovery;
@@ -26,6 +26,7 @@ pub mod signature;
 mod verification;
 
 pub use algorithm::{Algorithm, AlgorithmError, AlgorithmInstance, UnsupportedAlgorithm};
+pub use hash::HashFunction;
 pub use key::{KeyType, PublicKey, SecretKey};
 pub use options::*;
 pub use recovery::*;

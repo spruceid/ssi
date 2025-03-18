@@ -1,6 +1,4 @@
-use ssi_crypto::{Error, RejectedSignature, SignatureVerification};
-
-use super::Parameters;
+use ssi_crypto::{Error, Options, RejectedSignature, SignatureVerification};
 
 // #[derive(Debug, thiserror::Error)]
 // pub enum ProofPreparationError {
@@ -118,7 +116,7 @@ pub trait ValidateProof<T, V> {
         &'a self,
         verifier: &'a V,
         claims: &'a T,
-        params: &'a Parameters,
+        params: &'a Options,
     ) -> Result<SignatureVerification, Error>;
 }
 
@@ -127,7 +125,7 @@ impl<T, V, P: ValidateProof<T, V>> ValidateProof<T, V> for Vec<P> {
         &'a self,
         verifier: &'a V,
         claims: &'a T,
-        params: &'a Parameters,
+        params: &'a Options,
     ) -> Result<SignatureVerification, Error> {
         if self.is_empty() {
             // No proof.

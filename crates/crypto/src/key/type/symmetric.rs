@@ -28,7 +28,7 @@ impl From<Vec<u8>> for SymmetricKey {
 }
 
 impl SigningKey for SymmetricKey {
-    fn sign_bytes(
+    fn sign_message(
         &self,
         algorithm: impl Into<AlgorithmInstance>,
         _signing_bytes: &[u8],

@@ -1,4 +1,4 @@
-use ssi_claims_core::Parameters;
+use ssi_claims_core::Options;
 use ssi_crypto::Error;
 
 use crate::{CryptographicSuite, DataIntegrity, ProofRef};
@@ -21,6 +21,6 @@ pub trait CryptographicSuiteSelect<T>: SelectiveCryptographicSuite {
         unsecured_document: &T,
         proof: ProofRef<'_, Self>,
         options: Self::SelectionOptions,
-        params: &Parameters,
+        params: &Options,
     ) -> Result<DataIntegrity<ssi_json_ld::syntax::Object, Self>, Error>;
 }
