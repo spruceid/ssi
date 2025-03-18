@@ -1,12 +1,6 @@
 use digest::consts::U32;
 use sha2::Digest;
 
-/// Re-export the `sha2` library.
-pub use sha2;
-
-/// Re-export the `sha3` library.
-pub use sha3;
-
 mod sha256;
 pub use sha256::sha256;
 
@@ -17,6 +11,10 @@ pub mod ripemd160;
 pub mod keccak;
 
 /// Hash function.
+///
+/// Cryptographic algorithms are usually composed of a hash function to digest
+/// the input message, and a signature function used to sign the digest. This
+/// type lists all the hash functions supported by `ssi`.
 pub enum HashFunction {
     /// SHA-256
     Sha256,
@@ -36,7 +34,13 @@ pub enum HashFunction {
 
 impl HashFunction {
     pub fn begin(&self) -> Hasher {
-        todo!()
+        match self {
+            Self::Sha256 => Hasher::Sha256(sha2::Sha256::new()),
+            Self::Sha384 => Hasher::Sha384(sha2::Sha384::new()),
+            Self::Sha512 => Hasher::Sha512(sha2::Sha512::new()),
+            Self::Blake2b256 => Hasher::Blake2b256(blake2::Blake2b::<U32>::new()),
+            Self::Keccak256 => Hasher::Keccak256(sha3::Keccak256::new()),
+        }
     }
 
     pub fn apply(&self, data: impl AsRef<[u8]>) -> Box<[u8]> {

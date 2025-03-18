@@ -4,6 +4,10 @@ use std::{
     collections::HashMap,
 };
 
+/// Arbitrary signing or verification options.
+///
+/// Some cryptographic schemes require optional parameters that can be provided
+/// using this type.
 #[derive(Debug, Default)]
 pub struct Options(HashMap<TypeId, Box<dyn Send + Sync + Any>>);
 

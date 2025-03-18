@@ -24,44 +24,32 @@ mod spki;
 pub enum PublicKey {
     /// Symmetric key.
     ///
-    /// Such key cannot be made public, that's why there is no payload.
-    Symmetric,
-
-    #[cfg(feature = "ed25519")]
-    Ed25519(ed25519::Ed25519PublicKey),
+    /// Such key cannot be made public, that's why there is no payload, only the
+    /// size of the key.
+    Symmetric(usize),
 
     #[cfg(feature = "rsa")]
-    Rsa(rsa::RsaPublicKey),
+    Rsa(RsaPublicKey),
 
-    #[cfg(feature = "secp256k1")]
-    K256(k256::K256PublicKey),
+    Ecdsa(EcdsaPublicKey),
 
-    #[cfg(feature = "secp256r1")]
-    P256(p256::P256PublicKey),
-
-    #[cfg(feature = "secp384r1")]
-    P384(p384::P384PublicKey),
+    EdDsa(EdDsaPublicKey),
 }
 
 impl PublicKey {
     pub fn r#type(&self) -> KeyType {
         match self {
-            Self::Symmetric => KeyType::Symmetric,
-
-            #[cfg(feature = "ed25519")]
-            Self::Ed25519(_) => KeyType::Ed25519,
+            Self::Symmetric(len) => KeyType::Symmetric(*len),
 
             #[cfg(feature = "rsa")]
-            Self::Rsa(_) => KeyType::Rsa,
+            Self::Rsa(k) => {
+                use ::rsa::traits::PublicKeyParts;
+                KeyType::Rsa(k.size())
+            }
 
-            #[cfg(feature = "secp256k1")]
-            Self::K256(_) => KeyType::K256,
+            Self::Ecdsa(k) => KeyType::Ecdsa(k.r#type()),
 
-            #[cfg(feature = "secp256r1")]
-            Self::P256(_) => KeyType::P256,
-
-            #[cfg(feature = "secp384r1")]
-            Self::P384(_) => KeyType::P384,
+            Self::EdDsa(k) => KeyType::EdDsa(k.r#type()),
         }
     }
 
@@ -76,7 +64,7 @@ impl PublicKey {
 }
 
 impl VerifyingKey for PublicKey {
-    fn key_metadata(&self) -> KeyMetadata {
+    fn metadata(&self) -> KeyMetadata {
         KeyMetadata {
             id: None,
             r#type: Some(self.r#type()),
@@ -91,22 +79,14 @@ impl VerifyingKey for PublicKey {
         signature: &[u8],
     ) -> Result<SignatureVerification, Error> {
         match self {
-            Self::Symmetric => Err(Error::AlgorithmUnsupported(algorithm.into().algorithm())),
-
-            #[cfg(feature = "ed25519")]
-            Self::Ed25519(key) => key.verify_message(algorithm, signing_bytes, signature),
+            Self::Symmetric(_) => Err(Error::AlgorithmUnsupported(algorithm.into().algorithm())),
 
             #[cfg(feature = "rsa")]
             Self::Rsa(key) => key.verify_message(algorithm, signing_bytes, signature),
 
-            #[cfg(feature = "secp256r1")]
-            Self::P256(key) => key.verify_message(algorithm, signing_bytes, signature),
+            Self::Ecdsa(key) => key.verify_message(algorithm, signing_bytes, signature),
 
-            #[cfg(feature = "secp384r1")]
-            Self::P384(key) => key.verify_message(algorithm, signing_bytes, signature),
-
-            #[cfg(feature = "secp256k1")]
-            Self::K256(key) => key.verify_message(algorithm, signing_bytes, signature),
+            Self::EdDsa(key) => key.verify_message(algorithm, signing_bytes, signature),
         }
     }
 }
@@ -146,27 +126,19 @@ pub struct InvalidSecretKey;
 #[non_exhaustive]
 pub enum SecretKey {
     /// Symmetric key.
-    Symmetric(symmetric::SymmetricKey),
+    Symmetric(SymmetricKey),
 
     #[cfg(feature = "rsa")]
-    Rsa(rsa::RsaSecretKey),
+    Rsa(RsaSecretKey),
 
-    #[cfg(feature = "ed25519")]
-    Ed25519(ed25519::Ed25519SecretKey),
+    Ecdsa(EcdsaSecretKey),
 
-    #[cfg(feature = "secp256k1")]
-    K256(k256::K256SecretKey),
-
-    #[cfg(feature = "secp256r1")]
-    P256(p256::P256SecretKey),
-
-    #[cfg(feature = "secp384r1")]
-    P384(p384::P384SecretKey),
+    EdDsa(EdDsaSecretKey),
 }
 
 impl SecretKey {
     #[cfg(feature = "rsa")]
-    pub fn as_rsa(&self) -> Option<&rsa::RsaSecretKey> {
+    pub fn as_rsa(&self) -> Option<&RsaSecretKey> {
         match self {
             Self::Rsa(key) => Some(key),
             _ => None,
@@ -176,28 +148,53 @@ impl SecretKey {
     /// Returns the public key to this secret key.
     pub fn to_public(&self) -> PublicKey {
         match self {
-            Self::Symmetric(_) => PublicKey::Symmetric,
+            Self::Symmetric(s) => PublicKey::Symmetric(s.len()),
 
             #[cfg(feature = "rsa")]
             Self::Rsa(secret) => PublicKey::Rsa(secret.to_public_key()),
 
-            #[cfg(feature = "ed25519")]
-            Self::Ed25519(secret) => PublicKey::Ed25519(secret.verifying_key()),
+            Self::Ecdsa(secret) => PublicKey::Ecdsa(secret.to_public()),
 
-            #[cfg(feature = "secp256k1")]
-            Self::K256(secret) => PublicKey::K256(secret.public_key()),
-
-            #[cfg(feature = "secp256r1")]
-            Self::P256(secret) => PublicKey::P256(secret.public_key()),
-
-            #[cfg(feature = "secp384r1")]
-            Self::P384(secret) => PublicKey::P384(secret.public_key()),
+            Self::EdDsa(secret) => PublicKey::EdDsa(secret.to_public()),
         }
     }
 
     pub fn sign_message(
         &self,
         algorithm: impl Into<AlgorithmInstance>,
+        signing_bytes: &[u8],
+    ) -> Result<Box<[u8]>, Error> {
+        SigningKey::sign_message(self, algorithm, signing_bytes)
+    }
+}
+
+impl SigningKey for SecretKey {
+    fn sign_message(
+        &self,
+        algorithm: impl Into<AlgorithmInstance>,
+        signing_bytes: &[u8],
+    ) -> Result<Box<[u8]>, Error> {
+        match self {
+            Self::Symmetric(key) => key.sign_message(algorithm, signing_bytes),
+
+            #[cfg(feature = "rsa")]
+            Self::Rsa(key) => key.sign_message(algorithm, signing_bytes),
+
+            Self::Ecdsa(key) => key.sign_message(algorithm, signing_bytes),
+
+            Self::EdDsa(key) => key.sign_message(algorithm, signing_bytes),
+        }
+    }
+}
+
+impl Signer for SecretKey {
+    fn metadata(&self) -> KeyMetadata {
+        KeyMetadata::default()
+    }
+
+    async fn sign(
+        &self,
+        algorithm: AlgorithmInstance,
         signing_bytes: &[u8],
     ) -> Result<Box<[u8]>, Error> {
         SigningKey::sign_message(self, algorithm, signing_bytes)
@@ -219,44 +216,3 @@ pub enum KeyConversionError {
 #[derive(Debug, thiserror::Error)]
 #[error("key generation failed")]
 pub struct KeyGenerationFailed;
-
-impl SigningKey for SecretKey {
-    fn sign_message(
-        &self,
-        algorithm: impl Into<AlgorithmInstance>,
-        signing_bytes: &[u8],
-    ) -> Result<Box<[u8]>, Error> {
-        match self {
-            Self::Symmetric(key) => key.sign_message(algorithm, signing_bytes),
-
-            #[cfg(feature = "ed25519")]
-            Self::Ed25519(key) => key.sign_message(algorithm, signing_bytes),
-
-            #[cfg(feature = "rsa")]
-            Self::Rsa(key) => key.sign_message(algorithm, signing_bytes),
-
-            #[cfg(feature = "secp256r1")]
-            Self::P256(key) => key.sign_message(algorithm, signing_bytes),
-
-            #[cfg(feature = "secp384r1")]
-            Self::P384(key) => key.sign_message(algorithm, signing_bytes),
-
-            #[cfg(feature = "secp256k1")]
-            Self::K256(key) => key.sign_message(algorithm, signing_bytes),
-        }
-    }
-}
-
-impl Signer for SecretKey {
-    fn key_metadata(&self) -> KeyMetadata {
-        KeyMetadata::default()
-    }
-
-    async fn sign(
-        &self,
-        algorithm: AlgorithmInstance,
-        signing_bytes: &[u8],
-    ) -> Result<Box<[u8]>, Error> {
-        SigningKey::sign_message(self, algorithm, signing_bytes)
-    }
-}

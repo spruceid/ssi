@@ -211,7 +211,7 @@ impl CoseKeyDecode for CoseKey {
                         match iana::EllipticCurve::from_i64(crv) {
                             #[cfg(feature = "ed25519")]
                             Some(iana::EllipticCurve::Ed25519) => {
-                                ssi_crypto::SecretKey::new_ed25519(d).map_err(Into::into)
+                                ssi_crypto::SecretKey::new_curve25519(d).map_err(Into::into)
                             }
                             _ => Err(KeyDecodingError::UnsupportedParam(EC2_CRV, crv.into())),
                         }
@@ -229,7 +229,7 @@ impl CoseKeyDecode for CoseKey {
                         match iana::EllipticCurve::from_i64(crv) {
                             #[cfg(feature = "secp256k1")]
                             Some(iana::EllipticCurve::Secp256k1) => {
-                                ssi_crypto::SecretKey::new_secp256k1(d).map_err(Into::into)
+                                ssi_crypto::SecretKey::new_ecdsa_k256(d).map_err(Into::into)
                             }
                             #[cfg(feature = "secp256r1")]
                             Some(iana::EllipticCurve::P_256) => {
@@ -288,7 +288,7 @@ impl CoseKeyEncode for CoseKey {
     fn encode_public(key: &PublicKey) -> Result<Self, KeyEncodingError> {
         match key {
             #[cfg(feature = "ed25519")]
-            PublicKey::Ed25519(key) => Ok(Self {
+            PublicKey::EdDsa(ssi_crypto::key::EdDsaPublicKey::Curve25519(key)) => Ok(Self {
                 kty: KeyType::Assigned(iana::KeyType::OKP),
                 params: vec![
                     (OKP_CRV, iana::EllipticCurve::Ed25519.to_i64().into()),
@@ -297,7 +297,7 @@ impl CoseKeyEncode for CoseKey {
                 ..Default::default()
             }),
             #[cfg(feature = "secp256k1")]
-            PublicKey::K256(key) => {
+            PublicKey::Ecdsa(ssi_crypto::key::EcdsaPublicKey::K256(key)) => {
                 use ssi_crypto::k256::elliptic_curve::sec1::ToEncodedPoint;
                 let encoded_point = key.to_encoded_point(false);
                 Ok(Self {
@@ -311,7 +311,7 @@ impl CoseKeyEncode for CoseKey {
                 })
             }
             #[cfg(feature = "secp256r1")]
-            PublicKey::P256(key) => {
+            PublicKey::Ecdsa(ssi_crypto::key::EcdsaPublicKey::P256(key)) => {
                 use ssi_crypto::p256::elliptic_curve::sec1::ToEncodedPoint;
                 let encoded_point = key.to_encoded_point(false);
                 Ok(Self {
@@ -325,7 +325,7 @@ impl CoseKeyEncode for CoseKey {
                 })
             }
             #[cfg(feature = "secp384r1")]
-            PublicKey::P384(key) => {
+            PublicKey::Ecdsa(ssi_crypto::key::EcdsaPublicKey::P384(key)) => {
                 use ssi_crypto::p384::elliptic_curve::sec1::ToEncodedPoint;
                 let encoded_point = key.to_encoded_point(false);
                 Ok(Self {
@@ -345,7 +345,7 @@ impl CoseKeyEncode for CoseKey {
     fn encode_secret(key: &SecretKey) -> Result<Self, KeyEncodingError> {
         match key {
             #[cfg(feature = "ed25519")]
-            SecretKey::Ed25519(key) => {
+            SecretKey::EdDsa(ssi_crypto::key::EdDsaSecretKey::Curve25519(key)) => {
                 let public_key = key.verifying_key();
                 Ok(Self {
                     kty: KeyType::Assigned(iana::KeyType::OKP),
@@ -358,7 +358,7 @@ impl CoseKeyEncode for CoseKey {
                 })
             }
             #[cfg(feature = "secp256k1")]
-            SecretKey::K256(key) => {
+            SecretKey::Ecdsa(ssi_crypto::key::EcdsaSecretKey::K256(key)) => {
                 use ssi_crypto::k256::elliptic_curve::sec1::ToEncodedPoint;
                 let public_key = key.public_key();
                 let encoded_point = public_key.to_encoded_point(false);
@@ -374,7 +374,7 @@ impl CoseKeyEncode for CoseKey {
                 })
             }
             #[cfg(feature = "secp256r1")]
-            SecretKey::P256(key) => {
+            SecretKey::Ecdsa(ssi_crypto::key::EcdsaSecretKey::P256(key)) => {
                 use ssi_crypto::p256::elliptic_curve::sec1::ToEncodedPoint;
                 let public_key = key.public_key();
                 let encoded_point = public_key.to_encoded_point(false);
@@ -390,7 +390,7 @@ impl CoseKeyEncode for CoseKey {
                 })
             }
             #[cfg(feature = "secp384r1")]
-            SecretKey::P384(key) => {
+            SecretKey::Ecdsa(ssi_crypto::key::EcdsaSecretKey::P384(key)) => {
                 use ssi_crypto::p384::elliptic_curve::sec1::ToEncodedPoint;
                 let public_key = key.public_key();
                 let encoded_point = public_key.to_encoded_point(false);
@@ -439,22 +439,22 @@ pub trait CoseKeyGenerate {
 impl CoseKeyGenerate for CoseKey {
     #[cfg(feature = "ed25519")]
     fn generate_ed25519() -> Self {
-        Self::encode_secret(&ssi_crypto::SecretKey::generate_ed25519()).unwrap()
+        Self::encode_secret(&ssi_crypto::SecretKey::generate_curve25519()).unwrap()
     }
 
     #[cfg(feature = "ed25519")]
     fn generate_ed25519_from(rng: &mut (impl RngCore + CryptoRng)) -> Self {
-        Self::encode_secret(&ssi_crypto::SecretKey::generate_ed25519_from(rng)).unwrap()
+        Self::encode_secret(&ssi_crypto::SecretKey::generate_curve25519_from(rng)).unwrap()
     }
 
     #[cfg(feature = "secp256k1")]
     fn generate_secp256k1() -> Self {
-        Self::encode_secret(&ssi_crypto::SecretKey::generate_secp256k1()).unwrap()
+        Self::encode_secret(&ssi_crypto::SecretKey::generate_ecdsa_k256()).unwrap()
     }
 
     #[cfg(feature = "secp256k1")]
     fn generate_secp256k1_from(rng: &mut (impl RngCore + CryptoRng)) -> Self {
-        Self::encode_secret(&ssi_crypto::SecretKey::generate_secp256k1_from(rng)).unwrap()
+        Self::encode_secret(&ssi_crypto::SecretKey::generate_ecdsa_k256_from(rng)).unwrap()
     }
 
     #[cfg(feature = "secp256r1")]
@@ -502,7 +502,10 @@ mod tests {
         .unwrap();
         let cose_key = CoseKey::from_slice(&input).unwrap();
         let key = cose_key.decode_public().unwrap();
-        assert!(matches!(key, PublicKey::Ed25519(_)));
+        assert!(matches!(
+            key,
+            PublicKey::EdDsa(ssi_crypto::key::EdDsaPublicKey::Curve25519(_))
+        ));
         assert_eq!(
             CoseKey::encode_public_with_id(&key, cose_key.key_id.clone()).unwrap(),
             cose_key
@@ -525,7 +528,10 @@ mod tests {
         let input = hex::decode("a4010120062158208816d41001dd1a9ddea1232381b2eede803161e88ebb19eaf573d393dec800a7235820e25df1249ab766fc5a8c9f98d5e311cd4f7d5fd1c6b6a2032adc973056c87dc3").unwrap();
         let cose_key = CoseKey::from_slice(&input).unwrap();
         let key = cose_key.decode_secret().unwrap();
-        assert!(matches!(key, SecretKey::Ed25519(_)));
+        assert!(matches!(
+            key,
+            SecretKey::EdDsa(ssi_crypto::key::EdDsaSecretKey::Curve25519(_))
+        ));
         assert_eq!(
             CoseKey::encode_secret_with_id(&key, cose_key.key_id.clone()).unwrap(),
             cose_key
@@ -548,7 +554,10 @@ mod tests {
         let input = hex::decode("a401022008215820394fd5a1e33b8a67d5fa9ddca42d261219dde202e65bbf07bf2f671e157ac41f225820199d7db667e74905c8371168b815c267db76243fbfd387fa5f2d8a691099a89a").unwrap();
         let cose_key = CoseKey::from_slice(&input).unwrap();
         let key = cose_key.decode_public().unwrap();
-        assert!(matches!(key, PublicKey::K256(_)));
+        assert!(matches!(
+            key,
+            PublicKey::Ecdsa(ssi_crypto::key::EcdsaPublicKey::K256(_))
+        ));
         assert_eq!(
             CoseKey::encode_public_with_id(&key, cose_key.key_id.clone()).unwrap(),
             cose_key
@@ -572,7 +581,10 @@ mod tests {
         let input = hex::decode("a501022008215820394fd5a1e33b8a67d5fa9ddca42d261219dde202e65bbf07bf2f671e157ac41f225820199d7db667e74905c8371168b815c267db76243fbfd387fa5f2d8a691099a89a2358203e0fada8be75e5e47ab4c1c91c3f8f9185d1e18a2a16b3400a1eb33c9cdf8b96").unwrap();
         let cose_key = CoseKey::from_slice(&input).unwrap();
         let key = cose_key.decode_secret().unwrap();
-        assert!(matches!(key, SecretKey::K256(_)));
+        assert!(matches!(
+            key,
+            SecretKey::Ecdsa(ssi_crypto::key::EcdsaSecretKey::K256(_))
+        ));
         assert_eq!(
             CoseKey::encode_secret_with_id(&key, cose_key.key_id.clone()).unwrap(),
             cose_key
@@ -589,7 +601,10 @@ mod tests {
         let input = hex::decode("a5200121582065eda5a12577c2bae829437fe338701a10aaa375e1bb5b5de108de439c08551d2258201e52ed75701163f7f9e40ddf9f341b3dc9ba860af7e0ca7ca7e9eecd0084d19c01020258246d65726961646f632e6272616e64796275636b406275636b6c616e642e6578616d706c65").unwrap();
         let cose_key = CoseKey::from_slice(&input).unwrap();
         let key = cose_key.decode_public().unwrap();
-        assert!(matches!(key, PublicKey::P256(_)));
+        assert!(matches!(
+            key,
+            PublicKey::Ecdsa(ssi_crypto::key::EcdsaPublicKey::P256(_))
+        ));
         assert_eq!(
             CoseKey::encode_public_with_id(&key, cose_key.key_id.clone()).unwrap(),
             cose_key
@@ -606,7 +621,10 @@ mod tests {
         let input = hex::decode("a601020258246d65726961646f632e6272616e64796275636b406275636b6c616e642e6578616d706c65200121582065eda5a12577c2bae829437fe338701a10aaa375e1bb5b5de108de439c08551d2258201e52ed75701163f7f9e40ddf9f341b3dc9ba860af7e0ca7ca7e9eecd0084d19c235820aff907c99f9ad3aae6c4cdf21122bce2bd68b5283e6907154ad911840fa208cf").unwrap();
         let cose_key = CoseKey::from_slice(&input).unwrap();
         let key = cose_key.decode_secret().unwrap();
-        assert!(matches!(key, SecretKey::P256(_)));
+        assert!(matches!(
+            key,
+            SecretKey::Ecdsa(ssi_crypto::key::EcdsaSecretKey::P256(_))
+        ));
         assert_eq!(
             CoseKey::encode_secret_with_id(&key, cose_key.key_id.clone()).unwrap(),
             cose_key
@@ -622,7 +640,10 @@ mod tests {
         let input = hex::decode("a52001215820bac5b11cad8f99f9c72b05cf4b9e26d244dc189f745228255a219a86d6a09eff22582020138bf82dc1b6d562be0fa54ab7804a3a64b6d72ccfed6b6fb6ed28bbfc117e010202423131").unwrap();
         let cose_key = CoseKey::from_slice(&input).unwrap();
         let key = cose_key.decode_public().unwrap();
-        assert!(matches!(key, PublicKey::P256(_)));
+        assert!(matches!(
+            key,
+            PublicKey::Ecdsa(ssi_crypto::key::EcdsaPublicKey::P256(_))
+        ));
         assert_eq!(
             CoseKey::encode_public_with_id(&key, cose_key.key_id.clone()).unwrap(),
             cose_key
@@ -638,7 +659,10 @@ mod tests {
         let input = hex::decode("a60102024231312001215820bac5b11cad8f99f9c72b05cf4b9e26d244dc189f745228255a219a86d6a09eff22582020138bf82dc1b6d562be0fa54ab7804a3a64b6d72ccfed6b6fb6ed28bbfc117e23582057c92077664146e876760c9520d054aa93c3afb04e306705db6090308507b4d3").unwrap();
         let cose_key = CoseKey::from_slice(&input).unwrap();
         let key = cose_key.decode_secret().unwrap();
-        assert!(matches!(key, SecretKey::P256(_)));
+        assert!(matches!(
+            key,
+            SecretKey::Ecdsa(ssi_crypto::key::EcdsaSecretKey::P256(_))
+        ));
         assert_eq!(
             CoseKey::encode_secret_with_id(&key, cose_key.key_id.clone()).unwrap(),
             cose_key
@@ -654,7 +678,10 @@ mod tests {
         let input = hex::decode("a5200121582098f50a4ff6c05861c8860d13a638ea56c3f5ad7590bbfbf054e1c7b4d91d6280225820f01400b089867804b8e9fc96c3932161f1934f4223069170d924b7e03bf822bb0102025821706572656772696e2e746f6f6b407475636b626f726f7567682e6578616d706c65").unwrap();
         let cose_key = CoseKey::from_slice(&input).unwrap();
         let key = cose_key.decode_public().unwrap();
-        assert!(matches!(key, PublicKey::P256(_)));
+        assert!(matches!(
+            key,
+            PublicKey::Ecdsa(ssi_crypto::key::EcdsaPublicKey::P256(_))
+        ));
         assert_eq!(
             CoseKey::encode_public_with_id(&key, cose_key.key_id.clone()).unwrap(),
             cose_key
@@ -671,7 +698,10 @@ mod tests {
         let input = hex::decode("a601022001025821706572656772696e2e746f6f6b407475636b626f726f7567682e6578616d706c6521582098f50a4ff6c05861c8860d13a638ea56c3f5ad7590bbfbf054e1c7b4d91d6280225820f01400b089867804b8e9fc96c3932161f1934f4223069170d924b7e03bf822bb23582002d1f7e6f26c43d4868d87ceb2353161740aacf1f7163647984b522a848df1c3").unwrap();
         let cose_key = CoseKey::from_slice(&input).unwrap();
         let key = cose_key.decode_secret().unwrap();
-        assert!(matches!(key, SecretKey::P256(_)));
+        assert!(matches!(
+            key,
+            SecretKey::Ecdsa(ssi_crypto::key::EcdsaSecretKey::P256(_))
+        ));
         assert_eq!(
             CoseKey::encode_secret_with_id(&key, cose_key.key_id.clone()).unwrap(),
             cose_key
@@ -694,7 +724,10 @@ mod tests {
         let input = hex::decode("a401022002215830fa1d31d39853d37fbfd145675635d52795f5feb3eacf11371ad8c6eb30c6f2493b0ec74d8c5b5a20ebf68ce3e0bd2c072258307c2b27b366e4fc73b79d28bac0b18ae2f2b0c4e7849656a71aac8987e60af5af57a9af3faf206afc798fa5fb06db15aa").unwrap();
         let cose_key = CoseKey::from_slice(&input).unwrap();
         let key = cose_key.decode_public().unwrap();
-        assert!(matches!(key, PublicKey::P384(_)));
+        assert!(matches!(
+            key,
+            PublicKey::Ecdsa(ssi_crypto::key::EcdsaPublicKey::P384(_))
+        ));
         assert_eq!(
             CoseKey::encode_public_with_id(&key, cose_key.key_id.clone()).unwrap(),
             cose_key
@@ -718,7 +751,10 @@ mod tests {
         let input = hex::decode("a501022002215830fa1d31d39853d37fbfd145675635d52795f5feb3eacf11371ad8c6eb30c6f2493b0ec74d8c5b5a20ebf68ce3e0bd2c072258307c2b27b366e4fc73b79d28bac0b18ae2f2b0c4e7849656a71aac8987e60af5af57a9af3faf206afc798fa5fb06db15aa23583021d8eb2250cdaa19bfb01f03211be11a70ef4739650ed954166531808aa254c1d6d968b36d16184d350600253fa672c0").unwrap();
         let cose_key = CoseKey::from_slice(&input).unwrap();
         let key = cose_key.decode_secret().unwrap();
-        assert!(matches!(key, SecretKey::P384(_)));
+        assert!(matches!(
+            key,
+            SecretKey::Ecdsa(ssi_crypto::key::EcdsaSecretKey::P384(_))
+        ));
         assert_eq!(
             CoseKey::encode_secret_with_id(&key, cose_key.key_id.clone()).unwrap(),
             cose_key

@@ -1,3 +1,5 @@
+use std::ops::Deref;
+
 use zeroize::ZeroizeOnDrop;
 
 use crate::{
@@ -12,6 +14,14 @@ pub struct SymmetricKey(Box<[u8]>);
 impl SymmetricKey {
     pub fn new(value: Box<[u8]>) -> Self {
         Self(value)
+    }
+}
+
+impl Deref for SymmetricKey {
+    type Target = [u8];
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
     }
 }
 
@@ -49,9 +59,9 @@ impl SigningKey for SymmetricKey {
 }
 
 impl VerifyingKey for SymmetricKey {
-    fn key_metadata(&self) -> KeyMetadata {
+    fn metadata(&self) -> KeyMetadata {
         KeyMetadata {
-            r#type: Some(KeyType::Symmetric),
+            r#type: Some(KeyType::Symmetric(self.0.len())),
             ..Default::default()
         }
     }

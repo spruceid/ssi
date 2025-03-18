@@ -3,7 +3,7 @@ use crate::{
     key::{KeyConversionError, KeyMetadata},
     AlgorithmInstance, Error, PublicKey, RejectedSignature, SigningKey, VerifyingKey,
 };
-use rsa::pkcs1::DecodeRsaPublicKey;
+use rsa::{pkcs1::DecodeRsaPublicKey, traits::PublicKeyParts};
 pub use rsa::{RsaPrivateKey as RsaSecretKey, RsaPublicKey};
 use sha2::Sha256;
 
@@ -19,9 +19,9 @@ impl PublicKey {
 }
 
 impl VerifyingKey for RsaPublicKey {
-    fn key_metadata(&self) -> KeyMetadata {
+    fn metadata(&self) -> KeyMetadata {
         KeyMetadata {
-            r#type: Some(KeyType::Rsa),
+            r#type: Some(KeyType::Rsa(self.size())),
             ..Default::default()
         }
     }

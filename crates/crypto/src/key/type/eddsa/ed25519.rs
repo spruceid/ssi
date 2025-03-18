@@ -1,11 +1,11 @@
 use crate::{
     key::{KeyConversionError, KeyMetadata},
-    AlgorithmInstance, Error, PublicKey, RejectedSignature, SecretKey, SignatureVerification,
-    SigningKey, VerifyingKey,
+    AlgorithmInstance, Error, KeyType, PublicKey, RejectedSignature, SecretKey,
+    SignatureVerification, SigningKey, VerifyingKey,
 };
 pub use ed25519_dalek::{SigningKey as Ed25519SecretKey, VerifyingKey as Ed25519PublicKey};
 
-use super::KeyType;
+use super::{EdDsaKeyType, EdDsaPublicKey, EdDsaSecretKey};
 
 impl PublicKey {
     /// Decodes an EdDSA Ed25519 public key encoded as specified in
@@ -13,17 +13,27 @@ impl PublicKey {
     ///
     /// [1]: <https://www.rfc-editor.org/rfc/rfc8032#section-3.1>
     pub fn from_ed25519_bytes(bytes: &[u8]) -> Result<Self, KeyConversionError> {
+        EdDsaPublicKey::from_curve25519_bytes(bytes).map(Self::EdDsa)
+    }
+}
+
+impl EdDsaPublicKey {
+    /// Decodes an EdDSA Ed25519 public key encoded as specified in
+    /// [RFC8032 Section 3.1][1]
+    ///
+    /// [1]: <https://www.rfc-editor.org/rfc/rfc8032#section-3.1>
+    pub fn from_curve25519_bytes(bytes: &[u8]) -> Result<Self, KeyConversionError> {
         let bytes = bytes.try_into().map_err(|_| KeyConversionError::Invalid)?;
         Ed25519PublicKey::from_bytes(bytes)
-            .map(Self::Ed25519)
+            .map(Self::Curve25519)
             .map_err(|_| KeyConversionError::Invalid)
     }
 }
 
 impl VerifyingKey for Ed25519PublicKey {
-    fn key_metadata(&self) -> KeyMetadata {
+    fn metadata(&self) -> KeyMetadata {
         KeyMetadata {
-            r#type: Some(KeyType::Ed25519),
+            r#type: Some(KeyType::EdDsa(EdDsaKeyType::Curve25519)),
             ..Default::default()
         }
     }
@@ -53,19 +63,33 @@ impl VerifyingKey for Ed25519PublicKey {
 }
 
 impl SecretKey {
+    pub fn generate_curve25519() -> Self {
+        Self::EdDsa(EdDsaSecretKey::generate_ed25519())
+    }
+
+    pub fn generate_curve25519_from(rng: &mut (impl rand::CryptoRng + rand::RngCore)) -> Self {
+        Self::EdDsa(EdDsaSecretKey::generate_ed25519_from(rng))
+    }
+
+    pub fn new_curve25519(bytes: &[u8]) -> Result<Self, KeyConversionError> {
+        EdDsaSecretKey::new_ed25519(bytes).map(Self::EdDsa)
+    }
+}
+
+impl EdDsaSecretKey {
     pub fn generate_ed25519() -> Self {
         let mut rng = rand::rngs::OsRng {};
         Self::generate_ed25519_from(&mut rng)
     }
 
     pub fn generate_ed25519_from(rng: &mut (impl rand::CryptoRng + rand::RngCore)) -> Self {
-        Self::Ed25519(ed25519_dalek::SigningKey::generate(rng))
+        Self::Curve25519(ed25519_dalek::SigningKey::generate(rng))
     }
 
     pub fn new_ed25519(bytes: &[u8]) -> Result<Self, KeyConversionError> {
         bytes
             .try_into()
-            .map(Self::Ed25519)
+            .map(Self::Curve25519)
             .map_err(|_| KeyConversionError::Invalid)
     }
 }

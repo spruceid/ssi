@@ -1,3 +1,4 @@
+//! Legacy types and traits, soon to be removed.
 use core::fmt;
 
 use super::{

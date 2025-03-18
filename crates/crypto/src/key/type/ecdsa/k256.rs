@@ -1,19 +1,16 @@
 use crate::{
     key::{KeyConversionError, KeyMetadata},
-    AlgorithmInstance, Error, PublicKey, RejectedSignature, SecretKey, SigningKey, VerifyingKey,
+    AlgorithmInstance, Error, KeyType, PublicKey, RejectedSignature, SecretKey, SigningKey,
+    VerifyingKey,
 };
 pub use k256::{PublicKey as K256PublicKey, SecretKey as K256SecretKey};
 
-use super::KeyType;
+use super::{EcdsaKeyType, EcdsaPublicKey, EcdsaSecretKey};
 
 impl PublicKey {
     /// Creates a new ECDSA K-256 public key.
     pub fn new_ecdsa_k256(x: &[u8], y: &[u8]) -> Result<Self, KeyConversionError> {
-        let mut bytes = Vec::new();
-        bytes.push(0x04);
-        bytes.extend(x);
-        bytes.extend(y);
-        Self::from_ecdsa_k256_sec1_bytes(&bytes)
+        EcdsaPublicKey::new_k256(x, y).map(Self::Ecdsa)
     }
 
     /// Decodes an ECDSA P-256 [`PublicKey`] (compressed or uncompressed) from
@@ -23,6 +20,27 @@ impl PublicKey {
     ///
     /// See: <http://www.secg.org/sec1-v2.pdf>
     pub fn from_ecdsa_k256_sec1_bytes(bytes: &[u8]) -> Result<Self, KeyConversionError> {
+        EcdsaPublicKey::from_k256_sec1_bytes(bytes).map(Self::Ecdsa)
+    }
+}
+
+impl EcdsaPublicKey {
+    /// Creates a new ECDSA K-256 public key.
+    pub fn new_k256(x: &[u8], y: &[u8]) -> Result<Self, KeyConversionError> {
+        let mut bytes = Vec::new();
+        bytes.push(0x04);
+        bytes.extend(x);
+        bytes.extend(y);
+        Self::from_k256_sec1_bytes(&bytes)
+    }
+
+    /// Decodes an ECDSA P-256 [`PublicKey`] (compressed or uncompressed) from
+    /// the `Elliptic-Curve-Point-to-Octet-String` encoding described in
+    /// SEC 1: Elliptic Curve Cryptography (Version 2.0) section
+    /// 2.3.3 (page 10).
+    ///
+    /// See: <http://www.secg.org/sec1-v2.pdf>
+    pub fn from_k256_sec1_bytes(bytes: &[u8]) -> Result<Self, KeyConversionError> {
         K256PublicKey::from_sec1_bytes(bytes)
             .map(Self::K256)
             .map_err(|_| KeyConversionError::Invalid)
@@ -30,9 +48,9 @@ impl PublicKey {
 }
 
 impl VerifyingKey for K256PublicKey {
-    fn key_metadata(&self) -> KeyMetadata {
+    fn metadata(&self) -> KeyMetadata {
         KeyMetadata {
-            r#type: Some(KeyType::K256),
+            r#type: Some(KeyType::Ecdsa(EcdsaKeyType::K256)),
             ..Default::default()
         }
     }
@@ -70,16 +88,30 @@ impl VerifyingKey for K256PublicKey {
 }
 
 impl SecretKey {
-    pub fn generate_secp256k1() -> Self {
-        let mut rng = rand::rngs::OsRng {};
-        Self::generate_secp256k1_from(&mut rng)
+    pub fn generate_ecdsa_k256() -> Self {
+        Self::Ecdsa(EcdsaSecretKey::generate_k256())
     }
 
-    pub fn generate_secp256k1_from(rng: &mut (impl rand::CryptoRng + rand::RngCore)) -> Self {
+    pub fn generate_ecdsa_k256_from(rng: &mut (impl rand::CryptoRng + rand::RngCore)) -> Self {
+        Self::Ecdsa(EcdsaSecretKey::generate_k256_from(rng))
+    }
+
+    pub fn new_ecdsa_k256(d: &[u8]) -> Result<Self, KeyConversionError> {
+        EcdsaSecretKey::new_k256(d).map(Self::Ecdsa)
+    }
+}
+
+impl EcdsaSecretKey {
+    pub fn generate_k256() -> Self {
+        let mut rng = rand::rngs::OsRng {};
+        Self::generate_k256_from(&mut rng)
+    }
+
+    pub fn generate_k256_from(rng: &mut (impl rand::CryptoRng + rand::RngCore)) -> Self {
         Self::K256(k256::SecretKey::random(rng))
     }
 
-    pub fn new_secp256k1(d: &[u8]) -> Result<Self, KeyConversionError> {
+    pub fn new_k256(d: &[u8]) -> Result<Self, KeyConversionError> {
         k256::SecretKey::from_bytes(d.into())
             .map(Self::K256)
             .map_err(|_| KeyConversionError::Invalid)

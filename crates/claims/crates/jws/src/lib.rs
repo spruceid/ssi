@@ -504,7 +504,7 @@ pub fn sign_bytes(algorithm: Algorithm, data: &[u8], key: &JWK) -> Result<Vec<u8
             // let hashed;
             match algorithm {
                 Algorithm::RS256 => {
-                    let padding = rsa::Pkcs1v15Sign::new::<ssi_crypto::hash::sha2::Sha256>();
+                    let padding = rsa::Pkcs1v15Sign::new::<ssi_crypto::sha2::Sha256>();
                     let digest_in = ssi_crypto::hash::sha256(data);
                     private_key
                         .sign(padding, &digest_in)
@@ -512,7 +512,7 @@ pub fn sign_bytes(algorithm: Algorithm, data: &[u8], key: &JWK) -> Result<Vec<u8
                 }
                 Algorithm::PS256 => {
                     let mut rng = rand::rngs::OsRng {};
-                    let padding = rsa::Pss::new_with_salt::<ssi_crypto::hash::sha2::Sha256>(32);
+                    let padding = rsa::Pss::new_with_salt::<ssi_crypto::sha2::Sha256>(32);
                     let digest_in = ssi_crypto::hash::sha256(data);
                     private_key
                         .sign_with_rng(&mut rng, padding, &digest_in)
@@ -703,8 +703,7 @@ pub fn verify_bytes_warnable(
         #[cfg(all(feature = "rsa", not(feature = "ring")))]
         JWKParams::RSA(rsa_params) => {
             rsa_params.validate_key_size()?;
-            let public_key =
-                rsa::RsaPublicKey::try_from(rsa_params)?;
+            let public_key = rsa::RsaPublicKey::try_from(rsa_params)?;
             match algorithm {
                 Algorithm::RS256 => {
                     let key = rsa::pkcs1v15::VerifyingKey::<sha2::Sha256>::new(public_key);

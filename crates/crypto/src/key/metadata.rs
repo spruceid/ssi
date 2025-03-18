@@ -1,6 +1,7 @@
 use super::r#type::KeyType;
 use crate::{AlgorithmInstance, Error};
 
+/// Key metadata.
 #[derive(Default)]
 pub struct KeyMetadata {
     /// Identifier.
@@ -36,6 +37,7 @@ impl KeyMetadata {
     }
 }
 
+/// Infer the appropriate signature algorithm to use given the following hints.
 pub fn infer_algorithm(
     user_algorithm: Option<AlgorithmInstance>,
     key_algorithm: impl FnOnce() -> Option<AlgorithmInstance>,

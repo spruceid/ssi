@@ -3,24 +3,35 @@ use std::sync::Arc;
 use crate::{key::KeyMetadata, AlgorithmInstance, Error};
 
 /// Issuer.
+///
+/// Any object capable of providing a [`Signer`] for a given key.
 pub trait Issuer {
+    /// Signer type.
     type Signer: Signer;
 
+    /// Returns a signer for the key identified by `key_id`, if any.
     #[allow(async_fn_in_trait)]
-    async fn signer(&self, key_id: Option<&[u8]>) -> Result<Option<Self::Signer>, Error>;
+    async fn get_signer(&self, key_id: Option<&[u8]>) -> Result<Option<Self::Signer>, Error>;
 
+    /// Returns a signer for the key identified by `key_id`, or fail if there
+    /// isn't any.
     #[allow(async_fn_in_trait)]
     async fn require_signer(&self, key_id: Option<&[u8]>) -> Result<Self::Signer, Error> {
-        self.signer(key_id)
+        self.get_signer(key_id)
             .await?
             .ok_or_else(|| Error::KeyNotFound(key_id.map(|id| id.to_vec())))
     }
 }
 
 /// Signer.
+///
+/// Any object capable of signing a message with the given cryptographic
+/// algorithm instance.
 pub trait Signer {
-    fn key_metadata(&self) -> KeyMetadata;
+    /// Returns the signing key's metadata.
+    fn metadata(&self) -> KeyMetadata;
 
+    /// Signs a message with the given algorithm.
     #[allow(async_fn_in_trait)]
     async fn sign(
         &self,
@@ -30,8 +41,8 @@ pub trait Signer {
 }
 
 impl<T: Signer> Signer for &T {
-    fn key_metadata(&self) -> KeyMetadata {
-        T::key_metadata(*self)
+    fn metadata(&self) -> KeyMetadata {
+        T::metadata(*self)
     }
 
     async fn sign(
@@ -44,8 +55,8 @@ impl<T: Signer> Signer for &T {
 }
 
 impl<T: Signer> Signer for Box<T> {
-    fn key_metadata(&self) -> KeyMetadata {
-        T::key_metadata(self)
+    fn metadata(&self) -> KeyMetadata {
+        T::metadata(self)
     }
 
     async fn sign(
@@ -58,8 +69,8 @@ impl<T: Signer> Signer for Box<T> {
 }
 
 impl<T: Signer> Signer for Arc<T> {
-    fn key_metadata(&self) -> KeyMetadata {
-        T::key_metadata(self)
+    fn metadata(&self) -> KeyMetadata {
+        T::metadata(self)
     }
 
     async fn sign(
@@ -71,7 +82,11 @@ impl<T: Signer> Signer for Arc<T> {
     }
 }
 
+/// Signing key.
+///
+/// Any object capable of directly signing a message with a given algorithm.
 pub trait SigningKey {
+    /// Signs a message with the given algorithm.
     fn sign_message(
         &self,
         algorithm: impl Into<AlgorithmInstance>,
@@ -79,6 +94,7 @@ pub trait SigningKey {
     ) -> Result<Box<[u8]>, Error>;
 }
 
+/// Error raised when a signature could not be parsed.
 #[derive(Debug, thiserror::Error)]
 #[error("malformed signature")]
 pub struct MalformedSignature;

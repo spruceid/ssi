@@ -139,45 +139,6 @@ pub mod bbs;
 mod r#static;
 pub use r#static::*;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub enum SignatureFunction {
-    /// BBS.
-    Bbs,
-
-    /// ECDSA
-    EcDsa,
-
-    /// EdDSA
-    EdDsa,
-
-    /// HMAC
-    Hmac,
-
-    /// RSASSA-PSS with MGF1+SHA-256
-    RsaSsaPssMgf1Sha256,
-
-    /// RSASSA-PSS with MGF1+SHA-384
-    RsaSsaPssMgf1Sha384,
-
-    /// RSASSA-PSS with MGF1+SHA-512
-    RsaSsaPssMgf1Sha512,
-
-    /// RSASSA-PKCS1 v1.5
-    RsaSsaPkcs1v1_5,
-}
-
-impl SignatureFunction {
-    pub fn is_rsa(self) -> bool {
-        matches!(
-            self,
-            Self::RsaSsaPssMgf1Sha256
-                | Self::RsaSsaPssMgf1Sha384
-                | Self::RsaSsaPssMgf1Sha512
-                | Self::RsaSsaPkcs1v1_5
-        )
-    }
-}
-
 macro_rules! algorithms {
     ($(
         $(#[doc = $doc:tt])*
@@ -185,7 +146,7 @@ macro_rules! algorithms {
         $(#[serde $serde:tt])?
         $id:ident $( ($arg:ty) )? : $name:literal ($digest:ident, $signature:ident)
     ),*) => {
-        /// Signature algorithm.
+        /// Cryptographic signing algorithm.
         #[derive(Debug, Serialize, Deserialize, Clone, Copy, PartialEq, Hash, Eq)]
         pub enum Algorithm {
             $(
@@ -251,6 +212,7 @@ macro_rules! algorithms {
             type Instance = AlgorithmInstance;
         }
 
+        /// Cryptographic signing algorithm with parameters.
         #[derive(Debug, Clone)]
         pub enum AlgorithmInstance {
             $(
@@ -523,3 +485,47 @@ pub enum AlgorithmError {
 #[derive(Debug, thiserror::Error)]
 #[error("unsupported signature algorithm `{0}`")]
 pub struct UnsupportedAlgorithm(pub Algorithm);
+
+/// Cryptographic signature function.
+///
+/// Cryptographic algorithms are usually composed of a hash function to digest
+/// the input message, and a signature function used to sign the digest. This
+/// type lists all the signature functions supported by `ssi`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub enum SignatureFunction {
+    /// BBS.
+    Bbs,
+
+    /// ECDSA
+    EcDsa,
+
+    /// EdDSA
+    EdDsa,
+
+    /// HMAC
+    Hmac,
+
+    /// RSASSA-PSS with MGF1+SHA-256
+    RsaSsaPssMgf1Sha256,
+
+    /// RSASSA-PSS with MGF1+SHA-384
+    RsaSsaPssMgf1Sha384,
+
+    /// RSASSA-PSS with MGF1+SHA-512
+    RsaSsaPssMgf1Sha512,
+
+    /// RSASSA-PKCS1 v1.5
+    RsaSsaPkcs1v1_5,
+}
+
+impl SignatureFunction {
+    pub fn is_rsa(self) -> bool {
+        matches!(
+            self,
+            Self::RsaSsaPssMgf1Sha256
+                | Self::RsaSsaPssMgf1Sha384
+                | Self::RsaSsaPssMgf1Sha512
+                | Self::RsaSsaPkcs1v1_5
+        )
+    }
+}
