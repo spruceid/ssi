@@ -1,9 +1,10 @@
 use crate::{
     key::{KeyConversionError, KeyMetadata},
-    AlgorithmInstance, Error, KeyType, PublicKey, RejectedSignature, SecretKey, SigningKey,
-    VerifyingKey,
+    AlgorithmInstance, Error, KeyType, PublicKey, RecoveryKey, RejectedSignature, SecretKey,
+    SignatureVerification, SigningKey, VerifyingKey,
 };
-pub use k256::{PublicKey as K256PublicKey, SecretKey as K256SecretKey};
+pub use k256::ecdsa::{SigningKey as K256SecretKey, VerifyingKey as K256PublicKey};
+use sha2::Digest;
 
 use super::{EcdsaKeyType, EcdsaPublicKey, EcdsaSecretKey};
 
@@ -60,27 +61,93 @@ impl VerifyingKey for K256PublicKey {
         algorithm: impl Into<AlgorithmInstance>,
         signing_bytes: &[u8],
         signature: &[u8],
-    ) -> Result<crate::SignatureVerification, crate::Error> {
+    ) -> Result<SignatureVerification, Error> {
+        use k256::ecdsa::signature::{DigestVerifier, Verifier};
         match algorithm.into() {
             AlgorithmInstance::ES256K => {
-                use k256::ecdsa::signature::Verifier;
-                let verifying_key = k256::ecdsa::VerifyingKey::from(self);
                 let sig = k256::ecdsa::Signature::try_from(signature)
                     .map_err(|_| Error::SignatureMalformed)?;
-                let verification = verifying_key.verify(signing_bytes, &sig);
+                let verification = self.verify(signing_bytes, &sig);
                 Ok(verification.map_err(|_| RejectedSignature::Mismatch))
             }
             AlgorithmInstance::ES256KR => {
-                todo!()
+                let recovered_key =
+                    Self::recover(AlgorithmInstance::ES256KR, signing_bytes, signature)?;
+                if recovered_key == *self {
+                    Ok(Ok(()))
+                } else {
+                    Ok(Err(RejectedSignature::Mismatch))
+                }
             }
             AlgorithmInstance::ESBlake2bK => {
-                todo!()
+                use digest::consts::U32;
+                let sig = k256::ecdsa::Signature::try_from(signature)
+                    .map_err(|_| Error::SignatureMalformed)?;
+                let digest = blake2::Blake2b::<U32>::new_with_prefix(signing_bytes);
+                let verification = self.verify_digest(digest, &sig);
+                Ok(verification.map_err(|_| RejectedSignature::Mismatch))
             }
             AlgorithmInstance::ESKeccakK => {
-                todo!()
+                let sig = k256::ecdsa::Signature::try_from(signature)
+                    .map_err(|_| Error::SignatureMalformed)?;
+                let digest = sha3::Keccak256::new_with_prefix(signing_bytes);
+                let verification = self.verify_digest(digest, &sig);
+                Ok(verification.map_err(|_| RejectedSignature::Mismatch))
             }
             AlgorithmInstance::ESKeccakKR => {
-                todo!()
+                let recovered_key =
+                    Self::recover(AlgorithmInstance::ESKeccakKR, signing_bytes, signature)?;
+                if recovered_key == *self {
+                    Ok(Ok(()))
+                } else {
+                    Ok(Err(RejectedSignature::Mismatch))
+                }
+            }
+            other => Err(Error::AlgorithmUnsupported(other.algorithm())),
+        }
+    }
+}
+
+impl RecoveryKey for K256PublicKey {
+    fn recover(
+        algorithm: impl Into<AlgorithmInstance>,
+        signing_bytes: &[u8],
+        signature: &[u8],
+    ) -> Result<Self, Error> {
+        match algorithm.into() {
+            AlgorithmInstance::ES256KR => {
+                if signature.len() != 65 {
+                    return Err(Error::SignatureMalformed);
+                }
+
+                let sig = k256::ecdsa::Signature::try_from(&signature[..64])
+                    .map_err(|_| Error::SignatureMalformed)?;
+                let rec_id = k256::ecdsa::RecoveryId::try_from(signature[64])
+                    .map_err(|_| Error::SignatureMalformed)?;
+
+                k256::ecdsa::VerifyingKey::recover_from_digest(
+                    sha2::Sha256::new_with_prefix(signing_bytes),
+                    &sig,
+                    rec_id,
+                )
+                .map_err(|_| Error::SignatureMalformed)
+            }
+            AlgorithmInstance::ESKeccakKR => {
+                if signature.len() != 65 {
+                    return Err(Error::SignatureMalformed);
+                }
+
+                let sig = k256::ecdsa::Signature::try_from(&signature[..64])
+                    .map_err(|_| Error::SignatureMalformed)?;
+                let rec_id = k256::ecdsa::RecoveryId::try_from(signature[64])
+                    .map_err(|_| Error::SignatureMalformed)?;
+
+                k256::ecdsa::VerifyingKey::recover_from_digest(
+                    sha3::Keccak256::new_with_prefix(signing_bytes),
+                    &sig,
+                    rec_id,
+                )
+                .map_err(|_| Error::SignatureMalformed)
             }
             other => Err(Error::AlgorithmUnsupported(other.algorithm())),
         }
@@ -108,11 +175,12 @@ impl EcdsaSecretKey {
     }
 
     pub fn generate_k256_from(rng: &mut (impl rand::CryptoRng + rand::RngCore)) -> Self {
-        Self::K256(k256::SecretKey::random(rng))
+        Self::K256(k256::SecretKey::random(rng).into())
     }
 
     pub fn new_k256(d: &[u8]) -> Result<Self, KeyConversionError> {
         k256::SecretKey::from_bytes(d.into())
+            .map(Into::into)
             .map(Self::K256)
             .map_err(|_| KeyConversionError::Invalid)
     }
@@ -124,25 +192,48 @@ impl SigningKey for K256SecretKey {
         algorithm: impl Into<AlgorithmInstance>,
         signing_bytes: &[u8],
     ) -> Result<Box<[u8]>, Error> {
-        use k256::ecdsa::{signature::Signer, Signature, SigningKey};
-        let signing_key = SigningKey::from(self);
+        use k256::ecdsa::{
+            signature::{DigestSigner, Signer},
+            Signature,
+        };
 
         match algorithm.into() {
             AlgorithmInstance::ES256K => {
-                let signature: Signature = signing_key.try_sign(signing_bytes).unwrap(); // Uses SHA-256 by default.
+                let signature: Signature = self.try_sign(signing_bytes).unwrap(); // Uses SHA-256 by default.
                 Ok(signature.to_bytes().to_vec().into_boxed_slice())
             }
             AlgorithmInstance::ES256KR => {
-                todo!()
+                // NOTE: explicitly using SHA256 here because the default hash
+                //       function provided by the `k256` crate for recovery has
+                //       varied over time across different versions.
+                let digest = sha2::Sha256::new_with_prefix(signing_bytes);
+                let (sig, rec_id) = self
+                    .sign_digest_recoverable(digest)
+                    .map_err(Error::internal)?;
+
+                let mut result = sig.to_vec();
+                result.push(rec_id.to_byte());
+                Ok(result.into_boxed_slice())
             }
             AlgorithmInstance::ESBlake2bK => {
-                todo!()
+                use digest::consts::U32;
+                let digest = blake2::Blake2b::<U32>::new_with_prefix(signing_bytes);
+                let signature: Signature = self.try_sign_digest(digest).unwrap();
+                Ok(signature.to_bytes().to_vec().into_boxed_slice())
             }
             AlgorithmInstance::ESKeccakK => {
-                todo!()
+                let digest = sha3::Keccak256::new_with_prefix(signing_bytes);
+                let signature: Signature = self.try_sign_digest(digest).unwrap();
+                Ok(signature.to_bytes().to_vec().into_boxed_slice())
             }
             AlgorithmInstance::ESKeccakKR => {
-                todo!()
+                let digest = sha3::Keccak256::new_with_prefix(signing_bytes);
+                let (sig, rec_id) = self
+                    .sign_digest_recoverable(digest)
+                    .map_err(Error::internal)?;
+                let mut result = sig.to_vec();
+                result.push(rec_id.to_byte());
+                Ok(result.into_boxed_slice())
             }
             other => Err(Error::AlgorithmUnsupported(other.algorithm())),
         }

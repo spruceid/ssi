@@ -18,6 +18,7 @@ pub mod algorithm;
 pub mod hash;
 pub mod key;
 mod options;
+mod recovery;
 pub mod signature;
 mod utils;
 mod verification;
@@ -26,6 +27,7 @@ pub use algorithm::{Algorithm, AlgorithmError, AlgorithmInstance, UnsupportedAlg
 pub use hash::HashFunction;
 pub use key::{KeyType, PublicKey, SecretKey};
 pub use options::*;
+pub use recovery::*;
 pub use signature::{Issuer, Signer, SigningKey};
 pub use utils::*;
 pub use verification::*;

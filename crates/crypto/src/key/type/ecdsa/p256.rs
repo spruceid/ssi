@@ -3,7 +3,8 @@ use crate::{
     AlgorithmInstance, Error, KeyType, PublicKey, RejectedSignature, SecretKey,
     SignatureVerification, SigningKey, VerifyingKey,
 };
-pub use p256::{PublicKey as P256PublicKey, SecretKey as P256SecretKey};
+pub use p256::ecdsa::{SigningKey as P256SecretKey, VerifyingKey as P256PublicKey};
+use sha2::Digest;
 
 use super::{EcdsaKeyType, EcdsaPublicKey, EcdsaSecretKey};
 
@@ -64,14 +65,19 @@ impl VerifyingKey for P256PublicKey {
         match algorithm.into() {
             AlgorithmInstance::ES256 => {
                 use p256::ecdsa::signature::Verifier;
-                let verifying_key = p256::ecdsa::VerifyingKey::from(self);
                 let sig = p256::ecdsa::Signature::try_from(signature)
                     .map_err(|_| Error::SignatureMalformed)?;
-                let verification = verifying_key.verify(signing_bytes, &sig);
+                let verification = self.verify(signing_bytes, &sig);
                 Ok(verification.map_err(|_| RejectedSignature::Mismatch))
             }
             AlgorithmInstance::ESBlake2b => {
-                todo!()
+                use digest::consts::U32;
+                use p256::ecdsa::signature::DigestVerifier;
+                let sig = p256::ecdsa::Signature::try_from(signature)
+                    .map_err(|_| Error::SignatureMalformed)?;
+                let digest = blake2::Blake2b::<U32>::new_with_prefix(signing_bytes);
+                let verification = self.verify_digest(digest, &sig);
+                Ok(verification.map_err(|_| RejectedSignature::Mismatch))
             }
             other => Err(Error::AlgorithmUnsupported(other.algorithm())),
         }
@@ -104,6 +110,7 @@ impl EcdsaSecretKey {
 
     pub fn new_p256(d: &[u8]) -> Result<Self, KeyConversionError> {
         p256::SecretKey::from_bytes(d.into())
+            .map(Into::into)
             .map(Self::P256)
             .map_err(|_| KeyConversionError::Invalid)
     }
@@ -115,15 +122,20 @@ impl SigningKey for P256SecretKey {
         algorithm: impl Into<AlgorithmInstance>,
         signing_bytes: &[u8],
     ) -> Result<Box<[u8]>, Error> {
+        use p256::ecdsa::{
+            signature::{DigestSigner, Signer},
+            Signature,
+        };
         match algorithm.into() {
             AlgorithmInstance::ES256 => {
-                use p256::ecdsa::{signature::Signer, Signature};
-                let signing_key = p256::ecdsa::SigningKey::from(self);
-                let signature: Signature = signing_key.try_sign(signing_bytes).unwrap(); // Uses SHA-256 by default.
+                let signature: Signature = self.try_sign(signing_bytes).unwrap(); // Uses SHA-256 by default.
                 Ok(signature.to_bytes().as_slice().into())
             }
             AlgorithmInstance::ESBlake2b => {
-                todo!()
+                use digest::consts::U32;
+                let digest = blake2::Blake2b::<U32>::new_with_prefix(signing_bytes);
+                let signature: Signature = self.try_sign_digest(digest).unwrap();
+                Ok(signature.to_bytes().as_slice().into())
             }
             other => Err(Error::AlgorithmUnsupported(other.algorithm())),
         }

@@ -196,13 +196,13 @@ impl EcdsaSecretKey {
     pub fn to_public(&self) -> EcdsaPublicKey {
         match self {
             #[cfg(feature = "secp256k1")]
-            Self::K256(secret) => EcdsaPublicKey::K256(secret.public_key()),
+            Self::K256(secret) => EcdsaPublicKey::K256(*secret.verifying_key()),
 
             #[cfg(feature = "secp256r1")]
-            Self::P256(secret) => EcdsaPublicKey::P256(secret.public_key()),
+            Self::P256(secret) => EcdsaPublicKey::P256(*secret.verifying_key()),
 
             #[cfg(feature = "secp384r1")]
-            Self::P384(secret) => EcdsaPublicKey::P384(secret.public_key()),
+            Self::P384(secret) => EcdsaPublicKey::P384(*secret.verifying_key()),
         }
     }
 

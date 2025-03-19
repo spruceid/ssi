@@ -3,7 +3,7 @@ use crate::{
     AlgorithmInstance, Error, KeyType, PublicKey, RejectedSignature, SecretKey, SigningKey,
     VerifyingKey,
 };
-pub use p384::{PublicKey as P384PublicKey, SecretKey as P384SecretKey};
+pub use p384::ecdsa::{SigningKey as P384SecretKey, VerifyingKey as P384PublicKey};
 
 use super::{EcdsaKeyType, EcdsaPublicKey, EcdsaSecretKey};
 
@@ -64,10 +64,9 @@ impl VerifyingKey for P384PublicKey {
         match algorithm.into() {
             AlgorithmInstance::ES384 => {
                 use p384::ecdsa::signature::Verifier;
-                let verifying_key = p384::ecdsa::VerifyingKey::from(self);
                 let sig = p384::ecdsa::Signature::try_from(signature)
                     .map_err(|_| Error::SignatureMalformed)?;
-                let verification = verifying_key.verify(signing_bytes, &sig);
+                let verification = self.verify(signing_bytes, &sig);
                 Ok(verification.map_err(|_| RejectedSignature::Mismatch))
             }
             other => Err(Error::AlgorithmUnsupported(other.algorithm())),
@@ -96,11 +95,12 @@ impl EcdsaSecretKey {
     }
 
     pub fn generate_p384_from(rng: &mut (impl rand::CryptoRng + rand::RngCore)) -> Self {
-        Self::P384(p384::SecretKey::random(rng))
+        Self::P384(p384::SecretKey::random(rng).into())
     }
 
     pub fn new_p384(d: &[u8]) -> Result<Self, KeyConversionError> {
         p384::SecretKey::from_bytes(d.into())
+            .map(Into::into)
             .map(Self::P384)
             .map_err(|_| KeyConversionError::Invalid)
     }
@@ -115,8 +115,7 @@ impl SigningKey for P384SecretKey {
         match algorithm.into() {
             AlgorithmInstance::ES384 => {
                 use p384::ecdsa::{signature::Signer, Signature};
-                let signing_key = p384::ecdsa::SigningKey::from(self);
-                let signature: Signature = signing_key.try_sign(signing_bytes).unwrap(); // Uses SHA-384 by default.
+                let signature: Signature = self.try_sign(signing_bytes).unwrap(); // Uses SHA-384 by default.
                 Ok(signature.to_bytes().as_slice().into())
             }
             other => Err(Error::AlgorithmUnsupported(other.algorithm())),

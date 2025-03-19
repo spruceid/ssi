@@ -298,7 +298,6 @@ impl CoseKeyEncode for CoseKey {
             }),
             #[cfg(feature = "secp256k1")]
             PublicKey::Ecdsa(ssi_crypto::key::EcdsaPublicKey::K256(key)) => {
-                use ssi_crypto::k256::elliptic_curve::sec1::ToEncodedPoint;
                 let encoded_point = key.to_encoded_point(false);
                 Ok(Self {
                     kty: KeyType::Assigned(iana::KeyType::EC2),
@@ -312,7 +311,6 @@ impl CoseKeyEncode for CoseKey {
             }
             #[cfg(feature = "secp256r1")]
             PublicKey::Ecdsa(ssi_crypto::key::EcdsaPublicKey::P256(key)) => {
-                use ssi_crypto::p256::elliptic_curve::sec1::ToEncodedPoint;
                 let encoded_point = key.to_encoded_point(false);
                 Ok(Self {
                     kty: KeyType::Assigned(iana::KeyType::EC2),
@@ -326,7 +324,6 @@ impl CoseKeyEncode for CoseKey {
             }
             #[cfg(feature = "secp384r1")]
             PublicKey::Ecdsa(ssi_crypto::key::EcdsaPublicKey::P384(key)) => {
-                use ssi_crypto::p384::elliptic_curve::sec1::ToEncodedPoint;
                 let encoded_point = key.to_encoded_point(false);
                 Ok(Self {
                     kty: KeyType::Assigned(iana::KeyType::EC2),
@@ -359,8 +356,7 @@ impl CoseKeyEncode for CoseKey {
             }
             #[cfg(feature = "secp256k1")]
             SecretKey::Ecdsa(ssi_crypto::key::EcdsaSecretKey::K256(key)) => {
-                use ssi_crypto::k256::elliptic_curve::sec1::ToEncodedPoint;
-                let public_key = key.public_key();
+                let public_key = *key.verifying_key();
                 let encoded_point = public_key.to_encoded_point(false);
                 Ok(Self {
                     kty: KeyType::Assigned(iana::KeyType::EC2),
@@ -375,8 +371,7 @@ impl CoseKeyEncode for CoseKey {
             }
             #[cfg(feature = "secp256r1")]
             SecretKey::Ecdsa(ssi_crypto::key::EcdsaSecretKey::P256(key)) => {
-                use ssi_crypto::p256::elliptic_curve::sec1::ToEncodedPoint;
-                let public_key = key.public_key();
+                let public_key = *key.verifying_key();
                 let encoded_point = public_key.to_encoded_point(false);
                 Ok(Self {
                     kty: KeyType::Assigned(iana::KeyType::EC2),
