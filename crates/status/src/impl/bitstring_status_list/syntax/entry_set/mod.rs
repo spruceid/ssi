@@ -18,7 +18,7 @@ pub const BITSTRING_STATUS_LIST_ENTRY_TYPE: &str = "BitstringStatusListEntry";
 /// Credential.
 ///
 /// See: <https://www.w3.org/TR/vc-bitstring-status-list/#bitstringstatuslistentry>
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(tag = "type", rename_all = "camelCase")]
 pub struct BitstringStatusListEntry {
     /// Optional identifier for the status list entry.

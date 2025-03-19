@@ -15,7 +15,7 @@ use crate::{Overflow, StatusMap, StatusSizeError};
 mod syntax;
 pub use syntax::*;
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct StatusMessage {
     #[serde(with = "prefixed_hexadecimal")]
     pub status: u8,
