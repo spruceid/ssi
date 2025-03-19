@@ -5,6 +5,7 @@
 //! # Usage
 //!
 //! ```
+//! # #[cfg(feature = "secp256r1")] {
 //! use ssi_crypto::{AlgorithmInstance, KeyType, key::EcdsaKeyType};
 //!
 //! /// Select a key type at run time.
@@ -31,6 +32,7 @@
 //! ).expect("verification failed");
 //!
 //! assert!(verification.is_ok());
+//! # }
 //! ```
 #[cfg(feature = "ed25519")]
 pub use ed25519_dalek as ed25519;
