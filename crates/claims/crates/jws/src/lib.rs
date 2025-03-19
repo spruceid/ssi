@@ -487,8 +487,8 @@ pub fn sign_bytes(algorithm: Algorithm, data: &[u8], key: &JWK) -> Result<Vec<u8
             rsa_params.validate_key_size()?;
             let key_pair = ring::signature::RsaKeyPair::try_from(rsa_params)?;
             let padding_alg: &dyn ring::signature::RsaEncoding = match algorithm {
-                Algorithm::RS256 => &ring::signature::RSA_PKCS1_SHA256,
-                Algorithm::PS256 => &ring::signature::RSA_PSS_SHA256,
+                Algorithm::Rs256 => &ring::signature::RSA_PKCS1_SHA256,
+                Algorithm::Ps256 => &ring::signature::RSA_PSS_SHA256,
                 _ => return Err(Error::AlgorithmNotImplemented(algorithm.to_string())),
             };
             let mut sig = vec![0u8; key_pair.public_modulus_len()];
