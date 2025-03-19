@@ -2,6 +2,9 @@ use std::sync::Arc;
 
 use crate::{key::KeyMetadata, AlgorithmInstance, Error};
 
+// Re-export.
+pub use signature;
+
 /// Issuer.
 ///
 /// Any object capable of providing a [`Signer`] for a given key.

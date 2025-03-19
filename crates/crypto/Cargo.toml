@@ -58,6 +58,7 @@ serde = { workspace = true, features = ["derive"] }
 sha2 = { workspace = true }
 sha3 = { workspace = true, optional = true }
 sha2_old = { package = "sha2", version = "0.8", optional = true }
+signature = "2.2.0"
 spki = { version = "0.7.3", features = ["alloc"], optional = true }
 static-iref.workspace = true
 thiserror.workspace = true
