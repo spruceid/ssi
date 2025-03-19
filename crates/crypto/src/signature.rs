@@ -87,7 +87,7 @@ impl<T: Signer> Signer for Arc<T> {
 /// Any object capable of directly signing a message with a given algorithm.
 pub trait SigningKey {
     /// Signs a message with the given algorithm.
-    fn sign_message(
+    fn sign_bytes(
         &self,
         algorithm: impl Into<AlgorithmInstance>,
         signing_bytes: &[u8],

@@ -1,7 +1,8 @@
+use rand::{CryptoRng, RngCore};
 use zeroize::ZeroizeOnDrop;
 
 use crate::{
-    key::{metadata::infer_algorithm, KeyMetadata},
+    key::{metadata::infer_algorithm, KeyGenerationFailed, KeyMetadata},
     AlgorithmInstance, Error, Options, PublicKey, SignatureVerification, Signer, SigningKey,
     Verifier, VerifyingKey,
 };
@@ -19,6 +20,7 @@ pub mod p384;
 
 /// Key type.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[non_exhaustive]
 pub enum EcdsaKeyType {
     K256,
     P256,
@@ -31,6 +33,34 @@ impl EcdsaKeyType {
             Self::K256 => "K-256",
             Self::P256 => "P-256",
             Self::P384 => "P-384",
+        }
+    }
+
+    pub fn from_name(name: &str) -> Option<Self> {
+        match name {
+            "K-256" => Some(Self::K256),
+            "P-256" => Some(Self::P256),
+            "P-384" => Some(Self::P384),
+            _ => None,
+        }
+    }
+
+    pub fn generate_from(
+        &self,
+        rng: &mut (impl RngCore + CryptoRng),
+    ) -> Result<EcdsaSecretKey, KeyGenerationFailed> {
+        match self {
+            #[cfg(feature = "secp256k1")]
+            Self::K256 => Ok(EcdsaSecretKey::generate_k256_from(rng)),
+
+            #[cfg(feature = "secp256r1")]
+            Self::P256 => Ok(EcdsaSecretKey::generate_p256_from(rng)),
+
+            #[cfg(feature = "secp384r1")]
+            Self::P384 => Ok(EcdsaSecretKey::generate_p384_from(rng)),
+
+            #[allow(unreachable_patterns)]
+            _ => Err(KeyGenerationFailed::UnsupportedType),
         }
     }
 
@@ -83,7 +113,7 @@ impl EcdsaPublicKey {
         signing_bytes: &[u8],
         signature: &[u8],
     ) -> Result<SignatureVerification, Error> {
-        VerifyingKey::verify_message(self, algorithm, signing_bytes, signature)
+        VerifyingKey::verify_bytes(self, algorithm, signing_bytes, signature)
     }
 }
 
@@ -102,7 +132,7 @@ impl VerifyingKey for EcdsaPublicKey {
         }
     }
 
-    fn verify_message(
+    fn verify_bytes(
         &self,
         algorithm: impl Into<AlgorithmInstance>,
         signing_bytes: &[u8],
@@ -110,13 +140,13 @@ impl VerifyingKey for EcdsaPublicKey {
     ) -> Result<SignatureVerification, Error> {
         match self {
             #[cfg(feature = "secp256r1")]
-            Self::P256(key) => key.verify_message(algorithm, signing_bytes, signature),
+            Self::P256(key) => key.verify_bytes(algorithm, signing_bytes, signature),
 
             #[cfg(feature = "secp384r1")]
-            Self::P384(key) => key.verify_message(algorithm, signing_bytes, signature),
+            Self::P384(key) => key.verify_bytes(algorithm, signing_bytes, signature),
 
             #[cfg(feature = "secp256k1")]
-            Self::K256(key) => key.verify_message(algorithm, signing_bytes, signature),
+            Self::K256(key) => key.verify_bytes(algorithm, signing_bytes, signature),
         }
     }
 }
@@ -143,7 +173,7 @@ impl Verifier for EcdsaPublicKey {
         let algorithm = infer_algorithm(algorithm, || None, || Some(KeyType::Ecdsa(self.r#type())))
             .ok_or(Error::AlgorithmMissing)?;
 
-        VerifyingKey::verify_message(self, algorithm, signing_bytes, signature)
+        VerifyingKey::verify_bytes(self, algorithm, signing_bytes, signature)
     }
 }
 
@@ -181,25 +211,25 @@ impl EcdsaSecretKey {
         algorithm: impl Into<AlgorithmInstance>,
         signing_bytes: &[u8],
     ) -> Result<Box<[u8]>, Error> {
-        SigningKey::sign_message(self, algorithm, signing_bytes)
+        SigningKey::sign_bytes(self, algorithm, signing_bytes)
     }
 }
 
 impl SigningKey for EcdsaSecretKey {
-    fn sign_message(
+    fn sign_bytes(
         &self,
         algorithm: impl Into<AlgorithmInstance>,
         signing_bytes: &[u8],
     ) -> Result<Box<[u8]>, Error> {
         match self {
             #[cfg(feature = "secp256r1")]
-            Self::P256(key) => key.sign_message(algorithm, signing_bytes),
+            Self::P256(key) => key.sign_bytes(algorithm, signing_bytes),
 
             #[cfg(feature = "secp384r1")]
-            Self::P384(key) => key.sign_message(algorithm, signing_bytes),
+            Self::P384(key) => key.sign_bytes(algorithm, signing_bytes),
 
             #[cfg(feature = "secp256k1")]
-            Self::K256(key) => key.sign_message(algorithm, signing_bytes),
+            Self::K256(key) => key.sign_bytes(algorithm, signing_bytes),
         }
     }
 }
@@ -214,6 +244,6 @@ impl Signer for EcdsaSecretKey {
         algorithm: AlgorithmInstance,
         signing_bytes: &[u8],
     ) -> Result<Box<[u8]>, Error> {
-        SigningKey::sign_message(self, algorithm, signing_bytes)
+        SigningKey::sign_bytes(self, algorithm, signing_bytes)
     }
 }

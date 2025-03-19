@@ -44,7 +44,7 @@ impl PublicKey {
             #[cfg(feature = "rsa")]
             Self::Rsa(k) => {
                 use ::rsa::traits::PublicKeyParts;
-                KeyType::Rsa(k.size())
+                KeyType::Rsa(crate::BitSize(k.n().bits()))
             }
 
             Self::Ecdsa(k) => KeyType::Ecdsa(k.r#type()),
@@ -59,7 +59,7 @@ impl PublicKey {
         signing_bytes: &[u8],
         signature: &[u8],
     ) -> Result<SignatureVerification, Error> {
-        VerifyingKey::verify_message(self, algorithm, signing_bytes, signature)
+        VerifyingKey::verify_bytes(self, algorithm, signing_bytes, signature)
     }
 }
 
@@ -72,7 +72,7 @@ impl VerifyingKey for PublicKey {
         }
     }
 
-    fn verify_message(
+    fn verify_bytes(
         &self,
         algorithm: impl Into<AlgorithmInstance>,
         signing_bytes: &[u8],
@@ -82,7 +82,7 @@ impl VerifyingKey for PublicKey {
             Self::Symmetric(_) => Err(Error::AlgorithmUnsupported(algorithm.into().algorithm())),
 
             #[cfg(feature = "rsa")]
-            Self::Rsa(key) => key.verify_message(algorithm, signing_bytes, signature),
+            Self::Rsa(key) => key.verify_bytes(algorithm, signing_bytes, signature),
 
             Self::Ecdsa(key) => key.verify_message(algorithm, signing_bytes, signature),
 
@@ -113,7 +113,7 @@ impl Verifier for PublicKey {
         let algorithm = infer_algorithm(algorithm, || None, || Some(self.r#type()))
             .ok_or(Error::AlgorithmMissing)?;
 
-        VerifyingKey::verify_message(self, algorithm, signing_bytes, signature)
+        VerifyingKey::verify_bytes(self, algorithm, signing_bytes, signature)
     }
 }
 
@@ -164,21 +164,21 @@ impl SecretKey {
         algorithm: impl Into<AlgorithmInstance>,
         signing_bytes: &[u8],
     ) -> Result<Box<[u8]>, Error> {
-        SigningKey::sign_message(self, algorithm, signing_bytes)
+        SigningKey::sign_bytes(self, algorithm, signing_bytes)
     }
 }
 
 impl SigningKey for SecretKey {
-    fn sign_message(
+    fn sign_bytes(
         &self,
         algorithm: impl Into<AlgorithmInstance>,
         signing_bytes: &[u8],
     ) -> Result<Box<[u8]>, Error> {
         match self {
-            Self::Symmetric(key) => key.sign_message(algorithm, signing_bytes),
+            Self::Symmetric(key) => key.sign_bytes(algorithm, signing_bytes),
 
             #[cfg(feature = "rsa")]
-            Self::Rsa(key) => key.sign_message(algorithm, signing_bytes),
+            Self::Rsa(key) => key.sign_bytes(algorithm, signing_bytes),
 
             Self::Ecdsa(key) => key.sign_message(algorithm, signing_bytes),
 
@@ -197,7 +197,7 @@ impl Signer for SecretKey {
         algorithm: AlgorithmInstance,
         signing_bytes: &[u8],
     ) -> Result<Box<[u8]>, Error> {
-        SigningKey::sign_message(self, algorithm, signing_bytes)
+        SigningKey::sign_bytes(self, algorithm, signing_bytes)
     }
 }
 
@@ -214,5 +214,10 @@ pub enum KeyConversionError {
 }
 
 #[derive(Debug, thiserror::Error)]
-#[error("key generation failed")]
-pub struct KeyGenerationFailed;
+pub enum KeyGenerationFailed {
+    #[error("unsupported key type")]
+    UnsupportedType,
+
+    #[error("invalid key parameters")]
+    InvalidParameters,
+}

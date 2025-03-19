@@ -393,17 +393,17 @@ algorithms! {
     /// ECDSA using P-256 and SHA-256.
     ///
     /// See: <https://www.rfc-editor.org/rfc/rfc7518.txt>
-    ES256: "ES256" (Sha256, EcDsa),
+    ES256: "ES256" (Sha256, Ecdsa),
 
     /// ECDSA using P-384 and SHA-384.
     ///
     /// See: <https://www.rfc-editor.org/rfc/rfc7518.txt>
-    ES384: "ES384" (Sha384, EcDsa),
+    ES384: "ES384" (Sha384, Ecdsa),
 
     /// ECDSA using secp256k1 (K-256) and SHA-256.
     ///
     /// See: <https://datatracker.ietf.org/doc/html/rfc8812>
-    ES256K: "ES256K" (Sha256, EcDsa),
+    ES256K: "ES256K" (Sha256, Ecdsa),
 
     /// ECDSA using secp256k1 (K-256) and SHA-256 with a recovery bit.
     ///
@@ -412,29 +412,29 @@ algorithms! {
     /// extract the public key from the signature.
     ///
     /// See: <https://github.com/decentralized-identity/EcdsaSecp256k1RecoverySignature2020#es256k-r>
-    ES256KR: "ES256K-R" (Sha256, EcDsa),
+    ES256KR: "ES256K-R" (Sha256, Ecdsa),
 
     /// ECDSA using secp256k1 (K-256) and Keccak-256.
     ///
     /// Like `ES256K` but using Keccak-256 instead of SHA-256.
-    ESKeccakK: "ESKeccakK" (Keccak256, EcDsa),
+    ESKeccakK: "ESKeccakK" (Keccak256, Ecdsa),
 
     /// ECDSA using secp256k1 (K-256) and Keccak-256 with a recovery bit.
     ///
     /// Like `ES256K-R` but using Keccak-256 instead of SHA-256.
-    ESKeccakKR: "ESKeccakKR" (Keccak256, EcDsa),
+    ESKeccakKR: "ESKeccakKR" (Keccak256, Ecdsa),
 
     /// ECDSA using P-256 and Blake2b.
-    ESBlake2b: "ESBlake2b" (Blake2b256, EcDsa),
+    ESBlake2b: "ESBlake2b" (Blake2b256, Ecdsa),
 
     /// ECDSA using secp256k1 (K-256) and Blake2b.
-    ESBlake2bK: "ESBlake2bK" (Blake2b256, EcDsa),
+    ESBlake2bK: "ESBlake2bK" (Blake2b256, Ecdsa),
 
     /// BBS scheme.
     Bbs(bbs::BbsInstance): "BBS" (Sha256, Bbs),
 
     #[doc(hidden)]
-    AleoTestnet1Signature: "AleoTestnet1Signature" (Sha256, EcDsa) // NOTE: those are fake value since we intend to drop support for it.
+    AleoTestnet1Signature: "AleoTestnet1Signature" (Sha256, Ecdsa) // NOTE: those are fake value since we intend to drop support for it.
 }
 
 impl Algorithm {
@@ -497,7 +497,7 @@ pub enum SignatureFunction {
     Bbs,
 
     /// ECDSA
-    EcDsa,
+    Ecdsa,
 
     /// EdDSA
     EdDsa,

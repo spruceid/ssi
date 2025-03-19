@@ -38,7 +38,7 @@ impl VerifyingKey for Ed25519PublicKey {
         }
     }
 
-    fn verify_message(
+    fn verify_bytes(
         &self,
         algorithm: impl Into<AlgorithmInstance>,
         signing_bytes: &[u8],
@@ -95,7 +95,7 @@ impl EdDsaSecretKey {
 }
 
 impl SigningKey for Ed25519SecretKey {
-    fn sign_message(
+    fn sign_bytes(
         &self,
         algorithm: impl Into<AlgorithmInstance>,
         signing_bytes: &[u8],

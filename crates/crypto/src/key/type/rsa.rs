@@ -1,13 +1,14 @@
 use crate::{
     hash,
-    key::{KeyConversionError, KeyMetadata},
-    AlgorithmInstance, Error, PublicKey, RejectedSignature, SigningKey, VerifyingKey,
+    key::{KeyConversionError, KeyGenerationFailed, KeyMetadata},
+    AlgorithmInstance, Error, PublicKey, RejectedSignature, SecretKey, SigningKey, VerifyingKey,
 };
+use rand::{CryptoRng, RngCore};
 use rsa::{pkcs1::DecodeRsaPublicKey, traits::PublicKeyParts};
 pub use rsa::{RsaPrivateKey as RsaSecretKey, RsaPublicKey};
 use sha2::Sha256;
 
-use super::KeyType;
+use super::{BitSize, KeyType};
 
 impl PublicKey {
     /// Deserializes an ASN.1 DER-encoded `RsaPublicKey` (binary format).
@@ -18,15 +19,26 @@ impl PublicKey {
     }
 }
 
+impl SecretKey {
+    pub fn generate_rsa_from(
+        len: BitSize,
+        rng: &mut (impl RngCore + CryptoRng),
+    ) -> Result<Self, KeyGenerationFailed> {
+        RsaSecretKey::new(rng, len.0)
+            .map(Self::Rsa)
+            .map_err(|_| KeyGenerationFailed::InvalidParameters)
+    }
+}
+
 impl VerifyingKey for RsaPublicKey {
     fn metadata(&self) -> KeyMetadata {
         KeyMetadata {
-            r#type: Some(KeyType::Rsa(self.size())),
+            r#type: Some(KeyType::Rsa(BitSize(self.n().bits()))),
             ..Default::default()
         }
     }
 
-    fn verify_message(
+    fn verify_bytes(
         &self,
         algorithm: impl Into<AlgorithmInstance>,
         signing_bytes: &[u8],
@@ -56,7 +68,7 @@ impl VerifyingKey for RsaPublicKey {
 }
 
 impl SigningKey for RsaSecretKey {
-    fn sign_message(
+    fn sign_bytes(
         &self,
         algorithm: impl Into<AlgorithmInstance>,
         signing_bytes: &[u8],

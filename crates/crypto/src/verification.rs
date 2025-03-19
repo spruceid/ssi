@@ -59,7 +59,7 @@ pub trait Verifier {
     ) -> Result<SignatureVerification, Error> {
         let key = self.require_verifying_key_with(key_id, options).await?;
         let (_, algorithm) = key.metadata().into_id_and_algorithm(algorithm)?;
-        key.verify_message(algorithm, signing_bytes, signature)
+        key.verify_bytes(algorithm, signing_bytes, signature)
     }
 
     /// Verifies a signature against the given message, using a specific key and
@@ -110,7 +110,7 @@ pub trait VerifyingKey {
     fn metadata(&self) -> KeyMetadata;
 
     /// Verifies a message signed with the given algorithm.
-    fn verify_message(
+    fn verify_bytes(
         &self,
         algorithm: impl Into<AlgorithmInstance>,
         signing_bytes: &[u8],

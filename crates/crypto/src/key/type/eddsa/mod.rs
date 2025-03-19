@@ -1,7 +1,8 @@
+use rand::{CryptoRng, RngCore};
 use zeroize::ZeroizeOnDrop;
 
 use crate::{
-    key::{metadata::infer_algorithm, KeyMetadata},
+    key::{metadata::infer_algorithm, KeyGenerationFailed, KeyMetadata},
     AlgorithmInstance, Error, Options, SignatureVerification, Signer, SigningKey, Verifier,
     VerifyingKey,
 };
@@ -21,6 +22,26 @@ impl EdDsaKeyType {
     pub fn name(&self) -> &'static str {
         match self {
             Self::Curve25519 => "Ed25519",
+        }
+    }
+
+    pub fn from_name(name: &str) -> Option<Self> {
+        match name {
+            "Ed25519" => Some(Self::Curve25519),
+            _ => None,
+        }
+    }
+
+    pub fn generate_from(
+        &self,
+        rng: &mut (impl RngCore + CryptoRng),
+    ) -> Result<EdDsaSecretKey, KeyGenerationFailed> {
+        match self {
+            #[cfg(feature = "ed25519")]
+            Self::Curve25519 => Ok(EdDsaSecretKey::generate_ed25519_from(rng)),
+
+            #[allow(unreachable_patterns)]
+            _ => Err(KeyGenerationFailed::UnsupportedType),
         }
     }
 
@@ -52,7 +73,7 @@ impl EdDsaPublicKey {
         signing_bytes: &[u8],
         signature: &[u8],
     ) -> Result<SignatureVerification, Error> {
-        VerifyingKey::verify_message(self, algorithm, signing_bytes, signature)
+        VerifyingKey::verify_bytes(self, algorithm, signing_bytes, signature)
     }
 }
 
@@ -65,7 +86,7 @@ impl VerifyingKey for EdDsaPublicKey {
         }
     }
 
-    fn verify_message(
+    fn verify_bytes(
         &self,
         algorithm: impl Into<AlgorithmInstance>,
         signing_bytes: &[u8],
@@ -73,7 +94,7 @@ impl VerifyingKey for EdDsaPublicKey {
     ) -> Result<SignatureVerification, Error> {
         match self {
             #[cfg(feature = "ed25519")]
-            Self::Curve25519(key) => key.verify_message(algorithm, signing_bytes, signature),
+            Self::Curve25519(key) => key.verify_bytes(algorithm, signing_bytes, signature),
         }
     }
 }
@@ -100,7 +121,7 @@ impl Verifier for EdDsaPublicKey {
         let algorithm = infer_algorithm(algorithm, || None, || Some(KeyType::EdDsa(self.r#type())))
             .ok_or(Error::AlgorithmMissing)?;
 
-        VerifyingKey::verify_message(self, algorithm, signing_bytes, signature)
+        VerifyingKey::verify_bytes(self, algorithm, signing_bytes, signature)
     }
 }
 
@@ -125,19 +146,19 @@ impl EdDsaSecretKey {
         algorithm: impl Into<AlgorithmInstance>,
         signing_bytes: &[u8],
     ) -> Result<Box<[u8]>, Error> {
-        SigningKey::sign_message(self, algorithm, signing_bytes)
+        SigningKey::sign_bytes(self, algorithm, signing_bytes)
     }
 }
 
 impl SigningKey for EdDsaSecretKey {
-    fn sign_message(
+    fn sign_bytes(
         &self,
         algorithm: impl Into<AlgorithmInstance>,
         signing_bytes: &[u8],
     ) -> Result<Box<[u8]>, Error> {
         match self {
             #[cfg(feature = "ed25519")]
-            Self::Curve25519(key) => key.sign_message(algorithm, signing_bytes),
+            Self::Curve25519(key) => key.sign_bytes(algorithm, signing_bytes),
         }
     }
 }
@@ -152,6 +173,6 @@ impl Signer for EdDsaSecretKey {
         algorithm: AlgorithmInstance,
         signing_bytes: &[u8],
     ) -> Result<Box<[u8]>, Error> {
-        SigningKey::sign_message(self, algorithm, signing_bytes)
+        SigningKey::sign_bytes(self, algorithm, signing_bytes)
     }
 }

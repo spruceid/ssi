@@ -1,9 +1,11 @@
 use std::ops::Deref;
 
+use rand::{rngs::OsRng, CryptoRng, RngCore};
 use zeroize::ZeroizeOnDrop;
 
 use crate::{
-    key::KeyMetadata, AlgorithmInstance, Error, SignatureVerification, SigningKey, VerifyingKey,
+    key::KeyMetadata, AlgorithmInstance, Error, SecretKey, SignatureVerification, SigningKey,
+    VerifyingKey,
 };
 
 use super::KeyType;
@@ -14,6 +16,60 @@ pub struct SymmetricKey(Box<[u8]>);
 impl SymmetricKey {
     pub fn new(value: Box<[u8]>) -> Self {
         Self(value)
+    }
+
+    /// Generates a new symmetric key of specified byte length.
+    ///
+    /// # Examples
+    /// ```
+    /// let key = ssi_crypto::key::SymmetricKey::generate_with(32); // Generate a 256-bit key
+    /// ```
+    pub fn generate(len: usize) -> Self {
+        Self::generate_from(len, &mut OsRng)
+    }
+
+    /// Generates a new symmetric key of specified byte length using the
+    /// provided cryptographic random number generator.
+    ///
+    /// # Examples
+    /// ```
+    /// use rand::rngs::OsRng;
+    ///
+    /// let key = ssi_crypto::key::SymmetricKey::generate_from(32, &mut OsRng); // Generate a 256-bit key
+    /// ```
+    pub fn generate_from(len: usize, rng: &mut (impl RngCore + CryptoRng)) -> Self {
+        let mut bytes = vec![0; len];
+        rng.fill_bytes(bytes.as_mut_slice());
+        Self::new(bytes.into_boxed_slice())
+    }
+}
+
+impl SecretKey {
+    pub fn new_symmetric(value: Box<[u8]>) -> Self {
+        Self::Symmetric(SymmetricKey::new(value))
+    }
+
+    /// Generates a new symmetric key of specified byte length.
+    ///
+    /// # Examples
+    /// ```
+    /// let key = ssi_crypto::SecretKey::generate_symmetric(32); // Generate a 256-bit key
+    /// ```
+    pub fn generate_symmetric(len: usize) -> Self {
+        Self::Symmetric(SymmetricKey::generate(len))
+    }
+
+    /// Generates a new symmetric key of specified byte length using the
+    /// provided cryptographic random number generator.
+    ///
+    /// # Examples
+    /// ```
+    /// use rand::rngs::OsRng;
+    ///
+    /// let key = ssi_crypto::SecretKey::generate_symmetric_from(32, &mut OsRng); // Generate a 256-bit key
+    /// ```
+    pub fn generate_symmetric_from(len: usize, rng: &mut (impl RngCore + CryptoRng)) -> Self {
+        Self::Symmetric(SymmetricKey::generate_from(len, rng))
     }
 }
 
@@ -38,7 +94,7 @@ impl From<Vec<u8>> for SymmetricKey {
 }
 
 impl SigningKey for SymmetricKey {
-    fn sign_message(
+    fn sign_bytes(
         &self,
         algorithm: impl Into<AlgorithmInstance>,
         _signing_bytes: &[u8],
@@ -66,7 +122,7 @@ impl VerifyingKey for SymmetricKey {
         }
     }
 
-    fn verify_message(
+    fn verify_bytes(
         &self,
         algorithm: impl Into<AlgorithmInstance>,
         _signing_bytes: &[u8],

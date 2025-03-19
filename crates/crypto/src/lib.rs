@@ -19,6 +19,7 @@ pub mod hash;
 pub mod key;
 mod options;
 pub mod signature;
+mod utils;
 mod verification;
 
 pub use algorithm::{Algorithm, AlgorithmError, AlgorithmInstance, UnsupportedAlgorithm};
@@ -26,6 +27,7 @@ pub use hash::HashFunction;
 pub use key::{KeyType, PublicKey, SecretKey};
 pub use options::*;
 pub use signature::{Issuer, Signer, SigningKey};
+pub use utils::*;
 pub use verification::*;
 
 /// Signature or verification error.

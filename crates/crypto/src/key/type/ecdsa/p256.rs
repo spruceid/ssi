@@ -55,7 +55,7 @@ impl VerifyingKey for P256PublicKey {
         }
     }
 
-    fn verify_message(
+    fn verify_bytes(
         &self,
         algorithm: impl Into<AlgorithmInstance>,
         signing_bytes: &[u8],
@@ -110,7 +110,7 @@ impl EcdsaSecretKey {
 }
 
 impl SigningKey for P256SecretKey {
-    fn sign_message(
+    fn sign_bytes(
         &self,
         algorithm: impl Into<AlgorithmInstance>,
         signing_bytes: &[u8],
