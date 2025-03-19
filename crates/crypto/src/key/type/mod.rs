@@ -102,8 +102,8 @@ impl KeyType {
 
     pub fn default_algorithm_params(&self) -> Option<AlgorithmInstance> {
         match self {
-            Self::Symmetric(_) => Some(AlgorithmInstance::HS256),
-            Self::Rsa(_) => Some(AlgorithmInstance::RS256),
+            Self::Symmetric(_) => Some(AlgorithmInstance::Hs256),
+            Self::Rsa(_) => Some(AlgorithmInstance::Rs256),
             Self::EdDsa(t) => Some(t.default_algorithm_params()),
             Self::Ecdsa(t) => Some(t.default_algorithm_params()),
         }

@@ -377,7 +377,7 @@ impl JWK {
         }
         match &self.params {
             Params::RSA(_) => {
-                return Some(Algorithm::PS256);
+                return Some(Algorithm::Ps256);
             }
             Params::OKP(okp_params) if okp_params.curve == "Ed25519" => {
                 return Some(Algorithm::EdDsa);
@@ -393,13 +393,13 @@ impl JWK {
                 };
                 match &curve[..] {
                     "secp256k1" => {
-                        return Some(Algorithm::ES256K);
+                        return Some(Algorithm::Es256K);
                     }
                     "P-256" => {
-                        return Some(Algorithm::ES256);
+                        return Some(Algorithm::Es256);
                     }
                     "P-384" => {
-                        return Some(Algorithm::ES384);
+                        return Some(Algorithm::Es384);
                     }
                     _ => {}
                 }

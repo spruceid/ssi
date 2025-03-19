@@ -78,9 +78,9 @@ impl EcdsaKeyType {
 
     pub fn default_algorithm_params(&self) -> AlgorithmInstance {
         match self {
-            Self::K256 => AlgorithmInstance::ES256K,
-            Self::P256 => AlgorithmInstance::ES256,
-            Self::P384 => AlgorithmInstance::ES384,
+            Self::K256 => AlgorithmInstance::Es256K,
+            Self::P256 => AlgorithmInstance::Es256,
+            Self::P384 => AlgorithmInstance::Es384,
         }
     }
 }

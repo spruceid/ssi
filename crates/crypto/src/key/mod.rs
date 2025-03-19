@@ -60,7 +60,7 @@ impl PublicKey {
         }
     }
 
-    pub fn verify_message(
+    pub fn verify_bytes(
         &self,
         algorithm: impl Into<AlgorithmInstance>,
         signing_bytes: &[u8],
@@ -171,7 +171,7 @@ impl SecretKey {
         }
     }
 
-    pub fn sign_message(
+    pub fn sign_bytes(
         &self,
         algorithm: impl Into<AlgorithmInstance>,
         signing_bytes: &[u8],

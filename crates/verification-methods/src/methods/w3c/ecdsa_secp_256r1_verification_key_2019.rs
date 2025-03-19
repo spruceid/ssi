@@ -117,7 +117,7 @@ impl EcdsaSecp256r1VerificationKey2019 {
                 Ok(signature.to_bytes().to_vec())
             }
             SecretKeyRef::Jwk(secret_key) => {
-                let algorithm = ssi_jwk::Algorithm::ES256;
+                let algorithm = ssi_jwk::Algorithm::Es256;
                 let key_algorithm = secret_key.algorithm.unwrap_or(algorithm);
                 if !algorithm.is_compatible_with(key_algorithm) {
                     return Err(MessageSignatureError::InvalidSecretKey);
@@ -186,10 +186,10 @@ impl JwkVerificationMethod for EcdsaSecp256r1VerificationKey2019 {
     }
 }
 
-impl VerifyBytes<ssi_crypto::algorithm::ES256> for EcdsaSecp256r1VerificationKey2019 {
+impl VerifyBytes<ssi_crypto::algorithm::Es256> for EcdsaSecp256r1VerificationKey2019 {
     fn verify_bytes(
         &self,
-        _: ssi_crypto::algorithm::ES256,
+        _: ssi_crypto::algorithm::Es256,
         signing_bytes: &[u8],
         signature: &[u8],
     ) -> Result<ProofValidity, ProofValidationError> {

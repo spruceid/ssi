@@ -46,7 +46,7 @@ impl VerifyingKey for RsaPublicKey {
     ) -> Result<crate::SignatureVerification, crate::Error> {
         use rsa::signature::Verifier;
         match algorithm.into() {
-            AlgorithmInstance::RS256 => {
+            AlgorithmInstance::Rs256 => {
                 let key = rsa::pkcs1v15::VerifyingKey::<Sha256>::new(self.clone());
                 let signature = rsa::pkcs1v15::Signature::try_from(signature)
                     .map_err(|_| Error::SignatureMalformed)?;
@@ -54,7 +54,7 @@ impl VerifyingKey for RsaPublicKey {
                     .verify(signing_bytes, &signature)
                     .map_err(|_| RejectedSignature::Mismatch))
             }
-            AlgorithmInstance::PS256 => {
+            AlgorithmInstance::Ps256 => {
                 let key = rsa::pss::VerifyingKey::<Sha256>::new(self.clone());
                 let signature = rsa::pss::Signature::try_from(signature)
                     .map_err(|_| Error::SignatureMalformed)?;
@@ -74,14 +74,14 @@ impl SigningKey for RsaSecretKey {
         signing_bytes: &[u8],
     ) -> Result<Box<[u8]>, Error> {
         match algorithm.into() {
-            AlgorithmInstance::RS256 => {
+            AlgorithmInstance::Rs256 => {
                 let padding = rsa::Pkcs1v15Sign::new::<Sha256>();
                 let digest_in = hash::sha256(signing_bytes);
                 self.sign(padding, &digest_in)
                     .map(Vec::into_boxed_slice)
                     .map_err(Error::internal)
             }
-            AlgorithmInstance::PS256 => {
+            AlgorithmInstance::Ps256 => {
                 let mut rng = rand::rngs::OsRng {};
                 let padding = rsa::Pss::new_with_salt::<Sha256>(32);
                 let digest_in = hash::sha256(signing_bytes);
@@ -115,11 +115,11 @@ mod tests {
 
     #[test]
     fn rs256_roundtrip() {
-        roundtrip(AlgorithmInstance::RS256);
+        roundtrip(AlgorithmInstance::Rs256);
     }
 
     #[test]
     fn ps256_roundtrip() {
-        roundtrip(AlgorithmInstance::PS256);
+        roundtrip(AlgorithmInstance::Ps256);
     }
 }

@@ -129,7 +129,7 @@ pub fn verify_bytes(
     let public_key = key.decode_public()?;
 
     public_key
-        .verify_message(instance, signing_bytes, signature_bytes)
+        .verify_bytes(instance, signing_bytes, signature_bytes)
         .map(|r| r.is_ok())
         .map_err(Into::into)
 }

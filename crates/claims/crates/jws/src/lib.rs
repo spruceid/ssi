@@ -503,14 +503,14 @@ pub fn sign_bytes(algorithm: Algorithm, data: &[u8], key: &JWK) -> Result<Vec<u8
             // let padding;
             // let hashed;
             match algorithm {
-                Algorithm::RS256 => {
+                Algorithm::Rs256 => {
                     let padding = rsa::Pkcs1v15Sign::new::<ssi_crypto::sha2::Sha256>();
                     let digest_in = ssi_crypto::hash::sha256(data);
                     private_key
                         .sign(padding, &digest_in)
                         .map_err(ssi_jwk::Error::from)?
                 }
-                Algorithm::PS256 => {
+                Algorithm::Ps256 => {
                     let mut rng = rand::rngs::OsRng {};
                     let padding = rsa::Pss::new_with_salt::<ssi_crypto::sha2::Sha256>(32);
                     let digest_in = ssi_crypto::hash::sha256(data);
@@ -552,7 +552,7 @@ pub fn sign_bytes(algorithm: Algorithm, data: &[u8], key: &JWK) -> Result<Vec<u8
         #[allow(unused)]
         JWKParams::EC(ec) => match algorithm {
             #[cfg(feature = "secp384r1")]
-            Algorithm::ES384 => {
+            Algorithm::Es384 => {
                 use p384::ecdsa::{signature::Signer, Signature};
                 let curve = ec.curve.as_ref().ok_or(ssi_jwk::Error::MissingCurve)?;
                 let secret_key = p384::SecretKey::try_from(ec)?;
@@ -562,7 +562,7 @@ pub fn sign_bytes(algorithm: Algorithm, data: &[u8], key: &JWK) -> Result<Vec<u8
                 sig.to_bytes().to_vec()
             }
             #[cfg(feature = "secp256r1")]
-            Algorithm::ES256 => {
+            Algorithm::Es256 => {
                 use p256::ecdsa::{signature::Signer, Signature};
                 let curve = ec.curve.as_ref().ok_or(ssi_jwk::Error::MissingCurve)?;
                 let secret_key = p256::SecretKey::try_from(ec)?;
@@ -572,7 +572,7 @@ pub fn sign_bytes(algorithm: Algorithm, data: &[u8], key: &JWK) -> Result<Vec<u8
                 sig.to_bytes().to_vec()
             }
             #[cfg(feature = "secp256k1")]
-            Algorithm::ES256K => {
+            Algorithm::Es256K => {
                 use k256::ecdsa::{signature::Signer, Signature};
                 let curve = ec.curve.as_ref().ok_or(ssi_jwk::Error::MissingCurve)?;
                 let secret_key = k256::SecretKey::try_from(ec)?;
@@ -581,7 +581,7 @@ pub fn sign_bytes(algorithm: Algorithm, data: &[u8], key: &JWK) -> Result<Vec<u8
                 sig.to_bytes().to_vec()
             }
             #[cfg(feature = "secp256k1")]
-            Algorithm::ES256KR => {
+            Algorithm::Es256KR => {
                 use k256::ecdsa::{
                     signature::{digest::Digest, Signer},
                     Signature,
@@ -599,7 +599,7 @@ pub fn sign_bytes(algorithm: Algorithm, data: &[u8], key: &JWK) -> Result<Vec<u8
                 res
             }
             #[cfg(feature = "secp256k1")]
-            Algorithm::ESKeccakKR => {
+            Algorithm::EsKeccakKR => {
                 use k256::ecdsa::{
                     signature::{digest::Digest, Signer},
                     Signature,
@@ -618,7 +618,7 @@ pub fn sign_bytes(algorithm: Algorithm, data: &[u8], key: &JWK) -> Result<Vec<u8
                 res
             }
             #[cfg(feature = "secp256r1")]
-            Algorithm::ESBlake2b => {
+            Algorithm::EsBlake2b => {
                 use p256::ecdsa::{
                     signature::{
                         digest::{consts::U32, Digest},
@@ -634,7 +634,7 @@ pub fn sign_bytes(algorithm: Algorithm, data: &[u8], key: &JWK) -> Result<Vec<u8
                 sig.to_bytes().to_vec()
             }
             #[cfg(feature = "secp256k1")]
-            Algorithm::ESBlake2bK => {
+            Algorithm::EsBlake2bK => {
                 use k256::ecdsa::{
                     signature::{
                         digest::{consts::U32, Digest},
@@ -680,9 +680,9 @@ pub fn verify_bytes_warnable(
     if let Some(key_algorithm) = key.algorithm {
         if key_algorithm != algorithm
             && !(key_algorithm == Algorithm::EdDsa && algorithm == Algorithm::EdBlake2b)
-            && !(key_algorithm == Algorithm::ES256 && algorithm == Algorithm::ESBlake2b)
-            && !(key_algorithm == Algorithm::ES256K && algorithm == Algorithm::ESBlake2bK)
-            && !(key_algorithm == Algorithm::ES256KR && algorithm == Algorithm::ESBlake2bK)
+            && !(key_algorithm == Algorithm::Es256 && algorithm == Algorithm::EsBlake2b)
+            && !(key_algorithm == Algorithm::Es256K && algorithm == Algorithm::EsBlake2bK)
+            && !(key_algorithm == Algorithm::Es256KR && algorithm == Algorithm::EsBlake2bK)
         {
             return Err(Error::AlgorithmMismatch);
         }
@@ -694,8 +694,8 @@ pub fn verify_bytes_warnable(
             use ring::signature::RsaPublicKeyComponents;
             let public_key = RsaPublicKeyComponents::try_from(rsa_params)?;
             let parameters = match algorithm {
-                Algorithm::RS256 => &ring::signature::RSA_PKCS1_2048_8192_SHA256,
-                Algorithm::PS256 => &ring::signature::RSA_PSS_2048_8192_SHA256,
+                Algorithm::Rs256 => &ring::signature::RSA_PKCS1_2048_8192_SHA256,
+                Algorithm::Ps256 => &ring::signature::RSA_PSS_2048_8192_SHA256,
                 _ => return Err(Error::AlgorithmNotImplemented(algorithm.to_string())),
             };
             public_key.verify(parameters, data, signature)?
@@ -705,11 +705,11 @@ pub fn verify_bytes_warnable(
             rsa_params.validate_key_size()?;
             let public_key = rsa::RsaPublicKey::try_from(rsa_params)?;
             match algorithm {
-                Algorithm::RS256 => {
+                Algorithm::Rs256 => {
                     let key = rsa::pkcs1v15::VerifyingKey::<sha2::Sha256>::new(public_key);
                     rsa::pkcs1v15::Signature::try_from(signature).map_err(ssi_jwk::Error::from)?;
                 }
-                Algorithm::PS256 => {
+                Algorithm::Ps256 => {
                     let key = rsa::pss::VerifyingKey::<sha2::Sha256>::new(public_key);
                     rsa::pkcs1v15::Signature::try_from(signature).map_err(ssi_jwk::Error::from)?;
                 }
@@ -750,7 +750,7 @@ pub fn verify_bytes_warnable(
         #[allow(unused)]
         JWKParams::EC(ec) => match algorithm {
             #[cfg(feature = "secp256r1")]
-            Algorithm::ES256 => {
+            Algorithm::Es256 => {
                 use p256::ecdsa::signature::Verifier;
                 let curve = ec.curve.as_ref().ok_or(ssi_jwk::Error::MissingCurve)?;
                 let public_key = p256::PublicKey::try_from(ec)?;
@@ -762,7 +762,7 @@ pub fn verify_bytes_warnable(
                     .map_err(ssi_jwk::Error::from)?;
             }
             #[cfg(feature = "secp256k1")]
-            Algorithm::ES256K => {
+            Algorithm::Es256K => {
                 use k256::ecdsa::signature::Verifier;
                 let curve = ec.curve.as_ref().ok_or(ssi_jwk::Error::MissingCurve)?;
                 let public_key = k256::PublicKey::try_from(ec)?;
@@ -785,7 +785,7 @@ pub fn verify_bytes_warnable(
                     .map_err(ssi_jwk::Error::from)?;
             }
             #[cfg(feature = "secp256k1")]
-            Algorithm::ES256KR => {
+            Algorithm::Es256KR => {
                 use k256::ecdsa::{
                     signature::{
                         digest::{consts::U32, Digest},
@@ -810,7 +810,7 @@ pub fn verify_bytes_warnable(
                 ) {
                     Err(_e) => {
                         // Legacy mode: allow using Keccak-256 instead of SHA-256
-                        verify_bytes(Algorithm::ESKeccakKR, data, key, signature)?;
+                        verify_bytes(Algorithm::EsKeccakKR, data, key, signature)?;
                         warnings.push(
                             "Signature uses legacy mode ES256K-R with Keccak-256".to_string(),
                         );
@@ -822,7 +822,7 @@ pub fn verify_bytes_warnable(
                 }
             }
             #[cfg(feature = "eip")]
-            Algorithm::ESKeccakKR => {
+            Algorithm::EsKeccakKR => {
                 use k256::ecdsa::{
                     signature::{
                         digest::{consts::U32, Digest},
@@ -852,7 +852,7 @@ pub fn verify_bytes_warnable(
                 }
             }
             #[cfg(feature = "secp256r1")]
-            Algorithm::ESBlake2b => {
+            Algorithm::EsBlake2b => {
                 use p256::ecdsa::{
                     signature::{
                         digest::{consts::U32, Digest},
@@ -873,7 +873,7 @@ pub fn verify_bytes_warnable(
                     .map_err(ssi_jwk::Error::from)?;
             }
             #[cfg(feature = "secp256k1")]
-            Algorithm::ESBlake2bK => {
+            Algorithm::EsBlake2bK => {
                 use k256::ecdsa::signature::{
                     digest::{consts::U32, Digest},
                     DigestVerifier,
@@ -891,7 +891,7 @@ pub fn verify_bytes_warnable(
                     .map_err(ssi_jwk::Error::from)?;
             }
             #[cfg(feature = "secp384r1")]
-            Algorithm::ES384 => {
+            Algorithm::Es384 => {
                 use p384::ecdsa::signature::Verifier;
                 let curve = ec.curve.as_ref().ok_or(ssi_jwk::Error::MissingCurve)?;
                 let public_key = p384::PublicKey::try_from(ec)?;
@@ -930,7 +930,7 @@ pub fn verify_bytes(
 pub fn recover(algorithm: Algorithm, data: &[u8], signature: &[u8]) -> Result<JWK, Error> {
     match algorithm {
         #[cfg(feature = "secp256k1")]
-        Algorithm::ES256KR => {
+        Algorithm::Es256KR => {
             use k256::ecdsa::VerifyingKey;
             if signature.len() != 65 {
                 Err(k256::ecdsa::Error::new())?;
@@ -961,7 +961,7 @@ pub fn recover(algorithm: Algorithm, data: &[u8], signature: &[u8]) -> Result<JW
             Ok(jwk)
         }
         #[cfg(feature = "secp256k1")]
-        Algorithm::ESKeccakKR => {
+        Algorithm::EsKeccakKR => {
             use k256::ecdsa::{signature::digest::Digest, VerifyingKey};
             if signature.len() != 65 {
                 Err(k256::ecdsa::Error::new())?;
@@ -1146,10 +1146,10 @@ pub fn detached_recover_legacy_keccak_es256kr(
     let (mut jws, signing_bytes) =
         decode_jws_parts(header_b64, payload_enc, signature_b64)?.into_jws_and_signing_bytes();
     // Allow ESKeccakK-R misimplementation of ES256K-R, for legacy reasons.
-    if jws.header.algorithm != Algorithm::ES256KR {
+    if jws.header.algorithm != Algorithm::Es256KR {
         return Err(Error::AlgorithmMismatch);
     }
-    jws.header.algorithm = Algorithm::ESKeccakKR;
+    jws.header.algorithm = Algorithm::EsKeccakKR;
     let key = recover(
         jws.header.algorithm,
         &signing_bytes,
@@ -1203,7 +1203,7 @@ mod tests {
         .unwrap();
 
         // https://tools.ietf.org/html/rfc7515#page-43
-        let jws = encode_sign(Algorithm::RS256, payload, &key).unwrap();
+        let jws = encode_sign(Algorithm::Rs256, payload, &key).unwrap();
         assert_eq!(jws, "eyJhbGciOiJSUzI1NiJ9.eyJpc3MiOiJqb2UiLA0KICJleHAiOjEzMDA4MTkzODAsDQogImh0dHA6Ly9leGFtcGxlLmNvbS9pc19yb290Ijp0cnVlfQ.cC4hiUPoj9Eetdgtv3hF80EGrhuB__dzERat0XF9g2VtQgr9PJbu3XOiZj5RZmh7AAuHIm4Bh-0Qc_lF5YKt_O8W2Fp5jujGbds9uJdbF9CUAr7t1dnZcAcQjbKBYNX4BAynRFdiuB--f_nZLgrnbyTyWzO75vRK5h6xBArLIARNPvkSjtQBMHlb1L07Qe7K0GarZRmB_eSN9383LcOLn6_dO--xi12jzDwusC-eOkHWEsqtFZESc6BfI7noOPqvhJ1phCnvWh6IeYI2w9QOYEUipUTI8np6LbgGY9Fs98rqVt5AXLIhWkWywlVmtVrBp0igcN_IoypGlUPQGe77Rw");
 
         decode_verify(&jws, &key).unwrap();
@@ -1215,26 +1215,26 @@ mod tests {
         let key = JWK::generate_secp256k1();
         let data = b"asdf";
         let bad_data = b"no";
-        let sig = sign_bytes(Algorithm::ES256K, data, &key).unwrap();
-        verify_bytes(Algorithm::ES256K, data, &key, &sig).unwrap();
-        verify_bytes(Algorithm::ES256K, bad_data, &key, &sig).unwrap_err();
+        let sig = sign_bytes(Algorithm::Es256K, data, &key).unwrap();
+        verify_bytes(Algorithm::Es256K, data, &key, &sig).unwrap();
+        verify_bytes(Algorithm::Es256K, bad_data, &key, &sig).unwrap_err();
 
         // ES256K-R
         let key = JWK {
-            algorithm: Some(Algorithm::ES256KR),
+            algorithm: Some(Algorithm::Es256KR),
             ..key
         };
-        verify_bytes(Algorithm::ES256KR, data, &key, &sig).unwrap_err();
-        verify_bytes(Algorithm::ES256KR, bad_data, &key, &sig).unwrap_err();
+        verify_bytes(Algorithm::Es256KR, data, &key, &sig).unwrap_err();
+        verify_bytes(Algorithm::Es256KR, bad_data, &key, &sig).unwrap_err();
 
         // Test recovery
-        let sig = sign_bytes(Algorithm::ES256KR, data, &key).unwrap();
-        verify_bytes(Algorithm::ES256KR, data, &key, &sig).unwrap();
-        verify_bytes(Algorithm::ES256KR, bad_data, &key, &sig).unwrap_err();
-        let recovered_key = recover(Algorithm::ES256KR, data, &sig).unwrap();
-        verify_bytes(Algorithm::ES256KR, data, &recovered_key, &sig).unwrap();
+        let sig = sign_bytes(Algorithm::Es256KR, data, &key).unwrap();
+        verify_bytes(Algorithm::Es256KR, data, &key, &sig).unwrap();
+        verify_bytes(Algorithm::Es256KR, bad_data, &key, &sig).unwrap_err();
+        let recovered_key = recover(Algorithm::Es256KR, data, &sig).unwrap();
+        verify_bytes(Algorithm::Es256KR, data, &recovered_key, &sig).unwrap();
         let other_key = JWK::generate_secp256k1();
-        verify_bytes(Algorithm::ES256KR, data, &other_key, &sig).unwrap_err();
+        verify_bytes(Algorithm::Es256KR, data, &other_key, &sig).unwrap_err();
     }
 
     #[test]
@@ -1245,23 +1245,23 @@ mod tests {
         let bad_data = b"no";
         // ESKeccakK-R
         let key = JWK {
-            algorithm: Some(Algorithm::ESKeccakKR),
+            algorithm: Some(Algorithm::EsKeccakKR),
             ..key
         };
 
-        let sig = sign_bytes(Algorithm::ES256KR, data, &key).unwrap();
+        let sig = sign_bytes(Algorithm::Es256KR, data, &key).unwrap();
         let other_key = JWK::generate_secp256k1();
         // TODO check the error type
-        verify_bytes(Algorithm::ESKeccakKR, data, &key, &sig).unwrap_err();
-        verify_bytes(Algorithm::ESKeccakKR, bad_data, &key, &sig).unwrap_err();
+        verify_bytes(Algorithm::EsKeccakKR, data, &key, &sig).unwrap_err();
+        verify_bytes(Algorithm::EsKeccakKR, bad_data, &key, &sig).unwrap_err();
 
         // Test recovery (ESKeccakK-R)
-        let sig = sign_bytes(Algorithm::ESKeccakKR, data, &key).unwrap();
-        verify_bytes(Algorithm::ESKeccakKR, data, &key, &sig).unwrap();
-        verify_bytes(Algorithm::ESKeccakKR, bad_data, &key, &sig).unwrap_err();
-        let recovered_key = recover(Algorithm::ESKeccakKR, data, &sig).unwrap();
-        verify_bytes(Algorithm::ESKeccakKR, data, &recovered_key, &sig).unwrap();
-        verify_bytes(Algorithm::ESKeccakKR, data, &other_key, &sig).unwrap_err();
+        let sig = sign_bytes(Algorithm::EsKeccakKR, data, &key).unwrap();
+        verify_bytes(Algorithm::EsKeccakKR, data, &key, &sig).unwrap();
+        verify_bytes(Algorithm::EsKeccakKR, bad_data, &key, &sig).unwrap_err();
+        let recovered_key = recover(Algorithm::EsKeccakKR, data, &sig).unwrap();
+        verify_bytes(Algorithm::EsKeccakKR, data, &recovered_key, &sig).unwrap();
+        verify_bytes(Algorithm::EsKeccakKR, data, &other_key, &sig).unwrap_err();
     }
 
     #[test]
@@ -1270,16 +1270,16 @@ mod tests {
         let key = JWK::generate_p256();
         let data = b"asdf";
         let bad_data = b"no";
-        let sig = sign_bytes(Algorithm::ES256, data, &key).unwrap();
-        verify_bytes(Algorithm::ES256, data, &key, &sig).unwrap();
-        verify_bytes(Algorithm::ES256, bad_data, &key, &sig).unwrap_err();
+        let sig = sign_bytes(Algorithm::Es256, data, &key).unwrap();
+        verify_bytes(Algorithm::Es256, data, &key, &sig).unwrap();
+        verify_bytes(Algorithm::Es256, bad_data, &key, &sig).unwrap_err();
 
         let key: JWK = serde_json::from_str(include_str!(
             "../../../../../tests/secp256r1-2021-03-18.json"
         ))
         .unwrap();
         let payload = "{\"iss\":\"did:example:foo\",\"vp\":{\"@context\":[\"https://www.w3.org/2018/credentials/v1\"],\"type\":\"VerifiablePresentation\"}}";
-        let jws = encode_sign(Algorithm::ES256, payload, &key).unwrap();
+        let jws = encode_sign(Algorithm::Es256, payload, &key).unwrap();
         assert_eq!(jws, "eyJhbGciOiJFUzI1NiJ9.eyJpc3MiOiJkaWQ6ZXhhbXBsZTpmb28iLCJ2cCI6eyJAY29udGV4dCI6WyJodHRwczovL3d3dy53My5vcmcvMjAxOC9jcmVkZW50aWFscy92MSJdLCJ0eXBlIjoiVmVyaWZpYWJsZVByZXNlbnRhdGlvbiJ9fQ.rJzO6MmTNS8Tn-L3baIf9_2Jr9OoK8E06MxJtofz8xMUGSom6eRUmWGZ7oQVjgP3HogOD80miTvuvKTWa54Nvw");
         decode_verify(&jws, &key).unwrap();
     }
@@ -1290,16 +1290,16 @@ mod tests {
         let key = JWK::generate_p384();
         let data = b"asdf";
         let bad_data = b"no";
-        let sig = sign_bytes(Algorithm::ES384, data, &key).unwrap();
-        verify_bytes(Algorithm::ES384, data, &key, &sig).unwrap();
-        verify_bytes(Algorithm::ES384, bad_data, &key, &sig).unwrap_err();
+        let sig = sign_bytes(Algorithm::Es384, data, &key).unwrap();
+        verify_bytes(Algorithm::Es384, data, &key, &sig).unwrap();
+        verify_bytes(Algorithm::Es384, bad_data, &key, &sig).unwrap_err();
 
         let key: JWK = serde_json::from_str(include_str!(
             "../../../../../tests/secp384r1-2022-05-10.json"
         ))
         .unwrap();
         let payload = "{\"iss\":\"did:example:foo\",\"vp\":{\"@context\":[\"https://www.w3.org/2018/credentials/v1\"],\"type\":\"VerifiablePresentation\"}}";
-        let jws = encode_sign(Algorithm::ES384, payload, &key).unwrap();
+        let jws = encode_sign(Algorithm::Es384, payload, &key).unwrap();
         dbg!(&jws);
         decode_verify(&jws, &key).unwrap();
 

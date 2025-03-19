@@ -62,7 +62,7 @@ impl VerifyingKey for P256PublicKey {
         signature: &[u8],
     ) -> Result<SignatureVerification, Error> {
         match algorithm.into() {
-            AlgorithmInstance::ES256 => {
+            AlgorithmInstance::Es256 => {
                 use p256::ecdsa::signature::Verifier;
                 let sig = p256::ecdsa::Signature::try_from(signature)
                     .map_err(|_| Error::SignatureMalformed)?;
@@ -70,7 +70,7 @@ impl VerifyingKey for P256PublicKey {
                 Ok(verification.map_err(|_| RejectedSignature::Mismatch))
             }
             #[cfg(feature = "blake2")]
-            AlgorithmInstance::ESBlake2b => {
+            AlgorithmInstance::EsBlake2b => {
                 use digest::{consts::U32, Digest};
                 use p256::ecdsa::signature::DigestVerifier;
                 let sig = p256::ecdsa::Signature::try_from(signature)
@@ -124,12 +124,12 @@ impl SigningKey for P256SecretKey {
     ) -> Result<Box<[u8]>, Error> {
         use p256::ecdsa::{signature::Signer, Signature};
         match algorithm.into() {
-            AlgorithmInstance::ES256 => {
+            AlgorithmInstance::Es256 => {
                 let signature: Signature = self.try_sign(signing_bytes).unwrap(); // Uses SHA-256 by default.
                 Ok(signature.to_bytes().as_slice().into())
             }
             #[cfg(feature = "blake2")]
-            AlgorithmInstance::ESBlake2b => {
+            AlgorithmInstance::EsBlake2b => {
                 use digest::{consts::U32, Digest};
                 use p256::ecdsa::signature::DigestSigner;
                 let digest = blake2::Blake2b::<U32>::new_with_prefix(signing_bytes);
@@ -162,12 +162,12 @@ mod tests {
 
     #[test]
     fn es256_roundtrip() {
-        roundtrip(AlgorithmInstance::ES256);
+        roundtrip(AlgorithmInstance::Es256);
     }
 
     #[cfg(feature = "blake2")]
     #[test]
     fn esblake2b_roundtrip() {
-        roundtrip(AlgorithmInstance::ESBlake2b);
+        roundtrip(AlgorithmInstance::EsBlake2b);
     }
 }

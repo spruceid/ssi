@@ -185,11 +185,11 @@ impl TryFrom<GenericVerificationMethod> for Eip712Method2021 {
     }
 }
 
-impl SigningMethod<JWK, ssi_crypto::algorithm::ESKeccakKR> for Eip712Method2021 {
+impl SigningMethod<JWK, ssi_crypto::algorithm::EsKeccakKR> for Eip712Method2021 {
     fn sign_bytes(
         &self,
         key: &JWK,
-        _algorithm: ssi_crypto::algorithm::ESKeccakKR,
+        _algorithm: ssi_crypto::algorithm::EsKeccakKR,
         bytes: &[u8],
     ) -> Result<Vec<u8>, MessageSignatureError> {
         self.sign_bytes(key, bytes)

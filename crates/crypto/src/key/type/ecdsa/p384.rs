@@ -62,7 +62,7 @@ impl VerifyingKey for P384PublicKey {
         signature: &[u8],
     ) -> Result<crate::SignatureVerification, crate::Error> {
         match algorithm.into() {
-            AlgorithmInstance::ES384 => {
+            AlgorithmInstance::Es384 => {
                 use p384::ecdsa::signature::Verifier;
                 let sig = p384::ecdsa::Signature::try_from(signature)
                     .map_err(|_| Error::SignatureMalformed)?;
@@ -113,7 +113,7 @@ impl SigningKey for P384SecretKey {
         signing_bytes: &[u8],
     ) -> Result<Box<[u8]>, Error> {
         match algorithm.into() {
-            AlgorithmInstance::ES384 => {
+            AlgorithmInstance::Es384 => {
                 use p384::ecdsa::{signature::Signer, Signature};
                 let signature: Signature = self.try_sign(signing_bytes).unwrap(); // Uses SHA-384 by default.
                 Ok(signature.to_bytes().as_slice().into())
@@ -144,6 +144,6 @@ mod tests {
 
     #[test]
     fn es384_roundtrip() {
-        roundtrip(AlgorithmInstance::ES384);
+        roundtrip(AlgorithmInstance::Es384);
     }
 }

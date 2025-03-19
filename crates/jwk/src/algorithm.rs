@@ -117,47 +117,47 @@ algorithms! {
     /// HMAC using SHA-256.
     ///
     /// See: <https://www.rfc-editor.org/rfc/rfc7518.txt>
-    HS256: "HS256",
+    Hs256: "HS256",
 
     /// HMAC using SHA-384.
     ///
     /// See: <https://www.rfc-editor.org/rfc/rfc7518.txt>
-    HS384: "HS384",
+    Hs384: "HS384",
 
     /// HMAC using SHA-512.
     ///
     /// See: <https://www.rfc-editor.org/rfc/rfc7518.txt>
-    HS512: "HS512",
+    Hs512: "HS512",
 
     /// RSASSA-PKCS1-v1_5 using SHA-256.
     ///
     /// See: <https://www.rfc-editor.org/rfc/rfc7518.txt>
-    RS256: "RS256",
+    Rs256: "RS256",
 
     /// RSASSA-PKCS1-v1_5 using SHA-384.
     ///
     /// See: <https://www.rfc-editor.org/rfc/rfc7518.txt>
-    RS384: "RS384",
+    Rs384: "RS384",
 
     /// RSASSA-PKCS1-v1_5 using SHA-512.
     ///
     /// See: <https://www.rfc-editor.org/rfc/rfc7518.txt>
-    RS512: "RS512",
+    Rs512: "RS512",
 
     /// RSASSA-PSS using SHA-256 and MGF1 with SHA-256.
     ///
     /// See: <https://www.rfc-editor.org/rfc/rfc7518.txt>
-    PS256: "PS256",
+    Ps256: "PS256",
 
     /// RSASSA-PSS using SHA-384 and MGF1 with SHA-384.
     ///
     /// See: <https://www.rfc-editor.org/rfc/rfc7518.txt>
-    PS384: "PS384",
+    Ps384: "PS384",
 
     /// RSASSA-PSS using SHA-512 and MGF1 with SHA-512.
     ///
     /// See: <https://www.rfc-editor.org/rfc/rfc7518.txt>
-    PS512: "PS512",
+    Ps512: "PS512",
 
     /// Edwards-curve Digital Signature Algorithm (EdDSA) using SHA-256.
     ///
@@ -174,17 +174,17 @@ algorithms! {
     /// ECDSA using P-256 and SHA-256.
     ///
     /// See: <https://www.rfc-editor.org/rfc/rfc7518.txt>
-    ES256: "ES256",
+    Es256: "ES256",
 
     /// ECDSA using P-384 and SHA-384.
     ///
     /// See: <https://www.rfc-editor.org/rfc/rfc7518.txt>
-    ES384: "ES384",
+    Es384: "ES384",
 
     /// ECDSA using secp256k1 (K-256) and SHA-256.
     ///
     /// See: <https://datatracker.ietf.org/doc/html/rfc8812>
-    ES256K: "ES256K",
+    Es256K: "ES256K",
 
     /// ECDSA using secp256k1 (K-256) and SHA-256 with a recovery bit.
     ///
@@ -193,23 +193,23 @@ algorithms! {
     /// extract the public key from the signature.
     ///
     /// See: <https://github.com/decentralized-identity/EcdsaSecp256k1RecoverySignature2020#es256k-r>
-    ES256KR: "ES256K-R",
+    Es256KR: "ES256K-R",
 
     /// ECDSA using secp256k1 (K-256) and Keccak-256.
     ///
     /// Like `ES256K` but using Keccak-256 instead of SHA-256.
-    ESKeccakK: "ESKeccakK",
+    EsKeccakK: "ESKeccakK",
 
     /// ECDSA using secp256k1 (K-256) and Keccak-256 with a recovery bit.
     ///
     /// Like `ES256K-R` but using Keccak-256 instead of SHA-256.
-    ESKeccakKR: "ESKeccakKR",
+    EsKeccakKR: "ESKeccakKR",
 
     /// ECDSA using P-256 and Blake2b.
-    ESBlake2b: "ESBlake2b",
+    EsBlake2b: "ESBlake2b",
 
     /// ECDSA using secp256k1 (K-256) and Blake2b.
-    ESBlake2bK: "ESBlake2bK",
+    EsBlake2bK: "ESBlake2bK",
 
     #[doc(hidden)]
     AleoTestnet1Signature: "AleoTestnet1Signature"
@@ -222,9 +222,9 @@ impl Algorithm {
     /// signature created from `B`.
     pub fn is_compatible_with(&self, other: Self) -> bool {
         match self {
-            Self::ES256K | Self::ES256KR | Self::ESKeccakK | Self::ESKeccakKR => matches!(
+            Self::Es256K | Self::Es256KR | Self::EsKeccakK | Self::EsKeccakKR => matches!(
                 other,
-                Self::ES256K | Self::ES256KR | Self::ESKeccakK | Self::ESKeccakKR
+                Self::Es256K | Self::Es256KR | Self::EsKeccakK | Self::EsKeccakKR
             ),
             a => *a == other,
         }
@@ -264,8 +264,8 @@ impl fmt::Display for Algorithm {
 impl From<ssi_crypto::algorithm::AnyBlake2b> for Algorithm {
     fn from(value: ssi_crypto::algorithm::AnyBlake2b) -> Self {
         match value {
-            ssi_crypto::algorithm::AnyBlake2b::ESBlake2b => Self::ESBlake2b,
-            ssi_crypto::algorithm::AnyBlake2b::ESBlake2bK => Self::ESBlake2bK,
+            ssi_crypto::algorithm::AnyBlake2b::ESBlake2b => Self::EsBlake2b,
+            ssi_crypto::algorithm::AnyBlake2b::ESBlake2bK => Self::EsBlake2bK,
             ssi_crypto::algorithm::AnyBlake2b::EdBlake2b => Self::EdBlake2b,
         }
     }
@@ -276,8 +276,8 @@ impl TryFrom<Algorithm> for ssi_crypto::algorithm::AnyBlake2b {
 
     fn try_from(value: Algorithm) -> Result<Self, Self::Error> {
         match value {
-            Algorithm::ESBlake2b => Ok(Self::ESBlake2b),
-            Algorithm::ESBlake2bK => Ok(Self::ESBlake2bK),
+            Algorithm::EsBlake2b => Ok(Self::ESBlake2b),
+            Algorithm::EsBlake2bK => Ok(Self::ESBlake2bK),
             Algorithm::EdBlake2b => Ok(Self::EdBlake2b),
             other => Err(UnsupportedAlgorithm(other.into())),
         }
@@ -287,8 +287,8 @@ impl TryFrom<Algorithm> for ssi_crypto::algorithm::AnyBlake2b {
 impl From<ES256OrES384> for Algorithm {
     fn from(value: ES256OrES384) -> Self {
         match value {
-            ES256OrES384::ES256 => Self::ES256,
-            ES256OrES384::ES384 => Self::ES384,
+            ES256OrES384::ES256 => Self::Es256,
+            ES256OrES384::ES384 => Self::Es384,
         }
     }
 }

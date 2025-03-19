@@ -100,19 +100,19 @@ impl TypedVerificationMethod for P256PublicKeyBLAKE2BDigestSize20Base58CheckEnco
     }
 }
 
-impl VerifyBytesWithRecoveryJwk<ssi_crypto::algorithm::ESBlake2b>
+impl VerifyBytesWithRecoveryJwk<ssi_crypto::algorithm::EsBlake2b>
     for P256PublicKeyBLAKE2BDigestSize20Base58CheckEncoded2021
 {
     fn verify_bytes_with_public_jwk(
         &self,
         public_jwk: &JWK,
-        _: ssi_crypto::algorithm::ESBlake2b,
+        _: ssi_crypto::algorithm::EsBlake2b,
         signing_bytes: &[u8],
         signature: &[u8],
     ) -> Result<ProofValidity, ProofValidationError> {
         if self.matches_public_key(public_jwk)? {
             Ok(ssi_jws::verify_bytes(
-                ssi_jwk::Algorithm::ESBlake2b,
+                ssi_jwk::Algorithm::EsBlake2b,
                 signing_bytes,
                 public_jwk,
                 signature,
@@ -158,16 +158,16 @@ impl TryFrom<GenericVerificationMethod> for P256PublicKeyBLAKE2BDigestSize20Base
     }
 }
 
-impl SigningMethod<JWK, ssi_crypto::algorithm::ESBlake2b>
+impl SigningMethod<JWK, ssi_crypto::algorithm::EsBlake2b>
     for P256PublicKeyBLAKE2BDigestSize20Base58CheckEncoded2021
 {
     fn sign_bytes(
         &self,
         key: &JWK,
-        _algorithm: ssi_crypto::algorithm::ESBlake2b,
+        _algorithm: ssi_crypto::algorithm::EsBlake2b,
         bytes: &[u8],
     ) -> Result<Vec<u8>, MessageSignatureError> {
-        ssi_jws::sign_bytes(Algorithm::ESBlake2b, bytes, key)
+        ssi_jws::sign_bytes(Algorithm::EsBlake2b, bytes, key)
             .map_err(MessageSignatureError::signature_failed)
     }
 }

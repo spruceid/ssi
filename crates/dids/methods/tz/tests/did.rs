@@ -323,7 +323,7 @@ async fn credential_prove_verify_did_tz2() {
     let mut rng = rand_chacha::ChaCha8Rng::seed_from_u64(2);
     let mut key = JWK::generate_secp256k1_from(&mut rng);
     // mark this key as being for use with key recovery
-    key.algorithm = Some(Algorithm::ES256KR);
+    key.algorithm = Some(Algorithm::Es256KR);
     let did = DIDTZ.generate(&key).unwrap();
 
     let cred = JsonCredential::new(
@@ -421,7 +421,7 @@ async fn credential_prove_verify_did_tz3() {
 
     let mut rng = rand_chacha::ChaCha8Rng::seed_from_u64(2);
     let mut key = JWK::generate_p256_from(&mut rng);
-    key.algorithm = Some(Algorithm::ESBlake2b);
+    key.algorithm = Some(Algorithm::EsBlake2b);
     let did = DIDTZ.generate(&key).unwrap();
 
     let cred = JsonCredential::new(

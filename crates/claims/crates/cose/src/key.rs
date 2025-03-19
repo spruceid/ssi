@@ -54,7 +54,7 @@ impl CoseSigner for CoseKey {
         let algorithm = preferred_algorithm(self).ok_or(SignatureError::MissingAlgorithm)?;
         let secret_key = self.decode_secret()?;
         secret_key
-            .sign_message(
+            .sign_bytes(
                 instantiate_algorithm(&algorithm).ok_or_else(|| {
                     SignatureError::UnsupportedAlgorithm(algorithm_name(&algorithm))
                 })?,

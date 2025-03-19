@@ -200,8 +200,8 @@ impl VerificationMethod {
             Self::EcdsaSecp256k1VerificationKey2019(_) => Ok(AnyESKeccakK::ESKeccakK),
             Self::EcdsaSecp256k1RecoveryMethod2020(_) => Ok(AnyESKeccakK::ESKeccakKR),
             Self::JsonWebKey2020(m) => match m.public_key.algorithm {
-                Some(ssi_jwk::Algorithm::ES256K) => Ok(AnyESKeccakK::ESKeccakK),
-                Some(ssi_jwk::Algorithm::ES256KR) => Ok(AnyESKeccakK::ESKeccakKR),
+                Some(ssi_jwk::Algorithm::Es256K) => Ok(AnyESKeccakK::ESKeccakK),
+                Some(ssi_jwk::Algorithm::Es256KR) => Ok(AnyESKeccakK::ESKeccakKR),
                 Some(other) => Err(AlgorithmError::Unsupported(other.into())),
                 None => Err(AlgorithmError::Missing),
             },

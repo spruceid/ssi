@@ -9,7 +9,7 @@ repository = "https://github.com/spruceid/ssi/"
 documentation = "https://docs.rs/ssi-crypto/"
 
 [features]
-default = ["rsa", "secp256k1", "secp256r1", "secp384r1", "der", "keccak", "ripemd-160"]
+default = ["rsa", "secp256k1", "secp256r1"]
 
 # Key types and signature functions.
 rsa = ["dep:rsa"]
