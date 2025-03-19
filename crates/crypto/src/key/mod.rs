@@ -22,6 +22,7 @@ mod spki;
 /// Public key.
 #[derive(Clone)]
 #[non_exhaustive]
+#[allow(clippy::large_enum_variant)]
 pub enum PublicKey {
     /// Symmetric key.
     ///
@@ -131,6 +132,7 @@ pub struct InvalidSecretKey;
 /// Secret key.
 #[derive(ZeroizeOnDrop)]
 #[non_exhaustive]
+#[allow(clippy::large_enum_variant)]
 pub enum SecretKey {
     /// Symmetric key.
     Symmetric(SymmetricKey),

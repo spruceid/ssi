@@ -43,10 +43,12 @@ fn downcast<T: 'static>(t: Box<dyn Send + Sync + Any>) -> T {
     *<Box<dyn Send + Sync + Any>>::downcast(t).unwrap()
 }
 
+#[allow(clippy::borrowed_box)]
 fn downcast_ref<T: 'static>(t: &Box<dyn Send + Sync + Any>) -> &T {
     t.downcast_ref().unwrap()
 }
 
+#[allow(clippy::borrowed_box)]
 fn downcast_mut<T: 'static>(t: &mut Box<dyn Send + Sync + Any>) -> &mut T {
     t.downcast_mut().unwrap()
 }
