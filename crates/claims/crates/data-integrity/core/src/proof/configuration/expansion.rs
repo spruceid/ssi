@@ -114,9 +114,7 @@ impl<S: SerializeCryptographicSuite> Expandable for EmbeddedProofConfigurationRe
         V::BlankId: Clone + Eq + Hash + LinkedDataResource<I, V> + LinkedDataSubject<I, V>,
     {
         let json = json_syntax::to_value(self).unwrap();
-        eprintln!("json: {}", serde_json::to_string_pretty(&json).unwrap());
         let mut expanded = CompactJsonLd(json).expand_with(ld, loader).await?;
-        eprintln!("expanded");
         expanded.canonicalize();
         Ok(ExpandedEmbeddedProofConfiguration(expanded))
     }
