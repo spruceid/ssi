@@ -20,9 +20,18 @@ pub use eddsa::{EdDsaKeyType, EdDsaPublicKey, EdDsaSecretKey};
 /// Key type.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum KeyType {
+    /// Symmetric key.
     Symmetric(ByteSize),
+
+    /// RSA key.
+    ///
+    /// Implementation requires the `rsa` feature.
     Rsa(BitSize),
+
+    /// ECDSA key.
     Ecdsa(EcdsaKeyType),
+
+    /// EdDSA key.
     EdDsa(EdDsaKeyType),
 }
 

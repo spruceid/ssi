@@ -15,6 +15,9 @@ pub mod ed25519;
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 #[non_exhaustive]
 pub enum EdDsaKeyType {
+    /// Curve 25519.
+    ///
+    /// Implementation requires the `ed25519` feature.
     Curve25519,
 }
 
@@ -32,6 +35,7 @@ impl EdDsaKeyType {
         }
     }
 
+    #[allow(unused_variables)]
     pub fn generate_from(
         &self,
         rng: &mut (impl RngCore + CryptoRng),
@@ -64,6 +68,9 @@ impl EdDsaPublicKey {
         match self {
             #[cfg(feature = "ed25519")]
             Self::Curve25519(_) => EdDsaKeyType::Curve25519,
+
+            #[allow(unreachable_patterns)]
+            _ => unreachable!(),
         }
     }
 
@@ -86,6 +93,7 @@ impl VerifyingKey for EdDsaPublicKey {
         }
     }
 
+    #[allow(unused_variables)]
     fn verify_bytes(
         &self,
         algorithm: impl Into<AlgorithmInstance>,
@@ -95,6 +103,9 @@ impl VerifyingKey for EdDsaPublicKey {
         match self {
             #[cfg(feature = "ed25519")]
             Self::Curve25519(key) => key.verify_bytes(algorithm, signing_bytes, signature),
+
+            #[allow(unreachable_patterns)]
+            _ => Err(Error::KeyUnsupported),
         }
     }
 }
@@ -138,6 +149,9 @@ impl EdDsaSecretKey {
         match self {
             #[cfg(feature = "ed25519")]
             Self::Curve25519(key) => EdDsaPublicKey::Curve25519(key.verifying_key()),
+
+            #[allow(unreachable_patterns)]
+            _ => unreachable!(),
         }
     }
 
@@ -151,6 +165,7 @@ impl EdDsaSecretKey {
 }
 
 impl SigningKey for EdDsaSecretKey {
+    #[allow(unused_variables)]
     fn sign_bytes(
         &self,
         algorithm: impl Into<AlgorithmInstance>,
@@ -159,6 +174,9 @@ impl SigningKey for EdDsaSecretKey {
         match self {
             #[cfg(feature = "ed25519")]
             Self::Curve25519(key) => key.sign_bytes(algorithm, signing_bytes),
+
+            #[allow(unreachable_patterns)]
+            _ => Err(Error::KeyUnsupported),
         }
     }
 }

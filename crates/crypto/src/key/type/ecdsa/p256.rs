@@ -4,7 +4,6 @@ use crate::{
     SignatureVerification, SigningKey, VerifyingKey,
 };
 pub use p256::ecdsa::{SigningKey as P256SecretKey, VerifyingKey as P256PublicKey};
-use sha2::Digest;
 
 use super::{EcdsaKeyType, EcdsaPublicKey, EcdsaSecretKey};
 
@@ -70,8 +69,9 @@ impl VerifyingKey for P256PublicKey {
                 let verification = self.verify(signing_bytes, &sig);
                 Ok(verification.map_err(|_| RejectedSignature::Mismatch))
             }
+            #[cfg(feature = "blake2")]
             AlgorithmInstance::ESBlake2b => {
-                use digest::consts::U32;
+                use digest::{consts::U32, Digest};
                 use p256::ecdsa::signature::DigestVerifier;
                 let sig = p256::ecdsa::Signature::try_from(signature)
                     .map_err(|_| Error::SignatureMalformed)?;
@@ -122,22 +122,52 @@ impl SigningKey for P256SecretKey {
         algorithm: impl Into<AlgorithmInstance>,
         signing_bytes: &[u8],
     ) -> Result<Box<[u8]>, Error> {
-        use p256::ecdsa::{
-            signature::{DigestSigner, Signer},
-            Signature,
-        };
+        use p256::ecdsa::{signature::Signer, Signature};
         match algorithm.into() {
             AlgorithmInstance::ES256 => {
                 let signature: Signature = self.try_sign(signing_bytes).unwrap(); // Uses SHA-256 by default.
                 Ok(signature.to_bytes().as_slice().into())
             }
+            #[cfg(feature = "blake2")]
             AlgorithmInstance::ESBlake2b => {
-                use digest::consts::U32;
+                use digest::{consts::U32, Digest};
+                use p256::ecdsa::signature::DigestSigner;
                 let digest = blake2::Blake2b::<U32>::new_with_prefix(signing_bytes);
                 let signature: Signature = self.try_sign_digest(digest).unwrap();
                 Ok(signature.to_bytes().as_slice().into())
             }
             other => Err(Error::AlgorithmUnsupported(other.algorithm())),
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use rand::rngs::OsRng;
+
+    fn roundtrip(algorithm: AlgorithmInstance) {
+        let secret_key = P256SecretKey::random(&mut OsRng);
+        let signature = secret_key
+            .sign_bytes(algorithm.clone(), b"message")
+            .unwrap();
+        let public_key = *secret_key.verifying_key();
+        assert_eq!(
+            public_key
+                .verify_bytes(algorithm, b"message", &signature)
+                .unwrap(),
+            Ok(())
+        )
+    }
+
+    #[test]
+    fn es256_roundtrip() {
+        roundtrip(AlgorithmInstance::ES256);
+    }
+
+    #[cfg(feature = "blake2")]
+    #[test]
+    fn esblake2b_roundtrip() {
+        roundtrip(AlgorithmInstance::ESBlake2b);
     }
 }

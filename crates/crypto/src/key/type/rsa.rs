@@ -93,3 +93,33 @@ impl SigningKey for RsaSecretKey {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use rand::rngs::OsRng;
+
+    fn roundtrip(algorithm: AlgorithmInstance) {
+        let secret_key = RsaSecretKey::new(&mut OsRng, 1024).unwrap();
+        let signature = secret_key
+            .sign_bytes(algorithm.clone(), b"message")
+            .unwrap();
+        let public_key = secret_key.to_public_key();
+        assert_eq!(
+            public_key
+                .verify_bytes(algorithm, b"message", &signature)
+                .unwrap(),
+            Ok(())
+        )
+    }
+
+    #[test]
+    fn rs256_roundtrip() {
+        roundtrip(AlgorithmInstance::RS256);
+    }
+
+    #[test]
+    fn ps256_roundtrip() {
+        roundtrip(AlgorithmInstance::PS256);
+    }
+}

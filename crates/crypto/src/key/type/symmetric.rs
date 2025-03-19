@@ -22,7 +22,7 @@ impl SymmetricKey {
     ///
     /// # Examples
     /// ```
-    /// let key = ssi_crypto::key::SymmetricKey::generate_with(32); // Generate a 256-bit key
+    /// let key = ssi_crypto::key::SymmetricKey::generate(32); // Generate a 256-bit key
     /// ```
     pub fn generate(len: usize) -> Self {
         Self::generate_from(len, &mut OsRng)
@@ -99,18 +99,22 @@ impl SigningKey for SymmetricKey {
         algorithm: impl Into<AlgorithmInstance>,
         _signing_bytes: &[u8],
     ) -> Result<Box<[u8]>, Error> {
-        match algorithm.into() {
-            AlgorithmInstance::HS256 => {
-                todo!()
-            }
-            AlgorithmInstance::HS384 => {
-                todo!()
-            }
-            AlgorithmInstance::HS512 => {
-                todo!()
-            }
-            other => Err(Error::AlgorithmUnsupported(other.algorithm())),
-        }
+        // TODO we should implement those algorithms for symmetric keys,
+        // but since it's not implemented in `ssi_jws`, I'll not bother for
+        // now.
+        // match algorithm.into() {
+        //     AlgorithmInstance::HS256 => {
+        //         todo!()
+        //     }
+        //     AlgorithmInstance::HS384 => {
+        //         todo!()
+        //     }
+        //     AlgorithmInstance::HS512 => {
+        //         todo!()
+        //     }
+        //     other => Err(Error::AlgorithmUnsupported(other.algorithm())),
+        // }
+        Err(Error::AlgorithmUnsupported(algorithm.into().algorithm()))
     }
 }
 
@@ -128,17 +132,21 @@ impl VerifyingKey for SymmetricKey {
         _signing_bytes: &[u8],
         _signature: &[u8],
     ) -> Result<SignatureVerification, Error> {
-        match algorithm.into() {
-            AlgorithmInstance::HS256 => {
-                todo!()
-            }
-            AlgorithmInstance::HS384 => {
-                todo!()
-            }
-            AlgorithmInstance::HS512 => {
-                todo!()
-            }
-            other => Err(Error::AlgorithmUnsupported(other.algorithm())),
-        }
+        // TODO we should implement those algorithms for symmetric keys,
+        // but since it's not implemented in `ssi_jws`, I'll not bother for
+        // now.
+        // match algorithm.into() {
+        //     AlgorithmInstance::HS256 => {
+        //         todo!()
+        //     }
+        //     AlgorithmInstance::HS384 => {
+        //         todo!()
+        //     }
+        //     AlgorithmInstance::HS512 => {
+        //         todo!()
+        //     }
+        //     other => Err(Error::AlgorithmUnsupported(other.algorithm())),
+        // }
+        Err(Error::AlgorithmUnsupported(algorithm.into().algorithm()))
     }
 }

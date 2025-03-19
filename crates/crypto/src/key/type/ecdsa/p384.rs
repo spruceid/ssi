@@ -122,3 +122,28 @@ impl SigningKey for P384SecretKey {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use rand::rngs::OsRng;
+
+    fn roundtrip(algorithm: AlgorithmInstance) {
+        let secret_key = P384SecretKey::random(&mut OsRng);
+        let signature = secret_key
+            .sign_bytes(algorithm.clone(), b"message")
+            .unwrap();
+        let public_key = *secret_key.verifying_key();
+        assert_eq!(
+            public_key
+                .verify_bytes(algorithm, b"message", &signature)
+                .unwrap(),
+            Ok(())
+        )
+    }
+
+    #[test]
+    fn es384_roundtrip() {
+        roundtrip(AlgorithmInstance::ES384);
+    }
+}

@@ -4,6 +4,7 @@ use crate::{
     SignatureVerification, SigningKey, VerifyingKey,
 };
 pub use ed25519_dalek::{SigningKey as Ed25519SecretKey, VerifyingKey as Ed25519PublicKey};
+use sha2::Digest;
 
 use super::{EdDsaKeyType, EdDsaPublicKey, EdDsaSecretKey};
 
@@ -55,7 +56,19 @@ impl VerifyingKey for Ed25519PublicKey {
                     .map_err(|_| RejectedSignature::Mismatch))
             }
             AlgorithmInstance::EdBlake2b => {
-                todo!()
+                use digest::consts::U32;
+                use ed25519_dalek::Verifier;
+                let signature: ed25519_dalek::Signature = signature
+                    .try_into()
+                    .map_err(|_| Error::SignatureMalformed)?;
+                let digest = blake2::Blake2b::<U32>::new_with_prefix(signing_bytes);
+                // TODO this was copied from old code, but the `verify` method
+                // is probably going to use SHA-256 on top of `digest`, which is
+                // already digested with blake2. We should check if this is the
+                // intended behavior.
+                Ok(self
+                    .verify(&digest.finalize(), &signature)
+                    .map_err(|_| RejectedSignature::Mismatch))
             }
             other => Err(Error::AlgorithmUnsupported(other.algorithm())),
         }
@@ -117,5 +130,37 @@ impl SigningKey for Ed25519SecretKey {
             }
             other => Err(Error::AlgorithmUnsupported(other.algorithm())),
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use rand::rngs::OsRng;
+
+    fn roundtrip(algorithm: AlgorithmInstance) {
+        let secret_key = Ed25519SecretKey::generate(&mut OsRng);
+        let signature = secret_key
+            .sign_bytes(algorithm.clone(), b"message")
+            .unwrap();
+        let public_key = secret_key.verifying_key();
+        assert_eq!(
+            public_key
+                .verify_bytes(algorithm, b"message", &signature)
+                .unwrap(),
+            Ok(())
+        )
+    }
+
+    #[test]
+    fn eddsa_roundtrip() {
+        roundtrip(AlgorithmInstance::EdDsa);
+    }
+
+    // TODO this demonstrates that a roundtrip test is not enough, because I'm
+    //      pretty sure the implementation of this algorithm is wrong.
+    #[test]
+    fn edblake2b_roundtrip() {
+        roundtrip(AlgorithmInstance::EdBlake2b);
     }
 }

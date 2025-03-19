@@ -22,8 +22,19 @@ pub mod p384;
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 #[non_exhaustive]
 pub enum EcdsaKeyType {
+    /// K-256 curve.
+    ///
+    /// Implementation requires the `secp256k1` feature.
     K256,
+
+    /// P-256 curve.
+    ///
+    /// Implementation requires the `secp256r1` feature.
     P256,
+
+    /// P-384 curve.
+    ///
+    /// Implementation requires the `secp384r1` feature.
     P384,
 }
 
@@ -45,6 +56,7 @@ impl EcdsaKeyType {
         }
     }
 
+    #[allow(unused_variables)]
     pub fn generate_from(
         &self,
         rng: &mut (impl RngCore + CryptoRng),
@@ -104,6 +116,9 @@ impl EcdsaPublicKey {
 
             #[cfg(feature = "secp384r1")]
             Self::P384(_) => EcdsaKeyType::P384,
+
+            #[allow(unreachable_patterns)]
+            _ => unreachable!(),
         }
     }
 
@@ -132,6 +147,7 @@ impl VerifyingKey for EcdsaPublicKey {
         }
     }
 
+    #[allow(unused_variables)]
     fn verify_bytes(
         &self,
         algorithm: impl Into<AlgorithmInstance>,
@@ -147,6 +163,9 @@ impl VerifyingKey for EcdsaPublicKey {
 
             #[cfg(feature = "secp256k1")]
             Self::K256(key) => key.verify_bytes(algorithm, signing_bytes, signature),
+
+            #[allow(unreachable_patterns)]
+            _ => unreachable!(),
         }
     }
 }
@@ -203,6 +222,9 @@ impl EcdsaSecretKey {
 
             #[cfg(feature = "secp384r1")]
             Self::P384(secret) => EcdsaPublicKey::P384(*secret.verifying_key()),
+
+            #[allow(unreachable_patterns)]
+            _ => unreachable!(),
         }
     }
 
@@ -216,6 +238,7 @@ impl EcdsaSecretKey {
 }
 
 impl SigningKey for EcdsaSecretKey {
+    #[allow(unused_variables)]
     fn sign_bytes(
         &self,
         algorithm: impl Into<AlgorithmInstance>,
@@ -230,6 +253,9 @@ impl SigningKey for EcdsaSecretKey {
 
             #[cfg(feature = "secp256k1")]
             Self::K256(key) => key.sign_bytes(algorithm, signing_bytes),
+
+            #[allow(unreachable_patterns)]
+            _ => unreachable!(),
         }
     }
 }

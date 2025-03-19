@@ -79,6 +79,7 @@ impl VerifyingKey for K256PublicKey {
                     Ok(Err(RejectedSignature::Mismatch))
                 }
             }
+            #[cfg(feature = "blake2")]
             AlgorithmInstance::ESBlake2bK => {
                 use digest::consts::U32;
                 let sig = k256::ecdsa::Signature::try_from(signature)
@@ -87,6 +88,7 @@ impl VerifyingKey for K256PublicKey {
                 let verification = self.verify_digest(digest, &sig);
                 Ok(verification.map_err(|_| RejectedSignature::Mismatch))
             }
+            #[cfg(feature = "keccak")]
             AlgorithmInstance::ESKeccakK => {
                 let sig = k256::ecdsa::Signature::try_from(signature)
                     .map_err(|_| Error::SignatureMalformed)?;
@@ -94,6 +96,7 @@ impl VerifyingKey for K256PublicKey {
                 let verification = self.verify_digest(digest, &sig);
                 Ok(verification.map_err(|_| RejectedSignature::Mismatch))
             }
+            #[cfg(feature = "keccak")]
             AlgorithmInstance::ESKeccakKR => {
                 let recovered_key =
                     Self::recover(AlgorithmInstance::ESKeccakKR, signing_bytes, signature)?;
@@ -215,17 +218,20 @@ impl SigningKey for K256SecretKey {
                 result.push(rec_id.to_byte());
                 Ok(result.into_boxed_slice())
             }
+            #[cfg(feature = "blake2")]
             AlgorithmInstance::ESBlake2bK => {
                 use digest::consts::U32;
                 let digest = blake2::Blake2b::<U32>::new_with_prefix(signing_bytes);
                 let signature: Signature = self.try_sign_digest(digest).unwrap();
                 Ok(signature.to_bytes().to_vec().into_boxed_slice())
             }
+            #[cfg(feature = "keccak")]
             AlgorithmInstance::ESKeccakK => {
                 let digest = sha3::Keccak256::new_with_prefix(signing_bytes);
                 let signature: Signature = self.try_sign_digest(digest).unwrap();
                 Ok(signature.to_bytes().to_vec().into_boxed_slice())
             }
+            #[cfg(feature = "keccak")]
             AlgorithmInstance::ESKeccakKR => {
                 let digest = sha3::Keccak256::new_with_prefix(signing_bytes);
                 let (sig, rec_id) = self
@@ -237,5 +243,53 @@ impl SigningKey for K256SecretKey {
             }
             other => Err(Error::AlgorithmUnsupported(other.algorithm())),
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use rand::rngs::OsRng;
+
+    fn roundtrip(algorithm: AlgorithmInstance) {
+        let secret_key = K256SecretKey::random(&mut OsRng);
+        let signature = secret_key
+            .sign_bytes(algorithm.clone(), b"message")
+            .unwrap();
+        let public_key = *secret_key.verifying_key();
+        assert_eq!(
+            public_key
+                .verify_bytes(algorithm, b"message", &signature)
+                .unwrap(),
+            Ok(())
+        )
+    }
+
+    #[test]
+    fn es256k_roundtrip() {
+        roundtrip(AlgorithmInstance::ES256K);
+    }
+
+    #[test]
+    fn es256kr_roundtrip() {
+        roundtrip(AlgorithmInstance::ES256KR);
+    }
+
+    #[cfg(feature = "blake2")]
+    #[test]
+    fn esblake2bk_roundtrip() {
+        roundtrip(AlgorithmInstance::ESBlake2bK);
+    }
+
+    #[cfg(feature = "keccak")]
+    #[test]
+    fn eskeccakk_roundtrip() {
+        roundtrip(AlgorithmInstance::ESKeccakK);
+    }
+
+    #[cfg(feature = "keccak")]
+    #[test]
+    fn eskeccakkr_roundtrip() {
+        roundtrip(AlgorithmInstance::ESKeccakKR);
     }
 }

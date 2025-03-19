@@ -9,17 +9,26 @@ repository = "https://github.com/spruceid/ssi/"
 documentation = "https://docs.rs/ssi-crypto/"
 
 [features]
-default = ["rsa", "secp256k1", "secp256r1", "secp384r1", "keccak", "ripemd-160", "der"]
+default = ["rsa", "secp256k1", "secp256r1", "secp384r1", "der", "keccak", "ripemd-160"]
+
+# Key types and signature functions.
 rsa = ["dep:rsa"]
 ed25519 = ["ed25519-dalek", "blake2"]
 secp256k1 = ["k256", "getrandom", "keccak"]
 secp256r1 = ["p256"]
 secp384r1 = ["p384"]
 bbs = ["dep:bbs", "pairing-plus", "rand_old", "getrandom", "sha2_old", "hkdf"]
+
+# Hash functions.
+sha3 = ["dep:sha3"]
+blake2 = ["dep:blake2"]
+keccak = ["sha3"]
 ripemd-160 = ["ripemd160", "secp256k1"]
-keccak = ["dep:sha3"]
+
+# Other.
 ring = ["dep:ring"]
 der = ["dep:ecdsa", "ecdsa/der"]
+spki = ["dep:spki", "der"]
 
 [dependencies]
 anyhow.workspace = true
@@ -28,7 +37,7 @@ blake2 = { workspace = true, optional = true }
 ssi-bbs.workspace = true
 bbs = { version = "=0.4.1", optional = true }
 bs58 = { workspace = true, features = ["check"] }
-digest = "0.9"
+digest.workspace = true
 ecdsa = { version = "0.16.9", optional = true }
 ed25519-dalek = { workspace = true, optional = true, features = ["rand_core"] }
 getrandom = { workspace = true, optional = true } # Required for wasm targets.
@@ -49,7 +58,7 @@ serde = { workspace = true, features = ["derive"] }
 sha2 = { workspace = true }
 sha3 = { workspace = true, optional = true }
 sha2_old = { package = "sha2", version = "0.8", optional = true }
-spki = "0.7.3"
+spki = { version = "0.7.3", features = ["alloc"], optional = true }
 static-iref.workspace = true
 thiserror.workspace = true
 zeroize = { version = "1.5", features = ["zeroize_derive"] }

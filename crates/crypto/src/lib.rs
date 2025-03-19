@@ -12,6 +12,7 @@ pub use rand;
 #[cfg(feature = "rsa")]
 pub use rsa;
 pub use sha2;
+#[cfg(feature = "sha3")]
 pub use sha3;
 
 pub mod algorithm;
@@ -67,6 +68,9 @@ pub enum Error {
 
     #[error("unsupported algorithm `{0}`")]
     AlgorithmUnsupported(Algorithm),
+
+    #[error("unsupported hash function `{0}`")]
+    HashFunctionUnsupported(HashFunction),
 
     #[error("missing signature")]
     SignatureMissing,

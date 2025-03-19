@@ -16,6 +16,7 @@ use crate::{
     VerifyingKey,
 };
 
+#[cfg(feature = "spki")]
 mod spki;
 
 /// Public key.
@@ -28,15 +29,21 @@ pub enum PublicKey {
     /// size of the key.
     Symmetric(usize),
 
+    /// RSA key.
+    ///
+    /// Requires the `rsa` feature.
     #[cfg(feature = "rsa")]
     Rsa(RsaPublicKey),
 
+    /// ECDSA key.
     Ecdsa(EcdsaPublicKey),
 
+    /// EdDSA key.
     EdDsa(EdDsaPublicKey),
 }
 
 impl PublicKey {
+    /// Returns the key type.
     pub fn r#type(&self) -> KeyType {
         match self {
             Self::Symmetric(len) => KeyType::Symmetric(*len),
@@ -128,11 +135,16 @@ pub enum SecretKey {
     /// Symmetric key.
     Symmetric(SymmetricKey),
 
+    /// RSA key.
+    ///
+    /// Requires the `rsa` feature.
     #[cfg(feature = "rsa")]
     Rsa(RsaSecretKey),
 
+    /// ECDSA key.
     Ecdsa(EcdsaSecretKey),
 
+    /// EdDSA key.
     EdDsa(EdDsaSecretKey),
 }
 
