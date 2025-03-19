@@ -109,7 +109,7 @@ impl From<MalformedSignature> for Error {
 /// [RFC 3279 Section 2.2.3].
 ///
 /// [RFC 3279 Section 2.2.3]: <https://www.rfc-editor.org/rfc/rfc3279#section-2.2.3>
-#[cfg(feature = "der")]
+#[cfg(all(feature = "secp256r1", feature = "der"))]
 pub fn decode_ecdsa_p256_signature_der(
     bytes: impl AsRef<[u8]>,
 ) -> Result<Box<[u8]>, MalformedSignature> {

@@ -386,8 +386,7 @@ impl CoseKeyEncode for CoseKey {
             }
             #[cfg(feature = "secp384r1")]
             SecretKey::Ecdsa(ssi_crypto::key::EcdsaSecretKey::P384(key)) => {
-                use ssi_crypto::p384::elliptic_curve::sec1::ToEncodedPoint;
-                let public_key = key.public_key();
+                let public_key = *key.verifying_key();
                 let encoded_point = public_key.to_encoded_point(false);
                 Ok(Self {
                     kty: KeyType::Assigned(iana::KeyType::EC2),
