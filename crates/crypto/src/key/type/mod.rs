@@ -12,10 +12,10 @@ pub mod rsa;
 pub use rsa::{RsaPublicKey, RsaSecretKey};
 
 pub mod ecdsa;
-pub use ecdsa::{EcdsaKeyType, EcdsaPublicKey, EcdsaSecretKey};
+pub use ecdsa::{EcdsaCurve, EcdsaPublicKey, EcdsaSecretKey};
 
 pub mod eddsa;
-pub use eddsa::{EdDsaKeyType, EdDsaPublicKey, EdDsaSecretKey};
+pub use eddsa::{EdDsaCurve, EdDsaPublicKey, EdDsaSecretKey};
 
 /// Key type.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
@@ -29,10 +29,10 @@ pub enum KeyType {
     Rsa(BitSize),
 
     /// ECDSA key.
-    Ecdsa(EcdsaKeyType),
+    Ecdsa(EcdsaCurve),
 
     /// EdDSA key.
-    EdDsa(EdDsaKeyType),
+    EdDsa(EdDsaCurve),
 }
 
 impl KeyType {
@@ -50,11 +50,11 @@ impl KeyType {
     }
 
     pub fn from_name(name: &str) -> Option<Self> {
-        if let Some(t) = EcdsaKeyType::from_name(name) {
+        if let Some(t) = EcdsaCurve::from_name(name) {
             return Some(Self::Ecdsa(t));
         }
 
-        if let Some(t) = EdDsaKeyType::from_name(name) {
+        if let Some(t) = EdDsaCurve::from_name(name) {
             return Some(Self::EdDsa(t));
         }
 

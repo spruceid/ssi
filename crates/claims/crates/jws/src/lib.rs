@@ -500,8 +500,6 @@ pub fn sign_bytes(algorithm: Algorithm, data: &[u8], key: &JWK) -> Result<Vec<u8
         JWKParams::RSA(rsa_params) => {
             rsa_params.validate_key_size()?;
             let private_key = rsa::RsaPrivateKey::try_from(rsa_params)?;
-            // let padding;
-            // let hashed;
             match algorithm {
                 Algorithm::Rs256 => {
                     let padding = rsa::Pkcs1v15Sign::new::<ssi_crypto::sha2::Sha256>();

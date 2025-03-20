@@ -14,14 +14,14 @@ pub mod ed25519;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 #[non_exhaustive]
-pub enum EdDsaKeyType {
+pub enum EdDsaCurve {
     /// Curve 25519.
     ///
     /// Implementation requires the `ed25519` feature.
     Curve25519,
 }
 
-impl EdDsaKeyType {
+impl EdDsaCurve {
     pub fn name(&self) -> &'static str {
         match self {
             Self::Curve25519 => "Ed25519",
@@ -64,10 +64,10 @@ pub enum EdDsaPublicKey {
 }
 
 impl EdDsaPublicKey {
-    pub fn r#type(&self) -> EdDsaKeyType {
+    pub fn curve(&self) -> EdDsaCurve {
         match self {
             #[cfg(feature = "ed25519")]
-            Self::Curve25519(_) => EdDsaKeyType::Curve25519,
+            Self::Curve25519(_) => EdDsaCurve::Curve25519,
 
             #[allow(unreachable_patterns)]
             _ => unreachable!(),
@@ -88,7 +88,7 @@ impl VerifyingKey for EdDsaPublicKey {
     fn metadata(&self) -> KeyMetadata {
         KeyMetadata {
             id: None,
-            r#type: Some(KeyType::EdDsa(self.r#type())),
+            r#type: Some(KeyType::EdDsa(self.curve())),
             algorithm: None,
         }
     }
@@ -129,7 +129,7 @@ impl Verifier for EdDsaPublicKey {
         signature: &[u8],
         _options: &Options,
     ) -> Result<SignatureVerification, Error> {
-        let algorithm = infer_algorithm(algorithm, || None, || Some(KeyType::EdDsa(self.r#type())))
+        let algorithm = infer_algorithm(algorithm, || None, || Some(KeyType::EdDsa(self.curve())))
             .ok_or(Error::AlgorithmMissing)?;
 
         VerifyingKey::verify_bytes(self, algorithm, signing_bytes, signature)

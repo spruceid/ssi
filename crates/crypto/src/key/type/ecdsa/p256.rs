@@ -5,7 +5,7 @@ use crate::{
 };
 pub use p256::ecdsa::{SigningKey as P256SecretKey, VerifyingKey as P256PublicKey};
 
-use super::{EcdsaKeyType, EcdsaPublicKey, EcdsaSecretKey};
+use super::{EcdsaCurve, EcdsaPublicKey, EcdsaSecretKey};
 
 impl PublicKey {
     /// Creates a new ECDSA P-256 public key.
@@ -50,7 +50,7 @@ impl EcdsaPublicKey {
 impl VerifyingKey for P256PublicKey {
     fn metadata(&self) -> KeyMetadata {
         KeyMetadata {
-            r#type: Some(KeyType::Ecdsa(EcdsaKeyType::P256)),
+            r#type: Some(KeyType::Ecdsa(EcdsaCurve::P256)),
             ..Default::default()
         }
     }

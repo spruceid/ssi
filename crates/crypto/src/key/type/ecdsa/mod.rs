@@ -21,7 +21,7 @@ pub mod p384;
 /// Key type.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 #[non_exhaustive]
-pub enum EcdsaKeyType {
+pub enum EcdsaCurve {
     /// K-256 curve.
     ///
     /// Implementation requires the `secp256k1` feature.
@@ -38,7 +38,7 @@ pub enum EcdsaKeyType {
     P384,
 }
 
-impl EcdsaKeyType {
+impl EcdsaCurve {
     pub fn name(&self) -> &'static str {
         match self {
             Self::K256 => "K-256",
@@ -85,8 +85,8 @@ impl EcdsaKeyType {
     }
 }
 
-impl From<EcdsaKeyType> for KeyType {
-    fn from(value: EcdsaKeyType) -> Self {
+impl From<EcdsaCurve> for KeyType {
+    fn from(value: EcdsaCurve) -> Self {
         Self::Ecdsa(value)
     }
 }
@@ -106,16 +106,16 @@ pub enum EcdsaPublicKey {
 }
 
 impl EcdsaPublicKey {
-    pub fn r#type(&self) -> EcdsaKeyType {
+    pub fn curve(&self) -> EcdsaCurve {
         match self {
             #[cfg(feature = "secp256k1")]
-            Self::K256(_) => EcdsaKeyType::K256,
+            Self::K256(_) => EcdsaCurve::K256,
 
             #[cfg(feature = "secp256r1")]
-            Self::P256(_) => EcdsaKeyType::P256,
+            Self::P256(_) => EcdsaCurve::P256,
 
             #[cfg(feature = "secp384r1")]
-            Self::P384(_) => EcdsaKeyType::P384,
+            Self::P384(_) => EcdsaCurve::P384,
 
             #[allow(unreachable_patterns)]
             _ => unreachable!(),
@@ -142,7 +142,7 @@ impl VerifyingKey for EcdsaPublicKey {
     fn metadata(&self) -> KeyMetadata {
         KeyMetadata {
             id: None,
-            r#type: Some(KeyType::Ecdsa(self.r#type())),
+            r#type: Some(KeyType::Ecdsa(self.curve())),
             algorithm: None,
         }
     }
@@ -189,7 +189,7 @@ impl Verifier for EcdsaPublicKey {
         signature: &[u8],
         _options: &Options,
     ) -> Result<SignatureVerification, Error> {
-        let algorithm = infer_algorithm(algorithm, || None, || Some(KeyType::Ecdsa(self.r#type())))
+        let algorithm = infer_algorithm(algorithm, || None, || Some(KeyType::Ecdsa(self.curve())))
             .ok_or(Error::AlgorithmMissing)?;
 
         VerifyingKey::verify_bytes(self, algorithm, signing_bytes, signature)

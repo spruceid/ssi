@@ -6,7 +6,7 @@ use crate::{
 pub use k256::ecdsa::{SigningKey as K256SecretKey, VerifyingKey as K256PublicKey};
 use sha2::Digest;
 
-use super::{EcdsaKeyType, EcdsaPublicKey, EcdsaSecretKey};
+use super::{EcdsaCurve, EcdsaPublicKey, EcdsaSecretKey};
 
 impl PublicKey {
     /// Creates a new ECDSA K-256 public key.
@@ -51,7 +51,7 @@ impl EcdsaPublicKey {
 impl VerifyingKey for K256PublicKey {
     fn metadata(&self) -> KeyMetadata {
         KeyMetadata {
-            r#type: Some(KeyType::Ecdsa(EcdsaKeyType::K256)),
+            r#type: Some(KeyType::Ecdsa(EcdsaCurve::K256)),
             ..Default::default()
         }
     }

@@ -6,7 +6,7 @@ use crate::{
 pub use ed25519_dalek::{SigningKey as Ed25519SecretKey, VerifyingKey as Ed25519PublicKey};
 use sha2::Digest;
 
-use super::{EdDsaKeyType, EdDsaPublicKey, EdDsaSecretKey};
+use super::{EdDsaCurve, EdDsaPublicKey, EdDsaSecretKey};
 
 impl PublicKey {
     /// Decodes an EdDSA Ed25519 public key encoded as specified in
@@ -34,7 +34,7 @@ impl EdDsaPublicKey {
 impl VerifyingKey for Ed25519PublicKey {
     fn metadata(&self) -> KeyMetadata {
         KeyMetadata {
-            r#type: Some(KeyType::EdDsa(EdDsaKeyType::Curve25519)),
+            r#type: Some(KeyType::EdDsa(EdDsaCurve::Curve25519)),
             ..Default::default()
         }
     }

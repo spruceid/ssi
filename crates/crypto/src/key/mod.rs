@@ -55,9 +55,9 @@ impl PublicKey {
                 KeyType::Rsa(crate::BitSize(k.n().bits()))
             }
 
-            Self::Ecdsa(k) => KeyType::Ecdsa(k.r#type()),
+            Self::Ecdsa(k) => KeyType::Ecdsa(k.curve()),
 
-            Self::EdDsa(k) => KeyType::EdDsa(k.r#type()),
+            Self::EdDsa(k) => KeyType::EdDsa(k.curve()),
         }
     }
 

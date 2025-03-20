@@ -33,8 +33,6 @@ pub struct InvalidSignature;
 
 pub type ProofValidity = Result<(), InvalidSignature>;
 
-// pub struct
-
 pub fn proof_gen(
     pk: &BBSplusPublicKey,
     signature: &[u8],
