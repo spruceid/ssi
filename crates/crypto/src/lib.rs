@@ -6,10 +6,10 @@
 //!
 //! ```
 //! # #[cfg(feature = "secp256r1")] {
-//! use ssi_crypto::{AlgorithmInstance, KeyType, key::EcdsaKeyType};
+//! use ssi_crypto::{AlgorithmInstance, KeyType, key::EcdsaCurve};
 //!
 //! /// Select a key type at run time.
-//! let key_type = KeyType::Ecdsa(EcdsaKeyType::P256);
+//! let key_type = KeyType::Ecdsa(EcdsaCurve::P256);
 //!
 //! /// Generate a key of the given type.
 //! let secret_key = key_type.generate()
