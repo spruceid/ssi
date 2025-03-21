@@ -68,7 +68,7 @@ impl<M: ssi_verification_methods::JwkVerificationMethod, O> AlgorithmSelection<M
     }
 }
 
-impl<M, O> AlgorithmSelection<M, O> for algorithm::Es256KR {
+impl<M, O> AlgorithmSelection<M, O> for algorithm::ES256KR {
     fn select_algorithm(
         _verification_method: &M,
         _options: &O,
@@ -77,7 +77,7 @@ impl<M, O> AlgorithmSelection<M, O> for algorithm::Es256KR {
     }
 }
 
-impl<M, O> AlgorithmSelection<M, O> for algorithm::Es256K {
+impl<M, O> AlgorithmSelection<M, O> for algorithm::ES256K {
     fn select_algorithm(
         _verification_method: &M,
         _options: &O,
@@ -86,7 +86,7 @@ impl<M, O> AlgorithmSelection<M, O> for algorithm::Es256K {
     }
 }
 
-impl<M, O> AlgorithmSelection<M, O> for algorithm::Es256 {
+impl<M, O> AlgorithmSelection<M, O> for algorithm::ES256 {
     fn select_algorithm(
         _verification_method: &M,
         _options: &O,
@@ -95,7 +95,7 @@ impl<M, O> AlgorithmSelection<M, O> for algorithm::Es256 {
     }
 }
 
-impl<M, O> AlgorithmSelection<M, O> for algorithm::EdDsa {
+impl<M, O> AlgorithmSelection<M, O> for algorithm::EdDSA {
     fn select_algorithm(
         _verification_method: &M,
         _options: &O,
@@ -113,7 +113,7 @@ impl<M, O> AlgorithmSelection<M, O> for algorithm::EdBlake2b {
     }
 }
 
-impl<M, O> AlgorithmSelection<M, O> for algorithm::EsBlake2b {
+impl<M, O> AlgorithmSelection<M, O> for algorithm::ESBlake2b {
     fn select_algorithm(
         _verification_method: &M,
         _options: &O,

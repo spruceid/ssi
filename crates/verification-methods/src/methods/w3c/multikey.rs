@@ -234,7 +234,6 @@ impl SigningMethod<ssi_bbs::BBSplusSecretKey, ssi_crypto::algorithm::Bbs> for Mu
         bytes: &[u8],
     ) -> Result<Vec<u8>, MessageSignatureError> {
         self.sign_bytes_multi(secret, algorithm, &[bytes.to_vec()])
-            .map(Into::into)
             .map_err(MessageSignatureError::signature_failed)
     }
 

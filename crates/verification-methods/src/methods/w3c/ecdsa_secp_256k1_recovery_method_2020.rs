@@ -3,7 +3,7 @@ use iref::{Iri, IriBuf, UriBuf};
 use rdf_types::{Interpretation, Vocabulary};
 use serde::{Deserialize, Serialize};
 use ssi_claims_core::{InvalidProof, MessageSignatureError, ProofValidationError, ProofValidity};
-use ssi_crypto::algorithm::Es256KR;
+use ssi_crypto::algorithm::ES256KR;
 use ssi_jwk::JWK;
 use ssi_verification_methods_core::{VerificationMethodSet, VerifyBytes};
 use static_iref::iri;
@@ -102,8 +102,8 @@ pub enum DigestFunction {
 impl DigestFunction {
     pub fn into_crypto_algorithm(self) -> ssi_jwk::Algorithm {
         match self {
-            Self::Sha256 => ssi_jwk::Algorithm::Es256KR,
-            Self::Keccack => ssi_jwk::Algorithm::EsKeccakKR,
+            Self::Sha256 => ssi_jwk::Algorithm::ES256KR,
+            Self::Keccack => ssi_jwk::Algorithm::ESKeccakKR,
         }
     }
 }
@@ -161,10 +161,10 @@ impl EcdsaSecp256k1RecoveryMethod2020 {
     }
 }
 
-impl VerifyBytes<Es256KR> for EcdsaSecp256k1RecoveryMethod2020 {
+impl VerifyBytes<ES256KR> for EcdsaSecp256k1RecoveryMethod2020 {
     fn verify_bytes(
         &self,
-        _: Es256KR,
+        _: ES256KR,
         signing_bytes: &[u8],
         signature: &[u8],
     ) -> Result<ProofValidity, ProofValidationError> {
@@ -417,11 +417,11 @@ impl TryFrom<GenericVerificationMethod> for EcdsaSecp256k1RecoveryMethod2020 {
     }
 }
 
-impl SigningMethod<JWK, ssi_crypto::algorithm::Es256KR> for EcdsaSecp256k1RecoveryMethod2020 {
+impl SigningMethod<JWK, ssi_crypto::algorithm::ES256KR> for EcdsaSecp256k1RecoveryMethod2020 {
     fn sign_bytes(
         &self,
         secret: &JWK,
-        _algorithm: ssi_crypto::algorithm::Es256KR,
+        _algorithm: ssi_crypto::algorithm::ES256KR,
         bytes: &[u8],
     ) -> Result<Vec<u8>, MessageSignatureError> {
         self.sign(secret, bytes, DigestFunction::Sha256)
@@ -429,11 +429,11 @@ impl SigningMethod<JWK, ssi_crypto::algorithm::Es256KR> for EcdsaSecp256k1Recove
     }
 }
 
-impl SigningMethod<JWK, ssi_crypto::algorithm::EsKeccakKR> for EcdsaSecp256k1RecoveryMethod2020 {
+impl SigningMethod<JWK, ssi_crypto::algorithm::ESKeccakKR> for EcdsaSecp256k1RecoveryMethod2020 {
     fn sign_bytes(
         &self,
         secret: &JWK,
-        _algorithm: ssi_crypto::algorithm::EsKeccakKR,
+        _algorithm: ssi_crypto::algorithm::ESKeccakKR,
         bytes: &[u8],
     ) -> Result<Vec<u8>, MessageSignatureError> {
         self.sign(secret, bytes, DigestFunction::Keccack)

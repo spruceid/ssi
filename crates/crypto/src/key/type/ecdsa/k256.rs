@@ -70,9 +70,9 @@ impl VerifyingKey for K256PublicKey {
                 let verification = self.verify(signing_bytes, &sig);
                 Ok(verification.map_err(|_| RejectedSignature::Mismatch))
             }
-            AlgorithmInstance::Es256KR => {
+            AlgorithmInstance::Es256Kr => {
                 let recovered_key =
-                    Self::recover(AlgorithmInstance::Es256KR, signing_bytes, signature)?;
+                    Self::recover(AlgorithmInstance::Es256Kr, signing_bytes, signature)?;
                 if recovered_key == *self {
                     Ok(Ok(()))
                 } else {
@@ -97,9 +97,9 @@ impl VerifyingKey for K256PublicKey {
                 Ok(verification.map_err(|_| RejectedSignature::Mismatch))
             }
             #[cfg(feature = "keccak")]
-            AlgorithmInstance::EsKeccakKR => {
+            AlgorithmInstance::EsKeccakKr => {
                 let recovered_key =
-                    Self::recover(AlgorithmInstance::EsKeccakKR, signing_bytes, signature)?;
+                    Self::recover(AlgorithmInstance::EsKeccakKr, signing_bytes, signature)?;
                 if recovered_key == *self {
                     Ok(Ok(()))
                 } else {
@@ -118,7 +118,7 @@ impl RecoveryKey for K256PublicKey {
         signature: &[u8],
     ) -> Result<Self, Error> {
         match algorithm.into() {
-            AlgorithmInstance::Es256KR => {
+            AlgorithmInstance::Es256Kr => {
                 if signature.len() != 65 {
                     return Err(Error::SignatureMalformed);
                 }
@@ -135,7 +135,7 @@ impl RecoveryKey for K256PublicKey {
                 )
                 .map_err(|_| Error::SignatureMalformed)
             }
-            AlgorithmInstance::EsKeccakKR => {
+            AlgorithmInstance::EsKeccakKr => {
                 if signature.len() != 65 {
                     return Err(Error::SignatureMalformed);
                 }
@@ -205,7 +205,7 @@ impl SigningKey for K256SecretKey {
                 let signature: Signature = self.try_sign(signing_bytes).unwrap(); // Uses SHA-256 by default.
                 Ok(signature.to_bytes().to_vec().into_boxed_slice())
             }
-            AlgorithmInstance::Es256KR => {
+            AlgorithmInstance::Es256Kr => {
                 // NOTE: explicitly using SHA256 here because the default hash
                 //       function provided by the `k256` crate for recovery has
                 //       varied over time across different versions.
@@ -232,7 +232,7 @@ impl SigningKey for K256SecretKey {
                 Ok(signature.to_bytes().to_vec().into_boxed_slice())
             }
             #[cfg(feature = "keccak")]
-            AlgorithmInstance::EsKeccakKR => {
+            AlgorithmInstance::EsKeccakKr => {
                 let digest = sha3::Keccak256::new_with_prefix(signing_bytes);
                 let (sig, rec_id) = self
                     .sign_digest_recoverable(digest)
@@ -272,7 +272,7 @@ mod tests {
 
     #[test]
     fn es256kr_roundtrip() {
-        roundtrip(AlgorithmInstance::Es256KR);
+        roundtrip(AlgorithmInstance::Es256Kr);
     }
 
     #[cfg(feature = "blake2")]
@@ -290,6 +290,6 @@ mod tests {
     #[cfg(feature = "keccak")]
     #[test]
     fn eskeccakkr_roundtrip() {
-        roundtrip(AlgorithmInstance::EsKeccakKR);
+        roundtrip(AlgorithmInstance::EsKeccakKr);
     }
 }

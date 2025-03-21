@@ -412,7 +412,7 @@ algorithms! {
     /// extract the public key from the signature.
     ///
     /// See: <https://github.com/decentralized-identity/EcdsaSecp256k1RecoverySignature2020#es256k-r>
-    Es256KR: "ES256K-R" (Sha256, Ecdsa),
+    Es256Kr: "ES256K-R" (Sha256, Ecdsa),
 
     /// ECDSA using secp256k1 (K-256) and Keccak-256.
     ///
@@ -422,7 +422,7 @@ algorithms! {
     /// ECDSA using secp256k1 (K-256) and Keccak-256 with a recovery bit.
     ///
     /// Like `ES256K-R` but using Keccak-256 instead of SHA-256.
-    EsKeccakKR: "ESKeccakKR" (Keccak256, Ecdsa),
+    EsKeccakKr: "ESKeccakKR" (Keccak256, Ecdsa),
 
     /// ECDSA using P-256 and Blake2b.
     EsBlake2b: "ESBlake2b" (Blake2b256, Ecdsa),
@@ -444,9 +444,9 @@ impl Algorithm {
     /// signature created from `B`.
     pub fn is_compatible_with(&self, other: Self) -> bool {
         match self {
-            Self::Es256K | Self::Es256KR | Self::EsKeccakK | Self::EsKeccakKR => matches!(
+            Self::Es256K | Self::Es256Kr | Self::EsKeccakK | Self::EsKeccakKr => matches!(
                 other,
-                Self::Es256K | Self::Es256KR | Self::EsKeccakK | Self::EsKeccakKR
+                Self::Es256K | Self::Es256Kr | Self::EsKeccakK | Self::EsKeccakKr
             ),
             a => *a == other,
         }

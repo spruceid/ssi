@@ -148,19 +148,19 @@ impl SigningMethod<JWK, ssi_crypto::Algorithm> for AnyMethod {
             },
             #[cfg(feature = "secp256k1")]
             Self::EcdsaSecp256k1RecoveryMethod2020(m) => match algorithm {
-                ssi_crypto::AlgorithmInstance::Es256KR => {
-                    SigningMethod::<_, ssi_crypto::algorithm::Es256KR>::sign_bytes(
+                ssi_crypto::AlgorithmInstance::Es256Kr => {
+                    SigningMethod::<_, ssi_crypto::algorithm::Es256Kr>::sign_bytes(
                         m,
                         secret,
-                        ssi_crypto::algorithm::Es256KR,
+                        ssi_crypto::algorithm::Es256Kr,
                         bytes,
                     )
                 }
-                ssi_crypto::AlgorithmInstance::EsKeccakKR => {
-                    SigningMethod::<_, ssi_crypto::algorithm::EsKeccakKR>::sign_bytes(
+                ssi_crypto::AlgorithmInstance::EsKeccakKr => {
+                    SigningMethod::<_, ssi_crypto::algorithm::EsKeccakKr>::sign_bytes(
                         m,
                         secret,
-                        ssi_crypto::algorithm::EsKeccakKR,
+                        ssi_crypto::algorithm::EsKeccakKr,
                         bytes,
                     )
                 }

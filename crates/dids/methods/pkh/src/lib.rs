@@ -1214,16 +1214,16 @@ mod tests {
         ))
         .unwrap();
         let key_secp256k1_recovery = JWK {
-            algorithm: Some(Algorithm::Es256KR),
+            algorithm: Some(Algorithm::ES256KR),
             ..key_secp256k1.clone()
         };
         let key_secp256k1_eip712sig = JWK {
-            algorithm: Some(Algorithm::Es256KR),
+            algorithm: Some(Algorithm::ES256KR),
             key_operations: Some(vec!["signTypedData".to_string()]),
             ..key_secp256k1.clone()
         };
         let key_secp256k1_epsig = JWK {
-            algorithm: Some(Algorithm::Es256KR),
+            algorithm: Some(Algorithm::ES256KR),
             key_operations: Some(vec!["signPersonalMessage".to_string()]),
             ..key_secp256k1.clone()
         };
@@ -1396,8 +1396,8 @@ mod tests {
             None,
         )
         .await;
-        key_ed25519.algorithm = Some(Algorithm::EdDsa);
-        other_key_ed25519.algorithm = Some(Algorithm::EdDsa);
+        key_ed25519.algorithm = Some(Algorithm::EdDSA);
+        other_key_ed25519.algorithm = Some(Algorithm::EdDSA);
 
         // TODO
         // println!("did:pkh:tz:tz2");
@@ -1411,8 +1411,8 @@ mod tests {
         // .await;
 
         println!("did:pkh:tz:tz3");
-        key_p256.algorithm = Some(Algorithm::EsBlake2b);
-        other_key_p256.algorithm = Some(Algorithm::EsBlake2b);
+        key_p256.algorithm = Some(Algorithm::ESBlake2b);
+        other_key_p256.algorithm = Some(Algorithm::ESBlake2b);
         credential_prove_verify_did_pkh(
             key_p256.clone(),
             other_key_p256.clone(),
@@ -1423,8 +1423,8 @@ mod tests {
             None,
         )
         .await;
-        key_p256.algorithm = Some(Algorithm::Es256);
-        other_key_p256.algorithm = Some(Algorithm::Es256);
+        key_p256.algorithm = Some(Algorithm::ES256);
+        other_key_p256.algorithm = Some(Algorithm::ES256);
 
         println!("did:pkh:sol");
         credential_prove_verify_did_pkh(
@@ -1485,8 +1485,8 @@ mod tests {
             AnySuite::TezosSignature2021,
         )
         .await;
-        key_ed25519.algorithm = Some(Algorithm::EdDsa);
-        other_key_ed25519.algorithm = Some(Algorithm::EdDsa);
+        key_ed25519.algorithm = Some(Algorithm::EdDSA);
+        other_key_ed25519.algorithm = Some(Algorithm::EdDSA);
 
         /* https://github.com/spruceid/ssi/issues/194
         println!("did:pkh:tz:tz2 - TezosMethod2021");
@@ -1502,8 +1502,8 @@ mod tests {
         */
 
         println!("did:pkh:tz:tz3 - TezosMethod2021");
-        key_p256.algorithm = Some(Algorithm::EsBlake2b);
-        other_key_p256.algorithm = Some(Algorithm::EsBlake2b);
+        key_p256.algorithm = Some(Algorithm::ESBlake2b);
+        other_key_p256.algorithm = Some(Algorithm::ESBlake2b);
         credential_prepare_complete_verify_did_pkh_tz(
             key_p256.clone(),
             other_key_p256.clone(),
@@ -1512,8 +1512,8 @@ mod tests {
             AnySuite::TezosSignature2021,
         )
         .await;
-        key_p256.algorithm = Some(Algorithm::Es256);
-        other_key_p256.algorithm = Some(Algorithm::Es256);
+        key_p256.algorithm = Some(Algorithm::ES256);
+        other_key_p256.algorithm = Some(Algorithm::ES256);
     }
 
     async fn test_verify_vc(name: &str, vc_str: &str, _num_warnings: usize) {

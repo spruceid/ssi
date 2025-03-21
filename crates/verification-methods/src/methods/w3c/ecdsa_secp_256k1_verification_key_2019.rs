@@ -25,8 +25,8 @@ pub enum DigestFunction {
 impl DigestFunction {
     pub fn into_crypto_algorithm(self) -> ssi_jwk::Algorithm {
         match self {
-            Self::Sha256 => ssi_jwk::Algorithm::Es256K,
-            Self::Keccack => ssi_jwk::Algorithm::EsKeccakK,
+            Self::Sha256 => ssi_jwk::Algorithm::ES256K,
+            Self::Keccack => ssi_jwk::Algorithm::ESKeccakK,
         }
     }
 }
@@ -106,7 +106,7 @@ impl EcdsaSecp256k1VerificationKey2019 {
         }
 
         Ok(
-            ssi_jws::verify_bytes(ssi_jwk::Algorithm::Es256K, data, &public_key, signature)
+            ssi_jws::verify_bytes(ssi_jwk::Algorithm::ES256K, data, &public_key, signature)
                 .map_err(|_| InvalidProof::Signature),
         )
     }
@@ -157,10 +157,10 @@ impl JwkVerificationMethod for EcdsaSecp256k1VerificationKey2019 {
     }
 }
 
-impl VerifyBytes<ssi_crypto::algorithm::Es256K> for EcdsaSecp256k1VerificationKey2019 {
+impl VerifyBytes<ssi_crypto::algorithm::ES256K> for EcdsaSecp256k1VerificationKey2019 {
     fn verify_bytes(
         &self,
-        _: ssi_crypto::algorithm::Es256K,
+        _: ssi_crypto::algorithm::ES256K,
         signing_bytes: &[u8],
         signature: &[u8],
     ) -> Result<ProofValidity, ProofValidationError> {

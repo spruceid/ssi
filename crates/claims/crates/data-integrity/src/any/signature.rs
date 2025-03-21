@@ -77,25 +77,25 @@ impl IntoAnySignatureAlgorithm for ssi_crypto::AlgorithmInstance {
     }
 }
 
-impl IntoAnySignatureAlgorithm for ssi_crypto::algorithm::Rs256 {
+impl IntoAnySignatureAlgorithm for ssi_crypto::algorithm::RS256 {
     fn into_any_signature_algorithm(self) -> AnySignatureAlgorithmInstance {
         WithProtocol(self.into(), AnyProtocol::None)
     }
 }
 
-impl IntoAnySignatureAlgorithm for ssi_crypto::algorithm::Es256 {
+impl IntoAnySignatureAlgorithm for ssi_crypto::algorithm::ES256 {
     fn into_any_signature_algorithm(self) -> AnySignatureAlgorithmInstance {
         WithProtocol(self.into(), AnyProtocol::None)
     }
 }
 
-impl IntoAnySignatureAlgorithm for ssi_crypto::algorithm::Es256K {
+impl IntoAnySignatureAlgorithm for ssi_crypto::algorithm::ES256K {
     fn into_any_signature_algorithm(self) -> AnySignatureAlgorithmInstance {
         WithProtocol(self.into(), AnyProtocol::None)
     }
 }
 
-impl IntoAnySignatureAlgorithm for ssi_crypto::algorithm::Es256KR {
+impl IntoAnySignatureAlgorithm for ssi_crypto::algorithm::ES256KR {
     fn into_any_signature_algorithm(self) -> AnySignatureAlgorithmInstance {
         WithProtocol(self.into(), AnyProtocol::None)
     }
@@ -107,7 +107,7 @@ impl IntoAnySignatureAlgorithm for ssi_crypto::algorithm::AnyESKeccakK {
     }
 }
 
-impl IntoAnySignatureAlgorithm for ssi_crypto::algorithm::EdDsa {
+impl IntoAnySignatureAlgorithm for ssi_crypto::algorithm::EdDSA {
     fn into_any_signature_algorithm(self) -> AnySignatureAlgorithmInstance {
         WithProtocol(self.into(), AnyProtocol::None)
     }
@@ -119,7 +119,7 @@ impl IntoAnySignatureAlgorithm for ssi_crypto::algorithm::EdBlake2b {
     }
 }
 
-impl IntoAnySignatureAlgorithm for ssi_crypto::algorithm::EsBlake2b {
+impl IntoAnySignatureAlgorithm for ssi_crypto::algorithm::ESBlake2b {
     fn into_any_signature_algorithm(self) -> AnySignatureAlgorithmInstance {
         WithProtocol(self.into(), AnyProtocol::None)
     }

@@ -981,7 +981,7 @@ mod tests {
         fn validate_key(key: &JWK) -> bool {
             is_secp256k1(key)
         }
-        const SIGNATURE_ALGORITHM: Algorithm = Algorithm::Es256K;
+        const SIGNATURE_ALGORITHM: Algorithm = Algorithm::ES256K;
         const METHOD: &'static str = "sidetree";
     }
 

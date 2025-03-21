@@ -113,12 +113,12 @@ pub fn jwk_from_tezos_key(tz_pk: &str) -> Result<JWK, DecodeTezosPkError> {
         Some("sppk") => {
             let pk_bytes = bs58::decode(&tz_pk).with_check(None).into_vec()?[4..].to_owned();
             let jwk = ssi_jwk::secp256k1_parse(&pk_bytes)?;
-            (Algorithm::EsBlake2bK, jwk.params)
+            (Algorithm::ESBlake2bK, jwk.params)
         }
         Some("p2pk") => {
             let pk_bytes = bs58::decode(&tz_pk).with_check(None).into_vec()?[4..].to_owned();
             let jwk = ssi_jwk::p256_parse(&pk_bytes)?;
-            (Algorithm::EsBlake2b, jwk.params)
+            (Algorithm::ESBlake2b, jwk.params)
         }
         // TODO: more secret keys
         _ => return Err(DecodeTezosPkError::KeyPrefix),
@@ -153,8 +153,8 @@ pub fn sign_tezos(data: &[u8], algorithm: Algorithm, key: &JWK) -> Result<String
     const P2SIG_PREFIX: [u8; 4] = [54, 240, 44, 52];
     let prefix: &[u8] = match algorithm {
         Algorithm::EdBlake2b => &EDSIG_PREFIX,
-        Algorithm::EsBlake2bK => &SPSIG_PREFIX,
-        Algorithm::EsBlake2b => &P2SIG_PREFIX,
+        Algorithm::ESBlake2bK => &SPSIG_PREFIX,
+        Algorithm::ESBlake2b => &P2SIG_PREFIX,
         alg => return Err(SignTezosError::UnsupportedAlgorithm(alg)),
     };
     sig_prefixed.extend_from_slice(prefix);
@@ -205,8 +205,8 @@ pub fn decode_tzsig(sig_bs58: &str) -> Result<(Algorithm, Vec<u8>), DecodeTezosS
     // measure.
     let (algorithm, sig) = match sig_bs58.get(0..5) {
         Some("edsig") => (Algorithm::EdBlake2b, tzsig[5..].to_vec()),
-        Some("spsig") => (Algorithm::EsBlake2bK, tzsig[5..].to_vec()),
-        Some("p2sig") => (Algorithm::EsBlake2b, tzsig[4..].to_vec()),
+        Some("spsig") => (Algorithm::ESBlake2bK, tzsig[5..].to_vec()),
+        Some("p2sig") => (Algorithm::ESBlake2b, tzsig[4..].to_vec()),
         _ => {
             return Err(DecodeTezosSignatureError::SignaturePrefix(
                 sig_bs58.to_string(),
@@ -279,9 +279,9 @@ mod tests {
 
         let sig_bs58 = "spsig1TJjahaMVSCyvSBPvHJFXQ1WxASgHsygTvxgJxAWbYsv5R9nH1yzj5BEeHoqmHCogVYioVCbeKDNDwP17hMaM9foFdF8SS";
         let (_, sig) = decode_tzsig(sig_bs58).unwrap();
-        ssi_jws::verify_bytes(Algorithm::EsBlake2bK, &tsm, &jwk, &sig).unwrap();
+        ssi_jws::verify_bytes(Algorithm::ESBlake2bK, &tsm, &jwk, &sig).unwrap();
         tsm[1] ^= 1;
-        ssi_jws::verify_bytes(Algorithm::EsBlake2bK, &tsm, &jwk, &sig).unwrap_err();
+        ssi_jws::verify_bytes(Algorithm::ESBlake2bK, &tsm, &jwk, &sig).unwrap_err();
     }
 
     #[test]
@@ -329,7 +329,7 @@ mod tests {
         let tsm = encode_tezos_signed_message("example.org 2021-05-26T17:01:41Z Signed with ssi")
             .unwrap();
         eprintln!("msg: {:x?}", tsm);
-        let sig = sign_tezos(&tsm, Algorithm::EsBlake2bK, &key).unwrap();
+        let sig = sign_tezos(&tsm, Algorithm::ESBlake2bK, &key).unwrap();
         let sig_expected = "spsig1NRgjYaq8jeaWTMPUSsxkawWUzW1C3RoMfczWY2JAZSkNQQGM9QvCkxtRMcauJRaSUNcKgkj6WfpzLh1upXwjcfLh4wqqX";
         assert_eq!(sig, sig_expected);
     }

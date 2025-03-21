@@ -66,7 +66,7 @@ impl Ed25519VerificationKey2018 {
         data: &[u8],
         secret_key: &ed25519_dalek::SigningKey,
     ) -> Result<JwsString, SignatureError> {
-        let header = ssi_jws::Header::new_unencoded(ssi_jwk::Algorithm::EdDsa, None);
+        let header = ssi_jws::Header::new_unencoded(ssi_jwk::Algorithm::EdDSA, None);
         let signing_bytes = header.encode_signing_bytes(data);
         let signature = secret_key.sign(&signing_bytes);
 
@@ -146,22 +146,22 @@ impl TryFrom<GenericVerificationMethod> for Ed25519VerificationKey2018 {
     }
 }
 
-impl SigningMethod<JWK, ssi_crypto::algorithm::EdDsa> for Ed25519VerificationKey2018 {
+impl SigningMethod<JWK, ssi_crypto::algorithm::EdDSA> for Ed25519VerificationKey2018 {
     fn sign_bytes(
         &self,
         secret: &JWK,
-        _algorithm: ssi_crypto::algorithm::EdDsa,
+        _algorithm: ssi_crypto::algorithm::EdDSA,
         bytes: &[u8],
     ) -> Result<Vec<u8>, MessageSignatureError> {
-        ssi_jws::sign_bytes(ssi_jwk::Algorithm::EdDsa, bytes, secret)
+        ssi_jws::sign_bytes(ssi_jwk::Algorithm::EdDSA, bytes, secret)
             .map_err(MessageSignatureError::signature_failed)
     }
 }
 
-impl VerifyBytes<ssi_crypto::algorithm::EdDsa> for Ed25519VerificationKey2018 {
+impl VerifyBytes<ssi_crypto::algorithm::EdDSA> for Ed25519VerificationKey2018 {
     fn verify_bytes(
         &self,
-        _: ssi_crypto::algorithm::EdDsa,
+        _: ssi_crypto::algorithm::EdDSA,
         signing_bytes: &[u8],
         signature: &[u8],
     ) -> Result<ProofValidity, ProofValidationError> {

@@ -66,7 +66,7 @@ impl RsaVerificationKey2018 {
         data: &[u8],
         secret_key: &JWK,
     ) -> Result<Vec<u8>, MessageSignatureError> {
-        ssi_jws::sign_bytes(ssi_jwk::Algorithm::Rs256, data, secret_key)
+        ssi_jws::sign_bytes(ssi_jwk::Algorithm::RS256, data, secret_key)
             .map_err(|_| MessageSignatureError::InvalidSecretKey)
     }
 
@@ -76,7 +76,7 @@ impl RsaVerificationKey2018 {
         signature: &[u8],
     ) -> Result<ProofValidity, ProofValidationError> {
         let result =
-            ssi_jws::verify_bytes(ssi_jwk::Algorithm::Rs256, data, &self.public_key, signature);
+            ssi_jws::verify_bytes(ssi_jwk::Algorithm::RS256, data, &self.public_key, signature);
         match result {
             Ok(()) => Ok(Ok(())),
             Err(ssi_jws::Error::InvalidSignature) => Ok(Err(InvalidProof::Signature)),

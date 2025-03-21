@@ -112,7 +112,7 @@ impl VerificationAlgorithm<SolanaSignature2021> for SolanaSignatureAlgorithm {
         let signature_bytes = Base58Btc::decode_signature(proof.signature.proof_value.as_bytes())
             .map_err(|_| ProofValidationError::InvalidSignature)?;
         Ok(ssi_jws::verify_bytes(
-            ssi_jwk::Algorithm::EdDsa,
+            ssi_jwk::Algorithm::EdDSA,
             &signing_bytes,
             &method.public_key,
             &signature_bytes,

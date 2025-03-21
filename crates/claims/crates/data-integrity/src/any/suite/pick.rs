@@ -20,14 +20,14 @@ impl AnySuite {
         let algorithm = jwk.get_algorithm()?;
         match algorithm {
             #[cfg(all(feature = "w3c", feature = "rsa"))]
-            Algorithm::Rs256 => Some(Self::RsaSignature2018),
+            Algorithm::RS256 => Some(Self::RsaSignature2018),
             #[cfg(feature = "w3c")]
-            Algorithm::Ps256 => Some(Self::JsonWebSignature2020),
+            Algorithm::PS256 => Some(Self::JsonWebSignature2020),
             #[cfg(feature = "w3c")]
-            Algorithm::Es384 => Some(Self::JsonWebSignature2020),
+            Algorithm::ES384 => Some(Self::JsonWebSignature2020),
             #[cfg(feature = "aleo")]
             Algorithm::AleoTestnet1Signature => Some(Self::AleoSignature2021),
-            Algorithm::EdDsa | Algorithm::EdBlake2b => match verification_method {
+            Algorithm::EdDSA | Algorithm::EdBlake2b => match verification_method {
                 #[cfg(feature = "solana")]
                 Some(vm)
                     if (vm.id().starts_with("did:sol:") || vm.id().starts_with("did:pkh:sol:"))
@@ -56,7 +56,7 @@ impl AnySuite {
                     None
                 }
             },
-            Algorithm::Es256 | Algorithm::EsBlake2b => match verification_method {
+            Algorithm::ES256 | Algorithm::ESBlake2b => match verification_method {
                 #[cfg(feature = "tezos")]
                 Some(vm)
                     if vm.id().starts_with("did:tz:") || vm.id().starts_with("did:pkh:tz:") =>
@@ -78,7 +78,7 @@ impl AnySuite {
                     None
                 }
             },
-            Algorithm::Es256K | Algorithm::EsBlake2bK => match verification_method {
+            Algorithm::ES256K | Algorithm::ESBlake2bK => match verification_method {
                 #[cfg(any(feature = "tezos", feature = "dif"))]
                 #[allow(unreachable_code)]
                 Some(vm)
@@ -99,7 +99,7 @@ impl AnySuite {
                 #[allow(unreachable_patterns)]
                 _ => None,
             },
-            Algorithm::Es256KR => {
+            Algorithm::ES256KR => {
                 // #[allow(clippy::if_same_then_else)]
                 #[cfg(all(feature = "w3c", feature = "eip712"))]
                 if use_eip712sig(jwk) {

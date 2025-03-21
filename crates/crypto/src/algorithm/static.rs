@@ -1,8 +1,14 @@
 //! Legacy types and traits, soon to be removed.
 use core::fmt;
 
-use super::{
-    Algorithm, AlgorithmInstance, Es256K, Es256KR, EsKeccakK, EsKeccakKR, UnsupportedAlgorithm,
+use super::{Algorithm, AlgorithmInstance, UnsupportedAlgorithm};
+
+// Legacy names.
+pub use super::{
+    EdDsa as EdDSA, Es256 as ES256, Es256K as ES256K, Es256Kr as ES256KR, Es384 as ES384,
+    EsBlake2b as ESBlake2b, EsBlake2bK as ESBlake2bK, EsKeccakK as ESKeccakK,
+    EsKeccakKr as ESKeccakKR, Hs256 as HS256, Hs384 as HS384, Hs512 as HS512, Ps256 as PS256,
+    Ps384 as PS384, Ps512 as PS512, Rs256 as RS256, Rs384 as RS384, Rs512 as RS512,
 };
 
 pub trait SignatureAlgorithmType {
@@ -43,7 +49,7 @@ impl TryFrom<Algorithm> for AnyES256K {
     fn try_from(value: Algorithm) -> Result<Self, Self::Error> {
         match value {
             Algorithm::Es256K => Ok(Self::ES256K),
-            Algorithm::Es256KR => Ok(Self::ES256KR),
+            Algorithm::Es256Kr => Ok(Self::ES256KR),
             other => Err(UnsupportedAlgorithm(other)),
         }
     }
@@ -53,19 +59,19 @@ impl From<AnyES256K> for Algorithm {
     fn from(value: AnyES256K) -> Self {
         match value {
             AnyES256K::ES256K => Self::Es256K,
-            AnyES256K::ES256KR => Self::Es256KR,
+            AnyES256K::ES256KR => Self::Es256Kr,
         }
     }
 }
 
-impl From<Es256K> for AnyES256K {
-    fn from(_value: Es256K) -> Self {
+impl From<ES256K> for AnyES256K {
+    fn from(_value: ES256K) -> Self {
         Self::ES256K
     }
 }
 
-impl From<Es256KR> for AnyES256K {
-    fn from(_value: Es256KR) -> Self {
+impl From<ES256KR> for AnyES256K {
+    fn from(_value: ES256KR) -> Self {
         Self::ES256KR
     }
 }
@@ -102,7 +108,7 @@ impl TryFrom<Algorithm> for AnyESKeccakK {
     fn try_from(value: Algorithm) -> Result<Self, Self::Error> {
         match value {
             Algorithm::EsKeccakK => Ok(Self::ESKeccakK),
-            Algorithm::EsKeccakKR => Ok(Self::ESKeccakKR),
+            Algorithm::EsKeccakKr => Ok(Self::ESKeccakKR),
             other => Err(UnsupportedAlgorithm(other)),
         }
     }
@@ -112,7 +118,7 @@ impl From<AnyESKeccakK> for Algorithm {
     fn from(value: AnyESKeccakK) -> Self {
         match value {
             AnyESKeccakK::ESKeccakK => Self::EsKeccakK,
-            AnyESKeccakK::ESKeccakKR => Self::EsKeccakKR,
+            AnyESKeccakK::ESKeccakKR => Self::EsKeccakKr,
         }
     }
 }
@@ -121,19 +127,19 @@ impl From<AnyESKeccakK> for AlgorithmInstance {
     fn from(value: AnyESKeccakK) -> Self {
         match value {
             AnyESKeccakK::ESKeccakK => Self::EsKeccakK,
-            AnyESKeccakK::ESKeccakKR => Self::EsKeccakKR,
+            AnyESKeccakK::ESKeccakKR => Self::EsKeccakKr,
         }
     }
 }
 
-impl From<EsKeccakK> for AnyESKeccakK {
-    fn from(_value: EsKeccakK) -> Self {
+impl From<ESKeccakK> for AnyESKeccakK {
+    fn from(_value: ESKeccakK) -> Self {
         Self::ESKeccakK
     }
 }
 
-impl From<EsKeccakKR> for AnyESKeccakK {
-    fn from(_value: EsKeccakKR) -> Self {
+impl From<ESKeccakKR> for AnyESKeccakK {
+    fn from(_value: ESKeccakKR) -> Self {
         Self::ESKeccakKR
     }
 }
@@ -173,7 +179,7 @@ impl TryFrom<Algorithm> for AnyES {
     fn try_from(value: Algorithm) -> Result<Self, Self::Error> {
         match value {
             Algorithm::Es256K => Ok(Self::ES256K),
-            Algorithm::Es256KR => Ok(Self::ES256KR),
+            Algorithm::Es256Kr => Ok(Self::ES256KR),
             other => Err(UnsupportedAlgorithm(other)),
         }
     }
@@ -183,21 +189,21 @@ impl From<AnyES> for Algorithm {
     fn from(value: AnyES) -> Self {
         match value {
             AnyES::ES256K => Self::Es256K,
-            AnyES::ES256KR => Self::Es256KR,
+            AnyES::ES256KR => Self::Es256Kr,
             AnyES::ESKeccakK => Self::EsKeccakK,
-            AnyES::ESKeccakKR => Self::EsKeccakKR,
+            AnyES::ESKeccakKR => Self::EsKeccakKr,
         }
     }
 }
 
-impl From<Es256K> for AnyES {
-    fn from(_value: Es256K) -> Self {
+impl From<ES256K> for AnyES {
+    fn from(_value: ES256K) -> Self {
         Self::ES256K
     }
 }
 
-impl From<Es256KR> for AnyES {
-    fn from(_value: Es256KR) -> Self {
+impl From<ES256KR> for AnyES {
+    fn from(_value: ES256KR) -> Self {
         Self::ES256KR
     }
 }

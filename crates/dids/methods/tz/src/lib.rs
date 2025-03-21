@@ -673,7 +673,7 @@ mod tests {
             key_id: Some(format!("{}#blockchainAccountId", did)),
             ..ssi_tzkey::jwk_from_tezos_key(sk).unwrap()
         };
-        let jws = encode_sign(ssi_jwk::Algorithm::EdDsa, JSON_PATCH, &key).unwrap();
+        let jws = encode_sign(ssi_jwk::Algorithm::EdDSA, JSON_PATCH, &key).unwrap();
         let json_update = Updates::SignedIetfJsonPatch(vec![jws.clone()]);
         DIDTZ
             .tier3_updates(Prefix::TZ1, &mut doc, json_update)
@@ -734,7 +734,7 @@ mod tests {
             x509_thumbprint_sha1: None,
             x509_thumbprint_sha256: None,
         };
-        let jws = encode_sign(ssi_jwk::Algorithm::Es256KR, JSON_PATCH, &key).unwrap();
+        let jws = encode_sign(ssi_jwk::Algorithm::ES256KR, JSON_PATCH, &key).unwrap();
         let json_update = Updates::SignedIetfJsonPatch(vec![jws.clone()]);
         DIDTZ
             .tier3_updates(Prefix::TZ2, &mut doc, json_update)
@@ -794,7 +794,7 @@ mod tests {
             x509_thumbprint_sha1: None,
             x509_thumbprint_sha256: None,
         };
-        let jws = encode_sign(ssi_jwk::Algorithm::Es256, JSON_PATCH, &key).unwrap();
+        let jws = encode_sign(ssi_jwk::Algorithm::ES256, JSON_PATCH, &key).unwrap();
         let json_update = Updates::SignedIetfJsonPatch(vec![jws.clone()]);
         DIDTZ
             .tier3_updates(Prefix::TZ3, &mut doc, json_update)

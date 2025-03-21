@@ -112,7 +112,7 @@ impl VerifyBytesWithRecoveryJwk<ssi_crypto::algorithm::EsBlake2b>
     ) -> Result<ProofValidity, ProofValidationError> {
         if self.matches_public_key(public_jwk)? {
             Ok(ssi_jws::verify_bytes(
-                ssi_jwk::Algorithm::EsBlake2b,
+                ssi_jwk::Algorithm::ESBlake2b,
                 signing_bytes,
                 public_jwk,
                 signature,
@@ -167,7 +167,7 @@ impl SigningMethod<JWK, ssi_crypto::algorithm::EsBlake2b>
         _algorithm: ssi_crypto::algorithm::EsBlake2b,
         bytes: &[u8],
     ) -> Result<Vec<u8>, MessageSignatureError> {
-        ssi_jws::sign_bytes(Algorithm::EsBlake2b, bytes, key)
+        ssi_jws::sign_bytes(Algorithm::ESBlake2b, bytes, key)
             .map_err(MessageSignatureError::signature_failed)
     }
 }
