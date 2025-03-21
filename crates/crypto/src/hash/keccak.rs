@@ -1,4 +1,4 @@
-use keccak_hash::keccak;
+use sha3::Digest;
 
 pub fn bytes_to_lowerhex(bytes: &[u8]) -> String {
     use std::fmt::Write;
@@ -17,7 +17,7 @@ pub fn hash_public_key(k: &k256::PublicKey) -> String {
     use k256::elliptic_curve::sec1::ToEncodedPoint;
     let pk_ec = k.to_encoded_point(false);
     let pk_bytes = pk_ec.as_bytes();
-    let hash = keccak(&pk_bytes[1..65]).to_fixed_bytes();
+    let hash = sha3::Keccak256::digest(&pk_bytes[1..65]);
     let hash_last20 = &hash[12..32];
     bytes_to_lowerhex(hash_last20)
 }
@@ -51,7 +51,7 @@ pub fn eip55_checksum_addr(addr: &str) -> Result<String, Eip155Error> {
     if addr.contains(|c: char| c.is_ascii_uppercase()) {
         return Err(Eip155Error::ExpectedLowerCase);
     }
-    let eip55_hash = keccak(addr.as_bytes()).to_fixed_bytes();
+    let eip55_hash = sha3::Keccak256::digest(addr.as_bytes());
     let checksummed_addr = addr
         .chars()
         .enumerate()
@@ -77,7 +77,7 @@ pub fn prefix_personal_message<M: ?Sized + AsRef<[u8]>>(msg: &M) -> Vec<u8> {
 
 pub fn hash_personal_message(msg: &str) -> Vec<u8> {
     let data = prefix_personal_message(msg);
-    keccak(data).to_fixed_bytes().to_vec()
+    sha3::Keccak256::digest(data).to_vec()
 }
 
 #[cfg(test)]

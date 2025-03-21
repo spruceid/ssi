@@ -1,7 +1,7 @@
 use crate::Bbs2023;
 use serde::{Deserialize, Serialize};
-use ssi_bbs::Bbs;
 use ssi_claims_core::{ProofValidationError, SignatureError};
+use ssi_crypto::algorithm::Bbs;
 use ssi_data_integrity_core::{
     signing::AlterSignature,
     suite::standard::{SignatureAlgorithm, SignatureAndVerificationAlgorithm},
