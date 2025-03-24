@@ -229,6 +229,11 @@ impl<'a, T> DecodedJws<'a, T> {
         .unwrap()
     }
 
+    /// Takes ownership of the signing bytes, cloning them if necessary.
+    pub fn into_owned_signing_bytes(self) -> DecodedJws<'static, T> {
+        DecodedJws::new(self.signing_bytes.into_owned_bytes(), self.signature)
+    }
+
     /// Verify the JWS signature.
     ///
     /// This will check the signature and the validity of the decoded payload.
@@ -317,6 +322,14 @@ impl<'a, T> DecodedSigningBytes<'a, T> {
             header: self.header,
             payload: f(self.payload)?,
         })
+    }
+
+    pub fn into_owned_bytes(self) -> DecodedSigningBytes<'static, T> {
+        DecodedSigningBytes {
+            bytes: Cow::Owned(self.bytes.into_owned()),
+            header: self.header,
+            payload: self.payload,
+        }
     }
 }
 

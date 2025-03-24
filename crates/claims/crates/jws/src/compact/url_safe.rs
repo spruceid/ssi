@@ -1,7 +1,7 @@
 use base64::Engine;
 use core::fmt;
 use ssi_core::BytesBuf;
-use std::{ops::Deref, str::FromStr};
+use std::{borrow::Borrow, ops::Deref, str::FromStr};
 
 use crate::{
     utils::is_url_safe_base64_char, DecodeError, DecodedJws, Header, InvalidJws, JwsSlice, JwsStr,
@@ -130,6 +130,17 @@ impl Jws {
             // Safety: we already checked that the bytes are a valid UTF-8
             // string.
             std::str::from_utf8_unchecked(self.0.as_bytes())
+        }
+    }
+}
+
+impl ToOwned for Jws {
+    type Owned = JwsBuf;
+
+    fn to_owned(&self) -> Self::Owned {
+        unsafe {
+            // SAFETY: a `Jws` is a valid URL-safe JWS by construction.
+            JwsBuf::new_unchecked(self.0.to_owned().into_bytes())
         }
     }
 }
@@ -286,8 +297,12 @@ impl JwsBuf {
         Self::new_unchecked(bytes)
     }
 
-    pub fn as_compact_jws_str(&self) -> &Jws {
-        unsafe { Jws::new_unchecked(self.0.as_bytes()) }
+    pub fn as_jws_str(&self) -> &Jws {
+        unsafe {
+            // SAFETY: we validated that the inner value is an URL-safe JWS in
+            //         the `new` function.
+            Jws::new_unchecked(self.0.as_bytes())
+        }
     }
 
     pub fn into_signing_bytes(mut self) -> String {
@@ -310,7 +325,13 @@ impl Deref for JwsBuf {
     type Target = Jws;
 
     fn deref(&self) -> &Self::Target {
-        self.as_compact_jws_str()
+        self.as_jws_str()
+    }
+}
+
+impl Borrow<Jws> for JwsBuf {
+    fn borrow(&self) -> &Jws {
+        self.as_jws_str()
     }
 }
 
@@ -353,7 +374,7 @@ impl<'de> serde::Deserialize<'de> for JwsBuf {
             type Value = JwsBuf;
 
             fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
-                formatter.write_str("compact JWS")
+                formatter.write_str("URL-safe JWS")
             }
 
             fn visit_str<E>(self, v: &str) -> Result<Self::Value, E>
