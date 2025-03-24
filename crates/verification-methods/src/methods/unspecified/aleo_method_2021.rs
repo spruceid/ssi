@@ -66,7 +66,7 @@ impl AleoMethod2021 {
         key: &JWK, // FIXME: check key algorithm?
         bytes: &[u8],
     ) -> Result<Vec<u8>, MessageSignatureError> {
-        ssi_jwk::aleo::sign(bytes, key).map_err(|_| MessageSignatureError::InvalidSecretKey)
+        ssi_jwk::okp::aleo::sign(bytes, key).map_err(|_| MessageSignatureError::InvalidSecretKey)
     }
 
     pub fn verify_bytes(
@@ -75,13 +75,13 @@ impl AleoMethod2021 {
         bytes: &[u8],
         signature: &[u8],
     ) -> Result<bool, MessageSignatureError> {
-        match ssi_jwk::aleo::verify(
+        match ssi_jwk::okp::aleo::verify(
             bytes,
             &self.blockchain_account_id.account_address,
             signature,
         ) {
             Ok(()) => Ok(true),
-            Err(ssi_jwk::aleo::AleoVerifyError::InvalidSignature) => Ok(false),
+            Err(ssi_jwk::okp::aleo::AleoVerifyError::InvalidSignature) => Ok(false),
             Err(_) => Err(MessageSignatureError::InvalidSecretKey),
         }
     }
