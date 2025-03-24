@@ -143,7 +143,7 @@ impl Codec for JWK {
 pub enum FromMulticodecError {
     #[cfg(feature = "rsa")]
     #[error(transparent)]
-    RsaPub(crate::RsaX509PubParseError),
+    RsaPub(crate::rsa::RsaX509PubParseError),
 
     #[cfg(feature = "ed25519")]
     #[error(transparent)]

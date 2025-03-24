@@ -31,11 +31,11 @@ pub fn hash_public_key(jwk: &JWK) -> Result<String, Error> {
             let curve = params.curve.as_ref().ok_or(Error::MissingCurve)?;
             match &curve[..] {
                 "secp256k1" => {
-                    bytes = crate::serialize_secp256k1(params)?;
+                    bytes = crate::ec::k256::serialize_secp256k1(params)?;
                     (&TZ2_HASH, &bytes)
                 }
                 "P-256" => {
-                    bytes = crate::serialize_p256(params)?;
+                    bytes = crate::ec::p256::serialize_p256(params)?;
                     (&TZ3_HASH, &bytes)
                 }
                 _ => return Err(Error::CurveNotImplemented(curve.to_string())),
