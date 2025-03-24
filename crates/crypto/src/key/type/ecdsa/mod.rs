@@ -232,7 +232,7 @@ impl EcdsaSecretKey {
         &self,
         algorithm: impl Into<AlgorithmInstance>,
         signing_bytes: &[u8],
-    ) -> Result<Box<[u8]>, Error> {
+    ) -> Result<Vec<u8>, Error> {
         SigningKey::sign_bytes(self, algorithm, signing_bytes)
     }
 }
@@ -243,7 +243,7 @@ impl SigningKey for EcdsaSecretKey {
         &self,
         algorithm: impl Into<AlgorithmInstance>,
         signing_bytes: &[u8],
-    ) -> Result<Box<[u8]>, Error> {
+    ) -> Result<Vec<u8>, Error> {
         match self {
             #[cfg(feature = "secp256r1")]
             Self::P256(key) => key.sign_bytes(algorithm, signing_bytes),
@@ -269,7 +269,7 @@ impl Signer for EcdsaSecretKey {
         &self,
         algorithm: AlgorithmInstance,
         signing_bytes: &[u8],
-    ) -> Result<Box<[u8]>, Error> {
+    ) -> Result<Vec<u8>, Error> {
         SigningKey::sign_bytes(self, algorithm, signing_bytes)
     }
 }

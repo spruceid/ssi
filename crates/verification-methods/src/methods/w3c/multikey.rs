@@ -250,7 +250,6 @@ impl SigningMethod<ssi_bbs::BBSplusSecretKey, ssi_crypto::algorithm::Bbs> for Mu
         };
 
         ssi_bbs::sign(*algorithm.0, secret, pk, messages)
-            .map(Into::into)
             .map_err(MessageSignatureError::signature_failed)
     }
 }

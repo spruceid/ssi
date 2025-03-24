@@ -121,7 +121,7 @@ impl SigningKey for P256SecretKey {
         &self,
         algorithm: impl Into<AlgorithmInstance>,
         signing_bytes: &[u8],
-    ) -> Result<Box<[u8]>, Error> {
+    ) -> Result<Vec<u8>, Error> {
         use p256::ecdsa::{signature::Signer, Signature};
         match algorithm.into() {
             AlgorithmInstance::Es256 => {

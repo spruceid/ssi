@@ -112,7 +112,7 @@ impl SigningKey for Ed25519SecretKey {
         &self,
         algorithm: impl Into<AlgorithmInstance>,
         signing_bytes: &[u8],
-    ) -> Result<Box<[u8]>, Error> {
+    ) -> Result<Vec<u8>, Error> {
         use ed25519_dalek::Signer;
         match algorithm.into() {
             AlgorithmInstance::EdDsa => Ok(self.sign(signing_bytes).to_bytes().into()),

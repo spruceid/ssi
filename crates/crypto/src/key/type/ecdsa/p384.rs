@@ -111,7 +111,7 @@ impl SigningKey for P384SecretKey {
         &self,
         algorithm: impl Into<AlgorithmInstance>,
         signing_bytes: &[u8],
-    ) -> Result<Box<[u8]>, Error> {
+    ) -> Result<Vec<u8>, Error> {
         match algorithm.into() {
             AlgorithmInstance::Es384 => {
                 use p384::ecdsa::{signature::Signer, Signature};

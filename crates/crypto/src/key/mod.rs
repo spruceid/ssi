@@ -177,7 +177,7 @@ impl SecretKey {
         &self,
         algorithm: impl Into<AlgorithmInstance>,
         signing_bytes: &[u8],
-    ) -> Result<Box<[u8]>, Error> {
+    ) -> Result<Vec<u8>, Error> {
         SigningKey::sign_bytes(self, algorithm, signing_bytes)
     }
 }
@@ -187,7 +187,7 @@ impl SigningKey for SecretKey {
         &self,
         algorithm: impl Into<AlgorithmInstance>,
         signing_bytes: &[u8],
-    ) -> Result<Box<[u8]>, Error> {
+    ) -> Result<Vec<u8>, Error> {
         match self {
             Self::Symmetric(key) => key.sign_bytes(algorithm, signing_bytes),
 
@@ -210,7 +210,7 @@ impl Signer for SecretKey {
         &self,
         algorithm: AlgorithmInstance,
         signing_bytes: &[u8],
-    ) -> Result<Box<[u8]>, Error> {
+    ) -> Result<Vec<u8>, Error> {
         SigningKey::sign_bytes(self, algorithm, signing_bytes)
     }
 }

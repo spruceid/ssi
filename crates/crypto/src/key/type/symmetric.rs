@@ -11,10 +11,10 @@ use crate::{
 use super::KeyType;
 
 #[derive(Clone, ZeroizeOnDrop)]
-pub struct SymmetricKey(Box<[u8]>);
+pub struct SymmetricKey(Vec<u8>);
 
 impl SymmetricKey {
-    pub fn new(value: Box<[u8]>) -> Self {
+    pub fn new(value: Vec<u8>) -> Self {
         Self(value)
     }
 
@@ -40,12 +40,12 @@ impl SymmetricKey {
     pub fn generate_from(len: usize, rng: &mut (impl RngCore + CryptoRng)) -> Self {
         let mut bytes = vec![0; len];
         rng.fill_bytes(bytes.as_mut_slice());
-        Self::new(bytes.into_boxed_slice())
+        Self::new(bytes)
     }
 }
 
 impl SecretKey {
-    pub fn new_symmetric(value: Box<[u8]>) -> Self {
+    pub fn new_symmetric(value: Vec<u8>) -> Self {
         Self::Symmetric(SymmetricKey::new(value))
     }
 
@@ -81,15 +81,15 @@ impl Deref for SymmetricKey {
     }
 }
 
-impl From<Box<[u8]>> for SymmetricKey {
-    fn from(value: Box<[u8]>) -> Self {
+impl From<Vec<u8>> for SymmetricKey {
+    fn from(value: Vec<u8>) -> Self {
         Self::new(value)
     }
 }
 
-impl From<Vec<u8>> for SymmetricKey {
-    fn from(value: Vec<u8>) -> Self {
-        Self::new(value.into_boxed_slice())
+impl From<Box<[u8]>> for SymmetricKey {
+    fn from(value: Box<[u8]>) -> Self {
+        Self::new(value.into_vec())
     }
 }
 
@@ -98,7 +98,7 @@ impl SigningKey for SymmetricKey {
         &self,
         algorithm: impl Into<AlgorithmInstance>,
         _signing_bytes: &[u8],
-    ) -> Result<Box<[u8]>, Error> {
+    ) -> Result<Vec<u8>, Error> {
         // TODO we should implement those algorithms for symmetric keys,
         // but since it's not implemented in `ssi_jws`, I'll not bother for
         // now.

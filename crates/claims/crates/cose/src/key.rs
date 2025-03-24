@@ -60,7 +60,6 @@ impl CoseSigner for CoseKey {
                 })?,
                 signing_bytes,
             )
-            .map(Into::into)
             .map_err(Into::into)
     }
 }

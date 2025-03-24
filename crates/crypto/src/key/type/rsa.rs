@@ -72,21 +72,18 @@ impl SigningKey for RsaSecretKey {
         &self,
         algorithm: impl Into<AlgorithmInstance>,
         signing_bytes: &[u8],
-    ) -> Result<Box<[u8]>, Error> {
+    ) -> Result<Vec<u8>, Error> {
         match algorithm.into() {
             AlgorithmInstance::Rs256 => {
                 let padding = rsa::Pkcs1v15Sign::new::<Sha256>();
                 let digest_in = hash::sha256(signing_bytes);
-                self.sign(padding, &digest_in)
-                    .map(Vec::into_boxed_slice)
-                    .map_err(Error::internal)
+                self.sign(padding, &digest_in).map_err(Error::internal)
             }
             AlgorithmInstance::Ps256 => {
                 let mut rng = rand::rngs::OsRng {};
                 let padding = rsa::Pss::new_with_salt::<Sha256>(32);
                 let digest_in = hash::sha256(signing_bytes);
                 self.sign_with_rng(&mut rng, padding, &digest_in)
-                    .map(Vec::into_boxed_slice)
                     .map_err(Error::internal)
             }
             other => Err(Error::AlgorithmUnsupported(other.algorithm())),

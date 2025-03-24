@@ -84,7 +84,7 @@ pub fn sign(
     sk: &BBSplusSecretKey,
     pk: &BBSplusPublicKey,
     messages: &[Vec<u8>],
-) -> Result<Box<[u8]>, Error> {
+) -> Result<Vec<u8>, Error> {
     match params {
         SignatureParameters::Baseline { header } => {
             Ok(

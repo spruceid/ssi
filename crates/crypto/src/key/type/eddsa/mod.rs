@@ -159,7 +159,7 @@ impl EdDsaSecretKey {
         &self,
         algorithm: impl Into<AlgorithmInstance>,
         signing_bytes: &[u8],
-    ) -> Result<Box<[u8]>, Error> {
+    ) -> Result<Vec<u8>, Error> {
         SigningKey::sign_bytes(self, algorithm, signing_bytes)
     }
 }
@@ -170,7 +170,7 @@ impl SigningKey for EdDsaSecretKey {
         &self,
         algorithm: impl Into<AlgorithmInstance>,
         signing_bytes: &[u8],
-    ) -> Result<Box<[u8]>, Error> {
+    ) -> Result<Vec<u8>, Error> {
         match self {
             #[cfg(feature = "ed25519")]
             Self::Curve25519(key) => key.sign_bytes(algorithm, signing_bytes),
@@ -190,7 +190,7 @@ impl Signer for EdDsaSecretKey {
         &self,
         algorithm: AlgorithmInstance,
         signing_bytes: &[u8],
-    ) -> Result<Box<[u8]>, Error> {
+    ) -> Result<Vec<u8>, Error> {
         SigningKey::sign_bytes(self, algorithm, signing_bytes)
     }
 }

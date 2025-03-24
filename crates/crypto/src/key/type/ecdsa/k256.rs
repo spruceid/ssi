@@ -194,7 +194,7 @@ impl SigningKey for K256SecretKey {
         &self,
         algorithm: impl Into<AlgorithmInstance>,
         signing_bytes: &[u8],
-    ) -> Result<Box<[u8]>, Error> {
+    ) -> Result<Vec<u8>, Error> {
         use k256::ecdsa::{
             signature::{DigestSigner, Signer},
             Signature,
@@ -203,7 +203,7 @@ impl SigningKey for K256SecretKey {
         match algorithm.into() {
             AlgorithmInstance::Es256K => {
                 let signature: Signature = self.try_sign(signing_bytes).unwrap(); // Uses SHA-256 by default.
-                Ok(signature.to_bytes().to_vec().into_boxed_slice())
+                Ok(signature.to_bytes().to_vec())
             }
             AlgorithmInstance::Es256Kr => {
                 // NOTE: explicitly using SHA256 here because the default hash
@@ -216,20 +216,20 @@ impl SigningKey for K256SecretKey {
 
                 let mut result = sig.to_vec();
                 result.push(rec_id.to_byte());
-                Ok(result.into_boxed_slice())
+                Ok(result)
             }
             #[cfg(feature = "blake2")]
             AlgorithmInstance::EsBlake2bK => {
                 use digest::consts::U32;
                 let digest = blake2::Blake2b::<U32>::new_with_prefix(signing_bytes);
                 let signature: Signature = self.try_sign_digest(digest).unwrap();
-                Ok(signature.to_bytes().to_vec().into_boxed_slice())
+                Ok(signature.to_bytes().to_vec())
             }
             #[cfg(feature = "keccak")]
             AlgorithmInstance::EsKeccakK => {
                 let digest = sha3::Keccak256::new_with_prefix(signing_bytes);
                 let signature: Signature = self.try_sign_digest(digest).unwrap();
-                Ok(signature.to_bytes().to_vec().into_boxed_slice())
+                Ok(signature.to_bytes().to_vec())
             }
             #[cfg(feature = "keccak")]
             AlgorithmInstance::EsKeccakKr => {
@@ -239,7 +239,7 @@ impl SigningKey for K256SecretKey {
                     .map_err(Error::internal)?;
                 let mut result = sig.to_vec();
                 result.push(rec_id.to_byte());
-                Ok(result.into_boxed_slice())
+                Ok(result)
             }
             other => Err(Error::AlgorithmUnsupported(other.algorithm())),
         }

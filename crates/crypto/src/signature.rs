@@ -40,7 +40,7 @@ pub trait Signer {
         &self,
         algorithm: AlgorithmInstance,
         signing_bytes: &[u8],
-    ) -> Result<Box<[u8]>, Error>;
+    ) -> Result<Vec<u8>, Error>;
 }
 
 impl<T: Signer> Signer for &T {
@@ -52,7 +52,7 @@ impl<T: Signer> Signer for &T {
         &self,
         algorithm: AlgorithmInstance,
         signing_bytes: &[u8],
-    ) -> Result<Box<[u8]>, Error> {
+    ) -> Result<Vec<u8>, Error> {
         T::sign(self, algorithm, signing_bytes).await
     }
 }
@@ -66,7 +66,7 @@ impl<T: Signer> Signer for Box<T> {
         &self,
         algorithm: AlgorithmInstance,
         signing_bytes: &[u8],
-    ) -> Result<Box<[u8]>, Error> {
+    ) -> Result<Vec<u8>, Error> {
         T::sign(self, algorithm, signing_bytes).await
     }
 }
@@ -80,7 +80,7 @@ impl<T: Signer> Signer for Arc<T> {
         &self,
         algorithm: AlgorithmInstance,
         signing_bytes: &[u8],
-    ) -> Result<Box<[u8]>, Error> {
+    ) -> Result<Vec<u8>, Error> {
         T::sign(self, algorithm, signing_bytes).await
     }
 }
@@ -94,7 +94,7 @@ pub trait SigningKey {
         &self,
         algorithm: impl Into<AlgorithmInstance>,
         signing_bytes: &[u8],
-    ) -> Result<Box<[u8]>, Error>;
+    ) -> Result<Vec<u8>, Error>;
 }
 
 /// Error raised when a signature could not be parsed.
@@ -115,8 +115,8 @@ impl From<MalformedSignature> for Error {
 #[cfg(all(feature = "secp256r1", feature = "der"))]
 pub fn decode_ecdsa_p256_signature_der(
     bytes: impl AsRef<[u8]>,
-) -> Result<Box<[u8]>, MalformedSignature> {
+) -> Result<Vec<u8>, MalformedSignature> {
     p256::ecdsa::Signature::from_der(bytes.as_ref())
-        .map(|s| s.to_bytes().to_vec().into_boxed_slice())
+        .map(|s| s.to_bytes().to_vec())
         .map_err(|_| MalformedSignature)
 }

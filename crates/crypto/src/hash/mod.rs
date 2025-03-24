@@ -67,7 +67,7 @@ impl HashFunction {
         }
     }
 
-    pub fn apply(&self, data: impl AsRef<[u8]>) -> Result<Box<[u8]>, UnsupportedHashFunction> {
+    pub fn apply(&self, data: impl AsRef<[u8]>) -> Result<Vec<u8>, UnsupportedHashFunction> {
         Ok(self.begin()?.chain_update(data).finalize())
     }
 }
@@ -119,17 +119,17 @@ impl Hasher {
         }
     }
 
-    pub fn finalize(self) -> Box<[u8]> {
+    pub fn finalize(self) -> Vec<u8> {
         match self {
-            Self::Sha256(h) => h.finalize().to_vec().into_boxed_slice(),
-            Self::Sha384(h) => h.finalize().to_vec().into_boxed_slice(),
-            Self::Sha512(h) => h.finalize().to_vec().into_boxed_slice(),
+            Self::Sha256(h) => h.finalize().to_vec(),
+            Self::Sha384(h) => h.finalize().to_vec(),
+            Self::Sha512(h) => h.finalize().to_vec(),
 
             #[cfg(feature = "blake2")]
-            Self::Blake2b256(h) => h.finalize().to_vec().into_boxed_slice(),
+            Self::Blake2b256(h) => h.finalize().to_vec(),
 
             #[cfg(feature = "keccak")]
-            Self::Keccak256(h) => h.finalize().to_vec().into_boxed_slice(),
+            Self::Keccak256(h) => h.finalize().to_vec(),
         }
     }
 }
