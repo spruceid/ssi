@@ -160,7 +160,7 @@ async fn main() {
     // Signature options, defining the crypto suite, signature date,
     // signing key and proof purpose.
     let proof_options = ProofOptions::new(
-        DateTimeStamp::now(),
+        DateTimeStamp::now().into(),
         iri!("https://example.com/controller#key").to_owned().into(),
         ProofPurpose::Assertion,
         (),

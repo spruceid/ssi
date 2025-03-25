@@ -9,7 +9,7 @@
     "id": "_:1"
   },
   "issuer": "did:pkh:eth:0x2fbf1be19d90a29aea9363f4ef0b6bf1c4ff0758",
-  "issuanceDate": "2021-06-16T20:55:45.850Z",
+  "issuanceDate": "2021-06-16T20:55:45.85Z",
   "proof": {
     "@context": {
       "Eip712Method2021": "https://w3id.org/security#Eip712Method2021",
@@ -64,7 +64,7 @@
       }
     },
     "type": "Eip712Signature2021",
-    "created": "2021-06-16T20:55:45.850Z",
+    "created": "2021-06-16T20:55:45.85Z",
     "verificationMethod": "did:pkh:eth:0x2fbf1be19d90a29aea9363f4ef0b6bf1c4ff0758#Recovery2020",
     "proofPurpose": "assertionMethod",
     "proofValue": "0x0e969e465756dcb17a354ba3c88740b14b8f672602d208bb476458663d6797f315e35dd9fadc7547653c74fa3626bb06cd6d0ba358bcfb59d2581ba350f150e31b"

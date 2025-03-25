@@ -1,5 +1,6 @@
 use educe::Educe;
 use serde::Serialize;
+use ssi_core::Lexical;
 use ssi_verification_methods::{ProofPurpose, ReferenceOrOwnedRef};
 use std::collections::BTreeMap;
 
@@ -20,7 +21,7 @@ pub struct ProofConfigurationRef<'a, S: CryptographicSuite> {
     pub type_: &'a S,
 
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub created: Option<xsd_types::DateTimeStamp>,
+    pub created: Option<&'a Lexical<xsd_types::DateTimeStamp>>,
 
     #[serde(serialize_with = "S::serialize_verification_method_ref_ref")]
     pub verification_method: ReferenceOrOwnedRef<'a, S::VerificationMethod>,
@@ -28,7 +29,7 @@ pub struct ProofConfigurationRef<'a, S: CryptographicSuite> {
     pub proof_purpose: ProofPurpose,
 
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub expires: Option<xsd_types::DateTimeStamp>,
+    pub expires: Option<&'a Lexical<xsd_types::DateTimeStamp>>,
 
     #[serde(
         with = "crate::value_or_array",
@@ -59,10 +60,10 @@ impl<'a, S: CryptographicSuite> ProofConfigurationRef<'a, S> {
         ProofConfiguration {
             context: self.context.cloned(),
             type_: self.type_.clone(),
-            created: self.created,
+            created: self.created.cloned(),
             verification_method: S::clone_verification_method_ref_ref(self.verification_method),
             proof_purpose: self.proof_purpose,
-            expires: self.expires,
+            expires: self.expires.cloned(),
             domains: self.domains.to_owned(),
             challenge: self.challenge.map(ToOwned::to_owned),
             nonce: self.nonce.map(ToOwned::to_owned),
@@ -145,7 +146,7 @@ pub struct ProofConfigurationRefWithoutOptions<'a, S: CryptographicSuite> {
     pub type_: &'a S,
 
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub created: Option<xsd_types::DateTimeStamp>,
+    pub created: Option<&'a Lexical<xsd_types::DateTimeStamp>>,
 
     #[serde(serialize_with = "S::serialize_verification_method_ref_ref")]
     pub verification_method: ReferenceOrOwnedRef<'a, S::VerificationMethod>,
@@ -153,7 +154,7 @@ pub struct ProofConfigurationRefWithoutOptions<'a, S: CryptographicSuite> {
     pub proof_purpose: ProofPurpose,
 
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub expires: Option<xsd_types::DateTimeStamp>,
+    pub expires: Option<&'a Lexical<xsd_types::DateTimeStamp>>,
 
     #[serde(
         with = "crate::value_or_array",

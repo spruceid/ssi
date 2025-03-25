@@ -3,6 +3,7 @@ use linked_data::{LinkedDataResource, LinkedDataSubject};
 use rdf_types::VocabularyMut;
 use serde::{Deserialize, Serialize};
 use ssi_claims_core::{ClaimsValidity, DateTimeProvider, ValidateClaims};
+use ssi_core::Lexical;
 use ssi_json_ld::{JsonLdError, JsonLdNodeObject, JsonLdObject, JsonLdTypes, Loader};
 use ssi_rdf::{Interpretation, LdEnvironment};
 use std::{borrow::Cow, collections::BTreeMap, hash::Hash};
@@ -89,12 +90,12 @@ pub struct SpecializedJsonCredential<
     ///
     /// This property is required for validation.
     #[serde(rename = "issuanceDate")]
-    pub issuance_date: Option<xsd_types::DateTime>,
+    pub issuance_date: Option<Lexical<xsd_types::DateTime>>,
 
     /// Expiration date.
     #[serde(rename = "expirationDate")]
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub expiration_date: Option<xsd_types::DateTime>,
+    pub expiration_date: Option<Lexical<xsd_types::DateTime>>,
 
     /// Credential status.
     #[serde(rename = "credentialStatus")]
@@ -175,7 +176,7 @@ where
     pub fn new(
         id: Option<UriBuf>,
         issuer: Issuer,
-        issuance_date: xsd_types::DateTime,
+        issuance_date: Lexical<xsd_types::DateTime>,
         credential_subjects: NonEmptyVec<Subject>,
     ) -> Self {
         Self {
@@ -370,11 +371,11 @@ impl<
     }
 
     fn issuance_date(&self) -> Option<DateTime> {
-        self.issuance_date
+        self.issuance_date.as_ref().map(Lexical::to_value)
     }
 
     fn expiration_date(&self) -> Option<DateTime> {
-        self.expiration_date
+        self.expiration_date.as_ref().map(Lexical::to_value)
     }
 
     fn credential_status(&self) -> &[Self::Status] {
