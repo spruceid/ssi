@@ -13,6 +13,7 @@ use serde::{Deserialize, Serialize};
 /// [RFC7519]: <https://datatracker.ietf.org/doc/html/rfc7519#section-2>
 /// [RFC3986]: <https://datatracker.ietf.org/doc/html/rfc3986>
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[serde(transparent)]
 pub struct StringOrUri(String);
 
 impl StringOrUri {
