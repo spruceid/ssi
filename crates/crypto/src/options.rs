@@ -31,16 +31,18 @@ impl Options {
     pub fn insert<T: 'static + Send + Sync>(&mut self, value: T) -> Option<T> {
         self.0
             .insert(TypeId::of::<T>(), Box::new(value))
-            .map(downcast)
+            .and_then(downcast)
     }
 
     pub fn remove<T: 'static + Send + Sync>(&mut self) -> Option<T> {
-        self.0.remove(&TypeId::of::<T>()).map(downcast)
+        self.0.remove(&TypeId::of::<T>()).and_then(downcast)
     }
 }
 
-fn downcast<T: 'static>(t: Box<dyn Send + Sync + Any>) -> T {
-    *<Box<dyn Send + Sync + Any>>::downcast(t).unwrap()
+fn downcast<T: 'static>(t: Box<dyn Send + Sync + Any>) -> Option<T> {
+    <Box<dyn Send + Sync + Any>>::downcast(t)
+        .ok()
+        .and_then(|t| *t)
 }
 
 #[allow(clippy::borrowed_box)]
