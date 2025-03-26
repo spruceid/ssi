@@ -78,7 +78,7 @@ pub enum Error {
     /// Error eip155 encoding a JWK
     #[cfg(feature = "eip")]
     #[error(transparent)]
-    Eip155(#[from] ssi_crypto::hashes::keccak::Eip155Error),
+    Eip155(#[from] ssi_crypto::hash::keccak::Eip155Error),
     /// Error parsing a char
     #[error(transparent)]
     CharTryFrom(#[from] CharTryFromError),
@@ -99,24 +99,8 @@ pub enum Error {
     #[error("Unable to decompress elliptic curve")]
     ECDecompress,
     /// Errors from p256, k256 and ed25519-dalek
-    #[cfg(feature = "secp256k1")]
     #[error(transparent)]
-    CryptoErr(#[from] k256::ecdsa::Error),
-    #[cfg(all(feature = "secp256r1", not(feature = "secp256k1")))]
-    #[error(transparent)]
-    CryptoErr(#[from] p256::ecdsa::Error),
-    #[cfg(all(
-        feature = "secp384r1",
-        not(any(feature = "secp256r1", feature = "secp256k1"))
-    ))]
-    #[error(transparent)]
-    CryptoErr(#[from] p384::ecdsa::Error),
-    #[cfg(all(
-        feature = "ed25519",
-        not(any(feature = "secp384r1", feature = "secp256r1", feature = "secp256k1"))
-    ))]
-    #[error(transparent)]
-    CryptoErr(#[from] ed25519_dalek::ed25519::Error),
+    CryptoErr(#[from] ssi_crypto::signature::signature::Error),
     /// Error from `elliptic-curve` crate
     #[cfg(feature = "secp256k1")]
     #[error(transparent)]

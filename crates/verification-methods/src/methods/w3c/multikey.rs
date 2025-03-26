@@ -212,11 +212,11 @@ where
 }
 
 #[cfg(feature = "ed25519")]
-impl SigningMethod<ed25519_dalek::SigningKey, ssi_crypto::algorithm::EdDSA> for Multikey {
+impl SigningMethod<ed25519_dalek::SigningKey, ssi_crypto::algorithm::EdDsa> for Multikey {
     fn sign_bytes(
         &self,
         secret: &ed25519_dalek::SigningKey,
-        _algorithm: ssi_crypto::algorithm::EdDSA,
+        _algorithm: ssi_crypto::algorithm::EdDsa,
         bytes: &[u8],
     ) -> Result<Vec<u8>, MessageSignatureError> {
         use ed25519_dalek::Signer;
@@ -230,16 +230,17 @@ impl SigningMethod<ssi_bbs::BBSplusSecretKey, ssi_crypto::algorithm::Bbs> for Mu
     fn sign_bytes(
         &self,
         secret: &ssi_bbs::BBSplusSecretKey,
-        algorithm: ssi_crypto::algorithm::BbsInstance,
+        algorithm: ssi_crypto::algorithm::bbs::BbsInstance,
         bytes: &[u8],
     ) -> Result<Vec<u8>, MessageSignatureError> {
         self.sign_bytes_multi(secret, algorithm, &[bytes.to_vec()])
+            .map_err(MessageSignatureError::signature_failed)
     }
 
     fn sign_bytes_multi(
         &self,
         secret: &ssi_bbs::BBSplusSecretKey,
-        algorithm: ssi_crypto::algorithm::BbsInstance,
+        algorithm: ssi_crypto::algorithm::bbs::BbsInstance,
         messages: &[Vec<u8>],
     ) -> Result<Vec<u8>, MessageSignatureError> {
         #[allow(irrefutable_let_patterns)]
@@ -249,6 +250,7 @@ impl SigningMethod<ssi_bbs::BBSplusSecretKey, ssi_crypto::algorithm::Bbs> for Mu
         };
 
         ssi_bbs::sign(*algorithm.0, secret, pk, messages)
+            .map_err(MessageSignatureError::signature_failed)
     }
 }
 

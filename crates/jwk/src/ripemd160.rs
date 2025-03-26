@@ -2,7 +2,7 @@ use std::convert::TryFrom;
 
 use crate::error::Error;
 use crate::{Params, JWK};
-use ssi_crypto::hashes::ripemd160;
+use ssi_crypto::hash::ripemd160;
 
 /// Compute a hash of a public key as an ripemd160 hash.
 pub fn hash_public_key(jwk: &JWK, version: u8) -> Result<String, Error> {
