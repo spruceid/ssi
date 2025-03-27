@@ -19,7 +19,7 @@ use crate::{
 mod spki;
 
 /// Public key.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 #[non_exhaustive]
 pub enum PublicKey {
     /// Symmetric key.
