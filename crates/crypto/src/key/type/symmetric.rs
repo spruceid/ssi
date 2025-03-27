@@ -6,7 +6,7 @@ use crate::{
 
 use super::KeyType;
 
-#[derive(Clone, ZeroizeOnDrop)]
+#[derive(Debug, Clone, PartialEq, Eq, ZeroizeOnDrop)]
 pub struct SymmetricKey(Box<[u8]>);
 
 impl SymmetricKey {

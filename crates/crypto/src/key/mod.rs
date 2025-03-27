@@ -134,7 +134,7 @@ impl Verifier for PublicKey {
 pub struct InvalidSecretKey;
 
 /// Secret key.
-#[derive(ZeroizeOnDrop)]
+#[derive(Debug, Clone, PartialEq, Eq, ZeroizeOnDrop)]
 #[non_exhaustive]
 pub enum SecretKey {
     /// Symmetric key.
