@@ -11,8 +11,9 @@ impl OkpParams {
     pub fn generate_ed25519() -> Result<Self, KeyGenerationFailed> {
         #[cfg(feature = "ring")]
         {
-            let rng = ring::rand::SystemRandom::new();
-            let mut key_pkcs8 = ring::signature::Ed25519KeyPair::generate_pkcs8(&rng)
+            use zeroize::Zeroize;
+            let rng = ssi_crypto::ring::rand::SystemRandom::new();
+            let mut key_pkcs8 = ssi_crypto::ring::signature::Ed25519KeyPair::generate_pkcs8(&rng)
                 .map_err(|_| KeyGenerationFailed)?
                 .as_ref()
                 .to_vec();
@@ -106,33 +107,34 @@ impl OkpParams {
 }
 
 #[cfg(feature = "ring")]
-impl TryFrom<&OkpParams> for &ring::signature::EdDSAParameters {
-    type Error = Error;
+impl TryFrom<&OkpParams> for &ssi_crypto::ring::signature::EdDSAParameters {
+    type Error = KeyConversionError;
 
     fn try_from(params: &OkpParams) -> Result<Self, Self::Error> {
         if params.curve != *ED25519 {
-            return Err(Error::CurveNotImplemented(params.curve.to_string()));
+            return Err(KeyConversionError::Unsupported);
         }
-        Ok(&ring::signature::ED25519)
+        Ok(&ssi_crypto::ring::signature::ED25519)
     }
 }
 
-#[cfg(feature = "ring")]
-impl TryFrom<&OkpParams> for ring::signature::Ed25519KeyPair {
-    type Error = Error;
-    fn try_from(params: &OkpParams) -> Result<Self, Self::Error> {
-        if params.curve != *ED25519 {
-            return Err(Error::CurveNotImplemented(params.curve.to_string()));
-        }
-        params
-            .private_key
-            .as_ref()
-            .ok_or(Error::MissingPrivateKey)?;
-        let der = simple_asn1::der_encode(params)?;
-        let keypair = Self::from_pkcs8_maybe_unchecked(&der)?;
-        Ok(keypair)
-    }
-}
+// #[cfg(feature = "ring")]
+// impl TryFrom<&OkpParams> for ssi_crypto::ring::signature::Ed25519KeyPair {
+//     type Error = KeyConversionError;
+
+//     fn try_from(params: &OkpParams) -> Result<Self, Self::Error> {
+//         if params.curve != *ED25519 {
+//             return Err(KeyConversionError::Unsupported);
+//         }
+//         params
+//             .private_key
+//             .as_ref()
+//             .ok_or(KeyConversionError::NotSecret)?;
+//         let der = simple_asn1::der_encode(params)?;
+//         let keypair = Self::from_pkcs8_maybe_unchecked(&der)?;
+//         Ok(keypair)
+//     }
+// }
 
 impl JWK {
     pub fn generate_ed25519() -> Result<JWK, KeyGenerationFailed> {

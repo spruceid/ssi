@@ -31,7 +31,7 @@ bs58 = { workspace = true, features = ["check"] }
 digest = "0.9"
 ecdsa = { version = "0.16.9", optional = true }
 ed25519-dalek = { workspace = true, optional = true, features = ["rand_core"] }
-getrandom = { workspace = true, optional = true } # Required for wasm targets.
+getrandom = { workspace = true, optional = true }                               # Required for wasm targets.
 hex.workspace = true
 hkdf = { version = "0.8", optional = true }
 iref.workspace = true
@@ -49,10 +49,11 @@ rsa = { workspace = true, optional = true, features = ["sha2"] }
 serde = { workspace = true, features = ["derive"] }
 sha2 = { workspace = true }
 sha2_old = { package = "sha2", version = "0.8", optional = true }
-spki = "0.7.3"
+spki = { version = "0.7.3", features = ["alloc"] }
 static-iref.workspace = true
 thiserror.workspace = true
 zeroize = { version = "1.5", features = ["zeroize_derive"] }
+ssi-multicodec.workspace = true
 
 [target.'cfg(target_arch = "wasm32")'.dependencies]
 getrandom = { workspace = true, features = ["js"], optional = true }

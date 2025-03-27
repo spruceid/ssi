@@ -28,7 +28,7 @@ impl JWK {
             #[cfg(feature = "secp384r1")]
             ssi_multicodec::P384_PRIV => Self::from_secret_p384_bytes(k),
             #[cfg(feature = "bbs")]
-            ssi_multicodec::BLS12_381_G2_PUB => crate::from_public_bls12381g2_bytes(k),
+            ssi_multicodec::BLS12_381_G2_PUB => Self::from_public_bls12381g2_bytes(k),
             ssi_multicodec::JWK_JCS_PUB => {
                 JWK::from_bytes(k).map_err(|_| KeyConversionError::Invalid)
             }

@@ -12,8 +12,8 @@ use ssi_dids_core::{
     resolution::{self, Content, DIDMethodResolver, DerefError, Output, Parameter},
     DIDBuf, DIDMethod, DIDURLBuf, DidResolver, Document, DID, DIDURL,
 };
-use ssi_jwk::{Base64urlUInt, OkpParams, Params, JWK};
-use ssi_jws::{decode_unverified, decode_verify};
+use ssi_jwk::{Base64urlUInt, KeyConversionError, OkpParams, Params, JWK};
+use ssi_jws::Jws;
 use static_iref::iri;
 use std::{collections::BTreeMap, future::Future};
 
@@ -31,7 +31,7 @@ pub enum UpdateError {
     InvalidPatchKeyId(String),
 
     #[error("invalid public key `{0}`")]
-    InvalidPublicKey(String, ssi_jwk::Error),
+    InvalidPublicKey(String, KeyConversionError),
 
     #[error("invalid public key `{0}`: not base58")]
     InvalidPublicKeyEncoding(String),
@@ -48,8 +48,8 @@ pub enum UpdateError {
     #[error("missing public key for patch")]
     MissingPublicKey,
 
-    #[error("invalid JWS: {0}")]
-    InvalidJws(ssi_jws::Error),
+    #[error("invalid JWS")]
+    InvalidJws,
 
     #[error("invalid patch: {0}")]
     InvalidPatch(serde_json::Error),
@@ -436,8 +436,8 @@ impl From<JsonLdContext> for representation::json_ld::ContextEntry {
 
 impl DIDTz {
     // TODO need to handle different networks
-    pub fn generate(&self, jwk: &JWK) -> Result<DIDBuf, ssi_jwk::Error> {
-        let hash = ssi_jwk::blakesig::hash_public_key(jwk)?;
+    pub fn generate(&self, jwk: &JWK) -> Result<DIDBuf, KeyConversionError> {
+        let hash = ssi_jwk::hash::blakesig::hash_public_key(jwk)?;
         Ok(DIDBuf::from_string(format!("did:tz:{hash}")).unwrap())
     }
 
@@ -519,13 +519,15 @@ impl DIDTz {
                 Updates::SignedIetfJsonPatch(patches) => {
                     for jws in patches {
                         let mut doc_json = serde_json::to_value(&*doc).unwrap();
-                        let (patch_metadata, _) =
-                            decode_unverified(&jws).map_err(UpdateError::InvalidJws)?;
+                        let patch_metadata = Jws::new(&jws)
+                            .map_err(|_| UpdateError::InvalidJws)?
+                            .decode()
+                            .map_err(|_| UpdateError::InvalidJws)?;
                         let curve = VerificationMethodType::from_prefix(prefix)
                             .curve()
                             .to_string();
 
-                        let kid = match patch_metadata.key_id {
+                        let kid = match patch_metadata.header().key_id.clone() {
                             Some(k) => DIDURLBuf::from_string(k)
                                 .map_err(|e| UpdateError::InvalidPatchKeyId(e.0)),
                             None => {
@@ -593,16 +595,27 @@ impl DIDTz {
                                     return Err(UpdateError::PrefixNotEnabled(p));
                                 }
                             };
-                            let (_, patch_) =
-                                decode_verify(&jws, &jwk).map_err(UpdateError::InvalidJws)?;
+                            let patch_ = Jws::new(&jws)
+                                .map_err(|_| UpdateError::InvalidJws)?
+                                .decode()
+                                .map_err(|_| UpdateError::InvalidJws)?;
+
+                            patch_
+                                .verify(&jwk)
+                                .await
+                                .map_err(|_| UpdateError::InvalidJws)?
+                                .map_err(|_| UpdateError::InvalidJws)?;
+
                             patch(
                                 &mut doc_json,
                                 &serde_json::from_slice(
-                                    serde_json::from_slice::<SignedIetfJsonPatchPayload>(&patch_)
-                                        .map_err(UpdateError::InvalidPatch)?
-                                        .ietf_json_patch
-                                        .to_string()
-                                        .as_bytes(),
+                                    serde_json::from_slice::<SignedIetfJsonPatchPayload>(
+                                        &patch_.signing_bytes.payload,
+                                    )
+                                    .map_err(UpdateError::InvalidPatch)?
+                                    .ietf_json_patch
+                                    .to_string()
+                                    .as_bytes(),
                                 )
                                 .map_err(UpdateError::InvalidPatch)?,
                             )

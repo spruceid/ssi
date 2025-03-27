@@ -7,7 +7,8 @@
 //! This module provides [sign] and [verify] functions for Aleo signatures
 //! using static parameters ([struct@COM_PARAMS], [struct@ENC_PARAMS], [struct@SIG_PARAMS])
 //! and a [JWK-based keypair representation](OKP_CURVE).
-use crate::{Base64urlUInt, OctetParams, Params, JWK};
+use crate::{Base64urlUInt, OkpParams, Params, JWK};
+use ssi_crypto::key::KeyGenerationFailed;
 use thiserror::Error;
 
 use blake2::Blake2s;
@@ -157,8 +158,8 @@ lazy_static::lazy_static! {
 pub const OKP_CURVE: &str = "AleoTestnet1Key";
 
 impl JWK {
-    pub fn generate_aleo() -> Result<JWK, Error> {
-        crate::aleo::generate_private_key_jwk().map_err(Error::AleoGeneratePrivateKey)
+    pub fn generate_aleo() -> Result<JWK, KeyGenerationFailed> {
+        generate_private_key_jwk().map_err(|_| KeyGenerationFailed)
     }
 }
 
@@ -181,7 +182,7 @@ pub fn generate_private_key_jwk() -> Result<JWK, AleoGeneratePrivateKeyError> {
     address
         .write_le(&mut public_key_bytes)
         .map_err(AleoGeneratePrivateKeyError::WriteAddress)?;
-    Ok(JWK::from(Params::OKP(OctetParams {
+    Ok(JWK::from(Params::Okp(OkpParams {
         curve: OKP_CURVE.to_string(),
         public_key: Base64urlUInt(public_key_bytes),
         private_key: Some(Base64urlUInt(private_key_bytes)),
@@ -193,7 +194,7 @@ pub fn generate_private_key_jwk() -> Result<JWK, AleoGeneratePrivateKeyError> {
 /// Uses [struct@SIG_PARAMS], [struct@COM_PARAMS], and [struct@ENC_PARAMS] to compute the account address.
 fn aleo_jwk_to_private_key(jwk: &JWK) -> Result<PrivateKey<Components>, ParsePrivateKeyError> {
     let params = match &jwk.params {
-        Params::OKP(ref okp_params) => {
+        Params::Okp(ref okp_params) => {
             if okp_params.curve != OKP_CURVE {
                 return Err(ParsePrivateKeyError::UnexpectedCurve(
                     okp_params.curve.to_string(),
@@ -229,7 +230,7 @@ fn aleo_jwk_to_private_key(jwk: &JWK) -> Result<PrivateKey<Components>, ParsePri
 
 fn aleo_jwk_to_address(jwk: &JWK) -> Result<Address<Components>, ParseAddressError> {
     let params = match &jwk.params {
-        Params::OKP(ref okp_params) => {
+        Params::Okp(ref okp_params) => {
             if okp_params.curve != OKP_CURVE {
                 return Err(ParseAddressError::UnexpectedCurve(
                     okp_params.curve.to_string(),
@@ -292,9 +293,10 @@ mod tests {
 
     #[test]
     fn parse_private_key_jwk() {
-        let key: JWK =
-            serde_json::from_str(include_str!("../../../tests/aleotestnet1-2021-11-22.json"))
-                .unwrap();
+        let key: JWK = serde_json::from_str(include_str!(
+            "../../../../../../tests/aleotestnet1-2021-11-22.json"
+        ))
+        .unwrap();
         let private_key = aleo_jwk_to_private_key(&key).unwrap();
         let private_key_str = private_key.to_string();
         assert_eq!(
@@ -316,9 +318,10 @@ mod tests {
 
     #[test]
     fn aleo_jwk_sign_verify() {
-        let private_key: JWK =
-            serde_json::from_str(include_str!("../../../tests/aleotestnet1-2021-11-22.json"))
-                .unwrap();
+        let private_key: JWK = serde_json::from_str(include_str!(
+            "../../../../../../tests/aleotestnet1-2021-11-22.json"
+        ))
+        .unwrap();
 
         let public_key = private_key.to_public();
         let msg1 = b"asdf";

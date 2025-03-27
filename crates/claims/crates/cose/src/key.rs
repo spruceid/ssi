@@ -82,12 +82,12 @@ impl CoseKey {
 
     #[cfg(feature = "secp384r1")]
     pub fn generate_p384() -> Self {
-        Self::encode_secret(&ssi_crypto::SecretKey::generate_p384()).unwrap()
+        Self::encode_secret(&ssi_crypto::SecretKey::generate_ecdsa_p384()).unwrap()
     }
 
     #[cfg(feature = "secp384r1")]
     pub fn generate_p384_from(rng: &mut (impl RngCore + CryptoRng)) -> Self {
-        Self::encode_secret(&ssi_crypto::SecretKey::generate_p384_from(rng)).unwrap()
+        Self::encode_secret(&ssi_crypto::SecretKey::generate_ecdsa_p384_from(rng)).unwrap()
     }
 
     /// Fetch a key parameter.
@@ -165,7 +165,7 @@ impl CoseKey {
                             }
                             #[cfg(feature = "secp384r1")]
                             Some(iana::EllipticCurve::P_384) => {
-                                ssi_crypto::PublicKey::new_p384(x, y).map_err(Into::into)
+                                ssi_crypto::PublicKey::new_ecdsa_p384(x, y).map_err(Into::into)
                             }
                             _ => Err(KeyConversionError::Unsupported),
                         }
@@ -219,7 +219,7 @@ impl CoseKey {
                             }
                             #[cfg(feature = "secp384r1")]
                             Some(iana::EllipticCurve::P_384) => {
-                                ssi_crypto::SecretKey::new_p384(d).map_err(Into::into)
+                                ssi_crypto::SecretKey::new_ecdsa_p384(d).map_err(Into::into)
                             }
                             _ => Err(KeyConversionError::Unsupported),
                         }

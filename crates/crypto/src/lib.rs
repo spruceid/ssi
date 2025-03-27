@@ -15,11 +15,15 @@ pub use p256;
 #[cfg(feature = "secp384r1")]
 pub use p384;
 
+#[cfg(feature = "ring")]
+pub use ring;
+
 pub use rand;
 
 pub mod algorithm;
 pub mod hashes;
 pub mod key;
+mod multicodec;
 mod options;
 mod recovery;
 pub mod signature;

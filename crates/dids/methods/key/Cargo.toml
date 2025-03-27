@@ -13,18 +13,13 @@ documentation = "https://docs.rs/did-key/"
 
 [features]
 default = ["secp256k1", "secp256r1"]
-secp256k1 = [
-	"k256",
-	"ssi-jwk/secp256k1"
-]
-secp256r1 = [
-	"p256",
-	"ssi-jwk/secp256r1"
-]
+secp256k1 = ["k256", "ssi-jwk/secp256k1"]
+secp256r1 = ["p256", "ssi-jwk/secp256r1"]
 secp384r1 = ["ssi-jwk/secp384r1"]
 bbs = ["ssi-jwk/bbs"]
 
 [dependencies]
+ssi-crypto.workspace = true
 ssi-dids-core.workspace = true
 ssi-jwk = { workspace = true, features = ["ed25519"] }
 ssi-multicodec.workspace = true
@@ -43,7 +38,12 @@ p256 = { workspace = true, optional = true, features = ["ecdsa"] }
 ssi-jwk = { workspace = true, features = ["rsa"] }
 ssi-verification-methods-core.workspace = true
 ssi-verification-methods = { workspace = true, features = ["secp384r1"] }
-ssi-claims = { workspace = true, features = ["w3c", "ed25519", "secp256r1", "secp256k1"] }
+ssi-claims = { workspace = true, features = [
+    "w3c",
+    "ed25519",
+    "secp256r1",
+    "secp256k1",
+] }
 ssi-data-integrity.workspace = true
 xsd-types.workspace = true
 linked-data.workspace = true

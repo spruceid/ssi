@@ -1,9 +1,8 @@
-use std::{borrow::Cow, collections::HashMap, sync::Arc};
+use std::collections::BTreeMap;
 
 use iref::{Iri, IriBuf, UriBuf};
 use serde::{Deserialize, Serialize};
-use ssi_crypto::{Error, Issuer, Verifier};
-use ssi_jwk::JWK;
+use ssi_crypto::{Issuer, Verifier};
 use static_iref::iri;
 
 mod controller;
@@ -53,7 +52,7 @@ pub struct VerificationMethod {
 
     /// Other properties.
     #[serde(flatten)]
-    pub properties: HashMap<String, serde_json::Value>,
+    pub properties: BTreeMap<String, serde_json::Value>,
 }
 
 pub trait GetVerificationMethod {

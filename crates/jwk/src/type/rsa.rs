@@ -231,8 +231,13 @@ impl JWK {
 
 #[cfg(feature = "ring")]
 mod ring {
-    impl<'a> TryFrom<&'a RsaParams> for ring::signature::RsaPublicKeyComponents<&'a [u8]> {
-        type Error = Error;
+    use ssi_crypto::key::KeyConversionError;
+
+    use super::RsaParams;
+
+    impl<'a> TryFrom<&'a RsaParams> for ssi_crypto::ring::signature::RsaPublicKeyComponents<&'a [u8]> {
+        type Error = KeyConversionError;
+
         fn try_from(params: &'a RsaParams) -> Result<Self, Self::Error> {
             fn trim_bytes(bytes: &[u8]) -> &[u8] {
                 const ZERO: [u8; 1] = [0];
@@ -242,20 +247,33 @@ mod ring {
                     None => &ZERO,
                 }
             }
-            let n = trim_bytes(&params.modulus.as_ref().ok_or(Error::MissingModulus)?.0);
-            let e = trim_bytes(&params.exponent.as_ref().ok_or(Error::MissingExponent)?.0);
+            let n = trim_bytes(
+                &params
+                    .modulus
+                    .as_ref()
+                    .ok_or(KeyConversionError::Invalid)?
+                    .0,
+            );
+            let e = trim_bytes(
+                &params
+                    .exponent
+                    .as_ref()
+                    .ok_or(KeyConversionError::Invalid)?
+                    .0,
+            );
             Ok(Self { n, e })
         }
     }
 
-    impl TryFrom<&RsaParams> for ring::signature::RsaKeyPair {
-        type Error = Error;
-        fn try_from(params: &RsaParams) -> Result<Self, Self::Error> {
-            let der = simple_asn1::der_encode(params)?;
-            let keypair = Self::from_der(&der)?;
-            Ok(keypair)
-        }
-    }
+    // impl TryFrom<&RsaParams> for ssi_crypto::ring::signature::RsaKeyPair {
+    //     type Error = KeyConversionError;
+
+    //     fn try_from(params: &RsaParams) -> Result<Self, Self::Error> {
+    //         let der = simple_asn1::der_encode(params).map_err(|_| KeyConversionError::Invalid)?;
+    //         let keypair = Self::from_der(&der).map_err(|_| KeyConversionError::Invalid)?;
+    //         Ok(keypair)
+    //     }
+    // }
 }
 
 #[cfg(test)]

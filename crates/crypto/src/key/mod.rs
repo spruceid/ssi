@@ -75,6 +75,7 @@ impl VerifyingKey for PublicKey {
         }
     }
 
+    #[allow(unused_variables)]
     fn verify_bytes(
         &self,
         algorithm: impl Into<AlgorithmInstance>,

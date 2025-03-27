@@ -5,7 +5,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     document::{self, representation, DIDVerificationMethod, InvalidData},
-    DIDMethod, DidVerificationMethodResolver, Document, PrimaryDIDURL, DID, DIDURL,
+    DIDMethod, Document, PrimaryDIDURL, DID, DIDURL,
 };
 
 mod composition;
@@ -297,32 +297,32 @@ pub trait DidResolver {
         self.dereference_with(did_url, Options::default()).await
     }
 
-    /// Turns this DID resolver into a verification method resolver.
-    ///
-    /// To resolve a verification method, the output resolver will first
-    /// resolve the DID using the given `options` then pull the referenced
-    /// method from the DID document.
-    fn into_vm_resolver_with<M>(self, options: Options) -> DidVerificationMethodResolver<Self, M>
-    where
-        Self: Sized,
-    {
-        DidVerificationMethodResolver::new_with_options(self, options)
-    }
+    // /// Turns this DID resolver into a verification method resolver.
+    // ///
+    // /// To resolve a verification method, the output resolver will first
+    // /// resolve the DID using the given `options` then pull the referenced
+    // /// method from the DID document.
+    // fn into_vm_resolver_with<M>(self, options: Options) -> DidVerificationMethodResolver<Self, M>
+    // where
+    //     Self: Sized,
+    // {
+    //     DidVerificationMethodResolver::new_with_options(self, options)
+    // }
 
-    /// Turns this DID resolver into a verification method resolver.
-    ///
-    /// To resolve a verification method, the output resolver will first
-    /// resolve the DID then pull the referenced method from the DID document.
-    ///
-    /// This is equivalent to calling
-    /// [`into_vm_resolver_with`](DIDResolver::into_vm_resolver_with)
-    /// with the default options.
-    fn into_vm_resolver<M>(self) -> DidVerificationMethodResolver<Self, M>
-    where
-        Self: Sized,
-    {
-        DidVerificationMethodResolver::new(self)
-    }
+    // /// Turns this DID resolver into a verification method resolver.
+    // ///
+    // /// To resolve a verification method, the output resolver will first
+    // /// resolve the DID then pull the referenced method from the DID document.
+    // ///
+    // /// This is equivalent to calling
+    // /// [`into_vm_resolver_with`](DIDResolver::into_vm_resolver_with)
+    // /// with the default options.
+    // fn into_vm_resolver<M>(self) -> DidVerificationMethodResolver<Self, M>
+    // where
+    //     Self: Sized,
+    // {
+    //     DidVerificationMethodResolver::new(self)
+    // }
 }
 
 pub trait DIDMethodResolver: DIDMethod {

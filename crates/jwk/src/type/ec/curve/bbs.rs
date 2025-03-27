@@ -1,6 +1,7 @@
 use ssi_bbs::{BBSplusPublicKey, BBSplusSecretKey};
+use ssi_crypto::key::KeyConversionError;
 
-use crate::{Base64urlUInt, ECParams, Error, Params, JWK};
+use crate::{Base64urlUInt, EcParams, Params, JWK};
 
 impl JWK {
     pub fn generate_bls12381g2_with(rng: &mut (impl rand::CryptoRng + rand::RngCore)) -> Self {
@@ -12,13 +13,15 @@ impl JWK {
         Self::generate_bls12381g2_with(&mut rng)
     }
 
-    pub fn from_public_bls12381g2_bytes(bytes: &[u8]) -> Result<JWK, ssi_bbs::Error> {
-        Ok(BBSplusPublicKey::from_bytes(bytes)?.into())
+    pub fn from_public_bls12381g2_bytes(bytes: &[u8]) -> Result<JWK, KeyConversionError> {
+        Ok(BBSplusPublicKey::from_bytes(bytes)
+            .map_err(|_| KeyConversionError::Invalid)?
+            .into())
     }
 }
 
 impl<'a> TryFrom<&'a JWK> for BBSplusPublicKey {
-    type Error = Error;
+    type Error = KeyConversionError;
 
     fn try_from(value: &'a JWK) -> Result<Self, Self::Error> {
         (&value.params).try_into()
@@ -26,14 +29,14 @@ impl<'a> TryFrom<&'a JWK> for BBSplusPublicKey {
 }
 
 impl TryFrom<JWK> for BBSplusPublicKey {
-    type Error = Error;
+    type Error = KeyConversionError;
 
     fn try_from(value: JWK) -> Result<Self, Self::Error> {
         value.params.try_into()
     }
 }
 
-impl<'a> From<&'a BBSplusPublicKey> for ECParams {
+impl<'a> From<&'a BBSplusPublicKey> for EcParams {
     fn from(value: &'a BBSplusPublicKey) -> Self {
         let (x, y) = value.to_coordinates();
         Self {
@@ -45,7 +48,7 @@ impl<'a> From<&'a BBSplusPublicKey> for ECParams {
     }
 }
 
-impl From<BBSplusPublicKey> for ECParams {
+impl From<BBSplusPublicKey> for EcParams {
     fn from(value: BBSplusPublicKey) -> Self {
         (&value).into()
     }
@@ -53,13 +56,13 @@ impl From<BBSplusPublicKey> for ECParams {
 
 impl<'a> From<&'a BBSplusPublicKey> for Params {
     fn from(value: &'a BBSplusPublicKey) -> Self {
-        Self::EC(value.into())
+        Self::Ec(value.into())
     }
 }
 
 impl From<BBSplusPublicKey> for Params {
     fn from(value: BBSplusPublicKey) -> Self {
-        Self::EC(value.into())
+        Self::Ec(value.into())
     }
 }
 
@@ -76,41 +79,42 @@ impl From<BBSplusPublicKey> for JWK {
 }
 
 impl<'a> TryFrom<&'a Params> for BBSplusPublicKey {
-    type Error = Error;
+    type Error = KeyConversionError;
 
     fn try_from(value: &'a Params) -> Result<Self, Self::Error> {
         match value {
-            Params::EC(params) => match params.curve.as_deref() {
+            Params::Ec(params) => match params.curve.as_deref() {
                 Some("BLS12381G2") => {
                     let x: &[u8; 96] = params
                         .x_coordinate
                         .as_ref()
-                        .ok_or(Error::MissingPoint)?
+                        .ok_or(KeyConversionError::Invalid)?
                         .0
                         .as_slice()
                         .try_into()
-                        .map_err(|_| Error::InvalidCoordinates)?;
+                        .map_err(|_| KeyConversionError::Invalid)?;
                     let y: &[u8; 96] = params
                         .y_coordinate
                         .as_ref()
-                        .ok_or(Error::MissingPoint)?
+                        .ok_or(KeyConversionError::Invalid)?
                         .0
                         .as_slice()
                         .try_into()
-                        .map_err(|_| Error::InvalidCoordinates)?;
+                        .map_err(|_| KeyConversionError::Invalid)?;
 
-                    BBSplusPublicKey::from_coordinates(x, y).map_err(|_| Error::InvalidCoordinates)
+                    BBSplusPublicKey::from_coordinates(x, y)
+                        .map_err(|_| KeyConversionError::Invalid)
                 }
-                Some(other) => Err(Error::CurveNotImplemented(other.to_owned())),
-                None => Err(Error::MissingCurve),
+                Some(_) => Err(KeyConversionError::Unsupported),
+                None => Err(KeyConversionError::Invalid),
             },
-            _ => Err(Error::UnsupportedKeyType),
+            _ => Err(KeyConversionError::Unsupported),
         }
     }
 }
 
 impl TryFrom<Params> for BBSplusPublicKey {
-    type Error = Error;
+    type Error = KeyConversionError;
 
     fn try_from(value: Params) -> Result<Self, Self::Error> {
         (&value).try_into()
@@ -118,7 +122,7 @@ impl TryFrom<Params> for BBSplusPublicKey {
 }
 
 impl<'a> TryFrom<&'a JWK> for BBSplusSecretKey {
-    type Error = Error;
+    type Error = KeyConversionError;
 
     fn try_from(value: &'a JWK) -> Result<Self, Self::Error> {
         (&value.params).try_into()
@@ -126,7 +130,7 @@ impl<'a> TryFrom<&'a JWK> for BBSplusSecretKey {
 }
 
 impl TryFrom<JWK> for BBSplusSecretKey {
-    type Error = Error;
+    type Error = KeyConversionError;
 
     fn try_from(value: JWK) -> Result<Self, Self::Error> {
         value.params.try_into()
@@ -134,47 +138,47 @@ impl TryFrom<JWK> for BBSplusSecretKey {
 }
 
 impl<'a> TryFrom<&'a Params> for BBSplusSecretKey {
-    type Error = Error;
+    type Error = KeyConversionError;
 
     fn try_from(value: &'a Params) -> Result<Self, Self::Error> {
         match value {
-            Params::EC(params) => match params.curve.as_deref() {
+            Params::Ec(params) => match params.curve.as_deref() {
                 Some("BLS12381G2") => {
                     let p = params
                         .ecc_private_key
                         .as_ref()
-                        .ok_or(Error::MissingPrivateKey)?
+                        .ok_or(KeyConversionError::Invalid)?
                         .0
                         .as_slice();
 
-                    BBSplusSecretKey::from_bytes(p).map_err(|_| Error::InvalidCoordinates)
+                    BBSplusSecretKey::from_bytes(p).map_err(|_| KeyConversionError::Invalid)
                 }
-                Some(other) => Err(Error::CurveNotImplemented(other.to_owned())),
-                None => Err(Error::MissingCurve),
+                Some(_) => Err(KeyConversionError::Unsupported),
+                None => Err(KeyConversionError::Invalid),
             },
-            _ => Err(Error::UnsupportedKeyType),
+            _ => Err(KeyConversionError::Unsupported),
         }
     }
 }
 
 impl TryFrom<Params> for BBSplusSecretKey {
-    type Error = Error;
+    type Error = KeyConversionError;
 
     fn try_from(value: Params) -> Result<Self, Self::Error> {
         (&value).try_into()
     }
 }
 
-impl<'a> From<&'a BBSplusSecretKey> for ECParams {
+impl<'a> From<&'a BBSplusSecretKey> for EcParams {
     fn from(value: &'a BBSplusSecretKey) -> Self {
         let pk = value.public_key();
-        let mut params: ECParams = pk.into();
+        let mut params: EcParams = pk.into();
         params.ecc_private_key = Some(Base64urlUInt(value.to_bytes().to_vec()));
         params
     }
 }
 
-impl From<BBSplusSecretKey> for ECParams {
+impl From<BBSplusSecretKey> for EcParams {
     fn from(value: BBSplusSecretKey) -> Self {
         (&value).into()
     }
@@ -182,13 +186,13 @@ impl From<BBSplusSecretKey> for ECParams {
 
 impl<'a> From<&'a BBSplusSecretKey> for Params {
     fn from(value: &'a BBSplusSecretKey) -> Self {
-        Self::EC(value.into())
+        Self::Ec(value.into())
     }
 }
 
 impl From<BBSplusSecretKey> for Params {
     fn from(value: BBSplusSecretKey) -> Self {
-        Self::EC(value.into())
+        Self::Ec(value.into())
     }
 }
 

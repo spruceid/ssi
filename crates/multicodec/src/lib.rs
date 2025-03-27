@@ -99,7 +99,8 @@ impl MultiEncodedBuf {
         Ok(Self(bytes))
     }
 
-    pub fn encode_bytes(codec: u64, bytes: &[u8]) -> Self {
+    pub fn encode_bytes(codec: u64, bytes: impl AsRef<[u8]>) -> Self {
+        let bytes = bytes.as_ref();
         let mut codec_buffer = [0u8; 10];
         let encoded_codec = unsigned_varint::encode::u64(codec, &mut codec_buffer);
         let mut result = Vec::with_capacity(encoded_codec.len() + bytes.len());
