@@ -14,7 +14,9 @@ documentation = "https://docs.rs/did-web/"
 [dependencies]
 ssi-dids-core.workspace = true
 thiserror.workspace = true
-reqwest = { version = "0.11", default-features = false, features = ["rustls-tls"] }
+reqwest = { version = "0.11", default-features = false, features = [
+    "rustls-tls",
+] }
 http = "0.2"
 
 [target.'cfg(target_os = "android")'.dependencies.reqwest]
