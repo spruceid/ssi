@@ -21,6 +21,7 @@ pub mod error;
 pub use error::Error;
 
 mod hash;
+#[allow(unused_imports)]
 pub use hash::*;
 
 pub mod algorithm;

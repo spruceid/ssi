@@ -4,6 +4,7 @@ use zeroize::Zeroize;
 use crate::Base64urlUInt;
 
 mod curve;
+#[allow(unused_imports)]
 pub use curve::*;
 
 mod der;
