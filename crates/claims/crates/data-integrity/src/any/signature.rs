@@ -132,7 +132,7 @@ impl IntoAnySignatureAlgorithm for ssi_crypto::algorithm::ES256OrES384 {
 }
 
 #[cfg(all(feature = "w3c", feature = "bbs"))]
-impl IntoAnySignatureAlgorithm for ssi_crypto::algorithm::bbs::BbsInstance {
+impl IntoAnySignatureAlgorithm for ssi_crypto::algorithm::BbsInstance {
     fn into_any_signature_algorithm(self) -> AnySignatureAlgorithmInstance {
         WithProtocol(self.into(), AnyProtocol::None)
     }

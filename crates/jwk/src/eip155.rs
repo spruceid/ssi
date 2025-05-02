@@ -1,5 +1,5 @@
 use crate::{Error, Params, JWK};
-use ssi_crypto::hash::keccak;
+use ssi_crypto::hashes::keccak;
 
 /// Compute a hash of a public key as an Ethereum address.
 ///

@@ -1,3 +1,5 @@
+use ssi_claims_core::{InvalidProof, MessageSignatureError, ProofValidationError, ProofValidity};
+use ssi_crypto::algorithm::BbsParameters;
 pub use zkryptium::{
     bbsplus::keys::{BBSplusPublicKey, BBSplusSecretKey},
     errors::Error,
@@ -14,24 +16,10 @@ use zkryptium::{
     },
 };
 
-#[derive(Debug, Clone)]
-pub enum SignatureParameters {
-    Baseline {
-        header: [u8; 64],
-    },
-    Blind {
-        header: [u8; 64],
-        commitment_with_proof: Option<Vec<u8>>,
-        signer_blind: Option<[u8; 32]>,
-    },
-}
+pub use ssi_crypto::algorithm::Bbs;
 
 #[derive(Debug)]
 pub struct ProofGenFailed;
-
-pub struct InvalidSignature;
-
-pub type ProofValidity = Result<(), InvalidSignature>;
 
 pub fn proof_gen(
     pk: &BBSplusPublicKey,
@@ -62,11 +50,12 @@ pub fn proof_verify(
     ph: Option<&[u8]>,
     disclosed_messages: &[Vec<u8>],
     disclosed_indexes: &[usize],
-) -> Result<ProofValidity, Error> {
+) -> Result<ProofValidity, ProofValidationError> {
     let signature =
         zkryptium::schemes::generics::PoKSignature::<BBSplus<Bls12381Sha256>>::from_bytes(
             signature,
-        )?;
+        )
+        .map_err(|_| ProofValidationError::InvalidSignature)?;
 
     Ok(signature
         .proof_verify(
@@ -76,24 +65,25 @@ pub fn proof_verify(
             Some(header),
             ph,
         )
-        .map_err(|_| InvalidSignature))
+        .map_err(|_| InvalidProof::Signature))
 }
 
 pub fn sign(
-    params: SignatureParameters,
+    params: BbsParameters,
     sk: &BBSplusSecretKey,
     pk: &BBSplusPublicKey,
     messages: &[Vec<u8>],
-) -> Result<Vec<u8>, Error> {
+) -> Result<Vec<u8>, MessageSignatureError> {
     match params {
-        SignatureParameters::Baseline { header } => {
+        BbsParameters::Baseline { header } => {
             Ok(
-                Signature::<BBSplus<Bls12381Sha256>>::sign(Some(messages), sk, pk, Some(&header))?
+                Signature::<BBSplus<Bls12381Sha256>>::sign(Some(messages), sk, pk, Some(&header))
+                    .map_err(MessageSignatureError::signature_failed)?
                     .to_bytes()
-                    .into(),
+                    .to_vec(),
             )
         }
-        SignatureParameters::Blind {
+        BbsParameters::Blind {
             header,
             commitment_with_proof,
             signer_blind,
@@ -106,9 +96,10 @@ pub fn sign(
                 Some(&header),
                 Some(messages),
                 signer_blind.as_ref(),
-            )?
+            )
+            .map_err(MessageSignatureError::signature_failed)?
             .to_bytes()
-            .into())
+            .to_vec())
         }
     }
 }

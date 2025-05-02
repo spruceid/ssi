@@ -506,7 +506,7 @@ impl JWK {
                 format!(r#"{{"k":"{}","kty":"oct"}}"#, String::from(k))
             }
         };
-        let hash = ssi_crypto::hash::sha256(json_string.as_bytes());
+        let hash = ssi_crypto::hashes::sha256::sha256(json_string.as_bytes());
         let thumbprint = String::from(Base64urlUInt(hash.to_vec()));
         Ok(thumbprint)
     }
@@ -768,10 +768,7 @@ impl TryFrom<&RSAParams> for rsa::RsaPrivateKey {
         for prime in params.other_primes_info.iter().flatten() {
             primes.push((&prime.prime_factor).into());
         }
-        Self::from_components(n.into(), e.into(), d.into(), primes)
-            // NOTE it's not the correct error type, but it'll be replaced soon
-            //      anyway.
-            .map_err(|_| Error::InvalidCoordinates)
+        Ok(Self::from_components(n.into(), e.into(), d.into(), primes))
     }
 }
 

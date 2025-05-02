@@ -248,7 +248,7 @@ impl PublicKey {
                 let pk: k256::PublicKey = params
                     .try_into()
                     .map_err(|_| InvalidPublicKey::InvalidParams)?;
-                let b = ssi_crypto::hash::keccak::hash_public_key(&pk);
+                let b = ssi_crypto::hashes::keccak::hash_public_key(&pk);
                 Ok(a.as_str() == b.as_str())
             }
             Self::BlockchainAccountId(id) => {

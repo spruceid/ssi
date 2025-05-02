@@ -1,10 +1,7 @@
 use multibase::Base;
-use ssi_bbs::BBSplusPublicKey;
+use ssi_bbs::{BBSplusPublicKey, Bbs};
 use ssi_claims_core::SignatureError;
-use ssi_crypto::algorithm::{
-    bbs::{BbsInstance, SignatureParameters as BbsParameters},
-    Bbs,
-};
+use ssi_crypto::algorithm::{BbsInstance, BbsParameters};
 use ssi_di_sd_primitives::JsonPointerBuf;
 use ssi_rdf::IntoNQuads;
 use ssi_security::MultibaseBuf;
