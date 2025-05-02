@@ -50,9 +50,7 @@ impl VerificationAlgorithm<Bbs2023> for Bbs2023SignatureAlgorithm {
                         data.presentation_header.as_deref(),
                         &disclosed_messages,
                         &data.selective_indexes,
-                    )
-                    .map(|r| r.map_err(|_| ssi_claims_core::InvalidProof::Signature))
-                    .map_err(|_| ProofValidationError::InvalidProof),
+                    ),
                     _ => Err(ProofValidationError::other("unimplemented feature option")),
                 }
             }

@@ -500,24 +500,26 @@ pub fn sign_bytes(algorithm: Algorithm, data: &[u8], key: &JWK) -> Result<Vec<u8
         JWKParams::RSA(rsa_params) => {
             rsa_params.validate_key_size()?;
             let private_key = rsa::RsaPrivateKey::try_from(rsa_params)?;
+            let padding;
+            let hashed;
             match algorithm {
                 Algorithm::RS256 => {
-                    let padding = rsa::Pkcs1v15Sign::new::<ssi_crypto::sha2::Sha256>();
-                    let digest_in = ssi_crypto::hash::sha256(data);
-                    private_key
-                        .sign(padding, &digest_in)
-                        .map_err(ssi_jwk::Error::from)?
+                    let hash = rsa::hash::Hash::SHA2_256;
+                    padding = rsa::padding::PaddingScheme::new_pkcs1v15_sign(Some(hash));
+                    hashed = ssi_crypto::hashes::sha256::sha256(data);
                 }
                 Algorithm::PS256 => {
-                    let mut rng = rand::rngs::OsRng {};
-                    let padding = rsa::Pss::new_with_salt::<ssi_crypto::sha2::Sha256>(32);
-                    let digest_in = ssi_crypto::hash::sha256(data);
-                    private_key
-                        .sign_with_rng(&mut rng, padding, &digest_in)
-                        .map_err(ssi_jwk::Error::from)?
+                    let hash = rsa::hash::Hash::SHA2_256;
+                    let rng = rand::rngs::OsRng {};
+                    padding =
+                        rsa::PaddingScheme::new_pss_with_salt::<sha2::Sha256, _>(rng, hash.size());
+                    hashed = ssi_crypto::hashes::sha256::sha256(data);
                 }
                 _ => return Err(Error::AlgorithmNotImplemented(algorithm.to_string())),
             }
+            private_key
+                .sign(padding, &hashed)
+                .map_err(ssi_jwk::Error::from)?
         }
         #[cfg(any(feature = "ring", feature = "ed25519"))]
         JWKParams::OKP(okp) => {
@@ -701,18 +703,26 @@ pub fn verify_bytes_warnable(
         #[cfg(all(feature = "rsa", not(feature = "ring")))]
         JWKParams::RSA(rsa_params) => {
             rsa_params.validate_key_size()?;
+            use rsa::PublicKey;
             let public_key = rsa::RsaPublicKey::try_from(rsa_params)?;
+            let padding;
+            let hashed;
             match algorithm {
                 Algorithm::RS256 => {
-                    let key = rsa::pkcs1v15::VerifyingKey::<sha2::Sha256>::new(public_key);
-                    rsa::pkcs1v15::Signature::try_from(signature).map_err(ssi_jwk::Error::from)?;
+                    let hash = rsa::hash::Hash::SHA2_256;
+                    padding = rsa::padding::PaddingScheme::new_pkcs1v15_sign(Some(hash));
+                    hashed = ssi_crypto::hashes::sha256::sha256(data);
                 }
                 Algorithm::PS256 => {
-                    let key = rsa::pss::VerifyingKey::<sha2::Sha256>::new(public_key);
-                    rsa::pkcs1v15::Signature::try_from(signature).map_err(ssi_jwk::Error::from)?;
+                    let rng = rand::rngs::OsRng {};
+                    padding = rsa::PaddingScheme::new_pss::<sha2::Sha256, _>(rng);
+                    hashed = ssi_crypto::hashes::sha256::sha256(data);
                 }
                 _ => return Err(Error::AlgorithmNotImplemented(algorithm.to_string())),
             }
+            public_key
+                .verify(padding, &hashed, signature)
+                .map_err(ssi_jwk::Error::from)?;
         }
         // TODO: SymmetricParams
         #[cfg(any(feature = "ring", feature = "ed25519"))]
@@ -937,7 +947,7 @@ pub fn recover(algorithm: Algorithm, data: &[u8], signature: &[u8]) -> Result<JW
                 k256::ecdsa::Signature::try_from(&signature[..64]).map_err(ssi_jwk::Error::from)?;
             let rec_id =
                 k256::ecdsa::RecoveryId::try_from(signature[64]).map_err(ssi_jwk::Error::from)?;
-            let hash = ssi_crypto::hash::sha256(data);
+            let hash = ssi_crypto::hashes::sha256::sha256(data);
             let digest = k256::elliptic_curve::FieldBytes::<k256::Secp256k1>::from_slice(&hash);
             let recovered_key = VerifyingKey::recover_from_prehash(digest, &sig, rec_id)
                 .map_err(ssi_jwk::Error::from)?;

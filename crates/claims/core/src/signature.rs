@@ -59,10 +59,12 @@ impl From<std::convert::Infallible> for SignatureError {
     }
 }
 
-impl From<ssi_crypto::Error> for SignatureError {
-    fn from(value: ssi_crypto::Error) -> Self {
+impl From<ssi_crypto::SignatureError> for SignatureError {
+    fn from(value: ssi_crypto::SignatureError) -> Self {
         match value {
-            ssi_crypto::Error::AlgorithmUnsupported(a) => Self::UnsupportedAlgorithm(a.to_string()),
+            ssi_crypto::SignatureError::UnsupportedAlgorithm(a) => {
+                Self::UnsupportedAlgorithm(a.to_string())
+            }
             e => Self::other(e),
         }
     }

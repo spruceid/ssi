@@ -83,7 +83,6 @@ where
                     .map_err(|_| MessageSignatureError::InvalidSecretKey)?;
                 let pk = sk.public_key();
                 ssi_bbs::sign(*bbs.0, &sk, &pk, messages)
-                    .map_err(MessageSignatureError::signature_failed)
             }
             other => Err(MessageSignatureError::UnsupportedAlgorithm(
                 other.algorithm().to_string(),

@@ -1,4 +1,4 @@
-use crate::hash::sha256::sha256;
+use crate::hashes::sha256::sha256;
 
 use k256::{elliptic_curve::sec1::ToEncodedPoint, PublicKey};
 use ripemd160::{Digest, Ripemd160};

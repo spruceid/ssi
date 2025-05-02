@@ -31,7 +31,7 @@ secp384r1 = ["ssi-jwk/secp384r1", "p384"]
 ed25519 = ["ssi-jwk/ed25519", "ed25519-dalek", "rand", "blake2"]
 
 ## Enable RSA signatures.
-rsa = ["ssi-jwk/rsa", "dep:rsa", "rsa/sha2", "dep:sha2", "rand"]
+rsa = ["ssi-jwk/rsa", "dep:rsa", "dep:sha2", "rand"]
 
 ## Enable aleo ecosystem signatures.
 aleo = ["ssi-jwk/aleo"]

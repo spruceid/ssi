@@ -130,14 +130,14 @@ impl SigningMethod<JWK, ssi_crypto::Algorithm> for AnyMethod {
             }
             #[cfg(feature = "ed25519")]
             Self::Ed25519VerificationKey2020(m) => match algorithm {
-                ssi_crypto::AlgorithmInstance::EdDsa => m.sign_bytes(secret, bytes),
+                ssi_crypto::AlgorithmInstance::EdDSA => m.sign_bytes(secret, bytes),
                 _ => Err(MessageSignatureError::UnsupportedAlgorithm(
                     algorithm.algorithm().to_string(),
                 )),
             },
             #[cfg(feature = "secp256k1")]
             Self::EcdsaSecp256k1VerificationKey2019(m) => match algorithm {
-                ssi_crypto::AlgorithmInstance::Es256K => m.sign_bytes(
+                ssi_crypto::AlgorithmInstance::ES256K => m.sign_bytes(
                     secret,
                     ecdsa_secp_256k1_verification_key_2019::DigestFunction::Sha256,
                     bytes,
@@ -148,19 +148,19 @@ impl SigningMethod<JWK, ssi_crypto::Algorithm> for AnyMethod {
             },
             #[cfg(feature = "secp256k1")]
             Self::EcdsaSecp256k1RecoveryMethod2020(m) => match algorithm {
-                ssi_crypto::AlgorithmInstance::Es256Kr => {
-                    SigningMethod::<_, ssi_crypto::algorithm::Es256Kr>::sign_bytes(
+                ssi_crypto::AlgorithmInstance::ES256KR => {
+                    SigningMethod::<_, ssi_crypto::algorithm::ES256KR>::sign_bytes(
                         m,
                         secret,
-                        ssi_crypto::algorithm::Es256Kr,
+                        ssi_crypto::algorithm::ES256KR,
                         bytes,
                     )
                 }
-                ssi_crypto::AlgorithmInstance::EsKeccakKr => {
-                    SigningMethod::<_, ssi_crypto::algorithm::EsKeccakKr>::sign_bytes(
+                ssi_crypto::AlgorithmInstance::ESKeccakKR => {
+                    SigningMethod::<_, ssi_crypto::algorithm::ESKeccakKR>::sign_bytes(
                         m,
                         secret,
-                        ssi_crypto::algorithm::EsKeccakKr,
+                        ssi_crypto::algorithm::ESKeccakKR,
                         bytes,
                     )
                 }
@@ -170,7 +170,7 @@ impl SigningMethod<JWK, ssi_crypto::Algorithm> for AnyMethod {
             },
             #[cfg(feature = "secp256r1")]
             Self::EcdsaSecp256r1VerificationKey2019(m) => match algorithm {
-                ssi_crypto::AlgorithmInstance::Es256 => m.sign_bytes(secret, bytes),
+                ssi_crypto::AlgorithmInstance::ES256 => m.sign_bytes(secret, bytes),
                 _ => Err(MessageSignatureError::UnsupportedAlgorithm(
                     algorithm.algorithm().to_string(),
                 )),
@@ -300,14 +300,14 @@ impl SigningMethod<JWK, ssi_crypto::Algorithm> for AnyJwkMethod {
             }
             #[cfg(feature = "ed25519")]
             Self::Ed25519VerificationKey2020(m) => match algorithm {
-                ssi_crypto::AlgorithmInstance::EdDsa => m.sign_bytes(secret, bytes),
+                ssi_crypto::AlgorithmInstance::EdDSA => m.sign_bytes(secret, bytes),
                 _ => Err(MessageSignatureError::UnsupportedAlgorithm(
                     algorithm.algorithm().to_string(),
                 )),
             },
             #[cfg(feature = "secp256k1")]
             Self::EcdsaSecp256k1VerificationKey2019(m) => match algorithm {
-                ssi_crypto::AlgorithmInstance::Es256K => m.sign_bytes(
+                ssi_crypto::AlgorithmInstance::ES256K => m.sign_bytes(
                     secret,
                     ecdsa_secp_256k1_verification_key_2019::DigestFunction::Sha256,
                     bytes,
@@ -318,7 +318,7 @@ impl SigningMethod<JWK, ssi_crypto::Algorithm> for AnyJwkMethod {
             },
             #[cfg(feature = "secp256r1")]
             Self::EcdsaSecp256r1VerificationKey2019(m) => match algorithm {
-                ssi_crypto::AlgorithmInstance::Es256 => m.sign_bytes(secret, bytes),
+                ssi_crypto::AlgorithmInstance::ES256 => m.sign_bytes(secret, bytes),
                 _ => Err(MessageSignatureError::UnsupportedAlgorithm(
                     algorithm.algorithm().to_string(),
                 )),

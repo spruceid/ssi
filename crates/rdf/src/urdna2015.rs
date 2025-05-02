@@ -13,7 +13,7 @@ use rdf_types::Id;
 use rdf_types::LexicalQuad;
 use rdf_types::LexicalQuadRef;
 
-use ssi_crypto::hash::sha256;
+use ssi_crypto::hashes::sha256::sha256;
 
 use crate::{IntoNQuads, NQuadsStatement};
 

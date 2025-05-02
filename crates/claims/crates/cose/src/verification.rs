@@ -3,6 +3,7 @@ use ssi_claims_core::{
     ClaimsValidity, InvalidProof, ProofValidationError, ProofValidity, ResolverProvider,
     ValidateClaims, ValidateProof, VerifiableClaims, Verification,
 };
+use ssi_crypto::VerificationError;
 
 use crate::{
     algorithm::instantiate_algorithm,
@@ -105,7 +106,7 @@ pub enum CoseVerificationError {
     PublicKey(#[from] KeyDecodingError),
 
     #[error(transparent)]
-    Verification(#[from] ssi_crypto::Error),
+    Verification(#[from] VerificationError),
 }
 
 impl From<CoseVerificationError> for ProofValidationError {
@@ -129,7 +130,6 @@ pub fn verify_bytes(
     let public_key = key.decode_public()?;
 
     public_key
-        .verify_bytes(instance, signing_bytes, signature_bytes)
-        .map(|r| r.is_ok())
+        .verify(instance, signing_bytes, signature_bytes)
         .map_err(Into::into)
 }
