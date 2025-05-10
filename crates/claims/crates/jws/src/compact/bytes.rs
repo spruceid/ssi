@@ -6,7 +6,10 @@ pub use base64::DecodeError as Base64DecodeError;
 use base64::Engine;
 use ssi_claims_core::{ProofValidationError, ResolverProvider, Verification};
 use ssi_jwk::JWKResolver;
-use std::{borrow::Cow, ops::Deref};
+use std::{
+    borrow::{Borrow, Cow},
+    ops::Deref,
+};
 
 /// Borrowed JWS without any encoding guaranties.
 ///
@@ -243,6 +246,17 @@ impl JwsSlice {
     }
 }
 
+impl ToOwned for JwsSlice {
+    type Owned = JwsVec;
+
+    fn to_owned(&self) -> Self::Owned {
+        unsafe {
+            // SAFETY: `Jws` represent a valid JWS by construction.
+            JwsVec::new_unchecked(self.0.to_owned())
+        }
+    }
+}
+
 /// Owned JWS without any encoding guaranties.
 ///
 /// This type is similar to the [`JwsBuf`](crate::JwsBuf) type.
@@ -303,7 +317,7 @@ impl JwsVec {
         Self::new_unchecked(bytes)
     }
 
-    pub fn as_compact_jws(&self) -> &JwsSlice {
+    pub fn as_jws_slice(&self) -> &JwsSlice {
         unsafe { JwsSlice::new_unchecked(&self.0) }
     }
 
@@ -335,6 +349,12 @@ impl Deref for JwsVec {
     type Target = JwsSlice;
 
     fn deref(&self) -> &Self::Target {
-        self.as_compact_jws()
+        self.as_jws_slice()
+    }
+}
+
+impl Borrow<JwsSlice> for JwsVec {
+    fn borrow(&self) -> &JwsSlice {
+        self.as_jws_slice()
     }
 }
