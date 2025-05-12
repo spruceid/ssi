@@ -74,8 +74,15 @@ const ARRAY_CLAIM_ITEM_PROPERTY_NAME: &str = "...";
 
 /// Invalid SD-JWT error.
 #[derive(Debug, thiserror::Error)]
-#[error("invalid SD-JWT: `{0}`")]
+#[error("invalid SD-JWT")]
 pub struct InvalidSdJwt<T = String>(pub T);
+
+impl<T: ?Sized + ToOwned> InvalidSdJwt<&T> {
+    /// Takes ownership of the inner value.
+    pub fn into_owned(self) -> InvalidSdJwt<T::Owned> {
+        InvalidSdJwt(self.0.to_owned())
+    }
+}
 
 /// Creates a new static SD-JWT reference from a string literal.
 #[macro_export]
@@ -391,6 +398,19 @@ impl SdJwtBuf {
     /// Borrows the SD-JWT.
     pub fn as_sd_jwt(&self) -> &SdJwt {
         unsafe { SdJwt::new_unchecked(&self.0) }
+    }
+
+    /// Turns this SD-JWT into a byte string.
+    pub fn into_bytes(self) -> Vec<u8> {
+        self.0
+    }
+
+    /// Turns this SD-JWT into a string.
+    pub fn into_string(self) -> String {
+        unsafe {
+            // SAFETY: SD-JWTs are valid UTF-8 strings.
+            String::from_utf8_unchecked(self.0)
+        }
     }
 }
 
