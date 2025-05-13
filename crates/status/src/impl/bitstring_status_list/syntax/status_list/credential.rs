@@ -21,8 +21,9 @@ use ssi_sd_jwt::SdJwt;
 use ssi_vc::{
     syntax::RequiredType,
     v2::syntax::{Context, JsonCredentialTypes},
+    MEDIA_TYPE_VC,
 };
-use ssi_vc_jose_cose::SdJwtVc;
+use ssi_vc_jose_cose::{SdJwtVc, MEDIA_TYPE_VC_JWT, MEDIA_TYPE_VC_SD_JWT};
 use ssi_verification_methods::{AnyMethod, VerificationMethodResolver};
 
 use crate::{EncodedStatusMap, FromBytes, FromBytesOptions};
@@ -229,7 +230,7 @@ where
         options: FromBytesOptions,
     ) -> Result<Self, Self::Error> {
         match media_type {
-            "application/vc" | "application/vc+ld+json" => {
+            MEDIA_TYPE_VC | "application/vc+ld+json" => {
                 let vc = ssi_data_integrity::from_json_slice::<Self, AnySuite>(bytes)?;
 
                 if !options.allow_unsecured || !vc.proofs.is_empty() {
@@ -238,7 +239,7 @@ where
 
                 Ok(vc.claims)
             }
-            "application/vc+jwt" | "application/vc+ld+json+jwt" => {
+            MEDIA_TYPE_VC_JWT | "application/vc+ld+json+jwt" => {
                 let jws = JwsSlice::new(bytes)
                     .map_err(InvalidJws::into_owned)?
                     .decode()?
@@ -246,7 +247,7 @@ where
                 jws.verify(params).await??;
                 Ok(jws.signing_bytes.payload)
             }
-            "application/vc+sd-jwt" => {
+            MEDIA_TYPE_VC_SD_JWT => {
                 let sd_jwt = SdJwt::new(bytes).map_err(ssi_sd_jwt::InvalidSdJwt::into_owned)?;
                 let credential = SdJwtVc::<Self>::decode_reveal(sd_jwt)?;
 

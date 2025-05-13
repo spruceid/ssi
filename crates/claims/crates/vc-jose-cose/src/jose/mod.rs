@@ -15,3 +15,7 @@ pub enum JoseDecodeError {
     #[error(transparent)]
     JSON(#[from] serde_json::Error),
 }
+
+pub const MEDIA_TYPE_VC_JWT: &str = "application/vc+jwt";
+
+pub const MEDIA_TYPE_VP_JWT: &str = "application/vp+jwt";
