@@ -2,9 +2,9 @@ name: ci
 
 on:
   push:
-    branches: [ main ]
+    branches: [main]
   pull_request:
-    branches: [ main ]
+    branches: [main]
 
 env:
   CARGO_TERM_COLOR: always
@@ -17,76 +17,82 @@ jobs:
       RUSTFLAGS: "-Dwarnings"
       RUSTDOCFLAGS: "-Dwarnings"
     steps:
-    - name: Checkout SSI Library
-      uses: actions/checkout@v4
-      with:
-        submodules: true
+      - name: Checkout SSI Library
+        uses: actions/checkout@v4
+        with:
+          submodules: true
 
-    - name: Retrieve MSRV
-      id: msrv
-      run: echo "MSRV=$(cat Cargo.toml | grep -Po '(?<=rust-version = ")([\d\.]+)')" >> $GITHUB_OUTPUT
-    
-    - name: Install Rust
-      uses: dtolnay/rust-toolchain@master
-      with:
-        toolchain: ${{ steps.msrv.outputs.MSRV }}
-        components: rustfmt, clippy
+      - name: Retrieve MSRV
+        id: msrv
+        run: echo "MSRV=$(cat Cargo.toml | grep -Po '(?<=rust-version = ")([\d\.]+)')" >> $GITHUB_OUTPUT
 
-    - uses: Swatinem/rust-cache@v2
-      with:
-        cache-on-failure: "true"
-    - uses: taiki-e/install-action@v2
-      with:
-        tool: cargo-rdme
-    - uses: taiki-e/install-action@v2
-      with:
-        tool: cargo-deny
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: ${{ steps.msrv.outputs.MSRV }}
+          components: rustfmt, clippy
 
-    - name: Fmt
-      run: cargo fmt -- --check
+      - uses: Swatinem/rust-cache@v2
+        with:
+          cache-on-failure: "true"
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-rdme
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-deny
 
-    - name: Build
-      run: cargo build --workspace
+      - name: Fmt
+        run: cargo fmt -- --check
 
-    - name: Clippy
-      run: cargo clippy --workspace
+      - name: Build
+        run: cargo build --workspace
 
-    - name: Test WASM compilation
-      run: |
-        rustup target add wasm32-unknown-unknown
-        cargo check --workspace --target wasm32-unknown-unknown
+      - name: Clippy
+        run: cargo clippy --workspace
 
-    - name: Test examples
-      run: |
-        cargo test --examples
+      - name: Test WASM compilation
+        run: |
+          rustup target add wasm32-unknown-unknown
+          cargo check --workspace --target wasm32-unknown-unknown
 
-    - name: Doc
-      run: cargo doc --no-deps --workspace --all-features
-    - name: cargo-rdme
-      run: cargo rdme --check --no-fail-on-warnings
+      - name: Test examples
+        run: |
+          cargo test --examples
 
-    - run: cargo deny check bans
-    - run: cargo deny check licenses
+      - name: Doc
+        run: cargo doc --no-deps --workspace --all-features
+      - name: cargo-rdme
+        run: cargo rdme --check --no-fail-on-warnings
+
+      - run: cargo deny check bans
+      - run: cargo deny check licenses
 
   test-each-feature:
     if: ${{ !github.event.pull_request.draft }}
     runs-on: ubuntu-latest-m
     steps:
-    - name: Checkout SSI Library
-      uses: actions/checkout@v4
-      with:
-        submodules: true
+      - name: Checkout SSI Library
+        uses: actions/checkout@v4
+        with:
+          submodules: true
 
-    - name: Install Rust
-      uses: dtolnay/rust-toolchain@1.81.0
+      - name: Retrieve MSRV
+        id: msrv
+        run: echo "MSRV=$(cat Cargo.toml | grep -Po '(?<=rust-version = ")([\d\.]+)')" >> $GITHUB_OUTPUT
 
-    - uses: taiki-e/install-action@cargo-hack
-    - uses: Swatinem/rust-cache@v2
-      with:
-        cache-on-failure: "true"
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: ${{ steps.msrv.outputs.MSRV }}
 
-    - name: Test each feature
-      run: cargo hack test --each-feature --workspace --clean-per-run --exclude ssi --exclude 'ssi-did-test' -- --test-threads=4
+      - uses: taiki-e/install-action@cargo-hack
+      - uses: Swatinem/rust-cache@v2
+        with:
+          cache-on-failure: "true"
+
+      - name: Test each feature
+        run: cargo hack test --each-feature --workspace --clean-per-run --exclude ssi --exclude 'ssi-did-test' -- --test-threads=4
 
   # Disabled until caching is fixed or cargo-semver-checks-actions works with our workspace
   # semver:
