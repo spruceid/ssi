@@ -8,18 +8,18 @@ description = "Core library for Verifiable Credentials and Decentralized Identif
 repository = "https://github.com/spruceid/ssi/"
 documentation = "https://docs.rs/ssi/"
 keywords = ["ssi", "did", "vc", "vp", "jsonld"]
-rust-version = "1.81"
+rust-version = "1.82"
 
 [workspace]
 members = [
-  "crates/*",
-  "crates/verification-methods/core",
-  "crates/dids/core",
-  "crates/dids/methods/*",
-  "crates/claims/core",
-  "crates/claims/crates/*",
-  "crates/claims/crates/data-integrity/core",
-  "crates/claims/crates/data-integrity/suites",
+    "crates/*",
+    "crates/verification-methods/core",
+    "crates/dids/core",
+    "crates/dids/methods/*",
+    "crates/claims/core",
+    "crates/claims/crates/*",
+    "crates/claims/crates/data-integrity/core",
+    "crates/claims/crates/data-integrity/suites",
 ]
 
 [workspace.dependencies]
@@ -115,17 +115,17 @@ uuid = "1.9"
 
 [features]
 default = [
-  "w3c",
-  "rsa",
-  "ed25519",
-  "secp256k1",
-  "secp256r1",
-  "ripemd-160",
-  "eip712",
+    "w3c",
+    "rsa",
+    "ed25519",
+    "secp256k1",
+    "secp256r1",
+    "ripemd-160",
+    "eip712",
 ]
 
 ## Signature suites specified by the W3C.
-## 
+##
 ## This will enable the following Data-Integrity suites:
 ##   - `JsonWebSignature2020`
 ##   - `RsaSignature2018` (requires `rsa`)
@@ -190,7 +190,7 @@ tezos = ["ssi-claims/tezos", "ssi-caips/tezos", "ssi-dids/tezos"]
 aleo = ["ssi-claims/aleo", "ssi-caips/aleo", "ssi-dids/aleo"]
 
 ## Signature suites based on Ethereum EIP-712.
-## 
+##
 ## This includes:
 ##   - `Eip712Signature2021` (requires `ethereum`).
 ##   - `EthereumEip712Signature2021` (requires `w3c`)
