@@ -13,6 +13,7 @@ use iref::{Uri, UriBuf};
 use rdf_types::VocabularyMut;
 use serde::{Deserialize, Serialize};
 use ssi_claims_core::{ClaimsValidity, DateTimeProvider, ValidateClaims};
+use ssi_core::Lexical;
 use ssi_json_ld::{JsonLdError, JsonLdNodeObject, JsonLdObject, JsonLdTypes, Loader};
 use ssi_rdf::{Interpretation, LdEnvironment, LinkedDataResource, LinkedDataSubject};
 use xsd_types::DateTimeStamp;
@@ -74,12 +75,12 @@ pub struct SpecializedJsonCredential<
     /// Issuance date.
     #[serde(rename = "validFrom")]
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub valid_from: Option<xsd_types::DateTimeStamp>,
+    pub valid_from: Option<Lexical<xsd_types::DateTimeStamp>>,
 
     /// Expiration date.
     #[serde(rename = "validUntil")]
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub valid_until: Option<xsd_types::DateTimeStamp>,
+    pub valid_until: Option<Lexical<xsd_types::DateTimeStamp>>,
 
     /// Credential status.
     #[serde(rename = "credentialStatus")]
@@ -352,11 +353,11 @@ impl<
     }
 
     fn valid_from(&self) -> Option<DateTimeStamp> {
-        self.valid_from
+        self.valid_from.as_ref().map(Lexical::to_value)
     }
 
     fn valid_until(&self) -> Option<DateTimeStamp> {
-        self.valid_until
+        self.valid_until.as_ref().map(Lexical::to_value)
     }
 
     fn credential_status(&self) -> &[Self::Status] {

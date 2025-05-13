@@ -9,6 +9,7 @@ use crate::{
 use educe::Educe;
 use serde::{Deserialize, Serialize};
 use ssi_claims_core::{AttachProof, ProofValidationError, ProofValidity, ResourceProvider};
+use ssi_core::Lexical;
 use ssi_core::{one_or_many::OneOrManyRef, OneOrMany};
 use ssi_verification_methods::{ProofPurpose, ReferenceOrOwned};
 use std::collections::BTreeMap;
@@ -49,7 +50,7 @@ pub struct Proof<S: CryptographicSuite> {
 
     /// Date a creation of the proof.
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub created: Option<xsd_types::DateTimeStamp>,
+    pub created: Option<Lexical<xsd_types::DateTimeStamp>>,
 
     /// Verification method.
     #[serde(serialize_with = "S::serialize_verification_method_ref")]
@@ -60,7 +61,7 @@ pub struct Proof<S: CryptographicSuite> {
 
     /// Specifies when the proof expires.
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub expires: Option<xsd_types::DateTimeStamp>,
+    pub expires: Option<Lexical<xsd_types::DateTimeStamp>>,
 
     #[allow(rustdoc::bare_urls)]
     /// Conveys one or more security domains in which the proof is meant to be
@@ -117,7 +118,7 @@ impl<T: CryptographicSuite> Proof<T> {
     /// Creates a new proof.
     pub fn new(
         type_: T,
-        created: xsd_types::DateTimeStamp,
+        created: Lexical<xsd_types::DateTimeStamp>,
         verification_method: ReferenceOrOwned<T::VerificationMethod>,
         proof_purpose: ProofPurpose,
         options: T::ProofOptions,
@@ -143,10 +144,10 @@ impl<T: CryptographicSuite> Proof<T> {
         ProofRef {
             context: self.context.as_ref(),
             type_: &self.type_,
-            created: self.created,
+            created: self.created.as_ref(),
             verification_method: self.verification_method.borrowed(),
             proof_purpose: self.proof_purpose,
-            expires: self.expires,
+            expires: self.expires.as_ref(),
             domains: &self.domains,
             challenge: self.challenge.as_deref(),
             nonce: self.nonce.as_deref(),
@@ -171,10 +172,10 @@ impl<T: CryptographicSuite> Proof<T> {
         ProofConfigurationRef {
             context: self.context.as_ref(),
             type_: &self.type_,
-            created: self.created,
+            created: self.created.as_ref(),
             verification_method: self.verification_method.borrowed(),
             proof_purpose: self.proof_purpose,
-            expires: self.expires,
+            expires: self.expires.as_ref(),
             domains: &self.domains,
             challenge: self.challenge.as_deref(),
             nonce: self.nonce.as_deref(),
@@ -212,10 +213,10 @@ impl<S: CloneCryptographicSuite> Clone for Proof<S> {
         Self {
             context: self.context.clone(),
             type_: self.type_.clone(),
-            created: self.created,
+            created: self.created.clone(),
             verification_method: S::clone_verification_method_ref(&self.verification_method),
             proof_purpose: self.proof_purpose,
-            expires: self.expires,
+            expires: self.expires.clone(),
             domains: self.domains.clone(),
             challenge: self.challenge.clone(),
             nonce: self.nonce.clone(),

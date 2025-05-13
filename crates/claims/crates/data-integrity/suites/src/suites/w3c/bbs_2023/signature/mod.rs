@@ -1,7 +1,7 @@
 use crate::Bbs2023;
 use serde::{Deserialize, Serialize};
-use ssi_bbs::Bbs;
 use ssi_claims_core::{ProofValidationError, SignatureError};
+use ssi_crypto::algorithm::Bbs;
 use ssi_data_integrity_core::{
     signing::AlterSignature,
     suite::standard::{SignatureAlgorithm, SignatureAndVerificationAlgorithm},
@@ -185,7 +185,7 @@ _:b5 <https://windsurf.grotto-networking.com/selective#year> \"2023\"^^<http://w
         ];
         let proof_configuration = ProofConfiguration::new(
             Bbs2023,
-            xsd_types::DateTimeStamp::now_ms(),
+            xsd_types::DateTimeStamp::now_ms().into(),
             ReferenceOrOwned::Reference("did:method:test".parse().unwrap()),
             ProofPurpose::Assertion,
             (),

@@ -98,6 +98,14 @@ impl DIDMethodResolver for DIDWeb {
             reqwest::header::HeaderValue::from_static(USER_AGENT),
         );
 
+        #[cfg(target_os = "android")]
+        let client = reqwest::Client::builder()
+            .use_rustls_tls()
+            .default_headers(headers)
+            .build()
+            .map_err(|e| Error::internal(InternalError::Client(e)))?;
+
+        #[cfg(not(target_os = "android"))]
         let client = reqwest::Client::builder()
             .default_headers(headers)
             .build()

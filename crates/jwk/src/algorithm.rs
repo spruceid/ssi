@@ -10,7 +10,7 @@ macro_rules! algorithms {
         $(#[doc = $doc:tt])*
         $(#[doc($doc_tag:ident)])?
         $(#[serde $serde:tt])?
-        $id:ident: $name:literal
+        $id:ident: $name:literal = $crypto_id:ident
     ),*) => {
         /// Signature algorithm.
         #[derive(Debug, Serialize, Deserialize, Clone, Copy, PartialEq, Hash, Eq)]
@@ -53,7 +53,7 @@ macro_rules! algorithms {
         impl From<Algorithm> for ssi_crypto::Algorithm {
             fn from(a: Algorithm) -> Self {
                 match a {
-                    $(Algorithm::$id => Self::$id,)*
+                    $(Algorithm::$id => Self::$crypto_id,)*
                     Algorithm::None => Self::None
                 }
             }
@@ -62,20 +62,20 @@ macro_rules! algorithms {
         impl From<Algorithm> for ssi_crypto::AlgorithmInstance {
             fn from(a: Algorithm) -> Self {
                 match a {
-                    $(Algorithm::$id => Self::$id,)*
+                    $(Algorithm::$id => Self::$crypto_id,)*
                     Algorithm::None => Self::None
                 }
             }
         }
 
         $(
-            impl From<ssi_crypto::algorithm::$id> for Algorithm {
-                fn from(_: ssi_crypto::algorithm::$id) -> Self {
+            impl From<ssi_crypto::algorithm::$crypto_id> for Algorithm {
+                fn from(_: ssi_crypto::algorithm::$crypto_id) -> Self {
                     Self::$id
                 }
             }
 
-            impl TryFrom<Algorithm> for ssi_crypto::algorithm::$id {
+            impl TryFrom<Algorithm> for ssi_crypto::algorithm::$crypto_id {
                 type Error = UnsupportedAlgorithm;
 
                 fn try_from(value: Algorithm) -> Result<Self, Self::Error> {
@@ -92,7 +92,7 @@ macro_rules! algorithms {
 
             fn try_from(a: ssi_crypto::Algorithm) -> Result<Self, Self::Error> {
                 match a {
-                    $(ssi_crypto::Algorithm::$id => Ok(Self::$id),)*
+                    $(ssi_crypto::Algorithm::$crypto_id => Ok(Self::$id),)*
                     ssi_crypto::Algorithm::None => Ok(Self::None),
                     other => Err(UnsupportedAlgorithm(other))
                 }
@@ -104,7 +104,7 @@ macro_rules! algorithms {
 
             fn try_from(a: ssi_crypto::AlgorithmInstance) -> Result<Self, Self::Error> {
                 match a {
-                    $(ssi_crypto::AlgorithmInstance::$id => Ok(Self::$id),)*
+                    $(ssi_crypto::AlgorithmInstance::$crypto_id => Ok(Self::$id),)*
                     ssi_crypto::AlgorithmInstance::None => Ok(Self::None),
                     other => Err(UnsupportedAlgorithm(other.algorithm()))
                 }
@@ -117,47 +117,47 @@ algorithms! {
     /// HMAC using SHA-256.
     ///
     /// See: <https://www.rfc-editor.org/rfc/rfc7518.txt>
-    HS256: "HS256",
+    HS256: "HS256" = Hs256,
 
     /// HMAC using SHA-384.
     ///
     /// See: <https://www.rfc-editor.org/rfc/rfc7518.txt>
-    HS384: "HS384",
+    HS384: "HS384" = Hs384,
 
     /// HMAC using SHA-512.
     ///
     /// See: <https://www.rfc-editor.org/rfc/rfc7518.txt>
-    HS512: "HS512",
+    HS512: "HS512" = Hs512,
 
     /// RSASSA-PKCS1-v1_5 using SHA-256.
     ///
     /// See: <https://www.rfc-editor.org/rfc/rfc7518.txt>
-    RS256: "RS256",
+    RS256: "RS256" = Rs256,
 
     /// RSASSA-PKCS1-v1_5 using SHA-384.
     ///
     /// See: <https://www.rfc-editor.org/rfc/rfc7518.txt>
-    RS384: "RS384",
+    RS384: "RS384" = Rs384,
 
     /// RSASSA-PKCS1-v1_5 using SHA-512.
     ///
     /// See: <https://www.rfc-editor.org/rfc/rfc7518.txt>
-    RS512: "RS512",
+    RS512: "RS512" = Rs512,
 
     /// RSASSA-PSS using SHA-256 and MGF1 with SHA-256.
     ///
     /// See: <https://www.rfc-editor.org/rfc/rfc7518.txt>
-    PS256: "PS256",
+    PS256: "PS256" = Ps256,
 
     /// RSASSA-PSS using SHA-384 and MGF1 with SHA-384.
     ///
     /// See: <https://www.rfc-editor.org/rfc/rfc7518.txt>
-    PS384: "PS384",
+    PS384: "PS384" = Ps384,
 
     /// RSASSA-PSS using SHA-512 and MGF1 with SHA-512.
     ///
     /// See: <https://www.rfc-editor.org/rfc/rfc7518.txt>
-    PS512: "PS512",
+    PS512: "PS512" = Ps512,
 
     /// Edwards-curve Digital Signature Algorithm (EdDSA) using SHA-256.
     ///
@@ -166,25 +166,25 @@ algorithms! {
     ///  - `Ed448`
     ///
     /// See: <https://www.rfc-editor.org/rfc/rfc8037>
-    EdDSA: "EdDSA",
+    EdDSA: "EdDSA" = EdDsa,
 
     /// EdDSA using SHA-256 and Blake2b as pre-hash function.
-    EdBlake2b: "EdBlake2b", // TODO Blake2b is supposed to replace SHA-256
+    EdBlake2b: "EdBlake2b" = EdBlake2b, // TODO Blake2b is supposed to replace SHA-256
 
     /// ECDSA using P-256 and SHA-256.
     ///
     /// See: <https://www.rfc-editor.org/rfc/rfc7518.txt>
-    ES256: "ES256",
+    ES256: "ES256" = Es256,
 
     /// ECDSA using P-384 and SHA-384.
     ///
     /// See: <https://www.rfc-editor.org/rfc/rfc7518.txt>
-    ES384: "ES384",
+    ES384: "ES384" = Es384,
 
     /// ECDSA using secp256k1 (K-256) and SHA-256.
     ///
     /// See: <https://datatracker.ietf.org/doc/html/rfc8812>
-    ES256K: "ES256K",
+    ES256K: "ES256K" = Es256K,
 
     /// ECDSA using secp256k1 (K-256) and SHA-256 with a recovery bit.
     ///
@@ -193,26 +193,26 @@ algorithms! {
     /// extract the public key from the signature.
     ///
     /// See: <https://github.com/decentralized-identity/EcdsaSecp256k1RecoverySignature2020#es256k-r>
-    ES256KR: "ES256K-R",
+    ES256KR: "ES256K-R" = Es256Kr,
 
     /// ECDSA using secp256k1 (K-256) and Keccak-256.
     ///
     /// Like `ES256K` but using Keccak-256 instead of SHA-256.
-    ESKeccakK: "ESKeccakK",
+    ESKeccakK: "ESKeccakK" = EsKeccakK,
 
     /// ECDSA using secp256k1 (K-256) and Keccak-256 with a recovery bit.
     ///
     /// Like `ES256K-R` but using Keccak-256 instead of SHA-256.
-    ESKeccakKR: "ESKeccakKR",
+    ESKeccakKR: "ESKeccakKR" = EsKeccakKr,
 
     /// ECDSA using P-256 and Blake2b.
-    ESBlake2b: "ESBlake2b",
+    ESBlake2b: "ESBlake2b" = EsBlake2b,
 
     /// ECDSA using secp256k1 (K-256) and Blake2b.
-    ESBlake2bK: "ESBlake2bK",
+    ESBlake2bK: "ESBlake2bK" = EsBlake2bK,
 
     #[doc(hidden)]
-    AleoTestnet1Signature: "AleoTestnet1Signature"
+    AleoTestnet1Signature: "AleoTestnet1Signature" = AleoTestnet1Signature
 }
 
 impl Algorithm {
