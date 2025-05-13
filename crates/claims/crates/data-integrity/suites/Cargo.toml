@@ -1,6 +1,6 @@
 [package]
 name = "ssi-data-integrity-suites"
-version = "0.1.2"
+version = "0.2.0"
 edition = "2021"
 authors = ["Spruce Systems, Inc."]
 license = "Apache-2.0"
@@ -89,7 +89,7 @@ tezos = [
 aleo = ["ssi-jwk/aleo", "ssi-verification-methods/aleo", "k256"]
 
 ## Signature suites based on Ethereum EIP-712.
-## 
+##
 ## This includes:
 ##   - `Eip712Signature2021` (requires `ethereum`).
 ##   - `EthereumEip712Signature2021` (requires `w3c`)
@@ -106,7 +106,7 @@ solana = ["ssi-verification-methods/solana", "k256"]
 ethereum = ["serde_json"]
 
 ## BBS cryptographic suites.
-bbs = ["ssi-bbs", "ssi-verification-methods/bbs"] 
+bbs = ["ssi-bbs", "ssi-verification-methods/bbs"]
 
 [dependencies]
 ssi-data-integrity-core.workspace = true

@@ -1,6 +1,6 @@
 [package]
 name = "ssi-data-integrity"
-version = "0.1.1"
+version = "0.2.0"
 edition = "2021"
 authors = ["Spruce Systems, Inc."]
 license = "Apache-2.0"
@@ -77,7 +77,7 @@ tezos = ["ssi-data-integrity-suites/tezos"]
 aleo = ["ssi-data-integrity-suites/aleo"]
 
 ## Signature suites based on Ethereum EIP-712.
-## 
+##
 ## This includes:
 ##   - `Eip712Signature2021` (requires `ethereum`).
 ##   - `EthereumEip712Signature2021` (requires `w3c`)

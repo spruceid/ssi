@@ -1,6 +1,6 @@
 [package]
 name = "did-pkh"
-version = "0.3.1"
+version = "0.3.2"
 authors = ["Spruce Systems, Inc."]
 edition = "2021"
 license = "Apache-2.0"
@@ -41,7 +41,16 @@ chrono = { workspace = true, features = ["serde", "wasmbind"] }
 ssi-core.workspace = true
 ssi-verification-methods-core.workspace = true
 ssi-json-ld.workspace = true
-ssi-claims = { workspace = true, features = ["w3c", "dif", "ethereum", "eip712", "secp256k1", "secp256r1", "tezos", "ed25519"] }
+ssi-claims = { workspace = true, features = [
+    "w3c",
+    "dif",
+    "ethereum",
+    "eip712",
+    "secp256k1",
+    "secp256r1",
+    "tezos",
+    "ed25519",
+] }
 ssi-tzkey.workspace = true
 ssi-eip712.workspace = true
 ssi-caips = { workspace = true, features = ["eip"] }
