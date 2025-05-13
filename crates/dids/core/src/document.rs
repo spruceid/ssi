@@ -163,7 +163,7 @@ impl Document {
 }
 
 #[derive(Debug, thiserror::Error)]
-#[error("invalid DID document representation data")]
+#[error("invalid DID document representation data: {0}")]
 pub enum InvalidData {
     Json(serde_json::Error),
     JsonLd(serde_json::Error),

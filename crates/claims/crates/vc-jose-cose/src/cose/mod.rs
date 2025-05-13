@@ -14,3 +14,7 @@ pub enum CoseDecodeError {
     #[error(transparent)]
     Payload(#[from] serde_json::Error),
 }
+
+pub const MEDIA_TYPE_VC_COSE: &str = "application/vc+cose";
+
+pub const MEDIA_TYPE_VP_COSE: &str = "application/vp+cose";

@@ -16,7 +16,12 @@ use ssi_json_ld::{
 };
 use ssi_jwk::JWKResolver;
 use ssi_jws::{InvalidJws, JwsSlice, ValidateJwsHeader};
-use ssi_vc::v2::{syntax::JsonCredentialTypes, Context};
+use ssi_sd_jwt::SdJwt;
+use ssi_vc::{
+    v2::{syntax::JsonCredentialTypes, Context},
+    MEDIA_TYPE_VC,
+};
+use ssi_vc_jose_cose::{SdJwtVc, MEDIA_TYPE_VC_JWT, MEDIA_TYPE_VC_SD_JWT};
 use ssi_verification_methods::{ssi_core::OneOrMany, AnyMethod, VerificationMethodResolver};
 
 use crate::{
@@ -125,21 +130,7 @@ where
         options: FromBytesOptions,
     ) -> Result<Self, Self::Error> {
         match media_type {
-            "application/vc+ld+json+jwt" => {
-                let jws = JwsSlice::new(bytes)
-                    .map_err(InvalidJws::into_owned)?
-                    .decode()?
-                    .try_map::<Self, _>(|bytes| serde_json::from_slice(&bytes))?;
-                jws.verify(params).await??;
-                Ok(jws.signing_bytes.payload)
-            }
-            // "application/vc+ld+json+sd-jwt" => {
-            //     todo!()
-            // }
-            // "application/vc+ld+json+cose" => {
-            //     todo!()
-            // }
-            "application/vc+ld+json" => {
+            MEDIA_TYPE_VC | "application/vc+ld+json" => {
                 let vc = ssi_data_integrity::from_json_slice::<Self, AnySuite>(bytes)?;
 
                 if !options.allow_unsecured || !vc.proofs.is_empty() {
@@ -147,6 +138,21 @@ where
                 }
 
                 Ok(vc.claims)
+            }
+            MEDIA_TYPE_VC_JWT | "application/vc+ld+json+jwt" => {
+                let jws = JwsSlice::new(bytes)
+                    .map_err(InvalidJws::into_owned)?
+                    .decode()?
+                    .try_map::<Self, _>(|bytes| serde_json::from_slice(&bytes))?;
+                jws.verify(params).await??;
+                Ok(jws.signing_bytes.payload)
+            }
+            MEDIA_TYPE_VC_SD_JWT => {
+                let sd_jwt = SdJwt::new(bytes).map_err(ssi_sd_jwt::InvalidSdJwt::into_owned)?;
+                let credential = SdJwtVc::<Self>::decode_reveal(sd_jwt)?;
+
+                credential.verify(params).await??;
+                Ok(credential.jwt.signing_bytes.payload.private.0)
             }
             other => Err(FromBytesError::UnexpectedMediaType(other.to_owned())),
         }
