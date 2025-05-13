@@ -1,4 +1,5 @@
 use http::header;
+use iref::{uri::AuthorityBuf, UriBuf};
 use ssi_dids_core::{
     document::representation::MediaType,
     resolution::{self, DIDMethodResolver, Error, Output},
@@ -10,6 +11,7 @@ pub const USER_AGENT: &str = concat!(env!("CARGO_PKG_NAME"), "/", env!("CARGO_PK
 // For testing, enable handling requests at localhost.
 #[cfg(test)]
 use std::cell::RefCell;
+use std::{net::Ipv4Addr, str::FromStr};
 
 #[cfg(test)]
 thread_local! {
@@ -36,14 +38,37 @@ pub enum InternalError {
 /// [Specification](https://w3c-ccg.github.io/did-method-web/)
 pub struct DIDWeb;
 
-fn did_web_url(id: &str) -> Result<String, Error> {
+fn did_web_url(id: &str) -> Result<UriBuf, Error> {
     let mut parts = id.split(':').peekable();
-    let domain_name = parts
+
+    // Extract the authority, with an optional port colon percent-encoded.
+    let encoded_authority = parts
         .next()
         .ok_or_else(|| Error::InvalidMethodSpecificId(id.to_owned()))?;
 
+    // Decoded authority.
+    let authority: AuthorityBuf = match encoded_authority.rsplit_once("%3A") {
+        Some((host, port)) => AuthorityBuf::new(format!("{host}:{port}").into_bytes())
+            .map_err(|_| Error::InvalidMethodSpecificId(id.to_owned()))?,
+        None => encoded_authority
+            .parse()
+            .map_err(|_| Error::InvalidMethodSpecificId(id.to_owned()))?,
+    };
+
+    // Decide what scheme to use.
+    let host = authority.host().as_str();
+    let scheme = if host == "localhost" {
+        "http"
+    } else {
+        match Ipv4Addr::from_str(host) {
+            Ok(ip) if ip.is_private() || ip.is_loopback() => "http",
+            Ok(_) => return Err(Error::InvalidMethodSpecificId(id.to_owned())),
+            _ => "https",
+        }
+    };
+
     // TODO:
-    // - Validate domain name: alphanumeric, hyphen, dot. no IP address.
+    // - Validate domain name: alphanumeric, hyphen, dot.
     // - Ensure domain name matches TLS certificate common name
     // - Support punycode?
     // - Support query strings?
@@ -52,18 +77,8 @@ fn did_web_url(id: &str) -> Result<String, Error> {
         None => ".well-known".to_string(),
     };
 
-    // Use http for localhost, for testing purposes.
-    let proto = if domain_name.starts_with("localhost") {
-        "http"
-    } else {
-        "https"
-    };
-
     #[allow(unused_mut)]
-    let mut url = format!(
-        "{proto}://{}/{path}/did.json",
-        domain_name.replacen("%3A", ":", 1)
-    );
+    let mut url = format!("{scheme}://{}/{path}/did.json", authority);
 
     #[cfg(test)]
     PROXY.with(|proxy| {
@@ -72,7 +87,7 @@ fn did_web_url(id: &str) -> Result<String, Error> {
         }
     });
 
-    Ok(url)
+    UriBuf::new(url.into_bytes()).map_err(|_| Error::InvalidMethodSpecificId(id.to_owned()))
 }
 
 impl DIDMethod for DIDWeb {
@@ -114,11 +129,11 @@ impl DIDMethodResolver for DIDWeb {
         let accept = options.accept.unwrap_or(MediaType::Json);
 
         let resp = client
-            .get(&url)
+            .get(url.as_str())
             .header(header::ACCEPT, accept.to_string())
             .send()
             .await
-            .map_err(|e| Error::internal(InternalError::Request(url.to_owned(), e)))?;
+            .map_err(|e| Error::internal(InternalError::Request(url.to_string(), e)))?;
 
         resp.error_for_status_ref().map_err(|err| {
             if err.status() == Some(reqwest::StatusCode::NOT_FOUND) {
@@ -155,12 +170,13 @@ impl DIDMethodResolver for DIDWeb {
 
 #[cfg(test)]
 mod tests {
+    use iref::Uri;
     use ssi_claims::{
         data_integrity::{AnySuite, CryptographicSuite, ProofOptions},
         vc::{syntax::NonEmptyVec, v1::JsonCredential},
         VerificationParameters,
     };
-    use ssi_dids_core::{did, DIDResolver, Document, VerificationMethodDIDResolver};
+    use ssi_dids_core::{did, DIDResolver, Document, VerificationMethodDIDResolver, DID};
     use ssi_jwk::JWK;
     use ssi_verification_methods_core::{ProofPurpose, SingleSecretSigner};
     use static_iref::{iri, uri};
@@ -169,26 +185,47 @@ mod tests {
 
     #[tokio::test]
     async fn parse_did_web() {
-        // https://w3c-ccg.github.io/did-method-web/#example-3-creating-the-did
-        assert_eq!(
-            did_web_url(did!("did:web:w3c-ccg.github.io").method_specific_id()).unwrap(),
-            "https://w3c-ccg.github.io/.well-known/did.json"
-        );
-        // https://w3c-ccg.github.io/did-method-web/#example-4-creating-the-did-with-optional-path
-        assert_eq!(
-            did_web_url(did!("did:web:w3c-ccg.github.io:user:alice").method_specific_id()).unwrap(),
-            "https://w3c-ccg.github.io/user/alice/did.json"
-        );
-        // https://w3c-ccg.github.io/did-method-web/#optional-path-considerations
-        assert_eq!(
-            did_web_url(did!("did:web:example.com:u:bob").method_specific_id()).unwrap(),
-            "https://example.com/u/bob/did.json"
-        );
-        // https://w3c-ccg.github.io/did-method-web/#example-creating-the-did-with-optional-path-and-port
-        assert_eq!(
-            did_web_url(did!("did:web:example.com%3A443:u:bob").method_specific_id()).unwrap(),
-            "https://example.com:443/u/bob/did.json"
-        );
+        let test_vectors: [(&DID, &Uri); 7] = [
+            (
+                // https://w3c-ccg.github.io/did-method-web/#example-3-creating-the-did
+                did!("did:web:w3c-ccg.github.io"),
+                uri!("https://w3c-ccg.github.io/.well-known/did.json"),
+            ),
+            (
+                // https://w3c-ccg.github.io/did-method-web/#example-4-creating-the-did-with-optional-path
+                did!("did:web:w3c-ccg.github.io:user:alice"),
+                uri!("https://w3c-ccg.github.io/user/alice/did.json"),
+            ),
+            (
+                // https://w3c-ccg.github.io/did-method-web/#optional-path-considerations
+                did!("did:web:example.com:u:bob"),
+                uri!("https://example.com/u/bob/did.json"),
+            ),
+            (
+                // https://w3c-ccg.github.io/did-method-web/#example-creating-the-did-with-optional-path-and-port
+                did!("did:web:example.com%3A443:u:bob"),
+                uri!("https://example.com:443/u/bob/did.json"),
+            ),
+            (
+                // localhost
+                did!("did:web:localhost:u:alice"),
+                uri!("http://localhost/u/alice/did.json"),
+            ),
+            (
+                // Private IPv4.
+                did!("did:web:192.168.0.1:u:alice"),
+                uri!("http://192.168.0.1/u/alice/did.json"),
+            ),
+            (
+                // Private IPv4 with port.
+                did!("did:web:192.168.0.1%3A3003:u:alice"),
+                uri!("http://192.168.0.1:3003/u/alice/did.json"),
+            ),
+        ];
+
+        for (did, url) in test_vectors {
+            assert_eq!(did_web_url(did.method_specific_id()).unwrap(), url);
+        }
     }
 
     const DID_URL: &str = "http://localhost/.well-known/did.json";
