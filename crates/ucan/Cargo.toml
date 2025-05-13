@@ -1,6 +1,6 @@
 [package]
 name = "ssi-ucan"
-version = "0.2.1"
+version = "0.2.2"
 edition = "2021"
 authors = ["Spruce Systems, Inc."]
 license = "Apache-2.0"
@@ -13,7 +13,7 @@ thiserror.workspace = true
 iref.workspace = true
 serde = { workspace = true, features = ["derive"] }
 serde_json.workspace = true
-serde_with = { version = "1.14", features = ["base64"]}
+serde_with = { version = "1.14", features = ["base64"] }
 base64.workspace = true
 bs58.workspace = true
 hex.workspace = true
@@ -25,7 +25,12 @@ ssi-dids-core.workspace = true
 ssi-core.workspace = true
 ssi-verification-methods.workspace = true
 ssi-caips.workspace = true
-libipld = { version = "0.14", default-features = false, features = ["dag-cbor", "dag-json", "derive", "serde-codec"]}
+libipld = { version = "0.14", default-features = false, features = [
+    "dag-cbor",
+    "dag-json",
+    "derive",
+    "serde-codec",
+] }
 chrono = { workspace = true, features = ["serde"] }
 
 [target.'cfg(target_arch = "wasm32")'.dependencies]

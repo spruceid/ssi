@@ -1,6 +1,6 @@
 [package]
 name = "ssi-claims"
-version = "0.2.0"
+version = "0.3.0"
 edition = "2021"
 authors = ["Spruce Systems, Inc."]
 license = "Apache-2.0"
@@ -19,20 +19,40 @@ dif = ["ssi-data-integrity/dif"]
 # - `Ed25519Signature2018`
 # - `Ed25519Signature2020`
 # - `EdDsa2022`
-ed25519 = ["ssi-jws/ed25519", "ssi-cose/ed25519", "ssi-data-integrity/ed25519", "ssi-verification-methods/ed25519"]
+ed25519 = [
+    "ssi-jws/ed25519",
+    "ssi-cose/ed25519",
+    "ssi-data-integrity/ed25519",
+    "ssi-verification-methods/ed25519",
+]
 
 # Enables signature suites based on secp256k1:
 # - `EcdsaSecp256k1Signature2019`
-secp256k1 = ["ssi-jws/secp256k1", "ssi-cose/secp256k1", "ssi-data-integrity/secp256k1", "ssi-verification-methods/secp256k1"]
+secp256k1 = [
+    "ssi-jws/secp256k1",
+    "ssi-cose/secp256k1",
+    "ssi-data-integrity/secp256k1",
+    "ssi-verification-methods/secp256k1",
+]
 
 # Enables signature suites based on secp256r1:
 # - `EcdsaSecp256r1Signature2019`
 # - `EcdsaRdfc2019`
-secp256r1 = ["ssi-jws/secp256r1", "ssi-cose/secp256r1", "ssi-data-integrity/secp256r1", "ssi-verification-methods/secp256r1"]
+secp256r1 = [
+    "ssi-jws/secp256r1",
+    "ssi-cose/secp256r1",
+    "ssi-data-integrity/secp256r1",
+    "ssi-verification-methods/secp256r1",
+]
 
 # Enables signature suites based on secp384r1:
 # - `EcdsaRdfc2019`
-secp384r1 = ["ssi-jws/secp384r1", "ssi-cose/secp384r1", "ssi-data-integrity/secp384r1", "ssi-verification-methods/secp384r1"]
+secp384r1 = [
+    "ssi-jws/secp384r1",
+    "ssi-cose/secp384r1",
+    "ssi-data-integrity/secp384r1",
+    "ssi-verification-methods/secp384r1",
+]
 
 # Enables `RsaSignature2018`
 rsa = ["ssi-jws/rsa", "ssi-data-integrity/rsa", "ssi-verification-methods/rsa"]
@@ -45,7 +65,12 @@ rsa = ["ssi-jws/rsa", "ssi-data-integrity/rsa", "ssi-verification-methods/rsa"]
 tezos = ["ssi-jws/tezos", "ssi-data-integrity/tezos"]
 
 # Enables `AleoSignature2021`
-aleo = ["ssi-jwk/aleo", "ssi-jws/aleo", "ssi-data-integrity/aleo", "ssi-verification-methods/aleo"]
+aleo = [
+    "ssi-jwk/aleo",
+    "ssi-jws/aleo",
+    "ssi-data-integrity/aleo",
+    "ssi-verification-methods/aleo",
+]
 
 # Enables `Eip712Signature2021`
 eip712 = ["ssi-eip712", "ssi-data-integrity/eip712", "ssi-vc/eip712"]

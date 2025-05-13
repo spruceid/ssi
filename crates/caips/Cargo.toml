@@ -1,6 +1,6 @@
 [package]
 name = "ssi-caips"
-version = "0.2.1"
+version = "0.2.2"
 edition = "2021"
 authors = ["Spruce Systems, Inc."]
 license = "Apache-2.0"
@@ -14,7 +14,7 @@ eip = ["ssi-jwk/eip"]
 ripemd-160 = ["ssi-jwk/ripemd-160"]
 
 ## Enable aleo accounts.
-## 
+##
 ## Not compatible with WASM targets.
 aleo = ["ssi-jwk/aleo", "bech32"]
 tezos = ["ssi-jwk/tezos"]
