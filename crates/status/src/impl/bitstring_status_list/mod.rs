@@ -260,7 +260,6 @@ impl FromStr for StatusPurpose {
 
 /// Bit-string with status size.
 ///
-///
 /// This type is similar to [`BitString`] but also stores the bit size of
 /// each item (status size) and the number of items in the list.
 /// This provides a safer access to the underlying bit-string, ensuring that
@@ -414,6 +413,17 @@ impl SizedBitString {
 
     pub fn into_unsized(self) -> BitString {
         self.inner
+    }
+
+    /// Consumes the bit-string and returns its raw bytes.
+    pub fn into_bytes(self) -> Vec<u8> {
+        self.inner.into_bytes()
+    }
+}
+
+impl From<SizedBitString> for Vec<u8> {
+    fn from(value: SizedBitString) -> Self {
+        value.into_bytes()
     }
 }
 
@@ -569,6 +579,17 @@ impl BitString {
     pub fn encode(&self) -> EncodedList {
         EncodedList::encode(&self.0)
     }
+
+    /// Consumes the bit-string and returns its raw bytes.
+    pub fn into_bytes(self) -> Vec<u8> {
+        self.0
+    }
+}
+
+impl From<BitString> for Vec<u8> {
+    fn from(value: BitString) -> Self {
+        value.into_bytes()
+    }
 }
 
 trait OverflowingSignedShift: Sized {
@@ -614,9 +635,9 @@ impl StatusList {
         }
     }
 
-    pub fn from_bytes(bytes: Vec<u8>, ttl: TimeToLive) -> Self {
+    pub fn from_bytes(bytes: impl Into<Vec<u8>>, ttl: TimeToLive) -> Self {
         Self {
-            bit_string: BitString::from_bytes(bytes),
+            bit_string: BitString::from_bytes(bytes.into()),
             ttl,
         }
     }
