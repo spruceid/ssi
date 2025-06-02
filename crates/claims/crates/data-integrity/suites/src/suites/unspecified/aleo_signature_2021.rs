@@ -133,7 +133,7 @@ impl VerificationAlgorithm<AleoSignature2021> for AleoSignatureAlgorithm {
             return Err(ProofValidationError::InvalidKey);
         }
 
-        let result = ssi_jwk::aleo::verify(
+        let result = ssi_jwk::okp::aleo::verify(
             &prepared_claims,
             &account_id.account_address,
             &signature_bytes,
@@ -141,7 +141,7 @@ impl VerificationAlgorithm<AleoSignature2021> for AleoSignatureAlgorithm {
 
         match result {
             Ok(()) => Ok(Ok(())),
-            Err(ssi_jwk::aleo::AleoVerifyError::InvalidSignature) => {
+            Err(ssi_jwk::okp::aleo::AleoVerifyError::InvalidSignature) => {
                 Ok(Err(ssi_claims_core::InvalidProof::Signature))
             }
             Err(_) => Err(ProofValidationError::InvalidSignature),

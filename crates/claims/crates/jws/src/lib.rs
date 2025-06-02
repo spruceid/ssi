@@ -519,7 +519,7 @@ pub fn sign_bytes(algorithm: Algorithm, data: &[u8], key: &JWK) -> Result<Vec<u8
                 _ => return Err(Error::AlgorithmNotImplemented(algorithm.to_string())),
             }
         }
-        #[cfg(any(feature = "ring", feature = "ed25519"))]
+        #[cfg(feature = "ed25519")]
         JWKParams::OKP(okp) => {
             use blake2::digest::{consts::U32, Digest};
             if algorithm != Algorithm::EdDSA && algorithm != Algorithm::EdBlake2b {
@@ -540,7 +540,7 @@ pub fn sign_bytes(algorithm: Algorithm, data: &[u8], key: &JWK) -> Result<Vec<u8
                 key_pair.sign(&hash).as_ref().to_vec()
             }
             // TODO: SymmetricParams
-            #[cfg(all(feature = "ed25519", not(feature = "ring")))]
+            #[cfg(not(feature = "ring"))]
             {
                 let secret = ed25519_dalek::SigningKey::try_from(okp)?;
                 use ed25519_dalek::Signer;
