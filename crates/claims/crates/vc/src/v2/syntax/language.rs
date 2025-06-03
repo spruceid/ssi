@@ -4,7 +4,7 @@ use ssi_json_ld::LangString;
 use crate::v2::data_model;
 
 /// International string.
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 #[serde(untagged)]
 pub enum InternationalString {
     String(String),
