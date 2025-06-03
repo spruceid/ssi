@@ -1,6 +1,6 @@
 [package]
 name = "ssi"
-version = "0.11.0"
+version = "0.12.0"
 authors = ["Spruce Systems, Inc."]
 edition = "2021"
 license = "Apache-2.0"
@@ -37,9 +37,9 @@ ssi-json-ld = { path = "./crates/json-ld", version = "0.3.1", default-features =
 ssi-security = { path = "./crates/security", version = "0.1", default-features = false }
 ssi-caips = { path = "./crates/caips", version = "0.2.1", default-features = false }
 ssi-ucan = { path = "./crates/ucan", version = "0.2.1", default-features = false }
-ssi-zcap-ld = { path = "./crates/zcap-ld", version = "0.4.0", default-features = false }
+ssi-zcap-ld = { path = "./crates/zcap-ld", version = "0.5.0", default-features = false }
 ssi-ssh = { path = "./crates/ssh", version = "0.2.1", default-features = false }
-ssi-status = { path = "./crates/status", version = "0.4", default-features = false }
+ssi-status = { path = "./crates/status", version = "0.5", default-features = false }
 ssi-bbs = { path = "./crates/bbs", version = "0.1.1", default-features = false }
 
 # Verifiable Claims
@@ -48,13 +48,13 @@ ssi-jws = { path = "./crates/claims/crates/jws", version = "0.3", default-featur
 ssi-jwt = { path = "./crates/claims/crates/jwt", version = "0.3", default-features = false }
 ssi-sd-jwt = { path = "./crates/claims/crates/sd-jwt", version = "0.3", default-features = false }
 ssi-cose = { path = "./crates/claims/crates/cose", version = "0.1", default-features = false }
-ssi-vc = { path = "./crates/claims/crates/vc", version = "0.5", default-features = false }
-ssi-vc-jose-cose = { path = "./crates/claims/crates/vc-jose-cose", version = "0.3", default-features = false }
+ssi-vc = { path = "./crates/claims/crates/vc", version = "0.6", default-features = false }
+ssi-vc-jose-cose = { path = "./crates/claims/crates/vc-jose-cose", version = "0.4", default-features = false }
 ssi-data-integrity-core = { path = "./crates/claims/crates/data-integrity/core", version = "0.3", default-features = false }
 ssi-di-sd-primitives = { path = "./crates/claims/crates/data-integrity/sd-primitives", version = "0.2", default-features = false }
 ssi-data-integrity-suites = { path = "./crates/claims/crates/data-integrity/suites", version = "0.2", default-features = false }
 ssi-data-integrity = { path = "./crates/claims/crates/data-integrity", version = "0.2", default-features = false }
-ssi-claims = { path = "./crates/claims", version = "0.3.0", default-features = false }
+ssi-claims = { path = "./crates/claims", version = "0.4", default-features = false }
 
 # DID methods
 ssi-dids-core = { path = "./crates/dids/core", version = "0.1.2", default-features = false }
