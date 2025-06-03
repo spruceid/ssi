@@ -62,9 +62,11 @@ pub struct SpecializedJsonCredential<
     pub id: Option<UriBuf>,
 
     /// Name.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub name: Option<InternationalString>,
 
     /// Credential description.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub description: Option<InternationalString>,
 
     /// Credential type.
