@@ -18,6 +18,14 @@ impl<'a> From<&'a LangString> for LanguageValue<'a> {
 
 pub trait InternationalString {
     fn default_value(&self) -> Option<LanguageValue>;
+
+    fn get_language(&self, _lang: &LangTag) -> Option<LanguageValue> {
+        None
+    }
+
+    fn get_language_or_default(&self, lang: &LangTag) -> Option<LanguageValue> {
+        self.get_language(lang).or_else(|| self.default_value())
+    }
 }
 
 impl<T: ?Sized + InternationalString> InternationalString for &T {

@@ -20,4 +20,43 @@ impl data_model::InternationalString for InternationalString {
             Self::LanguageMap(_) => None,
         }
     }
+
+    fn get_language(
+        &self,
+        lang: &ssi_json_ld::syntax::LangTag,
+    ) -> Option<data_model::LanguageValue> {
+        match self {
+            Self::String(_) => None,
+            Self::LanguageValue(v) => {
+                if let Some(tag) = v.language() {
+                    if tag.as_str() == lang.as_str() {
+                        return Some(v.into());
+                    }
+                }
+
+                None
+            }
+            Self::LanguageMap(values) => values.iter().find_map(|v| {
+                if let Some(tag) = v.language() {
+                    if tag.as_str() == lang.as_str() {
+                        return Some(v.into());
+                    }
+                }
+
+                None
+            }),
+        }
+    }
+}
+
+impl From<String> for InternationalString {
+    fn from(value: String) -> Self {
+        Self::String(value)
+    }
+}
+
+impl From<LangString> for InternationalString {
+    fn from(value: LangString) -> Self {
+        Self::LanguageValue(value)
+    }
 }
