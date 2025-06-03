@@ -352,11 +352,11 @@ impl<
         self.types.additional_types()
     }
 
-    fn name(&self) -> Option<impl data_model::InternationalString> {
+    fn name(&self) -> Option<impl data_model::AnyInternationalString> {
         self.name.as_ref()
     }
 
-    fn description(&self) -> Option<impl data_model::InternationalString> {
+    fn description(&self) -> Option<impl data_model::AnyInternationalString> {
         self.description.as_ref()
     }
 

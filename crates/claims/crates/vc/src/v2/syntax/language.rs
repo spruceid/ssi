@@ -12,8 +12,8 @@ pub enum InternationalString {
     LanguageMap(Vec<LangString>),
 }
 
-impl data_model::InternationalString for InternationalString {
-    fn default_value(&self) -> Option<data_model::LanguageValue> {
+impl data_model::AnyInternationalString for InternationalString {
+    fn default_value(&self) -> Option<data_model::LanguageValueRef> {
         match self {
             Self::String(s) => s.default_value(),
             Self::LanguageValue(v) => v.default_value(),
@@ -24,7 +24,7 @@ impl data_model::InternationalString for InternationalString {
     fn get_language(
         &self,
         lang: &ssi_json_ld::syntax::LangTag,
-    ) -> Option<data_model::LanguageValue> {
+    ) -> Option<data_model::LanguageValueRef> {
         match self {
             Self::String(_) => None,
             Self::LanguageValue(v) => {

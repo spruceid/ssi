@@ -5,7 +5,7 @@ use ssi_json_ld::{iref::Uri, syntax::Context};
 use ssi_jws::{DecodedJws, JwsPayload, JwsSigner, JwsSlice, ValidateJwsHeader};
 use ssi_vc::{
     enveloped::EnvelopedVerifiableCredential,
-    v2::{Credential, CredentialTypes, InternationalString, JsonCredential},
+    v2::{AnyInternationalString, Credential, CredentialTypes, JsonCredential},
     MaybeIdentified,
 };
 use std::borrow::Cow;
@@ -95,11 +95,11 @@ impl<T: Credential> Credential for JoseVc<T> {
         self.0.types()
     }
 
-    fn name(&self) -> Option<impl InternationalString> {
+    fn name(&self) -> Option<impl AnyInternationalString> {
         self.0.name()
     }
 
-    fn description(&self) -> Option<impl InternationalString> {
+    fn description(&self) -> Option<impl AnyInternationalString> {
         self.0.description()
     }
 

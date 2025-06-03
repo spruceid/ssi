@@ -8,7 +8,7 @@ use ssi_jwt::{ClaimSet, InfallibleClaimSet, JWTClaims};
 use ssi_sd_jwt::{JsonPointer, RevealError, RevealedSdJwt, SdAlg, SdJwt, SdJwtBuf};
 use ssi_vc::{
     enveloped::EnvelopedVerifiableCredential,
-    v2::{Credential, CredentialTypes, InternationalString, JsonCredential},
+    v2::{AnyInternationalString, Credential, CredentialTypes, JsonCredential},
     MaybeIdentified,
 };
 use xsd_types::DateTimeStamp;
@@ -160,11 +160,11 @@ impl<T: Credential> Credential for SdJwtVc<T> {
         self.0.types()
     }
 
-    fn name(&self) -> Option<impl InternationalString> {
+    fn name(&self) -> Option<impl AnyInternationalString> {
         self.0.name()
     }
 
-    fn description(&self) -> Option<impl InternationalString> {
+    fn description(&self) -> Option<impl AnyInternationalString> {
         self.0.description()
     }
 
