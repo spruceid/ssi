@@ -7,6 +7,7 @@ use crate::{
         IdentifiedTypedObject, MaybeIdentifiedTypedObject, NonEmptyObject, NonEmptyVec,
         RequiredContextList, RequiredTypeSet, TypedObject,
     },
+    v2::data_model,
     Identified, MaybeIdentified, Typed,
 };
 use iref::{Uri, UriBuf};
@@ -59,6 +60,12 @@ pub struct SpecializedJsonCredential<
         skip_serializing_if = "Option::is_none"
     )]
     pub id: Option<UriBuf>,
+
+    /// Name.
+    pub name: Option<InternationalString>,
+
+    /// Credential description.
+    pub description: Option<InternationalString>,
 
     /// Credential type.
     #[serde(rename = "type")]
@@ -167,6 +174,8 @@ where
             context: Context::default(),
             id,
             types: JsonCredentialTypes::default(),
+            name: None,
+            description: None,
             issuer,
             credential_subjects,
             valid_from: None,
@@ -331,7 +340,6 @@ impl<
     >
 {
     type Subject = Subject;
-    type Description = InternationalString;
     type Issuer = Issuer;
     type Status = Status;
     type RefreshService = RefreshService;
@@ -342,6 +350,14 @@ impl<
 
     fn additional_types(&self) -> &[String] {
         self.types.additional_types()
+    }
+
+    fn name(&self) -> Option<impl data_model::AnyInternationalString> {
+        self.name.as_ref()
+    }
+
+    fn description(&self) -> Option<impl data_model::AnyInternationalString> {
+        self.description.as_ref()
     }
 
     fn credential_subjects(&self) -> &[Self::Subject] {

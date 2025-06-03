@@ -2,16 +2,13 @@ use iref::Uri;
 use ssi_claims_core::{ClaimsValidity, DateTimeProvider, InvalidClaims};
 use xsd_types::DateTimeStamp;
 
-use super::{InternationalString, RelatedResource};
+use super::{AnyInternationalString, RelatedResource};
 
 pub use crate::v1::CredentialTypes;
 use crate::{Identified, MaybeIdentified, Typed};
 
 /// Verifiable Credential.
 pub trait Credential: MaybeIdentified {
-    /// Description type.
-    type Description: InternationalString;
-
     /// Credential subject type.
     type Subject;
 
@@ -72,8 +69,8 @@ pub trait Credential: MaybeIdentified {
     /// other credentials that they might hold.
     ///
     /// See: <https://www.w3.org/TR/vc-data-model-2.0/#names-and-descriptions>
-    fn name(&self) -> Option<&str> {
-        None
+    fn name(&self) -> Option<impl AnyInternationalString> {
+        Option::<String>::None
     }
 
     /// Details about the credential.
@@ -84,8 +81,8 @@ pub trait Credential: MaybeIdentified {
     /// entirety of the claims.
     ///
     /// See: <https://www.w3.org/TR/vc-data-model-2.0/#names-and-descriptions>
-    fn description(&self) -> Option<&Self::Description> {
-        None
+    fn description(&self) -> Option<impl AnyInternationalString> {
+        Option::<String>::None
     }
 
     /// Credential subject.

@@ -5,7 +5,7 @@ use ssi_cose::{CosePayload, CoseSign1Bytes, CoseSigner, DecodedCoseSign1, Valida
 use ssi_json_ld::{iref::Uri, syntax::Context};
 use ssi_vc::{
     enveloped::EnvelopedVerifiableCredential,
-    v2::{Credential, CredentialTypes, JsonCredential},
+    v2::{AnyInternationalString, Credential, CredentialTypes, JsonCredential},
     MaybeIdentified,
 };
 use std::borrow::Cow;
@@ -90,7 +90,6 @@ impl<T: MaybeIdentified> MaybeIdentified for CoseVc<T> {
 }
 
 impl<T: Credential> Credential for CoseVc<T> {
-    type Description = T::Description;
     type Subject = T::Subject;
     type Issuer = T::Issuer;
     type Status = T::Status;
@@ -112,11 +111,11 @@ impl<T: Credential> Credential for CoseVc<T> {
         self.0.types()
     }
 
-    fn name(&self) -> Option<&str> {
+    fn name(&self) -> Option<impl AnyInternationalString> {
         self.0.name()
     }
 
-    fn description(&self) -> Option<&Self::Description> {
+    fn description(&self) -> Option<impl AnyInternationalString> {
         self.0.description()
     }
 

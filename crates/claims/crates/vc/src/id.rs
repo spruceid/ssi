@@ -71,12 +71,3 @@ impl Identified for IdentifiedTypedObject {
         &self.id
     }
 }
-
-impl Identified for IdOr<IdentifiedObject> {
-    fn id(&self) -> &Uri {
-        match self {
-            Self::Id(id) => id,
-            Self::NotId(o) => &o.id,
-        }
-    }
-}

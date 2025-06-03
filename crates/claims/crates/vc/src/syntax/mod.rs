@@ -34,6 +34,12 @@ impl<T: Identified> IdOr<T> {
     }
 }
 
+impl<T: Identified> Identified for IdOr<T> {
+    fn id(&self) -> &Uri {
+        self.id()
+    }
+}
+
 impl<T> From<UriBuf> for IdOr<T> {
     fn from(value: UriBuf) -> Self {
         Self::Id(value)
