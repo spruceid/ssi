@@ -20,8 +20,30 @@ pub trait InternationalString {
     fn default_value(&self) -> Option<LanguageValue>;
 }
 
-impl InternationalString for std::convert::Infallible {
+impl<T: ?Sized + InternationalString> InternationalString for &T {
     fn default_value(&self) -> Option<LanguageValue> {
-        unreachable!()
+        T::default_value(*self)
+    }
+}
+
+impl InternationalString for str {
+    fn default_value(&self) -> Option<LanguageValue> {
+        Some(LanguageValue {
+            value: self,
+            language: None,
+            direction: None,
+        })
+    }
+}
+
+impl InternationalString for String {
+    fn default_value(&self) -> Option<LanguageValue> {
+        self.as_str().default_value()
+    }
+}
+
+impl InternationalString for LangString {
+    fn default_value(&self) -> Option<LanguageValue> {
+        Some(LanguageValue::from(self))
     }
 }
