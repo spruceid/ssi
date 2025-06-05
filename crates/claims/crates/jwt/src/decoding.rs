@@ -1,7 +1,9 @@
 use serde::de::DeserializeOwned;
 use ssi_claims_core::{DateTimeProvider, ProofValidationError, ResolverProvider, Verification};
 use ssi_jwk::JWKResolver;
-use ssi_jws::{DecodeError as JWSDecodeError, DecodedJws, JwsSlice, JwsStr, JwsString, JwsVec};
+use ssi_jws::{
+    DecodeError as JWSDecodeError, DecodedJws, Jws, JwsBuf, JwsSlice, JwsStr, JwsString, JwsVec,
+};
 
 use crate::{AnyClaims, JWTClaims};
 
@@ -73,7 +75,7 @@ impl ToDecodedJwt for JwsStr {
     }
 }
 
-impl ToDecodedJwt for JwsVec {
+impl ToDecodedJwt for Jws {
     fn to_decoded_custom_jwt<C: DeserializeOwned>(&self) -> Result<DecodedJwt<C>, DecodeError> {
         JwsSlice::to_decoded_custom_jwt(self)
     }
@@ -88,13 +90,16 @@ impl IntoDecodedJwt for JwsVec {
     }
 }
 
-impl ToDecodedJwt for JwsString {
-    fn to_decoded_custom_jwt<C: DeserializeOwned>(&self) -> Result<DecodedJwt<C>, DecodeError> {
-        JwsSlice::to_decoded_custom_jwt(self)
+impl IntoDecodedJwt for JwsString {
+    fn into_decoded_custom_jwt<C: DeserializeOwned>(
+        self,
+    ) -> Result<DecodedJwt<'static, C>, DecodeError> {
+        self.into_decoded()?
+            .try_map(|bytes| serde_json::from_slice(&bytes).map_err(Into::into))
     }
 }
 
-impl IntoDecodedJwt for JwsString {
+impl IntoDecodedJwt for JwsBuf {
     fn into_decoded_custom_jwt<C: DeserializeOwned>(
         self,
     ) -> Result<DecodedJwt<'static, C>, DecodeError> {
