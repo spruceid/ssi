@@ -94,7 +94,7 @@ json-syntax = "0.12.5"
 nquads-syntax = "0.19"
 multibase = "0.9.1"
 serde = "1.0"
-serde_json = { version = "1.0", features = ["arbitrary_precision"] }
+serde_json = "1.0"
 serde_jcs = "0.1.0"
 ciborium = "0.2.2"
 bs58 = "0.4"

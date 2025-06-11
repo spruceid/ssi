@@ -563,10 +563,14 @@ mod ipld_encoding {
         pub exp: &'a NumericDate,
         #[serde(skip_serializing_if = "Option::is_none")]
         pub nnc: &'a Option<String>,
-        #[serde(skip_serializing_if = "Option::is_none")]
+        #[serde(skip_serializing_if = "is_null_opt_list")]
         pub fct: &'a Option<Vec<F>>,
         pub prf: &'a Vec<Cid>,
         pub att: &'a Vec<Capability<A>>,
+    }
+
+    fn is_null_opt_list<F>(l: &Option<Vec<F>>) -> bool {
+        l.as_ref().map_or(true, |v| v.is_empty())
     }
 
     #[derive(Deserialize, Clone, PartialEq, Debug)]
@@ -578,7 +582,7 @@ mod ipld_encoding {
         pub exp: NumericDate,
         #[serde(skip_serializing_if = "Option::is_none")]
         pub nnc: Option<String>,
-        #[serde(skip_serializing_if = "Option::is_none")]
+        #[serde(skip_serializing_if = "is_null_opt_list")]
         pub fct: Option<Vec<F>>,
         pub prf: Vec<Cid>,
         pub att: Vec<Capability<A>>,

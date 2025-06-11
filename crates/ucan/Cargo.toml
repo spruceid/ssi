@@ -25,7 +25,7 @@ ssi-dids-core.workspace = true
 ssi-core.workspace = true
 ssi-verification-methods.workspace = true
 ssi-caips.workspace = true
-libipld = { version = "0.14", default-features = false, features = [
+libipld = { version = "0.16", default-features = false, features = [
     "dag-cbor",
     "dag-json",
     "derive",
