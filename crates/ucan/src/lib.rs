@@ -1,7 +1,6 @@
 pub mod error;
 use base64::{prelude::BASE64_URL_SAFE_NO_PAD, Engine};
 pub use error::Error;
-use iref::UriBuf;
 use libipld::{
     codec::{Codec, Decode, Encode},
     error::Error as IpldError,
@@ -31,6 +30,7 @@ use std::{
     io::{Read, Seek, Write},
     str::Utf8Error,
 };
+use ucan_capabilities_object::Capabilities;
 
 #[derive(Clone, PartialEq, Debug)]
 pub struct Ucan<F = JsonValue, A = JsonValue> {
@@ -261,7 +261,7 @@ pub struct Payload<F = JsonValue, A = JsonValue> {
     #[serde(rename = "prf")]
     pub proof: Vec<Cid>,
     #[serde(rename = "att")]
-    pub attenuation: Vec<Capability<A>>,
+    pub attenuation: Capabilities<A>,
 }
 
 #[derive(thiserror::Error, Debug)]
@@ -364,23 +364,6 @@ pub enum BlockchainAccountIdError {
     Parse(#[from] BlockchainAccountIdParseError),
 }
 
-#[serde_as]
-#[derive(Serialize, Deserialize, Clone, PartialEq, Eq, Debug)]
-#[serde(untagged)]
-pub enum UcanResource {
-    Proof(#[serde_as(as = "DisplayFromStr")] UcanProofRef),
-    URI(UriBuf),
-}
-
-impl Display for UcanResource {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        match &self {
-            Self::Proof(p) => write!(f, "{p}"),
-            Self::URI(u) => write!(f, "{u}"),
-        }
-    }
-}
-
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub struct UcanProofRef(pub Cid);
 
@@ -408,48 +391,6 @@ impl std::str::FromStr for UcanProofRef {
                 .ok_or(ProofRefParseErr::Format)??,
         ))
     }
-}
-
-#[derive(Clone, PartialEq, Eq, Debug)]
-pub struct UcanScope {
-    pub namespace: String,
-    pub capability: String,
-}
-
-impl std::fmt::Display for UcanScope {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        write!(f, "{}/{}", self.namespace, self.capability)
-    }
-}
-
-#[derive(thiserror::Error, Debug)]
-pub enum UcanScopeParseErr {
-    #[error("Missing namespace")]
-    Namespace,
-}
-
-impl std::str::FromStr for UcanScope {
-    type Err = UcanScopeParseErr;
-
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        let (ns, cap) = s.split_once('/').ok_or(UcanScopeParseErr::Namespace)?;
-        Ok(UcanScope {
-            namespace: ns.to_string(),
-            capability: cap.to_string(),
-        })
-    }
-}
-
-/// 3.2.5 A JSON capability MUST include the with and can fields and
-/// MAY have additional fields needed to describe the capability
-#[serde_as]
-#[derive(Serialize, Deserialize, Clone, PartialEq, Eq, Debug)]
-pub struct Capability<A = JsonValue> {
-    pub with: UcanResource,
-    #[serde_as(as = "DisplayFromStr")]
-    pub can: UcanScope,
-    #[serde(rename = "nb", skip_serializing_if = "Option::is_none")]
-    pub additional_fields: Option<A>,
 }
 
 fn now() -> f64 {
@@ -555,7 +496,7 @@ mod ipld_encoding {
     }
 
     #[derive(Serialize, Clone, PartialEq, Debug)]
-    pub struct DagJsonPayloadRef<'a, F = JsonValue, A = JsonValue> {
+    pub struct DagJsonPayloadRef<'a, F = JsonValue, C = JsonValue> {
         pub iss: &'a str,
         pub aud: &'a str,
         #[serde(skip_serializing_if = "Option::is_none")]
@@ -566,7 +507,7 @@ mod ipld_encoding {
         #[serde(skip_serializing_if = "is_null_opt_list")]
         pub fct: &'a Option<Vec<F>>,
         pub prf: &'a Vec<Cid>,
-        pub att: &'a Vec<Capability<A>>,
+        pub att: &'a Capabilities<C>,
     }
 
     fn is_null_opt_list<F>(l: &Option<Vec<F>>) -> bool {
@@ -574,7 +515,7 @@ mod ipld_encoding {
     }
 
     #[derive(Deserialize, Clone, PartialEq, Debug)]
-    pub struct DagJsonPayload<F = JsonValue, A = JsonValue> {
+    pub struct DagJsonPayload<F = JsonValue, C = JsonValue> {
         pub iss: DIDURLBuf,
         pub aud: DIDBuf,
         #[serde(skip_serializing_if = "Option::is_none")]
@@ -585,7 +526,7 @@ mod ipld_encoding {
         #[serde(skip_serializing_if = "is_null_opt_list")]
         pub fct: Option<Vec<F>>,
         pub prf: Vec<Cid>,
-        pub att: Vec<Capability<A>>,
+        pub att: Capabilities<C>,
     }
 
     impl<F, A> Encode<DagJsonCodec> for Ucan<F, A>

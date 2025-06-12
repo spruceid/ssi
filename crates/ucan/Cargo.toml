@@ -10,7 +10,6 @@ documentation = "https://docs.rs/ssi-ucan/"
 
 [dependencies]
 thiserror.workspace = true
-iref.workspace = true
 serde = { workspace = true, features = ["derive"] }
 serde_json.workspace = true
 serde_with = { version = "1.14", features = ["base64"] }
@@ -32,6 +31,7 @@ libipld = { version = "0.16", default-features = false, features = [
     "serde-codec",
 ] }
 chrono = { workspace = true, features = ["serde"] }
+ucan-capabilities-object = { git = "https://github.com/tinycloudlabs/ucan-capabilities-object" }
 
 [target.'cfg(target_arch = "wasm32")'.dependencies]
 chrono = { workspace = true, features = ["serde", "wasmbind"] }
