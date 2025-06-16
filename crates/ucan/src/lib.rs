@@ -272,7 +272,7 @@ pub enum TimeInvalid {
     TooLate,
 }
 
-impl<F, A> Payload<F, A> {
+impl<F, C> Payload<F, C> {
     pub fn validate_time(&self, time: Option<f64>) -> Result<(), TimeInvalid> {
         let t = time.unwrap_or_else(now);
         match (self.not_before, t > self.expiration.as_seconds()) {
@@ -284,10 +284,10 @@ impl<F, A> Payload<F, A> {
 
     // NOTE IntoIter::new is deprecated, but into_iter() returns references until we move to 2021 edition
     #[allow(deprecated)]
-    pub fn sign(self, algorithm: Algorithm, key: &JWK) -> Result<Ucan<F, A>, Error>
+    pub fn sign(self, algorithm: Algorithm, key: &JWK) -> Result<Ucan<F, C>, Error>
     where
         F: Serialize,
-        A: Serialize,
+        C: Serialize,
     {
         let header = Header {
             algorithm,
