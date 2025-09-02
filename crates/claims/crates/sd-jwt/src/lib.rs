@@ -620,7 +620,7 @@ impl fmt::Display for PartsRef<'_> {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SdJwtPayload {
     /// Hash algorithm used by the Issuer to generate the digests.
-    #[serde(rename = "_sd_alg")]
+    #[serde(rename = "_sd_alg", default)]
     pub sd_alg: SdAlg,
 
     /// Other claims.

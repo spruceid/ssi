@@ -9,9 +9,10 @@ use crate::{disclosure::Disclosure, DecodeError, SD_ALG_CLAIM_NAME};
 
 /// Elements of the _sd_alg claim
 #[non_exhaustive]
-#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord)]
 pub enum SdAlg {
     /// SHA-256 Algortim for hashing disclosures
+    #[default]
     Sha256,
 }
 
