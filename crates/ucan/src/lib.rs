@@ -2,13 +2,7 @@ pub mod error;
 use base64::{prelude::BASE64_URL_SAFE_NO_PAD, Engine};
 pub use error::Error;
 use iref::UriBuf;
-use libipld::{
-    codec::{Codec, Decode, Encode},
-    error::Error as IpldError,
-    json::DagJsonCodec,
-    serde::{from_ipld, to_ipld},
-    Block, Cid, Ipld,
-};
+use cid::Cid;
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use serde_json::Value as JsonValue;
 use serde_with::{
@@ -28,8 +22,6 @@ use ssi_verification_methods::{GenericVerificationMethod, InvalidVerificationMet
 use std::{
     borrow::Cow,
     fmt::Display,
-    io::{Read, Seek, Write},
-    str::Utf8Error,
 };
 
 #[derive(Clone, PartialEq, Debug)]
@@ -123,7 +115,7 @@ impl<F, A> Ucan<F, A> {
         let (payload, codec): (Payload<F, A>, UcanCodec) =
             match serde_json::from_slice(&parts.signing_bytes.payload) {
                 Ok(p) => Ok((p, UcanCodec::Raw(jwt.to_string()))),
-                Err(e) => match DagJsonCodec.decode(&parts.signing_bytes.payload) {
+                Err(e) => match serde_ipld_dagjson::from_slice(&parts.signing_bytes.payload) {
                     Ok(p) => Ok((p, UcanCodec::DagJson)),
                     Err(_) => Err(e),
                 },
@@ -159,68 +151,13 @@ impl<F, A> Ucan<F, A> {
             UcanCodec::Raw(r) => r.clone(),
             UcanCodec::DagJson => [
                 BASE64_URL_SAFE_NO_PAD
-                    .encode(DagJsonCodec.encode(&to_ipld(&self.header).map_err(IpldError::new)?)?),
-                BASE64_URL_SAFE_NO_PAD.encode(DagJsonCodec.encode(&self.payload)?),
+                    .encode(serde_ipld_dagjson::to_vec(&self.header)?),
+                BASE64_URL_SAFE_NO_PAD.encode(serde_ipld_dagjson::to_vec(&self.payload)?),
                 BASE64_URL_SAFE_NO_PAD.encode(&self.signature),
             ]
             .join("."),
         })
     }
-
-    pub fn to_block<S, H>(&self, hash: H) -> Result<Block<S>, IpldError>
-    where
-        F: Serialize,
-        A: Serialize,
-        S: libipld::store::StoreParams,
-        H: Into<S::Hashes>,
-        S::Codecs: From<DagJsonCodec> + From<libipld::raw::RawCodec>,
-    {
-        match &self.codec {
-            UcanCodec::Raw(r) => Block::encode(libipld::raw::RawCodec, hash.into(), r.as_bytes()),
-            UcanCodec::DagJson => Block::encode(
-                DagJsonCodec,
-                hash.into(),
-                &to_ipld(ipld_encoding::DagJsonUcanRef::from(self))?,
-            ),
-        }
-    }
-
-    pub fn from_block<S>(block: &Block<S>) -> Result<Self, FromIpldBlockError>
-    where
-        F: DeserializeOwned,
-        A: DeserializeOwned,
-        S: libipld::store::StoreParams,
-        S::Codecs: From<DagJsonCodec> + From<libipld::raw::RawCodec>,
-        Ipld: Decode<S::Codecs>,
-    {
-        if block.cid().codec() == S::Codecs::from(DagJsonCodec).into() {
-            let ipld: Ipld = S::Codecs::from(DagJsonCodec).decode(block.data())?;
-            let du: ipld_encoding::DagJsonUcan<F, A> = from_ipld(ipld)?;
-            Ok(du.into())
-        } else if block.cid().codec() == S::Codecs::from(libipld::raw::RawCodec).into() {
-            Ok(Self::decode(std::str::from_utf8(block.data())?)?)
-        } else {
-            Err(FromIpldBlockError::InvalidCodec)
-        }
-    }
-}
-
-#[derive(Debug, thiserror::Error)]
-pub enum FromIpldBlockError {
-    #[error(transparent)]
-    Ipld(#[from] libipld::error::Error),
-
-    #[error(transparent)]
-    Decode(#[from] libipld::error::SerdeError),
-
-    #[error(transparent)]
-    Utf8(#[from] Utf8Error),
-
-    #[error(transparent)]
-    Ucan(#[from] Error),
-
-    #[error("Invalid codec: expected `raw` or `dagJson`")]
-    InvalidCodec,
 }
 
 fn match_key_with_did_pkh(key: &JWK, doc: &Document) -> Result<(), Error> {
@@ -304,8 +241,8 @@ impl<F, A> Payload<F, A> {
             algorithm,
             [
                 BASE64_URL_SAFE_NO_PAD
-                    .encode(DagJsonCodec.encode(&to_ipld(&header).map_err(IpldError::new)?)?),
-                BASE64_URL_SAFE_NO_PAD.encode(DagJsonCodec.encode(&self)?),
+                    .encode(serde_ipld_dagjson::to_vec(&header)?),
+                BASE64_URL_SAFE_NO_PAD.encode(serde_ipld_dagjson::to_vec(&self)?),
             ]
             .join(".")
             .as_bytes(),
@@ -395,7 +332,7 @@ pub enum ProofRefParseErr {
     #[error("Missing ucan prefix")]
     Format,
     #[error("Invalid Cid reference")]
-    ParseCid(#[from] libipld::cid::Error),
+    ParseCid(#[from] cid::Error),
 }
 
 impl std::str::FromStr for UcanProofRef {
@@ -534,147 +471,6 @@ impl UcanRevocation {
             &key,
             &self.challenge,
         )?)
-    }
-}
-
-mod ipld_encoding {
-    use super::*;
-
-    #[derive(Serialize, Clone, PartialEq, Debug)]
-    pub struct DagJsonUcanRef<'a, F = JsonValue, A = JsonValue> {
-        header: &'a Header,
-        payload: DagJsonPayloadRef<'a, F, A>,
-        signature: &'a [u8],
-    }
-
-    #[derive(Deserialize, Clone, PartialEq, Debug)]
-    pub struct DagJsonUcan<F = JsonValue, A = JsonValue> {
-        header: Header,
-        payload: DagJsonPayload<F, A>,
-        signature: Vec<u8>,
-    }
-
-    #[derive(Serialize, Clone, PartialEq, Debug)]
-    pub struct DagJsonPayloadRef<'a, F = JsonValue, A = JsonValue> {
-        pub iss: &'a str,
-        pub aud: &'a str,
-        #[serde(skip_serializing_if = "Option::is_none")]
-        pub nbf: &'a Option<NumericDate>,
-        pub exp: &'a NumericDate,
-        #[serde(skip_serializing_if = "Option::is_none")]
-        pub nnc: &'a Option<String>,
-        #[serde(skip_serializing_if = "Option::is_none")]
-        pub fct: &'a Option<Vec<F>>,
-        pub prf: &'a Vec<Cid>,
-        pub att: &'a Vec<Capability<A>>,
-    }
-
-    #[derive(Deserialize, Clone, PartialEq, Debug)]
-    pub struct DagJsonPayload<F = JsonValue, A = JsonValue> {
-        pub iss: DIDURLBuf,
-        pub aud: DIDBuf,
-        #[serde(skip_serializing_if = "Option::is_none")]
-        pub nbf: Option<NumericDate>,
-        pub exp: NumericDate,
-        #[serde(skip_serializing_if = "Option::is_none")]
-        pub nnc: Option<String>,
-        #[serde(skip_serializing_if = "Option::is_none")]
-        pub fct: Option<Vec<F>>,
-        pub prf: Vec<Cid>,
-        pub att: Vec<Capability<A>>,
-    }
-
-    impl<F, A> Encode<DagJsonCodec> for Ucan<F, A>
-    where
-        F: Serialize,
-        A: Serialize,
-    {
-        fn encode<W: Write>(&self, c: DagJsonCodec, w: &mut W) -> Result<(), IpldError> {
-            to_ipld(ipld_encoding::DagJsonUcanRef::from(self))?.encode(c, w)
-        }
-    }
-
-    impl<F, A> Decode<DagJsonCodec> for Ucan<F, A>
-    where
-        F: DeserializeOwned,
-        A: DeserializeOwned,
-    {
-        fn decode<R: Read + Seek>(c: DagJsonCodec, r: &mut R) -> Result<Self, IpldError> {
-            let u: ipld_encoding::DagJsonUcan<F, A> = from_ipld(Ipld::decode(c, r)?)?;
-            Ok(u.into())
-        }
-    }
-
-    impl<F, A> Encode<DagJsonCodec> for Payload<F, A>
-    where
-        F: Serialize,
-        A: Serialize,
-    {
-        fn encode<W: Write>(&self, c: DagJsonCodec, w: &mut W) -> Result<(), IpldError> {
-            to_ipld(ipld_encoding::DagJsonPayloadRef::from(self))?.encode(c, w)
-        }
-    }
-
-    impl<F, A> Decode<DagJsonCodec> for Payload<F, A>
-    where
-        F: DeserializeOwned,
-        A: DeserializeOwned,
-    {
-        fn decode<R: Read + Seek>(c: DagJsonCodec, r: &mut R) -> Result<Self, IpldError> {
-            let p: ipld_encoding::DagJsonPayload<F, A> = from_ipld(Ipld::decode(c, r)?)?;
-            Ok(p.into())
-        }
-    }
-
-    impl<'a, F, A> From<&'a Ucan<F, A>> for DagJsonUcanRef<'a, F, A> {
-        fn from(u: &'a Ucan<F, A>) -> Self {
-            Self {
-                header: &u.header,
-                payload: DagJsonPayloadRef::from(&u.payload),
-                signature: &u.signature,
-            }
-        }
-    }
-
-    impl<F, A> From<DagJsonUcan<F, A>> for Ucan<F, A> {
-        fn from(u: DagJsonUcan<F, A>) -> Self {
-            Self {
-                header: u.header,
-                payload: u.payload.into(),
-                signature: u.signature.into(),
-                codec: UcanCodec::DagJson,
-            }
-        }
-    }
-
-    impl<'a, F, A> From<&'a Payload<F, A>> for DagJsonPayloadRef<'a, F, A> {
-        fn from(p: &'a Payload<F, A>) -> Self {
-            Self {
-                iss: &p.issuer,
-                aud: &p.audience,
-                nbf: &p.not_before,
-                exp: &p.expiration,
-                nnc: &p.nonce,
-                fct: &p.facts,
-                prf: &p.proof,
-                att: &p.attenuation,
-            }
-        }
-    }
-
-    impl<F, A> From<DagJsonPayload<F, A>> for Payload<F, A> {
-        fn from(p: DagJsonPayload<F, A>) -> Self {
-            Self {
-                issuer: p.iss,
-                audience: p.aud,
-                not_before: p.nbf,
-                expiration: p.exp,
-                nonce: p.nnc,
-                facts: p.fct,
-                proof: p.prf,
-                attenuation: p.att,
-            }
-        }
     }
 }
 

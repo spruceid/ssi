@@ -9,7 +9,7 @@ pub enum Error {
     #[error(transparent)]
     DID(#[from] ssi_dids_core::resolution::DerefError),
     #[error(transparent)]
-    Ipld(#[from] libipld::error::Error),
+    IpldEncode(#[from] serde_ipld_dagjson::error::EncodeError),
     #[error("Verification method mismatch")]
     VerificationMethodMismatch,
     #[error(transparent)]
