@@ -2,7 +2,7 @@ use k256::sha2::Sha256;
 use ssi_data_integrity_core::{
     canonicalization::{CanonicalizeClaimsAndConfiguration, HashCanonicalClaimsAndConfiguration},
     signing::DetachedJwsSigning,
-    suite::NoConfiguration,
+    suite::{standard::EmptyProofOptions, NoConfiguration},
     StandardCryptographicSuite, TypeRef,
 };
 use ssi_verification_methods::EcdsaSecp256r1VerificationKey2019;
@@ -34,7 +34,7 @@ impl StandardCryptographicSuite for EcdsaSecp256r1Signature2019 {
 
     type SignatureAlgorithm = DetachedJwsSigning<ssi_crypto::algorithm::ES256>;
 
-    type ProofOptions = ();
+    type ProofOptions = EmptyProofOptions;
 
     fn type_(&self) -> TypeRef {
         TypeRef::Other(Self::NAME)

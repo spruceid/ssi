@@ -79,7 +79,7 @@ where
         domains: base_proof.domains.to_vec(),
         challenge: base_proof.challenge.map(ToOwned::to_owned),
         nonce: base_proof.nonce.map(ToOwned::to_owned),
-        options: *base_proof.options,
+        options: base_proof.options.clone(),
         signature: Signature::encode_derived(
             &data.base_signature,
             &data.public_key,

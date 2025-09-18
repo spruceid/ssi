@@ -9,7 +9,7 @@ use ssi_data_integrity_core::{
     },
     signing::{Base58Btc, MultibaseSigning},
     suite::{
-        standard::{HashingAlgorithm, HashingError},
+        standard::{EmptyProofOptions, HashingAlgorithm, HashingError},
         NoConfiguration,
     },
     CryptosuiteStr, ProofConfigurationRef, StandardCryptographicSuite, TypeRef,
@@ -42,7 +42,7 @@ impl StandardCryptographicSuite for EcdsaRdfc2019 {
 
     type SignatureAlgorithm = MultibaseSigning<ES256OrES384, Base58Btc>;
 
-    type ProofOptions = ();
+    type ProofOptions = EmptyProofOptions;
 
     fn type_(&self) -> TypeRef {
         TypeRef::DataIntegrityProof(CryptosuiteStr::new("ecdsa-rdfc-2019").unwrap())

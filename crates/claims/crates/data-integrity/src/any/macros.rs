@@ -46,6 +46,36 @@ macro_rules! crypto_suites {
             }
         }
 
+        impl ssi_data_integrity_core::suite::bounds::DeserializeCryptographicSuiteMultiplexing<'_> for AnySuite {
+            fn deserialize_extra_properties_finalized_proof(
+                &self,
+                other: json_syntax::Object,
+            ) -> Result<ssi_data_integrity_core::suite::bounds::ExtraPropertiesFinalizedProof<Self>, json_syntax::DeserializeError> {
+                match self {
+                    $(
+                        $(#[cfg($($t)*)])?
+                        Self::$name => {
+                            let p = ssi_data_integrity_suites::$name.deserialize_extra_properties_finalized_proof(other)?;
+                            Ok(ssi_data_integrity_core::suite::bounds::ExtraPropertiesFinalizedProof {
+                                options: AnyProofOptions::$name(p.options),
+                                signature: AnySignature::$name(p.signature),
+                                extra_properties: p.extra_properties,
+                            })
+                        }
+                    )*
+                    Self::Unknown(_) =>{
+                        use serde::Deserialize;
+                        let p = std::collections::BTreeMap::<_, _>::deserialize(json_syntax::Value::Object(other))?;
+                        Ok(ssi_data_integrity_core::suite::bounds::ExtraPropertiesFinalizedProof  {
+                            options: AnyProofOptions::Unknown,
+                            signature: AnySignature::Unknown,
+                            extra_properties: p,
+                        })
+                    }
+                }
+            }
+        }
+
         #[allow(unused)]
         pub(crate) trait Project<S: ssi_data_integrity_core::CryptographicSuite>: ssi_data_integrity_core::CryptographicSuite {
             fn project_input_options(
@@ -87,7 +117,7 @@ macro_rules! crypto_suites {
                 ) -> &<ssi_data_integrity_suites::$name as ssi_data_integrity_core::CryptographicSuite>::PreparedClaims {
                     match prepared_claims {
                         AnyPreparedClaims::$name(c) => c,
-                        _ => panic!("malformed `AnySuite` instance")
+                        _ => panic!("malformed `AnySuite` instance, mistmatch with prepared claims")
                     }
                 }
 
@@ -98,11 +128,11 @@ macro_rules! crypto_suites {
                         |_| &ssi_data_integrity_suites::$name,
                         |method| match method {
                             AnySuiteVerificationMethod::$name(m) => m,
-                            _ => panic!("malformed `AnySuite` instance")
+                            _ => panic!("malformed `AnySuite` instance, mismatch with verification method")
                         },
                         |options| match options {
                             AnyProofOptions::$name(m) => m,
-                            _ => panic!("malformed `AnySuite` instance")
+                            _ => panic!("malformed `AnySuite` instance, mismatch with proof options")
                         }
                     )
                 }
@@ -114,15 +144,15 @@ macro_rules! crypto_suites {
                         |_| &ssi_data_integrity_suites::$name,
                         |method| match method {
                             AnySuiteVerificationMethod::$name(m) => m,
-                            _ => panic!("malformed `AnySuite` instance")
+                            _ => panic!("malformed `AnySuite` instance, mismatch with verification method")
                         },
                         |options| match options {
                             AnyProofOptions::$name(m) => m,
-                            _ => panic!("malformed `AnySuite` instance")
+                            _ => panic!("malformed `AnySuite` instance, mistmatch with proof options")
                         },
                         |signature| match signature {
                             AnySignature::$name(s) => s,
-                            _ => panic!("malformed `AnySuite` instance")
+                            _ => panic!("malformed `AnySuite` instance, mismatch with signature")
                         }
                     )
                 }
@@ -132,7 +162,7 @@ macro_rules! crypto_suites {
                 ) -> ssi_data_integrity_core::suite::TransformationOptions<ssi_data_integrity_suites::$name> {
                     match options {
                         AnyTransformationOptions::$name(o) => o,
-                        _ => panic!("malformed `AnySuite` instance")
+                        _ => panic!("malformed `AnySuite` instance, mismatch with transformation options")
                     }
                 }
             }
@@ -244,7 +274,7 @@ macro_rules! crypto_suites {
         }
 
         /// Any verification method.
-        #[derive(Debug, Clone, serde::Serialize)]
+        #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
         #[serde(untagged)]
         pub enum AnySuiteVerificationMethod {
             $(
@@ -288,28 +318,8 @@ macro_rules! crypto_suites {
             }
         }
 
-        impl<'de> ssi_core::de::DeserializeTyped<'de, AnySuite> for AnySuiteVerificationMethod {
-            fn deserialize_typed<D>(
-                suite: &AnySuite,
-                deserializer: D
-            ) -> Result<Self, D::Error>
-            where
-                D: serde::Deserializer<'de>
-            {
-                match suite {
-                    $(
-                        $(#[cfg($($t)*)])?
-                        AnySuite::$name => {
-                            serde::Deserialize::deserialize(deserializer).map(Self::$name)
-                        },
-                    )*
-                    _ => serde::Deserialize::deserialize(deserializer).map(Self::Unknown)
-                }
-            }
-        }
-
         /// Any signature.
-        #[derive(Debug, Clone, serde::Serialize)]
+        #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
         #[serde(untagged)]
         pub enum AnySignature {
             $(
@@ -345,29 +355,8 @@ macro_rules! crypto_suites {
             }
         }
 
-        #[allow(unused_variables)]
-        impl<'de> ssi_core::de::DeserializeTyped<'de, AnySuite> for AnySignature {
-            fn deserialize_typed<D>(
-                suite: &AnySuite,
-                deserializer: D
-            ) -> Result<Self, D::Error>
-            where
-                D: serde::Deserializer<'de>
-            {
-                match suite {
-                    $(
-                        $(#[cfg($($t)*)])?
-                        AnySuite::$name => {
-                            serde::Deserialize::deserialize(deserializer).map(AnySignature::$name)
-                        },
-                    )*
-                    _ => Ok(AnySignature::Unknown)
-                }
-            }
-        }
-
         /// Any signature protocol.
-        #[derive(Debug, Clone, serde::Serialize)]
+        #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
         #[serde(untagged)]
         pub enum AnyProofOptions {
             $(
@@ -375,27 +364,6 @@ macro_rules! crypto_suites {
                 $name(<ssi_data_integrity_suites::$name as ssi_data_integrity_core::CryptographicSuite>::ProofOptions),
             )*
             Unknown
-        }
-
-        #[allow(unused_variables)]
-        impl<'de> ssi_core::de::DeserializeTyped<'de, AnySuite> for AnyProofOptions {
-            fn deserialize_typed<D>(
-                suite: &AnySuite,
-                deserializer: D
-            ) -> Result<Self, D::Error>
-            where
-                D: serde::Deserializer<'de>
-            {
-                match suite {
-                    $(
-                        $(#[cfg($($t)*)])?
-                        AnySuite::$name => {
-                            serde::Deserialize::deserialize(deserializer).map(AnyProofOptions::$name)
-                        },
-                    )*
-                    _ => Ok(AnyProofOptions::Unknown)
-                }
-            }
         }
 
         impl From<AnyProofOptions> for crate::AnyInputSuiteOptions {

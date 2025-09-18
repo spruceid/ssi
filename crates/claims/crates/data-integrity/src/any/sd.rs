@@ -2,7 +2,10 @@ use serde::{Deserialize, Serialize};
 use ssi_claims_core::ResolverProvider;
 use ssi_core::JsonPointerBuf;
 use ssi_data_integrity_core::{
-    suite::{CryptographicSuiteSelect, SelectionError, SelectiveCryptographicSuite},
+    suite::{
+        standard::EmptyProofOptions, CryptographicSuiteSelect, SelectionError,
+        SelectiveCryptographicSuite,
+    },
     DataIntegrity, ProofRef,
 };
 use ssi_json_ld::{Expandable, ExpandedDocument, JsonLdLoaderProvider, JsonLdNodeObject};
@@ -86,7 +89,7 @@ where
                             p.map_type(
                                 |_| Self::EcdsaSd2023,
                                 crate::AnySuiteVerificationMethod::EcdsaSd2023,
-                                |_| crate::AnyProofOptions::EcdsaSd2023(()),
+                                |_| crate::AnyProofOptions::EcdsaSd2023(EmptyProofOptions {}),
                                 crate::AnySignature::EcdsaSd2023,
                             )
                         })

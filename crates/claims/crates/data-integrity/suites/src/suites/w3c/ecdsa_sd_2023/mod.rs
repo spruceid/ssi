@@ -1,6 +1,9 @@
 use serde::Serialize;
 use ssi_data_integrity_core::{
-    suite::{CryptographicSuiteSelect, SelectionError, SelectiveCryptographicSuite},
+    suite::{
+        standard::EmptyProofOptions, CryptographicSuiteSelect, SelectionError,
+        SelectiveCryptographicSuite,
+    },
     CryptosuiteStr, DataIntegrity, ProofRef, StandardCryptographicSuite, TypeRef,
 };
 
@@ -41,7 +44,7 @@ impl StandardCryptographicSuite for EcdsaSd2023 {
 
     type VerificationMethod = Multikey;
 
-    type ProofOptions = ();
+    type ProofOptions = EmptyProofOptions;
 
     type SignatureAlgorithm = SignatureAlgorithm;
 

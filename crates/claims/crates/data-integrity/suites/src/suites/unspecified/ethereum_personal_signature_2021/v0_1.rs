@@ -29,7 +29,7 @@ impl StandardCryptographicSuite for EthereumPersonalSignature2021v0_1 {
 
     type SignatureAlgorithm = EthereumWalletSigning;
 
-    type ProofOptions = ();
+    type ProofOptions = EmptyProofOptions;
 
     fn type_(&self) -> TypeRef {
         TypeRef::Other(Self::NAME)

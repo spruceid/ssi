@@ -1,6 +1,9 @@
 use ssi_core::JsonPointerBuf;
 use ssi_data_integrity_core::{
-    suite::{ConfigurationError, InputSignatureOptions, InputVerificationOptions},
+    suite::{
+        standard::EmptyProofOptions, ConfigurationError, InputSignatureOptions,
+        InputVerificationOptions,
+    },
     ProofConfiguration, ProofOptions,
 };
 use ssi_di_sd_primitives::HmacShaAnyKey;
@@ -26,7 +29,7 @@ impl ssi_data_integrity_core::suite::ConfigurationAlgorithm<EcdsaSd2023>
 {
     type InputVerificationMethod = Multikey;
 
-    type InputSuiteOptions = ();
+    type InputSuiteOptions = EmptyProofOptions;
 
     type InputSignatureOptions = SignatureOptions;
 

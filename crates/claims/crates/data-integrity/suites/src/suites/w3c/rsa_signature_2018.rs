@@ -5,7 +5,10 @@ use ssi_claims_core::{ProofValidationError, ProofValidity, SignatureError};
 use ssi_data_integrity_core::{
     canonicalization::{CanonicalizeClaimsAndConfiguration, HashCanonicalClaimsAndConfiguration},
     suite::{
-        standard::{SignatureAlgorithm, SignatureAndVerificationAlgorithm, VerificationAlgorithm},
+        standard::{
+            EmptyProofOptions, SignatureAlgorithm, SignatureAndVerificationAlgorithm,
+            VerificationAlgorithm,
+        },
         NoConfiguration,
     },
     ProofConfigurationRef, ProofRef, StandardCryptographicSuite, TypeRef,
@@ -38,7 +41,7 @@ impl StandardCryptographicSuite for RsaSignature2018 {
 
     type SignatureAlgorithm = RsaSignatureAlgorithm;
 
-    type ProofOptions = ();
+    type ProofOptions = EmptyProofOptions;
 
     fn type_(&self) -> TypeRef {
         TypeRef::Other(Self::NAME)

@@ -81,7 +81,7 @@ impl StandardCryptographicSuite for AleoSignature2021 {
 
     type SignatureAlgorithm = AleoSignatureAlgorithm;
 
-    type ProofOptions = ();
+    type ProofOptions = EmptyProofOptions;
 
     fn type_(&self) -> TypeRef {
         TypeRef::Other(Self::NAME)

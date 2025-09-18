@@ -1,12 +1,15 @@
 use std::marker::PhantomData;
 
-use crate::{CryptographicSuite, DataIntegrity, DeserializeCryptographicSuite, Proofs};
+use crate::{
+    suite::bounds::DeserializeCryptographicSuiteMultiplexing, CryptographicSuite, DataIntegrity,
+    Proofs,
+};
 use serde::Deserialize;
 
 impl<'de, T, S> Deserialize<'de> for DataIntegrity<T, S>
 where
     T: Deserialize<'de>,
-    S: DeserializeCryptographicSuite<'de>,
+    S: DeserializeCryptographicSuiteMultiplexing<'de>,
 {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
@@ -21,7 +24,7 @@ struct Visitor<T, S>(PhantomData<(T, S)>);
 impl<'de, T, S> serde::de::Visitor<'de> for Visitor<T, S>
 where
     T: Deserialize<'de>,
-    S: DeserializeCryptographicSuite<'de>,
+    S: DeserializeCryptographicSuiteMultiplexing<'de>,
 {
     type Value = DataIntegrity<T, S>;
 
@@ -52,7 +55,7 @@ struct Deserializer<'de, D, S: CryptographicSuite> {
     de: PhantomData<&'de ()>,
 }
 
-impl<'de, D: serde::de::MapAccess<'de>, S: DeserializeCryptographicSuite<'de>>
+impl<'de, D: serde::de::MapAccess<'de>, S: DeserializeCryptographicSuiteMultiplexing<'de>>
     Deserializer<'de, D, S>
 {
     fn into_proofs(mut self) -> Result<Proofs<S>, D::Error> {
@@ -69,7 +72,7 @@ impl<'de, D: serde::de::MapAccess<'de>, S: DeserializeCryptographicSuite<'de>>
 
 impl<'de, D: serde::de::MapAccess<'de>, S> serde::de::MapAccess<'de> for Deserializer<'de, D, S>
 where
-    S: DeserializeCryptographicSuite<'de>,
+    S: DeserializeCryptographicSuiteMultiplexing<'de>,
 {
     type Error = D::Error;
 
@@ -103,7 +106,7 @@ where
 
 impl<'de, D: serde::de::MapAccess<'de>, S> serde::Deserializer<'de> for &mut Deserializer<'de, D, S>
 where
-    S: DeserializeCryptographicSuite<'de>,
+    S: DeserializeCryptographicSuiteMultiplexing<'de>,
 {
     type Error = D::Error;
 

@@ -34,7 +34,7 @@ impl StandardCryptographicSuite for EcdsaSecp256k1RecoverySignature2020 {
 
     type SignatureAlgorithm = DetachedJwsSigning<ssi_crypto::algorithm::ES256KR>;
 
-    type ProofOptions = ();
+    type ProofOptions = EmptyProofOptions;
 
     fn type_(&self) -> TypeRef {
         TypeRef::Other(Self::NAME)

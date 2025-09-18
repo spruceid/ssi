@@ -1,11 +1,11 @@
-use crate::suite::bounds::{OptionsRefOf, SignatureRefOf, VerificationMethodRefOf};
+use crate::suite::bounds::{
+    DeserializeCryptographicSuiteMultiplexing, OptionsRefOf, SignatureRefOf,
+    VerificationMethodRefOf,
+};
 use crate::suite::{
     CryptographicSuiteVerification, InputVerificationOptions, SerializeCryptographicSuite,
 };
-use crate::{
-    CloneCryptographicSuite, CryptographicSuite, DataIntegrity, DebugCryptographicSuite,
-    DeserializeCryptographicSuite,
-};
+use crate::{CloneCryptographicSuite, CryptographicSuite, DataIntegrity, DebugCryptographicSuite};
 use educe::Educe;
 use serde::{Deserialize, Serialize};
 use ssi_claims_core::{AttachProof, ProofValidationError, ProofValidity, ResourceProvider};
@@ -429,7 +429,7 @@ impl<T: SerializeCryptographicSuite> Serialize for Proofs<T> {
     }
 }
 
-impl<'de, S: DeserializeCryptographicSuite<'de>> Deserialize<'de> for Proofs<S> {
+impl<'de, S: DeserializeCryptographicSuiteMultiplexing<'de>> Deserialize<'de> for Proofs<S> {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
         D: serde::Deserializer<'de>,

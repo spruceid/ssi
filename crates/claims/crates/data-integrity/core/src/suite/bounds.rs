@@ -1,13 +1,13 @@
 use core::fmt;
-use std::fmt::Debug;
+use std::{collections::BTreeMap, fmt::Debug};
 
-use serde::{Deserializer, Serialize, Serializer};
+use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use ssi_core::de::DeserializeTyped;
 use ssi_verification_methods::{ReferenceOrOwned, ReferenceOrOwnedRef};
 
 use crate::Type;
 
-use super::CryptographicSuite;
+use super::{CryptographicSuite, StandardCryptographicSuite};
 
 pub trait DebugCryptographicSuite: CryptographicSuite + Debug {
     fn fmt_prepared_claims(claims: &Self::PreparedClaims, f: &mut fmt::Formatter) -> fmt::Result;
@@ -192,28 +192,76 @@ where
     }
 }
 
-pub trait DeserializeCryptographicSuite<'de>: CryptographicSuite + TryFrom<Type> {
+pub trait DeserializeCryptographicSuite<'de>:
+    CryptographicSuite<
+        VerificationMethod: Deserialize<'de>,
+        ProofOptions: Deserialize<'de>,
+        Signature: Deserialize<'de>,
+    > + TryFrom<Type>
+{
     fn deserialize_verification_method<D: Deserializer<'de>>(
         &self,
         deserializer: D,
     ) -> Result<Self::VerificationMethod, D::Error>;
 
     fn deserialize_proof_options<D: Deserializer<'de>>(
-        &self,
         deserializer: D,
     ) -> Result<Self::ProofOptions, D::Error>;
 
     fn deserialize_signature<D: Deserializer<'de>>(
-        &self,
         deserializer: D,
     ) -> Result<Self::Signature, D::Error>;
 }
 
+#[derive(Deserialize)]
+pub struct ExtraPropertiesPreparedProof<S: CryptographicSuite> {
+    #[serde(flatten)]
+    #[serde(bound(deserialize = "S::ProofOptions: Deserialize<'de>"))]
+    pub options: S::ProofOptions,
+    #[serde(flatten)]
+    pub extra_properties: BTreeMap<String, json_syntax::Value>,
+}
+
+#[derive(Deserialize)]
+pub struct ExtraPropertiesFinalizedProof<S: CryptographicSuite> {
+    #[serde(flatten)]
+    #[serde(bound(deserialize = "S::ProofOptions: Deserialize<'de>"))]
+    pub options: S::ProofOptions,
+    #[serde(flatten)]
+    #[serde(bound(deserialize = "S::Signature: Deserialize<'de>"))]
+    pub signature: S::Signature,
+    #[serde(flatten)]
+    pub extra_properties: BTreeMap<String, json_syntax::Value>,
+}
+
+pub trait DeserializeCryptographicSuiteMultiplexing<'de>:
+    DeserializeCryptographicSuite<'de>
+{
+    fn deserialize_extra_properties_finalized_proof(
+        &self,
+        other: json_syntax::Object,
+    ) -> Result<ExtraPropertiesFinalizedProof<Self>, json_syntax::DeserializeError> {
+        ExtraPropertiesFinalizedProof::<Self>::deserialize(json_syntax::Value::Object(other))
+    }
+
+    fn deserialize_extra_properties_prepared_proof(
+        &self,
+        other: json_syntax::Object,
+    ) -> Result<ExtraPropertiesPreparedProof<Self>, json_syntax::DeserializeError> {
+        ExtraPropertiesPreparedProof::<Self>::deserialize(json_syntax::Value::Object(other))
+    }
+}
+
+impl<'de, T> DeserializeCryptographicSuiteMultiplexing<'de> for T where
+    T: DeserializeCryptographicSuite<'de> + StandardCryptographicSuite
+{
+}
+
 impl<'de, S: CryptographicSuite + TryFrom<Type>> DeserializeCryptographicSuite<'de> for S
 where
-    Self::VerificationMethod: DeserializeTyped<'de, S>,
-    Self::ProofOptions: DeserializeTyped<'de, S>,
-    Self::Signature: DeserializeTyped<'de, S>,
+    Self::VerificationMethod: Deserialize<'de>,
+    Self::ProofOptions: Deserialize<'de>,
+    Self::Signature: Deserialize<'de>,
 {
     fn deserialize_verification_method<D: Deserializer<'de>>(
         &self,
@@ -223,27 +271,27 @@ where
     }
 
     fn deserialize_proof_options<D: Deserializer<'de>>(
-        &self,
         deserializer: D,
     ) -> Result<Self::ProofOptions, D::Error> {
-        Self::ProofOptions::deserialize_typed(self, deserializer)
+        Self::ProofOptions::deserialize(deserializer)
     }
 
     fn deserialize_signature<D: Deserializer<'de>>(
-        &self,
         deserializer: D,
     ) -> Result<Self::Signature, D::Error> {
-        Self::Signature::deserialize_typed(self, deserializer)
+        Self::Signature::deserialize(deserializer)
     }
 }
 
 pub trait DeserializeCryptographicSuiteOwned:
-    CryptographicSuite + for<'de> DeserializeCryptographicSuite<'de>
+    CryptographicSuite + for<'de> DeserializeCryptographicSuiteMultiplexing<'de>
 {
 }
 
-impl<S> DeserializeCryptographicSuiteOwned for S where S: for<'de> DeserializeCryptographicSuite<'de>
-{}
+impl<S> DeserializeCryptographicSuiteOwned for S where
+    S: for<'de> DeserializeCryptographicSuiteMultiplexing<'de>
+{
+}
 
 pub struct VerificationMethodOf<S: CryptographicSuite>(pub S::VerificationMethod);
 
@@ -278,15 +326,6 @@ impl<S: DebugCryptographicSuite> fmt::Debug for VerificationMethodRefOf<'_, S> {
 
 pub struct OptionsOf<S: CryptographicSuite>(pub S::ProofOptions);
 
-impl<'de, T: DeserializeCryptographicSuite<'de>> DeserializeTyped<'de, T> for OptionsOf<T> {
-    fn deserialize_typed<S>(type_: &T, deserializer: S) -> Result<Self, S::Error>
-    where
-        S: serde::Deserializer<'de>,
-    {
-        type_.deserialize_proof_options(deserializer).map(Self)
-    }
-}
-
 pub struct OptionsRefOf<'a, S: CryptographicSuite>(pub &'a S::ProofOptions);
 
 impl<S: DebugCryptographicSuite> fmt::Debug for OptionsRefOf<'_, S> {
@@ -296,15 +335,6 @@ impl<S: DebugCryptographicSuite> fmt::Debug for OptionsRefOf<'_, S> {
 }
 
 pub struct SignatureOf<S: CryptographicSuite>(pub S::Signature);
-
-impl<'de, T: DeserializeCryptographicSuite<'de>> DeserializeTyped<'de, T> for SignatureOf<T> {
-    fn deserialize_typed<S>(type_: &T, deserializer: S) -> Result<Self, S::Error>
-    where
-        S: serde::Deserializer<'de>,
-    {
-        type_.deserialize_signature(deserializer).map(Self)
-    }
-}
 
 pub struct SignatureRefOf<'a, S: CryptographicSuite>(pub &'a S::Signature);
 

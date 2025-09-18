@@ -1,5 +1,5 @@
 use serde::{Deserialize, Serialize};
-use ssi_data_integrity_core::ProofOptions;
+use ssi_data_integrity_core::{suite::standard::EmptyProofOptions, ProofOptions};
 use ssi_jwk::JWK;
 use ssi_verification_methods::AnyMethod;
 
@@ -31,12 +31,14 @@ impl AnyInputSuiteOptions {
     }
 }
 
-impl From<AnyInputSuiteOptions> for () {
-    fn from(_: AnyInputSuiteOptions) -> Self {}
+impl From<AnyInputSuiteOptions> for EmptyProofOptions {
+    fn from(_: AnyInputSuiteOptions) -> Self {
+        Self {}
+    }
 }
 
-impl From<()> for AnyInputSuiteOptions {
-    fn from(_: ()) -> Self {
+impl From<EmptyProofOptions> for AnyInputSuiteOptions {
+    fn from(_: EmptyProofOptions) -> Self {
         Self::default()
     }
 }

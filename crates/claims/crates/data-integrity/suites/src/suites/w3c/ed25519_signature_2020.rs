@@ -9,7 +9,7 @@ use lazy_static::lazy_static;
 use ssi_data_integrity_core::{
     canonicalization::{CanonicalizeClaimsAndConfiguration, HashCanonicalClaimsAndConfiguration},
     signing::{Base58Btc, MultibaseSigning},
-    suite::AddProofContext,
+    suite::{standard::EmptyProofOptions, AddProofContext},
     StandardCryptographicSuite, TypeRef,
 };
 use ssi_verification_methods::Ed25519VerificationKey2020;
@@ -60,7 +60,7 @@ impl StandardCryptographicSuite for Ed25519Signature2020 {
 
     type SignatureAlgorithm = MultibaseSigning<ssi_crypto::algorithm::EdDSA, Base58Btc>;
 
-    type ProofOptions = ();
+    type ProofOptions = EmptyProofOptions;
 
     fn type_(&self) -> TypeRef {
         TypeRef::Other(Self::NAME)

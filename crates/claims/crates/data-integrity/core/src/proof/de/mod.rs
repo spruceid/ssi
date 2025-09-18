@@ -7,18 +7,15 @@
 //! (and `cryptosuite`) field *before* deserializing the other fields of the
 //! proof.
 use crate::{
-    suite::bounds::{OptionsOf, SignatureOf, VerificationMethodOf},
-    CryptosuiteString, DeserializeCryptographicSuite, Proof, Type,
+    suite::bounds::{DeserializeCryptographicSuiteMultiplexing, VerificationMethodOf},
+    CryptosuiteString, Proof, Type,
 };
-use serde::{
-    de::{DeserializeSeed, MapAccess},
-    Deserialize,
-};
+use serde::de::{Error, MapAccess};
 use ssi_core::{de::WithType, Lexical, OneOrMany};
-use std::{collections::BTreeMap, marker::PhantomData};
+use std::marker::PhantomData;
 
 mod field;
-pub use field::*;
+pub use field::{Field, TypeField};
 
 mod ref_or_value;
 pub use ref_or_value::*;
@@ -55,7 +52,10 @@ fn datetime_to_utc_datetimestamp(
     })
 }
 
-impl<'de, T: DeserializeCryptographicSuite<'de>> Proof<T> {
+impl<'de, T> Proof<T>
+where
+    T: DeserializeCryptographicSuiteMultiplexing<'de>,
+{
     fn deserialize_with_type<S>(type_: Type, mut deserializer: S) -> Result<Self, S::Error>
     where
         S: serde::de::MapAccess<'de>,
@@ -73,7 +73,7 @@ impl<'de, T: DeserializeCryptographicSuite<'de>> Proof<T> {
         let mut challenge = None;
         let mut nonce = None;
 
-        let mut other = Vec::new();
+        let mut other = json_syntax::Object::new();
 
         while let Some(key) = deserializer.next_key::<Field>()? {
             match key {
@@ -92,23 +92,15 @@ impl<'de, T: DeserializeCryptographicSuite<'de>> Proof<T> {
                 Field::Domains => domains = Some(deserializer.next_value()?),
                 Field::Challenge => challenge = Some(deserializer.next_value()?),
                 Field::Nonce => nonce = Some(deserializer.next_value()?),
-                Field::Other(key) => other.push(Some((key, deserializer.next_value()?))),
+                Field::Other(key) => {
+                    other.insert(key.into(), deserializer.next_value::<json_syntax::Value>()?);
+                }
             }
         }
 
-        let options = WithType::<T, OptionsOf<T>>::new(&suite)
-            .deserialize(serde::__private::de::FlatMapDeserializer(
-                &mut other,
-                PhantomData,
-            ))?
-            .0;
-
-        let signature = WithType::<T, SignatureOf<T>>::new(&suite)
-            .deserialize(serde::__private::de::FlatMapDeserializer(
-                &mut other,
-                PhantomData,
-            ))?
-            .0;
+        let interim_extra_properties = suite
+            .deserialize_extra_properties_finalized_proof(other)
+            .map_err(S::Error::custom)?;
 
         Ok(Self {
             context,
@@ -123,17 +115,14 @@ impl<'de, T: DeserializeCryptographicSuite<'de>> Proof<T> {
             domains: domains.map(|d| d.into_vec()).unwrap_or_default(),
             challenge,
             nonce,
-            options,
-            signature,
-            extra_properties: BTreeMap::deserialize(serde::__private::de::FlatMapDeserializer(
-                &mut other,
-                PhantomData,
-            ))?,
+            options: interim_extra_properties.options,
+            signature: interim_extra_properties.signature,
+            extra_properties: interim_extra_properties.extra_properties,
         })
     }
 }
 
-impl<'de, T: DeserializeCryptographicSuite<'de>> serde::Deserialize<'de> for Proof<T> {
+impl<'de, T: DeserializeCryptographicSuiteMultiplexing<'de>> serde::Deserialize<'de> for Proof<T> {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
         D: serde::Deserializer<'de>,
@@ -144,7 +133,9 @@ impl<'de, T: DeserializeCryptographicSuite<'de>> serde::Deserialize<'de> for Pro
 
 struct ProofVisitor<T>(PhantomData<T>);
 
-impl<'de, T: DeserializeCryptographicSuite<'de>> serde::de::Visitor<'de> for ProofVisitor<T> {
+impl<'de, T: DeserializeCryptographicSuiteMultiplexing<'de>> serde::de::Visitor<'de>
+    for ProofVisitor<T>
+{
     type Value = Proof<T>;
 
     fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {

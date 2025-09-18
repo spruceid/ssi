@@ -93,7 +93,7 @@ impl StandardCryptographicSuite for Eip712Signature2021 {
 
     type SignatureAlgorithm = Eip712SignatureAlgorithm;
 
-    type ProofOptions = ();
+    type ProofOptions = EmptyProofOptions;
 
     fn type_(&self) -> TypeRef {
         TypeRef::Other(Self::NAME)

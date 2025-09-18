@@ -1,17 +1,17 @@
 use crate::{
-    suite::bounds::{OptionsOf, VerificationMethodOf},
-    CryptosuiteString, DeserializeCryptographicSuite, ProofConfiguration, Type,
+    suite::bounds::{DeserializeCryptographicSuiteMultiplexing, VerificationMethodOf},
+    CryptosuiteString, ProofConfiguration, Type,
 };
-use serde::{
-    de::{DeserializeSeed, MapAccess},
-    Deserialize,
-};
+use serde::de::{Error, MapAccess};
 use ssi_core::de::WithType;
-use std::{collections::BTreeMap, marker::PhantomData};
+use std::marker::PhantomData;
 
 use super::{Field, RefOrValue, ReplayMap, TypeField};
 
-impl<'de, T: DeserializeCryptographicSuite<'de>> ProofConfiguration<T> {
+impl<'de, T> ProofConfiguration<T>
+where
+    T: DeserializeCryptographicSuiteMultiplexing<'de>,
+{
     fn deserialize_with_type<S>(type_: Type, mut deserializer: S) -> Result<Self, S::Error>
     where
         S: serde::de::MapAccess<'de>,
@@ -29,7 +29,7 @@ impl<'de, T: DeserializeCryptographicSuite<'de>> ProofConfiguration<T> {
         let mut challenge = None;
         let mut nonce = None;
 
-        let mut other = Vec::new();
+        let mut other = json_syntax::Object::new();
 
         while let Some(key) = deserializer.next_key::<Field>()? {
             match key {
@@ -48,16 +48,15 @@ impl<'de, T: DeserializeCryptographicSuite<'de>> ProofConfiguration<T> {
                 Field::Domains => domains = Some(deserializer.next_value()?),
                 Field::Challenge => challenge = Some(deserializer.next_value()?),
                 Field::Nonce => nonce = Some(deserializer.next_value()?),
-                Field::Other(key) => other.push(Some((key, deserializer.next_value()?))),
+                Field::Other(key) => {
+                    other.insert(key.into(), deserializer.next_value::<json_syntax::Value>()?);
+                }
             }
         }
 
-        let options = WithType::<T, OptionsOf<T>>::new(&suite)
-            .deserialize(serde::__private::de::FlatMapDeserializer(
-                &mut other,
-                PhantomData,
-            ))?
-            .0;
+        let interim_extra_properties = suite
+            .deserialize_extra_properties_prepared_proof(other)
+            .map_err(S::Error::custom)?;
 
         Ok(Self {
             context,
@@ -72,16 +71,16 @@ impl<'de, T: DeserializeCryptographicSuite<'de>> ProofConfiguration<T> {
             domains: domains.unwrap_or_default(),
             challenge,
             nonce,
-            options,
-            extra_properties: BTreeMap::deserialize(serde::__private::de::FlatMapDeserializer(
-                &mut other,
-                PhantomData,
-            ))?,
+            options: interim_extra_properties.options,
+            extra_properties: interim_extra_properties.extra_properties,
         })
     }
 }
 
-impl<'de, T: DeserializeCryptographicSuite<'de>> serde::Deserialize<'de> for ProofConfiguration<T> {
+impl<'de, T> serde::Deserialize<'de> for ProofConfiguration<T>
+where
+    T: DeserializeCryptographicSuiteMultiplexing<'de>,
+{
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
         D: serde::Deserializer<'de>,
@@ -92,8 +91,9 @@ impl<'de, T: DeserializeCryptographicSuite<'de>> serde::Deserialize<'de> for Pro
 
 struct ProofConfigurationVisitor<T>(PhantomData<T>);
 
-impl<'de, T: DeserializeCryptographicSuite<'de>> serde::de::Visitor<'de>
-    for ProofConfigurationVisitor<T>
+impl<'de, T> serde::de::Visitor<'de> for ProofConfigurationVisitor<T>
+where
+    T: DeserializeCryptographicSuiteMultiplexing<'de>,
 {
     type Value = ProofConfiguration<T>;
 

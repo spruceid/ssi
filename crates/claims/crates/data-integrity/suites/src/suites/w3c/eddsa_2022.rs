@@ -2,7 +2,7 @@ use k256::sha2::Sha256;
 use ssi_data_integrity_core::{
     canonicalization::{CanonicalizeClaimsAndConfiguration, HashCanonicalClaimsAndConfiguration},
     signing::{Base58Btc, MultibaseSigning},
-    suite::NoConfiguration,
+    suite::{standard::EmptyProofOptions, NoConfiguration},
     CryptosuiteStr, StandardCryptographicSuite, TypeRef,
 };
 use ssi_verification_methods::Multikey;
@@ -37,7 +37,7 @@ impl StandardCryptographicSuite for EdDsa2022 {
 
     type SignatureAlgorithm = MultibaseSigning<ssi_crypto::algorithm::EdDSA, Base58Btc>;
 
-    type ProofOptions = ();
+    type ProofOptions = EmptyProofOptions;
 
     fn type_(&self) -> TypeRef {
         TypeRef::DataIntegrityProof(CryptosuiteStr::new("eddsa-2022").unwrap())

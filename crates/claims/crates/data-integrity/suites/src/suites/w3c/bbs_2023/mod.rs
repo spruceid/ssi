@@ -83,7 +83,7 @@ impl StandardCryptographicSuite for Bbs2023 {
 
     type VerificationMethod = Multikey;
 
-    type ProofOptions = ();
+    type ProofOptions = EmptyProofOptions;
 
     type SignatureAlgorithm = Bbs2023SignatureAlgorithm;
 

@@ -3,7 +3,7 @@ use lazy_static::lazy_static;
 use ssi_data_integrity_core::{
     canonicalization::{CanonicalizeClaimsAndConfiguration, HashCanonicalClaimsAndConfiguration},
     signing::DetachedJwsSigning,
-    suite::AddProofContext,
+    suite::{standard::EmptyProofOptions, AddProofContext},
     StandardCryptographicSuite, TypeRef,
 };
 use ssi_verification_methods::JsonWebKey2020;
@@ -51,7 +51,7 @@ impl StandardCryptographicSuite for JsonWebSignature2020 {
 
     type SignatureAlgorithm = DetachedJwsSigning<ssi_jwk::Algorithm>; // TODO make sure to include the key id
 
-    type ProofOptions = ();
+    type ProofOptions = EmptyProofOptions;
 
     fn type_(&self) -> TypeRef {
         TypeRef::Other(Self::NAME)

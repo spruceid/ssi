@@ -63,7 +63,7 @@ impl StandardCryptographicSuite for SolanaSignature2021 {
 
     type SignatureAlgorithm = SolanaSignatureAlgorithm;
 
-    type ProofOptions = ();
+    type ProofOptions = EmptyProofOptions;
 
     fn type_(&self) -> TypeRef {
         TypeRef::Other(Self::NAME)

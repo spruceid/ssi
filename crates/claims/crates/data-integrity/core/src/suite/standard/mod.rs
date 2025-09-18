@@ -1,6 +1,7 @@
 //! Cryptographic suites.
 use std::borrow::Cow;
 
+use serde::{Deserialize, Serialize};
 use ssi_claims_core::{
     ProofValidationError, ProofValidity, ResolverProvider, ResourceProvider, SignatureError,
 };
@@ -26,6 +27,10 @@ use super::{
 };
 
 // mod test_bbs;
+
+/// Empty cryptography suite options
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct EmptyProofOptions {}
 
 /// Standard cryptographic suite.
 ///
