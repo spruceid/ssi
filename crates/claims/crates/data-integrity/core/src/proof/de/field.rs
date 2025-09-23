@@ -1,3 +1,5 @@
+use core::fmt;
+
 use serde::Deserialize;
 
 pub enum TypeField {
@@ -23,14 +25,11 @@ struct TypeFieldVisitor;
 impl<'de> serde::de::Visitor<'de> for TypeFieldVisitor {
     type Value = TypeField;
 
-    fn expecting(
-        &self,
-        __formatter: &mut serde::__private::Formatter,
-    ) -> serde::__private::fmt::Result {
-        serde::__private::Formatter::write_str(__formatter, "field identifier")
+    fn expecting(&self, __formatter: &mut fmt::Formatter) -> fmt::Result {
+        fmt::Formatter::write_str(__formatter, "field identifier")
     }
 
-    fn visit_str<__E>(self, __value: &str) -> serde::__private::Result<Self::Value, __E>
+    fn visit_str<__E>(self, __value: &str) -> Result<Self::Value, __E>
     where
         __E: serde::de::Error,
     {
@@ -41,10 +40,7 @@ impl<'de> serde::de::Visitor<'de> for TypeFieldVisitor {
         }
     }
 
-    fn visit_borrowed_str<__E>(
-        self,
-        __value: &'de str,
-    ) -> serde::__private::Result<Self::Value, __E>
+    fn visit_borrowed_str<__E>(self, __value: &'de str) -> Result<Self::Value, __E>
     where
         __E: serde::de::Error,
     {
@@ -70,14 +66,11 @@ struct FieldVisitor;
 impl<'de> serde::de::Visitor<'de> for FieldVisitor {
     type Value = Field;
 
-    fn expecting(
-        &self,
-        __formatter: &mut serde::__private::Formatter,
-    ) -> serde::__private::fmt::Result {
-        serde::__private::Formatter::write_str(__formatter, "field identifier")
+    fn expecting(&self, __formatter: &mut fmt::Formatter) -> fmt::Result {
+        fmt::Formatter::write_str(__formatter, "field identifier")
     }
 
-    fn visit_str<__E>(self, __value: &str) -> serde::__private::Result<Self::Value, __E>
+    fn visit_str<__E>(self, __value: &str) -> Result<Self::Value, __E>
     where
         __E: serde::de::Error,
     {
@@ -94,10 +87,7 @@ impl<'de> serde::de::Visitor<'de> for FieldVisitor {
         }
     }
 
-    fn visit_borrowed_str<__E>(
-        self,
-        __value: &'de str,
-    ) -> serde::__private::Result<Self::Value, __E>
+    fn visit_borrowed_str<__E>(self, __value: &'de str) -> Result<Self::Value, __E>
     where
         __E: serde::de::Error,
     {
