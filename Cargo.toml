@@ -8,7 +8,7 @@ description = "Core library for Verifiable Credentials and Decentralized Identif
 repository = "https://github.com/spruceid/ssi/"
 documentation = "https://docs.rs/ssi/"
 keywords = ["ssi", "did", "vc", "vp", "jsonld"]
-rust-version = "1.82"
+rust-version = "1.87"
 
 [workspace]
 members = [

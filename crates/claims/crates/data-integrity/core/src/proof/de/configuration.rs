@@ -9,7 +9,7 @@ use serde::{
 use ssi_core::de::WithType;
 use std::{collections::BTreeMap, marker::PhantomData};
 
-use super::{Field, RefOrValue, ReplayMap, TypeField};
+use super::{Field, FlatMapDeserializer, RefOrValue, ReplayMap, TypeField};
 
 impl<'de, T: DeserializeCryptographicSuite<'de>> ProofConfiguration<T> {
     fn deserialize_with_type<S>(type_: Type, mut deserializer: S) -> Result<Self, S::Error>
@@ -53,10 +53,7 @@ impl<'de, T: DeserializeCryptographicSuite<'de>> ProofConfiguration<T> {
         }
 
         let options = WithType::<T, OptionsOf<T>>::new(&suite)
-            .deserialize(serde::__private::de::FlatMapDeserializer(
-                &mut other,
-                PhantomData,
-            ))?
+            .deserialize(FlatMapDeserializer::new(&mut other))?
             .0;
 
         Ok(Self {
@@ -73,10 +70,7 @@ impl<'de, T: DeserializeCryptographicSuite<'de>> ProofConfiguration<T> {
             challenge,
             nonce,
             options,
-            extra_properties: BTreeMap::deserialize(serde::__private::de::FlatMapDeserializer(
-                &mut other,
-                PhantomData,
-            ))?,
+            extra_properties: BTreeMap::deserialize(FlatMapDeserializer::new(&mut other))?,
         })
     }
 }

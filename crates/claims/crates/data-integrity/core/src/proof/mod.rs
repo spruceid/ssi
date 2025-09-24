@@ -140,7 +140,7 @@ impl<T: CryptographicSuite> Proof<T> {
         }
     }
 
-    pub fn borrowed(&self) -> ProofRef<T> {
+    pub fn borrowed(&'_ self) -> ProofRef<'_, T> {
         ProofRef {
             context: self.context.as_ref(),
             type_: &self.type_,
@@ -168,7 +168,7 @@ impl<T: CryptographicSuite> Proof<T> {
         &self.type_
     }
 
-    pub fn configuration(&self) -> ProofConfigurationRef<T> {
+    pub fn configuration(&'_ self) -> ProofConfigurationRef<'_, T> {
         ProofConfigurationRef {
             context: self.context.as_ref(),
             type_: &self.type_,
@@ -300,11 +300,11 @@ impl<S: CryptographicSuite> Proofs<S> {
         &mut self.0
     }
 
-    pub fn iter(&self) -> std::slice::Iter<Proof<S>> {
+    pub fn iter(&'_ self) -> std::slice::Iter<'_, Proof<S>> {
         self.0.iter()
     }
 
-    pub fn iter_mut(&mut self) -> std::slice::IterMut<Proof<S>> {
+    pub fn iter_mut(&'_ mut self) -> std::slice::IterMut<'_, Proof<S>> {
         self.0.iter_mut()
     }
 }

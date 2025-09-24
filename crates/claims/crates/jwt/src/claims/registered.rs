@@ -31,7 +31,7 @@ impl RegisteredClaims {
         self.0.len()
     }
 
-    pub fn iter(&self) -> RegisteredClaimsIter {
+    pub fn iter(&'_ self) -> RegisteredClaimsIter<'_> {
         self.0.values()
     }
 
@@ -82,7 +82,7 @@ impl JwsPayload for RegisteredClaims {
         Some("JWT")
     }
 
-    fn payload_bytes(&self) -> Cow<[u8]> {
+    fn payload_bytes(&'_ self) -> Cow<'_, [u8]> {
         Cow::Owned(serde_json::to_vec(self).unwrap())
     }
 }
@@ -222,7 +222,7 @@ macro_rules! registered_claims {
                 false
             }
 
-            fn try_get<C: Claim>(&self) -> Result<Option<Cow<C>>, InvalidClaimValue> {
+            fn try_get<C: Claim>(&'_ self) -> Result<Option<Cow<'_, C>>, InvalidClaimValue> {
                 $(
                     if std::any::TypeId::of::<C>() == std::any::TypeId::of::<$variant>() {
                         return Ok(unsafe { CastClaim::cast_claim(self.get::<$variant>()) }.map(Cow::Borrowed));

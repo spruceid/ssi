@@ -26,7 +26,7 @@ impl<T: Serialize> CosePayload for CoseVp<T> {
         Some(ssi_cose::ContentType::Text("application/vp".to_owned()))
     }
 
-    fn payload_bytes(&self) -> Cow<[u8]> {
+    fn payload_bytes(&'_ self) -> Cow<'_, [u8]> {
         Cow::Owned(serde_json::to_vec(&self.0).unwrap())
     }
 }
@@ -99,7 +99,7 @@ impl<T: Presentation> Presentation for CoseVp<T> {
         self.0.additional_types()
     }
 
-    fn types(&self) -> PresentationTypes {
+    fn types(&'_ self) -> PresentationTypes<'_> {
         self.0.types()
     }
 

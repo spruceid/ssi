@@ -61,10 +61,10 @@ impl<V: Vocabulary, I: Interpretation> linked_data::LinkedDataResource<I, V>
     for EthereumAddressBuf
 {
     fn interpretation(
-        &self,
+        &'_ self,
         _vocabulary: &mut V,
         _interpretation: &mut I,
-    ) -> linked_data::ResourceInterpretation<I, V> {
+    ) -> linked_data::ResourceInterpretation<'_, I, V> {
         use linked_data::{rdf_types::Term, CowRdfTerm, RdfLiteral, ResourceInterpretation};
         ResourceInterpretation::Uninterpreted(Some(CowRdfTerm::Owned(Term::Literal(
             RdfLiteral::Xsd(xsd_types::Value::String(self.to_string())),
@@ -116,10 +116,10 @@ impl EthereumAddress {
 
 impl<V: Vocabulary, I: Interpretation> linked_data::LinkedDataResource<I, V> for EthereumAddress {
     fn interpretation(
-        &self,
+        &'_ self,
         _vocabulary: &mut V,
         _interpretation: &mut I,
-    ) -> linked_data::ResourceInterpretation<I, V> {
+    ) -> linked_data::ResourceInterpretation<'_, I, V> {
         use linked_data::{rdf_types::Term, CowRdfTerm, RdfLiteralRef, ResourceInterpretation};
         ResourceInterpretation::Uninterpreted(Some(CowRdfTerm::Borrowed(Term::Literal(
             RdfLiteralRef::Xsd(xsd_types::ValueRef::String(&self.0)),

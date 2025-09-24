@@ -36,7 +36,7 @@ impl StandardCryptographicSuite for EcdsaSecp256k1Signature2019 {
 
     type ProofOptions = ();
 
-    fn type_(&self) -> TypeRef {
+    fn type_(&'_ self) -> TypeRef<'_> {
         TypeRef::Other(Self::NAME)
     }
 }

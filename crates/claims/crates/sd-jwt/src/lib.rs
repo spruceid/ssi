@@ -226,7 +226,7 @@ impl SdJwt {
     }
 
     /// Returns an iterator over the disclosures of the SD-JWT.
-    pub fn disclosures(&self) -> Disclosures {
+    pub fn disclosures(&'_ self) -> Disclosures<'_> {
         Disclosures {
             bytes: &self.0,
             offset: self.jwt_end() + 1,
@@ -234,7 +234,7 @@ impl SdJwt {
     }
 
     /// Returns references to each part of this SD-JWT.
-    pub fn parts(&self) -> PartsRef {
+    pub fn parts(&'_ self) -> PartsRef<'_> {
         PartsRef {
             jwt: self.jwt(),
             disclosures: self.disclosures().collect(),
@@ -242,25 +242,27 @@ impl SdJwt {
     }
 
     /// Decode a compact SD-JWT.
-    pub fn decode(&self) -> Result<DecodedSdJwt, DecodeError> {
+    pub fn decode(&'_ self) -> Result<DecodedSdJwt<'_>, DecodeError> {
         self.parts().decode()
     }
 
     /// Decodes and reveals the SD-JWT.
-    pub fn decode_reveal<T: DeserializeOwned>(&self) -> Result<RevealedSdJwt<T>, RevealError> {
+    pub fn decode_reveal<T: DeserializeOwned>(
+        &'_ self,
+    ) -> Result<RevealedSdJwt<'_, T>, RevealError> {
         self.parts().decode_reveal()
     }
 
     /// Decodes and reveals the SD-JWT.
-    pub fn decode_reveal_any(&self) -> Result<RevealedSdJwt, RevealError> {
+    pub fn decode_reveal_any(&'_ self) -> Result<RevealedSdJwt<'_>, RevealError> {
         self.parts().decode_reveal_any()
     }
 
     /// Decode a compact SD-JWT.
     pub async fn decode_verify_concealed<P>(
-        &self,
+        &'_ self,
         params: P,
-    ) -> Result<(DecodedSdJwt, Verification), ProofValidationError>
+    ) -> Result<(DecodedSdJwt<'_>, Verification), ProofValidationError>
     where
         P: ResolverProvider<Resolver: JWKResolver>,
     {
@@ -276,9 +278,9 @@ impl SdJwt {
     ///
     /// Returns the decoded JWT with the verification status.
     pub async fn decode_reveal_verify_any<P>(
-        &self,
+        &'_ self,
         params: P,
-    ) -> Result<(RevealedSdJwt, Verification), ProofValidationError>
+    ) -> Result<(RevealedSdJwt<'_>, Verification), ProofValidationError>
     where
         P: ResolverProvider<Resolver: JWKResolver> + DateTimeProvider,
     {
@@ -294,9 +296,9 @@ impl SdJwt {
     ///
     /// Returns the decoded JWT with the verification status.
     pub async fn decode_reveal_verify<T, P>(
-        &self,
+        &'_ self,
         params: P,
-    ) -> Result<(RevealedSdJwt<T>, Verification), ProofValidationError>
+    ) -> Result<(RevealedSdJwt<'_, T>, Verification), ProofValidationError>
     where
         T: ClaimSet + DeserializeOwned + ValidateClaims<P, JwsSignature>,
         P: ResolverProvider<Resolver: JWKResolver> + DateTimeProvider,
@@ -629,7 +631,7 @@ pub struct SdJwtPayload {
 }
 
 impl JwsPayload for SdJwtPayload {
-    fn payload_bytes(&self) -> Cow<[u8]> {
+    fn payload_bytes(&'_ self) -> Cow<'_, [u8]> {
         Cow::Owned(serde_json::to_vec(self).unwrap())
     }
 }

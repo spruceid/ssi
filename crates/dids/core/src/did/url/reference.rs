@@ -12,7 +12,7 @@ pub enum DIDURLReference<'a> {
 }
 
 impl DIDURLReference<'_> {
-    pub fn resolve(&self, base_id: &DID) -> Cow<DIDURL> {
+    pub fn resolve(&'_ self, base_id: &DID) -> Cow<'_, DIDURL> {
         match self {
             Self::Absolute(a) => Cow::Borrowed(a),
             Self::Relative(r) => Cow::Owned(r.resolve(base_id)),
@@ -28,14 +28,14 @@ pub enum DIDURLReferenceBuf {
 }
 
 impl DIDURLReferenceBuf {
-    pub fn as_did_reference(&self) -> DIDURLReference {
+    pub fn as_did_reference(&'_ self) -> DIDURLReference<'_> {
         match self {
             Self::Absolute(a) => DIDURLReference::Absolute(a),
             Self::Relative(r) => DIDURLReference::Relative(r),
         }
     }
 
-    pub fn resolve(&self, base_id: &DID) -> Cow<DIDURL> {
+    pub fn resolve(&'_ self, base_id: &DID) -> Cow<'_, DIDURL> {
         match self {
             Self::Absolute(a) => Cow::Borrowed(a.as_did_url()),
             Self::Relative(r) => Cow::Owned(r.resolve(base_id)),

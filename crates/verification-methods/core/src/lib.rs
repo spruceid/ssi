@@ -116,7 +116,7 @@ impl VerificationMethodTypeSet for &'static str {
 
 impl VerificationMethodTypeSet for &'static [&'static str] {
     fn contains(&self, ty: &str) -> bool {
-        self.iter().any(|&t| t == ty)
+        self.iter().any(|t| t.contains(ty))
     }
 
     fn pick(&self) -> Option<&str> {
@@ -137,19 +137,19 @@ pub trait VerificationMethodResolver {
     /// Resolve the verification method reference.
     #[allow(async_fn_in_trait)]
     async fn resolve_verification_method_with(
-        &self,
+        &'_ self,
         issuer: Option<&Iri>,
         method: Option<ReferenceOrOwnedRef<'_, Self::Method>>,
         options: ResolutionOptions,
-    ) -> Result<Cow<Self::Method>, VerificationMethodResolutionError>;
+    ) -> Result<Cow<'_, Self::Method>, VerificationMethodResolutionError>;
 
     /// Resolve the verification method reference with the default options.
     #[allow(async_fn_in_trait)]
     async fn resolve_verification_method(
-        &self,
+        &'_ self,
         issuer: Option<&Iri>,
         method: Option<ReferenceOrOwnedRef<'_, Self::Method>>,
-    ) -> Result<Cow<Self::Method>, VerificationMethodResolutionError> {
+    ) -> Result<Cow<'_, Self::Method>, VerificationMethodResolutionError> {
         self.resolve_verification_method_with(issuer, method, Default::default())
             .await
     }
@@ -159,11 +159,11 @@ impl<T: VerificationMethodResolver> VerificationMethodResolver for &T {
     type Method = T::Method;
 
     async fn resolve_verification_method_with(
-        &self,
+        &'_ self,
         issuer: Option<&Iri>,
         method: Option<ReferenceOrOwnedRef<'_, T::Method>>,
         options: ResolutionOptions,
-    ) -> Result<Cow<T::Method>, VerificationMethodResolutionError> {
+    ) -> Result<Cow<'_, T::Method>, VerificationMethodResolutionError> {
         T::resolve_verification_method_with(self, issuer, method, options).await
     }
 }
@@ -172,11 +172,11 @@ impl<M: VerificationMethod> VerificationMethodResolver for HashMap<IriBuf, M> {
     type Method = M;
 
     async fn resolve_verification_method_with(
-        &self,
+        &'_ self,
         _issuer: Option<&Iri>,
         method: Option<ReferenceOrOwnedRef<'_, Self::Method>>,
         _options: ResolutionOptions,
-    ) -> Result<Cow<Self::Method>, VerificationMethodResolutionError> {
+    ) -> Result<Cow<'_, Self::Method>, VerificationMethodResolutionError> {
         match method {
             Some(ReferenceOrOwnedRef::Owned(method)) => Ok(Cow::Owned(method.clone())),
             Some(ReferenceOrOwnedRef::Reference(iri)) => match self.get(iri) {
@@ -317,16 +317,16 @@ impl From<InvalidVerificationMethod> for SignatureError {
 
 /// Verification method that can be turned into a JSON Web Key.
 pub trait JwkVerificationMethod: VerificationMethod {
-    fn to_jwk(&self) -> Cow<JWK>;
+    fn to_jwk(&'_ self) -> Cow<'_, JWK>;
 }
 
 /// Verification method that *may* be turned into a JSON Web Key.
 pub trait MaybeJwkVerificationMethod: VerificationMethod {
-    fn try_to_jwk(&self) -> Option<Cow<JWK>>;
+    fn try_to_jwk(&'_ self) -> Option<Cow<'_, JWK>>;
 }
 
 impl<M: JwkVerificationMethod> MaybeJwkVerificationMethod for M {
-    fn try_to_jwk(&self) -> Option<Cow<JWK>> {
+    fn try_to_jwk(&'_ self) -> Option<Cow<'_, JWK>> {
         Some(M::to_jwk(self))
     }
 }

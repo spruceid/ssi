@@ -122,7 +122,7 @@ impl TypedVerificationMethod for Ed25519VerificationKey2018 {
 }
 
 impl JwkVerificationMethod for Ed25519VerificationKey2018 {
-    fn to_jwk(&self) -> Cow<JWK> {
+    fn to_jwk(&'_ self) -> Cow<'_, JWK> {
         Cow::Owned(self.public_key_jwk())
     }
 }
@@ -252,10 +252,10 @@ where
     String: linked_data::LinkedDataResource<I, V>,
 {
     fn interpretation(
-        &self,
+        &'_ self,
         vocabulary: &mut V,
         interpretation: &mut I,
-    ) -> linked_data::ResourceInterpretation<I, V> {
+    ) -> linked_data::ResourceInterpretation<'_, I, V> {
         self.encoded.interpretation(vocabulary, interpretation)
     }
 }

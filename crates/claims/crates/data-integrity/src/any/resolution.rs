@@ -22,11 +22,11 @@ where
     type Method = M;
 
     async fn resolve_verification_method_with(
-        &self,
+        &'_ self,
         issuer: Option<&iref::Iri>,
         method: Option<ssi_verification_methods::ReferenceOrOwnedRef<'_, Self::Method>>,
         options: ssi_verification_methods::ResolutionOptions,
-    ) -> Result<Cow<Self::Method>, ssi_verification_methods::VerificationMethodResolutionError>
+    ) -> Result<Cow<'_, Self::Method>, ssi_verification_methods::VerificationMethodResolutionError>
     {
         let method = method.map(|m| match m {
             ssi_verification_methods::ReferenceOrOwnedRef::Reference(uri) => {

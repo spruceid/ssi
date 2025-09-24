@@ -58,7 +58,7 @@ pub trait CryptographicSuite: Clone {
     type Signature: AsRef<str>;
 
     /// Returns the cryptographic suite type.
-    fn type_(&self) -> TypeRef;
+    fn type_(&'_ self) -> TypeRef<'_>;
 
     /// Generates a proof configuration from input options.
     fn configure_signature(

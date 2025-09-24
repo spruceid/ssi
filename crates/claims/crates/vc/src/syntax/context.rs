@@ -61,7 +61,7 @@ impl<V, T> Context<V, T> {
     }
 
     /// Returns an iterator over the context entries.
-    pub fn iter(&self) -> std::slice::Iter<ContextEntry> {
+    pub fn iter(&'_ self) -> std::slice::Iter<'_, ContextEntry> {
         self.0.iter()
     }
 

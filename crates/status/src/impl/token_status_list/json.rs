@@ -88,7 +88,7 @@ impl ClaimSet for StatusListJwtPrivateClaims {
         }
     }
 
-    fn try_get<C: Claim>(&self) -> Result<Option<Cow<C>>, InvalidClaimValue> {
+    fn try_get<C: Claim>(&'_ self) -> Result<Option<Cow<'_, C>>, InvalidClaimValue> {
         match_claim_type! {
             match C {
                 TimeToLiveClaim => {

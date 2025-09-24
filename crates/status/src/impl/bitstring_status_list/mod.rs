@@ -402,7 +402,7 @@ impl SizedBitString {
     }
 
     /// Returns an iterator over all the statuses stored in this bit-string.
-    pub fn iter(&self) -> BitStringIter {
+    pub fn iter(&'_ self) -> BitStringIter<'_> {
         self.inner.iter(self.status_size)
     }
 
@@ -567,7 +567,7 @@ impl BitString {
     }
 
     /// Returns an iterator over all the statuses stored in this bit-string.
-    pub fn iter(&self, status_size: StatusSize) -> BitStringIter {
+    pub fn iter(&'_ self, status_size: StatusSize) -> BitStringIter<'_> {
         BitStringIter {
             bit_string: self,
             status_size,
@@ -655,7 +655,7 @@ impl StatusList {
         self.bit_string.set(status_size, index, value)
     }
 
-    pub fn iter(&self, status_size: StatusSize) -> BitStringIter {
+    pub fn iter(&'_ self, status_size: StatusSize) -> BitStringIter<'_> {
         self.bit_string.iter(status_size)
     }
 
@@ -707,7 +707,7 @@ impl SizedStatusList {
         self.bit_string.push(value)
     }
 
-    pub fn iter(&self) -> BitStringIter {
+    pub fn iter(&'_ self) -> BitStringIter<'_> {
         self.bit_string.iter()
     }
 

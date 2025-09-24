@@ -95,10 +95,10 @@ impl<V: Vocabulary, I: Interpretation> linked_data::LinkedDataResource<I, V>
     for BlockchainAccountId
 {
     fn interpretation(
-        &self,
+        &'_ self,
         _vocabulary: &mut V,
         _interpretation: &mut I,
-    ) -> linked_data::ResourceInterpretation<I, V> {
+    ) -> linked_data::ResourceInterpretation<'_, I, V> {
         use linked_data::{rdf_types::Term, CowRdfTerm, RdfLiteral, ResourceInterpretation};
         ResourceInterpretation::Uninterpreted(Some(CowRdfTerm::Owned(Term::Literal(
             RdfLiteral::Xsd(xsd_types::Value::String(self.to_string())),
@@ -406,10 +406,10 @@ impl<V: Vocabulary, I: Interpretation, T> linked_data::LinkedDataResource<I, V>
     for TypedBlockchainAccountId<T>
 {
     fn interpretation(
-        &self,
+        &'_ self,
         _vocabulary: &mut V,
         _interpretation: &mut I,
-    ) -> linked_data::ResourceInterpretation<I, V> {
+    ) -> linked_data::ResourceInterpretation<'_, I, V> {
         use linked_data::{rdf_types::Term, CowRdfTerm, RdfLiteral, ResourceInterpretation};
         ResourceInterpretation::Uninterpreted(Some(CowRdfTerm::Owned(Term::Literal(
             RdfLiteral::Xsd(xsd_types::Value::String(self.to_string())),

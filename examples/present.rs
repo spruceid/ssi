@@ -29,7 +29,7 @@ async fn verify(proof_format_in: &str, proof_format_out: &str, input_vc: &str) {
         "ldp" => {
             let vc_ldp: AnyDataIntegrity<AnyJsonCredential> =
                 serde_json::from_str(input_vc).unwrap();
-            ssi::claims::JsonCredentialOrJws::Credential(vc_ldp)
+            ssi::claims::JsonCredentialOrJws::Credential(Box::new(vc_ldp))
         }
         "jwt" => match JwsString::from_string(input_vc.to_string()) {
             Ok(vc_jwt) => ssi::claims::JsonCredentialOrJws::Jws(vc_jwt),

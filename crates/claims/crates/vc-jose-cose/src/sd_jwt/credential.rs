@@ -116,7 +116,7 @@ impl<T: DeserializeOwned> SdJwtVc<T> {
     /// This function requires the `T` parameter, representing the credential
     /// type, to be known. If you don't know what `T` you should use, use the
     /// [`Self::decode_reveal_any`].
-    pub fn decode_reveal(sd_jwt: &SdJwt) -> Result<RevealedSdJwt<Self>, RevealError> {
+    pub fn decode_reveal(sd_jwt: &'_ SdJwt) -> Result<RevealedSdJwt<'_, Self>, RevealError> {
         sd_jwt.decode_reveal()
     }
 }
@@ -127,7 +127,7 @@ impl SdJwtVc {
     /// This function uses [`JsonCredential`] as credential type. If you need
     /// to use a custom credential type, use the [`Self::decode_reveal`]
     /// function.
-    pub fn decode_reveal_any(sd_jwt: &SdJwt) -> Result<RevealedSdJwt<Self>, RevealError> {
+    pub fn decode_reveal_any(sd_jwt: &'_ SdJwt) -> Result<RevealedSdJwt<'_, Self>, RevealError> {
         sd_jwt.decode_reveal()
     }
 }
@@ -156,7 +156,7 @@ impl<T: Credential> Credential for SdJwtVc<T> {
         self.0.additional_types()
     }
 
-    fn types(&self) -> CredentialTypes {
+    fn types(&'_ self) -> CredentialTypes<'_> {
         self.0.types()
     }
 

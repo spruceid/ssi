@@ -101,11 +101,11 @@ where
     type Method = M;
 
     async fn resolve_verification_method_with(
-        &self,
+        &'_ self,
         _issuer: Option<&iref::Iri>,
         method: Option<ReferenceOrOwnedRef<'_, M>>,
         options: ssi_verification_methods_core::ResolutionOptions,
-    ) -> Result<Cow<M>, VerificationMethodResolutionError> {
+    ) -> Result<Cow<'_, M>, VerificationMethodResolutionError> {
         let mut deref_options = self.options.clone();
 
         if let Some(set) = options.accept {
@@ -166,9 +166,9 @@ where
         + TryFrom<GenericVerificationMethod, Error = InvalidVerificationMethod>,
 {
     async fn fetch_public_jwk(
-        &self,
+        &'_ self,
         key_id: Option<&str>,
-    ) -> Result<Cow<JWK>, ProofValidationError> {
+    ) -> Result<Cow<'_, JWK>, ProofValidationError> {
         let vm = match key_id {
             Some(id) => match Iri::new(id) {
                 Ok(iri) => Some(ReferenceOrOwnedRef::Reference(iri)),

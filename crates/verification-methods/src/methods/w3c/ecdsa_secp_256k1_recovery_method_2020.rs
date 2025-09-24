@@ -113,7 +113,7 @@ impl EcdsaSecp256k1RecoveryMethod2020 {
     pub const IRI: &'static Iri =
         iri!("https://w3id.org/security#EcdsaSecp256k1RecoveryMethod2020");
 
-    pub fn public_key_jwk(&self) -> Option<Cow<JWK>> {
+    pub fn public_key_jwk(&'_ self) -> Option<Cow<'_, JWK>> {
         self.public_key.to_jwk()
     }
 
@@ -227,7 +227,7 @@ impl From<InvalidPublicKey> for ProofValidationError {
 }
 
 impl PublicKey {
-    pub fn to_jwk(&self) -> Option<Cow<JWK>> {
+    pub fn to_jwk(&'_ self) -> Option<Cow<'_, JWK>> {
         match self {
             Self::Jwk(jwk) => Some(Cow::Borrowed(jwk)),
             Self::Hex(hex) => Some(Cow::Owned(hex.to_jwk())),
@@ -333,10 +333,10 @@ where
     String: linked_data::LinkedDataResource<I, V>,
 {
     fn interpretation(
-        &self,
+        &'_ self,
         vocabulary: &mut V,
         interpretation: &mut I,
-    ) -> linked_data::ResourceInterpretation<I, V> {
+    ) -> linked_data::ResourceInterpretation<'_, I, V> {
         self.encoded.interpretation(vocabulary, interpretation)
     }
 }

@@ -256,8 +256,8 @@ impl AnyDidMethod {
     /// - `jwk` to generate a `did:jwk` DID,
     /// - `ethr` to generate a `did:ethr` DID,
     /// - `pkh:{pkh_name}` to generate a `did:pkh` DID, where `{pkh_name}`
-    ///    should be replaced by the network id as specified by the
-    ///    [`DIDPKH::generate`] function.
+    ///   should be replaced by the network id as specified by the
+    ///   [`DIDPKH::generate`] function.
     /// - `tz` to generate a `did:tz` DID.
     ///
     /// # Example

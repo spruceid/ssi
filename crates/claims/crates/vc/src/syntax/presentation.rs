@@ -17,7 +17,7 @@ pub enum AnyJsonPresentation<C1 = v1::syntax::JsonCredential, C2 = v2::syntax::J
 }
 
 impl<C1, C2> JsonLdObject for AnyJsonPresentation<C1, C2> {
-    fn json_ld_context(&self) -> Option<Cow<ssi_json_ld::syntax::Context>> {
+    fn json_ld_context(&'_ self) -> Option<Cow<'_, ssi_json_ld::syntax::Context>> {
         match self {
             Self::V1(p) => p.json_ld_context(),
             Self::V2(p) => p.json_ld_context(),
@@ -26,7 +26,7 @@ impl<C1, C2> JsonLdObject for AnyJsonPresentation<C1, C2> {
 }
 
 impl<C1, C2> JsonLdNodeObject for AnyJsonPresentation<C1, C2> {
-    fn json_ld_type(&self) -> JsonLdTypes {
+    fn json_ld_type(&'_ self) -> JsonLdTypes<'_> {
         match self {
             Self::V1(p) => p.json_ld_type(),
             Self::V2(p) => p.json_ld_type(),

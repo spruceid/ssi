@@ -67,7 +67,7 @@ impl<T: Serialize> CosePayload for CoseVc<T> {
         Some(ssi_cose::ContentType::Text("application/vc".to_owned()))
     }
 
-    fn payload_bytes(&self) -> Cow<[u8]> {
+    fn payload_bytes(&'_ self) -> Cow<'_, [u8]> {
         Cow::Owned(serde_json::to_vec(&self.0).unwrap())
     }
 }
@@ -107,7 +107,7 @@ impl<T: Credential> Credential for CoseVc<T> {
         self.0.additional_types()
     }
 
-    fn types(&self) -> CredentialTypes {
+    fn types(&'_ self) -> CredentialTypes<'_> {
         self.0.types()
     }
 

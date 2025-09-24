@@ -113,7 +113,7 @@ impl<T: DeserializeOwned> SdJwtVp<T> {
     /// This function requires the `T` parameter, representing the presentation
     /// type, to be known. If you don't know what `T` you should use, use the
     /// [`Self::decode_reveal_any`].
-    pub fn decode_reveal(sd_jwt: &SdJwt) -> Result<RevealedSdJwt<Self>, RevealError> {
+    pub fn decode_reveal(sd_jwt: &'_ SdJwt) -> Result<RevealedSdJwt<'_, Self>, RevealError> {
         sd_jwt.decode_reveal()
     }
 }
@@ -124,7 +124,7 @@ impl SdJwtVp {
     /// This function uses [`JsonPresentation<EnvelopedVerifiableCredential>`]
     /// as presentation type. If you need to use a custom presentation type, use
     /// the [`Self::decode_reveal`] function.
-    pub fn decode_reveal_any(sd_jwt: &SdJwt) -> Result<RevealedSdJwt<Self>, RevealError> {
+    pub fn decode_reveal_any(sd_jwt: &'_ SdJwt) -> Result<RevealedSdJwt<'_, Self>, RevealError> {
         sd_jwt.decode_reveal()
     }
 }
@@ -147,7 +147,7 @@ impl<T: Presentation> Presentation for SdJwtVp<T> {
         self.0.additional_types()
     }
 
-    fn types(&self) -> PresentationTypes {
+    fn types(&'_ self) -> PresentationTypes<'_> {
         self.0.types()
     }
 

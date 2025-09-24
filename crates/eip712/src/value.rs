@@ -45,11 +45,11 @@ impl Struct {
         self.0.get_mut(key)
     }
 
-    pub fn iter(&self) -> indexmap::map::Iter<String, Value> {
+    pub fn iter(&'_ self) -> indexmap::map::Iter<'_, String, Value> {
         self.0.iter()
     }
 
-    pub fn keys(&self) -> indexmap::map::Keys<String, Value> {
+    pub fn keys(&'_ self) -> indexmap::map::Keys<'_, String, Value> {
         self.0.keys()
     }
 

@@ -130,13 +130,13 @@ impl Expandable for CompactJsonLd {
 /// Any type representing a JSON-LD object.
 pub trait JsonLdObject {
     /// Returns the JSON-LD context attached to `self`.
-    fn json_ld_context(&self) -> Option<Cow<json_ld::syntax::Context>> {
+    fn json_ld_context(&'_ self) -> Option<Cow<'_, json_ld::syntax::Context>> {
         None
     }
 }
 
 impl JsonLdObject for CompactJsonLd {
-    fn json_ld_context(&self) -> Option<Cow<json_ld::syntax::Context>> {
+    fn json_ld_context(&'_ self) -> Option<Cow<'_, json_ld::syntax::Context>> {
         json_syntax::from_value(self.0.as_object()?.get("@context").next()?.clone())
             .map(Cow::Owned)
             .ok()
@@ -144,7 +144,7 @@ impl JsonLdObject for CompactJsonLd {
 }
 
 pub trait JsonLdNodeObject: JsonLdObject {
-    fn json_ld_type(&self) -> JsonLdTypes {
+    fn json_ld_type(&'_ self) -> JsonLdTypes<'_> {
         JsonLdTypes::default()
     }
 }
@@ -177,7 +177,7 @@ impl<'a> JsonLdTypes<'a> {
         self.static_.is_empty() && self.non_static.is_empty()
     }
 
-    pub fn reborrow(&self) -> JsonLdTypes {
+    pub fn reborrow(&'_ self) -> JsonLdTypes<'_> {
         JsonLdTypes {
             static_: self.static_,
             non_static: Cow::Borrowed(&self.non_static),

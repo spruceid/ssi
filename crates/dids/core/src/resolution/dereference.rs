@@ -94,7 +94,7 @@ impl DerefOutput<PrimaryContent> {
 pub enum PrimaryContent {
     Null,
     Url(IriBuf), // TODO must be an URL
-    Document(document::Represented),
+    Document(Box<document::Represented>),
 }
 
 impl From<IriBuf> for PrimaryContent {
@@ -132,7 +132,7 @@ impl From<PrimaryContent> for Content {
             PrimaryContent::Null => Self::Null,
             PrimaryContent::Url(url) => Self::Url(url),
             PrimaryContent::Document(doc) => {
-                Self::Resource(Resource::Document(doc.into_document()))
+                Self::Resource(Resource::Document(Box::new(doc.into_document())))
             }
         }
     }
@@ -187,7 +187,7 @@ pub(crate) async fn dereference_primary_resource<'a, R: ?Sized + DIDResolver>(
             if primary_did_url.path().is_empty() && primary_did_url.query().is_none() {
                 // 2.1
                 return Ok(DerefOutput::new(
-                    PrimaryContent::Document(resolution_output.document),
+                    PrimaryContent::Document(Box::new(resolution_output.document)),
                     document::Metadata::default(),
                     resolution_output.metadata,
                 ));

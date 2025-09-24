@@ -130,7 +130,7 @@ impl JWK {
 impl Codec for JWK {
     const CODEC: u64 = ssi_multicodec::JWK_JCS_PUB;
 
-    fn to_bytes(&self) -> Cow<[u8]> {
+    fn to_bytes(&'_ self) -> Cow<'_, [u8]> {
         Cow::Owned(serde_jcs::to_vec(self).unwrap())
     }
 

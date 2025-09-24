@@ -116,7 +116,7 @@ impl TypedVerificationMethod for SolanaMethod2021 {
 }
 
 impl JwkVerificationMethod for SolanaMethod2021 {
-    fn to_jwk(&self) -> Cow<JWK> {
+    fn to_jwk(&'_ self) -> Cow<'_, JWK> {
         Cow::Borrowed(self.public_key_jwk())
     }
 }

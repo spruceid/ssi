@@ -52,10 +52,10 @@ where
     V: IriVocabularyMut,
 {
     fn interpretation(
-        &self,
+        &'_ self,
         vocabulary: &mut V,
         _interpretation: &mut I,
-    ) -> linked_data::ResourceInterpretation<I, V> {
+    ) -> linked_data::ResourceInterpretation<'_, I, V> {
         use linked_data::{rdf_types::Term, CowRdfTerm, ResourceInterpretation};
         ResourceInterpretation::Uninterpreted(Some(CowRdfTerm::Owned(Term::Literal(
             RdfLiteral::Any(
@@ -152,10 +152,10 @@ where
     V: IriVocabularyMut,
 {
     fn interpretation(
-        &self,
+        &'_ self,
         vocabulary: &mut V,
         _interpretation: &mut I,
-    ) -> linked_data::ResourceInterpretation<I, V> {
+    ) -> linked_data::ResourceInterpretation<'_, I, V> {
         use linked_data::{rdf_types::Term, CowRdfTerm, ResourceInterpretation};
         ResourceInterpretation::Uninterpreted(Some(CowRdfTerm::Owned(Term::Literal(
             RdfLiteral::Any(

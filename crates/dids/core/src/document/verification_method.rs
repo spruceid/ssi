@@ -22,7 +22,7 @@ pub enum ValueOrReference {
 }
 
 impl ValueOrReference {
-    pub fn id(&self) -> DIDURLReference {
+    pub fn id(&'_ self) -> DIDURLReference<'_> {
         match self {
             Self::Reference(r) => r.as_did_reference(),
             Self::Value(v) => DIDURLReference::Absolute(&v.id),
@@ -65,7 +65,7 @@ impl UsesResource for ValueOrReference {
 }
 
 impl FindResource for ValueOrReference {
-    fn find_resource(&self, base_did: &DID, id: &DIDURL) -> Option<ResourceRef> {
+    fn find_resource(&'_ self, base_did: &DID, id: &DIDURL) -> Option<ResourceRef<'_>> {
         match self {
             Self::Reference(_) => None,
             Self::Value(m) => m.find_resource(base_did, id),
@@ -141,7 +141,7 @@ impl UsesResource for DIDVerificationMethod {
 }
 
 impl FindResource for DIDVerificationMethod {
-    fn find_resource(&self, _base_did: &DID, id: &DIDURL) -> Option<ResourceRef> {
+    fn find_resource(&'_ self, _base_did: &DID, id: &DIDURL) -> Option<ResourceRef<'_>> {
         if self.id == *id {
             Some(ResourceRef::VerificationMethod(self))
         } else {

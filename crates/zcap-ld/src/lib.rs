@@ -297,7 +297,7 @@ impl<C, S, R, L1, L2> TargetCapabilityProvider for InvocationVerifier<'_, C, S, 
 }
 
 impl<C, P> JsonLdObject for Delegation<C, P> {
-    fn json_ld_context(&self) -> Option<Cow<ssi_json_ld::syntax::Context>> {
+    fn json_ld_context(&'_ self) -> Option<Cow<'_, ssi_json_ld::syntax::Context>> {
         Some(Cow::Borrowed(self.context.as_ref()))
     }
 }
@@ -431,7 +431,7 @@ impl<P> Invocation<P> {
 }
 
 impl<P> JsonLdObject for Invocation<P> {
-    fn json_ld_context(&self) -> Option<Cow<ssi_json_ld::syntax::Context>> {
+    fn json_ld_context(&'_ self) -> Option<Cow<'_, ssi_json_ld::syntax::Context>> {
         Some(Cow::Borrowed(self.context.as_ref()))
     }
 }

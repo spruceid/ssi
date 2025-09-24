@@ -66,7 +66,7 @@ impl AnyMethod {
     /// Returns the public key of the verification method as a JWK.
     ///
     /// Some methods don't have any the public key embedded.
-    pub fn public_key_jwk(&self) -> Option<Cow<JWK>> {
+    pub fn public_key_jwk(&'_ self) -> Option<Cow<'_, JWK>> {
         match self {
             #[cfg(feature = "rsa")]
             Self::RsaVerificationKey2018(m) => Some(Cow::Borrowed(m.public_key_jwk())),
@@ -109,7 +109,7 @@ impl From<AnyMethod> for GenericVerificationMethod {
 }
 
 impl MaybeJwkVerificationMethod for AnyMethod {
-    fn try_to_jwk(&self) -> Option<Cow<JWK>> {
+    fn try_to_jwk(&'_ self) -> Option<Cow<'_, JWK>> {
         self.public_key_jwk()
     }
 }
@@ -259,7 +259,7 @@ impl AnyJwkMethod {
     /// Returns the public key of the verification method as a JWK.
     ///
     /// Some methods don't have any the public key embedded.
-    pub fn public_key_jwk(&self) -> Cow<JWK> {
+    pub fn public_key_jwk(&'_ self) -> Cow<'_, JWK> {
         match self {
             Self::JsonWebKey2020(m) => Cow::Borrowed(m.public_key_jwk()),
             #[cfg(feature = "rsa")]
@@ -279,7 +279,7 @@ impl AnyJwkMethod {
 }
 
 impl JwkVerificationMethod for AnyJwkMethod {
-    fn to_jwk(&self) -> Cow<JWK> {
+    fn to_jwk(&'_ self) -> Cow<'_, JWK> {
         self.public_key_jwk()
     }
 }

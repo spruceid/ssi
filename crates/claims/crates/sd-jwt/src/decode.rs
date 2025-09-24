@@ -91,7 +91,7 @@ impl<'a> PartsRef<'a> {
 
 impl Disclosure {
     /// Decode this disclosure.
-    pub fn decode(&self) -> Result<DecodedDisclosure, DecodeError> {
+    pub fn decode(&'_ self) -> Result<DecodedDisclosure<'_>, DecodeError> {
         DecodedDisclosure::new(self)
     }
 }

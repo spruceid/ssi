@@ -45,7 +45,7 @@ impl StandardCryptographicSuite for EcdsaSd2023 {
 
     type SignatureAlgorithm = SignatureAlgorithm;
 
-    fn type_(&self) -> TypeRef {
+    fn type_(&'_ self) -> TypeRef<'_> {
         TypeRef::DataIntegrityProof(CryptosuiteStr::new("ecdsa-sd-2023").unwrap())
     }
 }

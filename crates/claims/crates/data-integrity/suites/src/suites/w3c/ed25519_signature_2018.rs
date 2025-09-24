@@ -35,7 +35,7 @@ impl StandardCryptographicSuite for Ed25519Signature2018 {
 
     type ProofOptions = ();
 
-    fn type_(&self) -> TypeRef {
+    fn type_(&'_ self) -> TypeRef<'_> {
         TypeRef::Other(Self::NAME)
     }
 }

@@ -10,7 +10,7 @@ impl Codec for VerifyingKey {
         Self::try_from(bytes).map_err(|_| Error::InvalidData)
     }
 
-    fn to_bytes(&self) -> Cow<[u8]> {
+    fn to_bytes(&'_ self) -> Cow<'_, [u8]> {
         Cow::Borrowed(self.as_bytes().as_slice())
     }
 }

@@ -111,9 +111,9 @@ pub enum AnyDecodedStatusMap {
 
 impl AnyDecodedStatusMap {
     pub fn iter(
-        &self,
+        &'_ self,
         status_size: Option<u8>,
-    ) -> Result<AnyDecodedStatusMapIter, StatusSizeError> {
+    ) -> Result<AnyDecodedStatusMapIter<'_>, StatusSizeError> {
         match self {
             Self::BitstringStatusList(m) => Ok(AnyDecodedStatusMapIter::BitstringStatusList(
                 m.iter(status_size.ok_or(StatusSizeError::Missing)?.try_into()?),

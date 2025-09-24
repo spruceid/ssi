@@ -81,13 +81,13 @@ pub struct EmbeddedProofConfigurationRef<'d, 'a, S: CryptographicSuite> {
 }
 
 impl<S: CryptographicSuite> JsonLdObject for EmbeddedProofConfigurationRef<'_, '_, S> {
-    fn json_ld_context(&self) -> Option<Cow<ssi_json_ld::syntax::Context>> {
+    fn json_ld_context(&'_ self) -> Option<Cow<'_, ssi_json_ld::syntax::Context>> {
         self.context.as_deref().map(Cow::Borrowed)
     }
 }
 
 impl<S: CryptographicSuite> JsonLdNodeObject for EmbeddedProofConfigurationRef<'_, '_, S> {
-    fn json_ld_type(&self) -> JsonLdTypes {
+    fn json_ld_type(&'_ self) -> JsonLdTypes<'_> {
         self.type_.reborrow()
     }
 }

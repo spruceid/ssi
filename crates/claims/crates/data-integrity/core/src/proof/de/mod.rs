@@ -23,8 +23,8 @@ pub use field::*;
 mod ref_or_value;
 pub use ref_or_value::*;
 
-mod replay_map;
-pub use replay_map::*;
+mod utils;
+use utils::{FlatMapDeserializer, ReplayMap};
 
 mod configuration;
 
@@ -97,17 +97,11 @@ impl<'de, T: DeserializeCryptographicSuite<'de>> Proof<T> {
         }
 
         let options = WithType::<T, OptionsOf<T>>::new(&suite)
-            .deserialize(serde::__private::de::FlatMapDeserializer(
-                &mut other,
-                PhantomData,
-            ))?
+            .deserialize(FlatMapDeserializer::new(&mut other))?
             .0;
 
         let signature = WithType::<T, SignatureOf<T>>::new(&suite)
-            .deserialize(serde::__private::de::FlatMapDeserializer(
-                &mut other,
-                PhantomData,
-            ))?
+            .deserialize(FlatMapDeserializer::new(&mut other))?
             .0;
 
         Ok(Self {
@@ -125,10 +119,7 @@ impl<'de, T: DeserializeCryptographicSuite<'de>> Proof<T> {
             nonce,
             options,
             signature,
-            extra_properties: BTreeMap::deserialize(serde::__private::de::FlatMapDeserializer(
-                &mut other,
-                PhantomData,
-            ))?,
+            extra_properties: BTreeMap::deserialize(FlatMapDeserializer::new(&mut other))?,
         })
     }
 }

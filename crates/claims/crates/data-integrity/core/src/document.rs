@@ -62,13 +62,13 @@ impl ssi_json_ld::Expandable for DataIntegrityDocument {
 }
 
 impl JsonLdObject for DataIntegrityDocument {
-    fn json_ld_context(&self) -> Option<Cow<ssi_json_ld::syntax::Context>> {
+    fn json_ld_context(&'_ self) -> Option<Cow<'_, ssi_json_ld::syntax::Context>> {
         self.context.as_ref().map(Cow::Borrowed)
     }
 }
 
 impl JsonLdNodeObject for DataIntegrityDocument {
-    fn json_ld_type(&self) -> ssi_json_ld::JsonLdTypes {
+    fn json_ld_type(&'_ self) -> ssi_json_ld::JsonLdTypes<'_> {
         ssi_json_ld::JsonLdTypes::new(&[], Cow::Borrowed(self.types.as_slice()))
     }
 }

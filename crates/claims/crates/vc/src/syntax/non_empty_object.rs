@@ -30,14 +30,14 @@ impl NonEmptyObject {
         self.0
     }
 
-    pub fn iter_mut(&mut self) -> IterMut {
+    pub fn iter_mut(&'_ mut self) -> IterMut<'_> {
         self.0.iter_mut()
     }
 
     /// Returns an iterator over the values matching the given key.
     ///
     /// Runs in `O(1)` (average).
-    pub fn get_mut<Q>(&mut self, key: &Q) -> ValuesMut
+    pub fn get_mut<Q>(&'_ mut self, key: &Q) -> ValuesMut<'_>
     where
         Q: ?Sized + Hash + Equivalent<Key>,
     {
@@ -114,7 +114,7 @@ impl NonEmptyObject {
     /// If one or more entries are already matching the given key,
     /// all of them are removed and returned in the resulting iterator.
     /// Otherwise, `None` is returned.
-    pub fn insert(&mut self, key: Key, value: Value) -> Option<RemovedByInsertion> {
+    pub fn insert(&'_ mut self, key: Key, value: Value) -> Option<RemovedByInsertion<'_>> {
         self.0.insert(key, value)
     }
 
@@ -122,7 +122,7 @@ impl NonEmptyObject {
     ///
     /// If one or more entries are already matching the given key,
     /// all of them are removed and returned in the resulting iterator.
-    pub fn insert_front(&mut self, key: Key, value: Value) -> RemovedByInsertFront {
+    pub fn insert_front(&'_ mut self, key: Key, value: Value) -> RemovedByInsertFront<'_> {
         self.0.insert_front(key, value)
     }
 

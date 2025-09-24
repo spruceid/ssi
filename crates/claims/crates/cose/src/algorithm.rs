@@ -39,7 +39,7 @@ pub fn algorithm_name(algorithm: &Algorithm) -> String {
 }
 
 /// Returns the preferred signature algorithm for the give COSE key.
-pub fn preferred_algorithm(key: &CoseKey) -> Option<Cow<Algorithm>> {
+pub fn preferred_algorithm(key: &'_ CoseKey) -> Option<Cow<'_, Algorithm>> {
     key.alg
         .as_ref()
         .map(Cow::Borrowed)
