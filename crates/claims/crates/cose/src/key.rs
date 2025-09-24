@@ -19,25 +19,25 @@ pub trait CoseKeyResolver {
     /// Fetches the COSE key associated to the give identifier.
     #[allow(async_fn_in_trait)]
     async fn fetch_public_cose_key(
-        &self,
+        &'_ self,
         id: Option<&[u8]>,
-    ) -> Result<Cow<CoseKey>, ProofValidationError>;
+    ) -> Result<Cow<'_, CoseKey>, ProofValidationError>;
 }
 
 impl<T: CoseKeyResolver> CoseKeyResolver for &T {
     async fn fetch_public_cose_key(
-        &self,
+        &'_ self,
         id: Option<&[u8]>,
-    ) -> Result<Cow<CoseKey>, ProofValidationError> {
+    ) -> Result<Cow<'_, CoseKey>, ProofValidationError> {
         T::fetch_public_cose_key(*self, id).await
     }
 }
 
 impl CoseKeyResolver for CoseKey {
     async fn fetch_public_cose_key(
-        &self,
+        &'_ self,
         _id: Option<&[u8]>,
-    ) -> Result<Cow<CoseKey>, ProofValidationError> {
+    ) -> Result<Cow<'_, CoseKey>, ProofValidationError> {
         Ok(Cow::Borrowed(self))
     }
 }

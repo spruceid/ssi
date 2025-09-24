@@ -39,7 +39,7 @@ pub trait ClaimSet {
         false
     }
 
-    fn try_get<C: Claim>(&self) -> Result<Option<Cow<C>>, InvalidClaimValue> {
+    fn try_get<C: Claim>(&'_ self) -> Result<Option<Cow<'_, C>>, InvalidClaimValue> {
         Ok(None)
     }
 
@@ -87,7 +87,7 @@ pub trait ClaimSet {
 
 /// Set of JWT claims.
 pub trait InfallibleClaimSet: ClaimSet {
-    fn get<C: Claim>(&self) -> Option<Cow<C>> {
+    fn get<C: Claim>(&'_ self) -> Option<Cow<'_, C>> {
         Self::try_get(self).unwrap()
     }
 

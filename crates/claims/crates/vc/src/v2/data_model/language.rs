@@ -17,25 +17,25 @@ impl<'a> From<&'a LangString> for LanguageValueRef<'a> {
 }
 
 pub trait AnyInternationalString {
-    fn default_value(&self) -> Option<LanguageValueRef>;
+    fn default_value(&'_ self) -> Option<LanguageValueRef<'_>>;
 
-    fn get_language(&self, _lang: &LangTag) -> Option<LanguageValueRef> {
+    fn get_language(&'_ self, _lang: &LangTag) -> Option<LanguageValueRef<'_>> {
         None
     }
 
-    fn get_language_or_default(&self, lang: &LangTag) -> Option<LanguageValueRef> {
+    fn get_language_or_default(&'_ self, lang: &LangTag) -> Option<LanguageValueRef<'_>> {
         self.get_language(lang).or_else(|| self.default_value())
     }
 }
 
 impl<T: ?Sized + AnyInternationalString> AnyInternationalString for &T {
-    fn default_value(&self) -> Option<LanguageValueRef> {
+    fn default_value(&'_ self) -> Option<LanguageValueRef<'_>> {
         T::default_value(*self)
     }
 }
 
 impl AnyInternationalString for str {
-    fn default_value(&self) -> Option<LanguageValueRef> {
+    fn default_value(&'_ self) -> Option<LanguageValueRef<'_>> {
         Some(LanguageValueRef {
             value: self,
             language: None,
@@ -45,13 +45,13 @@ impl AnyInternationalString for str {
 }
 
 impl AnyInternationalString for String {
-    fn default_value(&self) -> Option<LanguageValueRef> {
+    fn default_value(&'_ self) -> Option<LanguageValueRef<'_>> {
         self.as_str().default_value()
     }
 }
 
 impl AnyInternationalString for LangString {
-    fn default_value(&self) -> Option<LanguageValueRef> {
+    fn default_value(&'_ self) -> Option<LanguageValueRef<'_>> {
         Some(LanguageValueRef::from(self))
     }
 }

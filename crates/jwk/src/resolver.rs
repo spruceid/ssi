@@ -15,25 +15,25 @@ pub trait JWKResolver {
     /// The key identifier is optional since the key may be known in advance.
     #[allow(async_fn_in_trait)]
     async fn fetch_public_jwk(
-        &self,
+        &'_ self,
         key_id: Option<&str>,
-    ) -> Result<Cow<JWK>, ProofValidationError>;
+    ) -> Result<Cow<'_, JWK>, ProofValidationError>;
 }
 
 impl<T: JWKResolver> JWKResolver for &T {
     async fn fetch_public_jwk(
-        &self,
+        &'_ self,
         key_id: Option<&str>,
-    ) -> Result<Cow<JWK>, ProofValidationError> {
+    ) -> Result<Cow<'_, JWK>, ProofValidationError> {
         T::fetch_public_jwk(*self, key_id).await
     }
 }
 
 impl JWKResolver for JWK {
     async fn fetch_public_jwk(
-        &self,
+        &'_ self,
         _key_id: Option<&str>,
-    ) -> Result<Cow<JWK>, ProofValidationError> {
+    ) -> Result<Cow<'_, JWK>, ProofValidationError> {
         Ok(Cow::Borrowed(self))
     }
 }

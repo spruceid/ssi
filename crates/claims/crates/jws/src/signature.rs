@@ -20,7 +20,7 @@ pub trait JwsPayload {
         None
     }
 
-    fn payload_bytes(&self) -> Cow<[u8]>;
+    fn payload_bytes(&'_ self) -> Cow<'_, [u8]>;
 
     /// Signs the payload and returns a compact JWS.
     #[allow(async_fn_in_trait)]
@@ -38,7 +38,7 @@ impl<P: ?Sized + JwsPayload> JwsPayload for &P {
         P::cty(*self)
     }
 
-    fn payload_bytes(&self) -> Cow<[u8]> {
+    fn payload_bytes(&'_ self) -> Cow<'_, [u8]> {
         P::payload_bytes(*self)
     }
 
@@ -48,31 +48,31 @@ impl<P: ?Sized + JwsPayload> JwsPayload for &P {
 }
 
 impl JwsPayload for [u8] {
-    fn payload_bytes(&self) -> Cow<[u8]> {
+    fn payload_bytes(&'_ self) -> Cow<'_, [u8]> {
         Cow::Borrowed(self)
     }
 }
 
 impl JwsPayload for Vec<u8> {
-    fn payload_bytes(&self) -> Cow<[u8]> {
+    fn payload_bytes(&'_ self) -> Cow<'_, [u8]> {
         Cow::Borrowed(self)
     }
 }
 
 impl JwsPayload for str {
-    fn payload_bytes(&self) -> Cow<[u8]> {
+    fn payload_bytes(&'_ self) -> Cow<'_, [u8]> {
         Cow::Borrowed(self.as_bytes())
     }
 }
 
 impl JwsPayload for String {
-    fn payload_bytes(&self) -> Cow<[u8]> {
+    fn payload_bytes(&'_ self) -> Cow<'_, [u8]> {
         Cow::Borrowed(self.as_bytes())
     }
 }
 
 impl JwsPayload for serde_json::Value {
-    fn payload_bytes(&self) -> Cow<[u8]> {
+    fn payload_bytes(&'_ self) -> Cow<'_, [u8]> {
         Cow::Owned(serde_json::to_vec(self).unwrap())
     }
 }

@@ -35,7 +35,7 @@ macro_rules! crypto_suites {
 
             type ProofOptions = AnyProofOptions;
 
-            fn type_(&self) -> ssi_data_integrity_core::TypeRef {
+            fn type_(&'_ self) -> ssi_data_integrity_core::TypeRef<'_> {
                 match self {
                     $(
                         $(#[cfg($($t)*)])?

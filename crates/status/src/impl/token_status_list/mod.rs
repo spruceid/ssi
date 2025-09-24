@@ -250,7 +250,7 @@ impl StatusList {
         Self { bit_string, ttl }
     }
 
-    pub fn iter(&self) -> BitStringIter {
+    pub fn iter(&'_ self) -> BitStringIter<'_> {
         self.bit_string.iter()
     }
 }
@@ -484,7 +484,7 @@ impl BitString {
     }
 
     /// Returns an iterator over all the statuses stored in this bit-string.
-    pub fn iter(&self) -> BitStringIter {
+    pub fn iter(&'_ self) -> BitStringIter<'_> {
         BitStringIter {
             bit_string: self,
             index: 0,

@@ -138,7 +138,7 @@ impl TypedVerificationMethod for JsonWebKey2020 {
 }
 
 impl JwkVerificationMethod for JsonWebKey2020 {
-    fn to_jwk(&self) -> Cow<JWK> {
+    fn to_jwk(&'_ self) -> Cow<'_, JWK> {
         Cow::Borrowed(self.public_key_jwk())
     }
 }

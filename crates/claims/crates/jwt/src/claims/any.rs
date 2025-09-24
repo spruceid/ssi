@@ -26,7 +26,7 @@ impl AnyClaims {
         self.0.remove(key)
     }
 
-    pub fn iter(&self) -> std::collections::btree_map::Iter<String, serde_json::Value> {
+    pub fn iter(&'_ self) -> std::collections::btree_map::Iter<'_, String, serde_json::Value> {
         self.0.iter()
     }
 }
@@ -60,7 +60,7 @@ impl ClaimSet for AnyClaims {
         self.contains(C::JWT_CLAIM_NAME)
     }
 
-    fn try_get<C: Claim>(&self) -> Result<Option<Cow<C>>, InvalidClaimValue> {
+    fn try_get<C: Claim>(&'_ self) -> Result<Option<Cow<'_, C>>, InvalidClaimValue> {
         self.get(C::JWT_CLAIM_NAME)
             .cloned()
             .map(serde_json::from_value)

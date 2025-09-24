@@ -222,7 +222,7 @@ impl<
         ExtraProperties,
     >
 {
-    fn json_ld_context(&self) -> Option<Cow<ssi_json_ld::syntax::Context>> {
+    fn json_ld_context(&'_ self) -> Option<Cow<'_, ssi_json_ld::syntax::Context>> {
         Some(Cow::Borrowed(self.context.as_ref()))
     }
 }
@@ -252,7 +252,7 @@ impl<
         ExtraProperties,
     >
 {
-    fn json_ld_type(&self) -> JsonLdTypes {
+    fn json_ld_type(&'_ self) -> JsonLdTypes<'_> {
         self.types.to_json_ld_types()
     }
 }

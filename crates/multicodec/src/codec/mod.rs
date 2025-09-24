@@ -5,19 +5,19 @@ use crate::Error;
 pub trait Codec: Sized {
     const CODEC: u64;
 
-    fn to_bytes(&self) -> Cow<[u8]>;
+    fn to_bytes(&'_ self) -> Cow<'_, [u8]>;
 
     fn from_bytes(bytes: &[u8]) -> Result<Self, Error>;
 }
 
 pub trait MultiCodec: Sized {
-    fn to_codec_and_bytes(&self) -> (u64, Cow<[u8]>);
+    fn to_codec_and_bytes(&'_ self) -> (u64, Cow<'_, [u8]>);
 
     fn from_codec_and_bytes(codec: u64, bytes: &[u8]) -> Result<Self, Error>;
 }
 
 impl<C: Codec> MultiCodec for C {
-    fn to_codec_and_bytes(&self) -> (u64, Cow<[u8]>) {
+    fn to_codec_and_bytes(&'_ self) -> (u64, Cow<'_, [u8]>) {
         (Self::CODEC, self.to_bytes())
     }
 

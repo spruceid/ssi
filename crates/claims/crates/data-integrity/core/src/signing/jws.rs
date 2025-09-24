@@ -220,5 +220,5 @@ where
 }
 
 pub trait RecoverPublicJwk {
-    fn public_jwk(&self) -> Cow<JWK>;
+    fn public_jwk(&'_ self) -> Cow<'_, JWK>;
 }

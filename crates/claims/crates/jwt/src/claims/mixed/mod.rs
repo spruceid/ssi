@@ -50,7 +50,7 @@ impl<T: ClaimSet> ClaimSet for JWTClaims<T> {
         ClaimSet::contains::<C>(&self.registered) || self.private.contains::<C>()
     }
 
-    fn try_get<C: Claim>(&self) -> Result<Option<Cow<C>>, InvalidClaimValue> {
+    fn try_get<C: Claim>(&'_ self) -> Result<Option<Cow<'_, C>>, InvalidClaimValue> {
         match InfallibleClaimSet::get(&self.registered) {
             Some(claim) => Ok(Some(claim)),
             None => self.private.try_get(),
@@ -77,7 +77,7 @@ impl<T: Serialize> JwsPayload for JWTClaims<T> {
         Some("JWT")
     }
 
-    fn payload_bytes(&self) -> Cow<[u8]> {
+    fn payload_bytes(&'_ self) -> Cow<'_, [u8]> {
         Cow::Owned(serde_json::to_vec(self).unwrap())
     }
 }

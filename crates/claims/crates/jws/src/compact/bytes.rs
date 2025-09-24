@@ -155,7 +155,7 @@ impl JwsSlice {
     /// Decode the payload bytes.
     ///
     /// The header is necessary to know how the payload is encoded.
-    pub fn decode_payload(&self, header: &Header) -> Result<Cow<[u8]>, Base64DecodeError> {
+    pub fn decode_payload(&'_ self, header: &Header) -> Result<Cow<'_, [u8]>, Base64DecodeError> {
         if header.base64urlencode_payload.unwrap_or(true) {
             Ok(Cow::Owned(
                 base64::prelude::BASE64_URL_SAFE_NO_PAD.decode(self.payload())?,
@@ -177,7 +177,7 @@ impl JwsSlice {
     }
 
     /// Decodes the entire JWS.
-    pub fn decode(&self) -> Result<DecodedJws<Cow<[u8]>>, DecodeError> {
+    pub fn decode(&'_ self) -> Result<DecodedJws<'_, Cow<'_, [u8]>>, DecodeError> {
         let header = self.decode_header().map_err(DecodeError::Header)?;
         let payload = self.decode_payload(&header).map_err(DecodeError::Payload)?;
         let signature = self.decode_signature().map_err(DecodeError::Signature)?;

@@ -111,7 +111,7 @@ impl StandardCryptographicSuite for EthereumEip712Signature2021 {
 
     type ProofOptions = Options;
 
-    fn type_(&self) -> TypeRef {
+    fn type_(&'_ self) -> TypeRef<'_> {
         TypeRef::Other(Self::NAME)
     }
 }

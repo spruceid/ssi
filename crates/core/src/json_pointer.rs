@@ -131,7 +131,7 @@ impl JsonPointer {
         })
     }
 
-    pub fn iter(&self) -> JsonPointerIter {
+    pub fn iter(&'_ self) -> JsonPointerIter<'_> {
         let mut tokens = self.0.split('/');
         tokens.next();
         JsonPointerIter(tokens)
@@ -322,7 +322,7 @@ impl ReferenceToken {
         &self.0
     }
 
-    pub fn to_decoded(&self) -> Cow<str> {
+    pub fn to_decoded(&'_ self) -> Cow<'_, str> {
         if self.is_escaped() {
             Cow::Owned(self.decode())
         } else {

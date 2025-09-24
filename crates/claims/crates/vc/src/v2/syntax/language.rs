@@ -13,7 +13,7 @@ pub enum InternationalString {
 }
 
 impl data_model::AnyInternationalString for InternationalString {
-    fn default_value(&self) -> Option<data_model::LanguageValueRef> {
+    fn default_value(&'_ self) -> Option<data_model::LanguageValueRef<'_>> {
         match self {
             Self::String(s) => s.default_value(),
             Self::LanguageValue(v) => v.default_value(),
@@ -22,9 +22,9 @@ impl data_model::AnyInternationalString for InternationalString {
     }
 
     fn get_language(
-        &self,
+        &'_ self,
         lang: &ssi_json_ld::syntax::LangTag,
-    ) -> Option<data_model::LanguageValueRef> {
+    ) -> Option<data_model::LanguageValueRef<'_>> {
         match self {
             Self::String(_) => None,
             Self::LanguageValue(v) => {

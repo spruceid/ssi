@@ -35,7 +35,7 @@ pub enum AnySpecializedJsonCredential<S = json_syntax::Object, C = (), T = ()> {
 }
 
 impl<S, C, T> JsonLdObject for AnySpecializedJsonCredential<S, C, T> {
-    fn json_ld_context(&self) -> Option<Cow<ssi_json_ld::syntax::Context>> {
+    fn json_ld_context(&'_ self) -> Option<Cow<'_, ssi_json_ld::syntax::Context>> {
         match self {
             Self::V1(c) => c.json_ld_context(),
             Self::V2(c) => c.json_ld_context(),
@@ -44,7 +44,7 @@ impl<S, C, T> JsonLdObject for AnySpecializedJsonCredential<S, C, T> {
 }
 
 impl<S, C, T> JsonLdNodeObject for AnySpecializedJsonCredential<S, C, T> {
-    fn json_ld_type(&self) -> JsonLdTypes {
+    fn json_ld_type(&'_ self) -> JsonLdTypes<'_> {
         match self {
             Self::V1(c) => c.json_ld_type(),
             Self::V2(c) => c.json_ld_type(),

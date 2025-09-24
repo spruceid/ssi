@@ -23,7 +23,7 @@ impl<T: Serialize> JwsPayload for JoseVp<T> {
         Some("vp")
     }
 
-    fn payload_bytes(&self) -> Cow<[u8]> {
+    fn payload_bytes(&'_ self) -> Cow<'_, [u8]> {
         Cow::Owned(serde_json::to_vec(&self.0).unwrap())
     }
 }
@@ -52,7 +52,7 @@ impl<T: Serialize> JoseVp<T> {
 
 impl<T: DeserializeOwned> JoseVp<T> {
     /// Decode a JOSE VP.
-    pub fn decode(jws: &JwsSlice) -> Result<DecodedJws<Self>, JoseDecodeError> {
+    pub fn decode(jws: &'_ JwsSlice) -> Result<DecodedJws<'_, Self>, JoseDecodeError> {
         jws.decode()?
             .try_map(|payload| serde_json::from_slice(&payload).map(Self))
             .map_err(Into::into)
@@ -61,7 +61,7 @@ impl<T: DeserializeOwned> JoseVp<T> {
 
 impl JoseVp {
     /// Decode a JOSE VP with an arbitrary presentation type.
-    pub fn decode_any(jws: &JwsSlice) -> Result<DecodedJws<Self>, JoseDecodeError> {
+    pub fn decode_any(jws: &'_ JwsSlice) -> Result<DecodedJws<'_, Self>, JoseDecodeError> {
         Self::decode(jws)
     }
 }
@@ -84,7 +84,7 @@ impl<T: Presentation> Presentation for JoseVp<T> {
         self.0.additional_types()
     }
 
-    fn types(&self) -> PresentationTypes {
+    fn types(&'_ self) -> PresentationTypes<'_> {
         self.0.types()
     }
 

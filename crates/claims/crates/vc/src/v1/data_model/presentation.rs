@@ -20,7 +20,7 @@ pub trait Presentation {
         &[]
     }
 
-    fn types(&self) -> PresentationTypes {
+    fn types(&'_ self) -> PresentationTypes<'_> {
         PresentationTypes {
             base_type: true,
             additional_types: self.additional_types().iter(),

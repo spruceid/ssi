@@ -109,7 +109,7 @@ pub use sign1::*;
 ///       "application/json+cose".to_owned(),
 ///     ))
 ///   }
-///   
+///
 ///   fn content_type(&self) -> Option<ContentType> {
 ///     Some(ContentType::Text("application/json".to_owned()))
 ///   }
@@ -136,7 +136,7 @@ pub trait CosePayload {
     /// Payload bytes.
     ///
     /// Returns the payload bytes representing this value.
-    fn payload_bytes(&self) -> Cow<[u8]>;
+    fn payload_bytes(&'_ self) -> Cow<'_, [u8]>;
 
     /// Sign the payload to produce a serialized `COSE_Sign1` object.
     ///
@@ -153,7 +153,7 @@ pub trait CosePayload {
 }
 
 impl CosePayload for [u8] {
-    fn payload_bytes(&self) -> Cow<[u8]> {
+    fn payload_bytes(&'_ self) -> Cow<'_, [u8]> {
         Cow::Borrowed(self)
     }
 }

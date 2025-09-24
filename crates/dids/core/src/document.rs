@@ -115,7 +115,7 @@ impl Document {
     /// Select an object in the DID document.
     ///
     /// See: <https://w3c-ccg.github.io/did-resolution/#dereferencing-algorithm-secondary>
-    pub fn find_resource(&self, id: &DIDURL) -> Option<ResourceRef> {
+    pub fn find_resource(&'_ self, id: &DIDURL) -> Option<ResourceRef<'_>> {
         if self.id == *id {
             Some(ResourceRef::Document(self))
         } else {
@@ -130,7 +130,7 @@ impl Document {
     /// See: <https://w3c-ccg.github.io/did-resolution/#dereferencing-algorithm-secondary>
     pub fn into_resource(self, id: &DIDURL) -> Option<Resource> {
         if self.id == *id {
-            Some(Resource::Document(self))
+            Some(Resource::Document(Box::new(self)))
         } else {
             self.verification_method
                 .extract_resource(&self.id, id)
@@ -278,7 +278,7 @@ impl VerificationRelationships {
 }
 
 impl FindResource for VerificationRelationships {
-    fn find_resource(&self, base_did: &DID, id: &DIDURL) -> Option<ResourceRef> {
+    fn find_resource(&'_ self, base_did: &DID, id: &DIDURL) -> Option<ResourceRef<'_>> {
         self.authentication
             .find_resource(base_did, id)
             .or_else(|| self.assertion_method.find_resource(base_did, id))

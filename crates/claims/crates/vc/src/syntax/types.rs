@@ -52,7 +52,7 @@ impl<B, T> Types<B, T> {
 }
 
 impl<B: RequiredType, T> Types<B, T> {
-    pub fn to_json_ld_types(&self) -> JsonLdTypes {
+    pub fn to_json_ld_types(&'_ self) -> JsonLdTypes<'_> {
         JsonLdTypes::new(&[B::REQUIRED_TYPE], Cow::Borrowed(&self.0))
     }
 }

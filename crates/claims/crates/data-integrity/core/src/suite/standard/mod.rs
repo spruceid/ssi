@@ -53,7 +53,7 @@ pub trait StandardCryptographicSuite: Clone {
     type ProofOptions;
 
     /// Returns the cryptographic suite type.
-    fn type_(&self) -> TypeRef;
+    fn type_(&'_ self) -> TypeRef<'_>;
 
     #[allow(async_fn_in_trait)]
     async fn transform<T, C>(
@@ -112,7 +112,7 @@ impl<S: StandardCryptographicSuite> CryptographicSuite for S {
     type Signature = <S::SignatureAlgorithm as SignatureAndVerificationAlgorithm>::Signature;
 
     /// Returns the cryptographic suite type.
-    fn type_(&self) -> TypeRef {
+    fn type_(&'_ self) -> TypeRef<'_> {
         StandardCryptographicSuite::type_(self)
     }
 }

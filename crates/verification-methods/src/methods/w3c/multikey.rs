@@ -267,7 +267,7 @@ impl TypedVerificationMethod for Multikey {
 }
 
 impl MaybeJwkVerificationMethod for Multikey {
-    fn try_to_jwk(&self) -> Option<Cow<JWK>> {
+    fn try_to_jwk(&'_ self) -> Option<Cow<'_, JWK>> {
         self.public_key_jwk().map(Cow::Owned)
     }
 }
@@ -379,10 +379,10 @@ where
     V: IriVocabularyMut,
 {
     fn interpretation(
-        &self,
+        &'_ self,
         vocabulary: &mut V,
         interpretation: &mut I,
-    ) -> linked_data::ResourceInterpretation<I, V> {
+    ) -> linked_data::ResourceInterpretation<'_, I, V> {
         self.encoded.interpretation(vocabulary, interpretation)
     }
 }
@@ -497,7 +497,7 @@ impl MultiCodec for DecodedMultikey {
         }
     }
 
-    fn to_codec_and_bytes(&self) -> (u64, Cow<[u8]>) {
+    fn to_codec_and_bytes(&'_ self) -> (u64, Cow<'_, [u8]>) {
         match self {
             #[cfg(feature = "ed25519")]
             Self::Ed25519(k) => k.to_codec_and_bytes(),

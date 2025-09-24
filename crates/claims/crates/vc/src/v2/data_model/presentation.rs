@@ -23,7 +23,7 @@ pub trait Presentation: MaybeIdentified {
         &[]
     }
 
-    fn types(&self) -> PresentationTypes {
+    fn types(&'_ self) -> PresentationTypes<'_> {
         PresentationTypes::from_additional_types(self.additional_types())
     }
 

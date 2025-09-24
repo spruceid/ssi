@@ -9,7 +9,7 @@ impl Codec for k256::PublicKey {
         Self::from_sec1_bytes(bytes).map_err(|_| Error::InvalidData)
     }
 
-    fn to_bytes(&self) -> Cow<[u8]> {
+    fn to_bytes(&'_ self) -> Cow<'_, [u8]> {
         Cow::Owned(self.to_sec1_bytes().into_vec())
     }
 }

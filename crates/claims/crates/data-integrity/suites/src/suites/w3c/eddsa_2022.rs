@@ -39,7 +39,7 @@ impl StandardCryptographicSuite for EdDsa2022 {
 
     type ProofOptions = ();
 
-    fn type_(&self) -> TypeRef {
+    fn type_(&'_ self) -> TypeRef<'_> {
         TypeRef::DataIntegrityProof(CryptosuiteStr::new("eddsa-2022").unwrap())
     }
 }

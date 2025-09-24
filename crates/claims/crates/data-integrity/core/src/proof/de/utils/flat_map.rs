@@ -157,7 +157,7 @@ where
 
 /// Claims one key-value pair from a FlatMapDeserializer's field buffer if the
 /// field name matches any of the recognized ones.
-fn flat_map_take_entry<'de>(
+fn flat_map_take_entry(
     entry: &mut Option<(String, serde_json::Value)>,
     recognized: &[&str],
 ) -> Option<(String, serde_json::Value)> {
@@ -378,7 +378,7 @@ where
     }
 }
 
-fn content_unexpected<'a>(content: &'a serde_json::Value) -> de::Unexpected<'a> {
+fn content_unexpected(content: &serde_json::Value) -> de::Unexpected<'_> {
     match content {
         serde_json::Value::Null => de::Unexpected::Unit,
         serde_json::Value::Bool(b) => de::Unexpected::Bool(*b),

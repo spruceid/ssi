@@ -59,17 +59,17 @@ impl<T: UsesResource> UsesResource for Vec<T> {
 
 /// Find a resource definition.
 pub trait FindResource {
-    fn find_resource(&self, base_did: &DID, id: &DIDURL) -> Option<ResourceRef>;
+    fn find_resource(&'_ self, base_did: &DID, id: &DIDURL) -> Option<ResourceRef<'_>>;
 }
 
 impl<T: FindResource> FindResource for Option<T> {
-    fn find_resource(&self, base_did: &DID, id: &DIDURL) -> Option<ResourceRef> {
+    fn find_resource(&'_ self, base_did: &DID, id: &DIDURL) -> Option<ResourceRef<'_>> {
         self.as_ref().and_then(|t| t.find_resource(base_did, id))
     }
 }
 
 impl<T: FindResource> FindResource for Vec<T> {
-    fn find_resource(&self, base_did: &DID, id: &DIDURL) -> Option<ResourceRef> {
+    fn find_resource(&'_ self, base_did: &DID, id: &DIDURL) -> Option<ResourceRef<'_>> {
         self.iter().find_map(|t| t.find_resource(base_did, id))
     }
 }

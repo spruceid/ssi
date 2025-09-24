@@ -34,7 +34,7 @@ impl<M> ReferenceOrOwned<M> {
         }
     }
 
-    pub fn borrowed(&self) -> ReferenceOrOwnedRef<M> {
+    pub fn borrowed(&'_ self) -> ReferenceOrOwnedRef<'_, M> {
         match self {
             Self::Reference(r) => ReferenceOrOwnedRef::Reference(r.as_iri()),
             Self::Owned(m) => ReferenceOrOwnedRef::Owned(m),

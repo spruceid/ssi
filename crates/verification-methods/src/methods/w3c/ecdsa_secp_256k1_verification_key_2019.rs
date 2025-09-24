@@ -70,7 +70,7 @@ impl EcdsaSecp256k1VerificationKey2019 {
     pub const IRI: &'static Iri =
         iri!("https://w3id.org/security#EcdsaSecp256k1VerificationKey2019");
 
-    pub fn public_key_jwk(&self) -> Cow<JWK> {
+    pub fn public_key_jwk(&'_ self) -> Cow<'_, JWK> {
         self.public_key.to_jwk()
     }
 
@@ -152,7 +152,7 @@ impl TypedVerificationMethod for EcdsaSecp256k1VerificationKey2019 {
 }
 
 impl JwkVerificationMethod for EcdsaSecp256k1VerificationKey2019 {
-    fn to_jwk(&self) -> Cow<JWK> {
+    fn to_jwk(&'_ self) -> Cow<'_, JWK> {
         self.public_key_jwk()
     }
 }
@@ -223,7 +223,7 @@ pub enum PublicKey {
 }
 
 impl PublicKey {
-    pub fn to_jwk(&self) -> Cow<JWK> {
+    pub fn to_jwk(&'_ self) -> Cow<'_, JWK> {
         match self {
             Self::Jwk(jwk) => Cow::Borrowed(jwk),
             Self::Hex(hex) => Cow::Owned(hex.to_jwk()),
@@ -297,10 +297,10 @@ where
     String: linked_data::LinkedDataResource<I, V>,
 {
     fn interpretation(
-        &self,
+        &'_ self,
         vocabulary: &mut V,
         interpretation: &mut I,
-    ) -> linked_data::ResourceInterpretation<I, V> {
+    ) -> linked_data::ResourceInterpretation<'_, I, V> {
         self.encoded.interpretation(vocabulary, interpretation)
     }
 }

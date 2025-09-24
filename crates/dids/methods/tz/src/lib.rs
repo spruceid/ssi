@@ -544,7 +544,7 @@ impl DIDTz {
                                 .await
                                 .map_err(UpdateError::DereferenceFailed)?;
                             match deref.content {
-                                Content::Resource(Resource::Document(d)) => d,
+                                Content::Resource(Resource::Document(d)) => *d,
                                 _ => {
                                     // Dereferenced content not a DID document.
                                     return Err(UpdateError::NotADocument);

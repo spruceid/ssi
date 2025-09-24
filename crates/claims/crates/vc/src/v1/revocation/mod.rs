@@ -85,8 +85,8 @@ pub enum ListIterDecodeError {
 impl List {
     /// Get an array of indices in the revocation list for credentials that are revoked.
     pub fn iter_revoked_indexes(
-        &self,
-    ) -> Result<bitvec::slice::IterOnes<Lsb0, u8>, ListIterDecodeError> {
+        &'_ self,
+    ) -> Result<bitvec::slice::IterOnes<'_, Lsb0, u8>, ListIterDecodeError> {
         let bitstring = BitSlice::<Lsb0, u8>::from_slice(&self.0[..])?;
         if bitstring.len() < MIN_BITSTRING_LENGTH {
             return Err(ListIterDecodeError::ListTooSmall(
@@ -133,7 +133,7 @@ impl EncodedList {
     ///
     /// Given length must be a multiple of 8.
     pub fn new(bit_len: usize) -> Result<Self, NewEncodedListError> {
-        if bit_len % 8 != 0 {
+        if !bit_len.is_multiple_of(8) {
             return Err(NewEncodedListError::LengthMultiple8(bit_len));
         }
         let byte_len = bit_len / 8;

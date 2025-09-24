@@ -181,7 +181,7 @@ impl TypedVerificationMethod for EcdsaSecp256r1VerificationKey2019 {
 }
 
 impl JwkVerificationMethod for EcdsaSecp256r1VerificationKey2019 {
-    fn to_jwk(&self) -> Cow<JWK> {
+    fn to_jwk(&'_ self) -> Cow<'_, JWK> {
         Cow::Owned(self.public_key_jwk())
     }
 }
@@ -330,10 +330,10 @@ where
     MultibaseBuf: linked_data::LinkedDataResource<I, V>,
 {
     fn interpretation(
-        &self,
+        &'_ self,
         vocabulary: &mut V,
         interpretation: &mut I,
-    ) -> linked_data::ResourceInterpretation<I, V> {
+    ) -> linked_data::ResourceInterpretation<'_, I, V> {
         self.encoded.interpretation(vocabulary, interpretation)
     }
 }

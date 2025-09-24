@@ -58,7 +58,7 @@ pub trait Credential {
         &[]
     }
 
-    fn types(&self) -> CredentialTypes {
+    fn types(&'_ self) -> CredentialTypes<'_> {
         CredentialTypes::from_additional_types(self.additional_types())
     }
 

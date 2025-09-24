@@ -218,7 +218,7 @@ impl<S: CryptographicSuite> ProofConfiguration<S> {
         }
     }
 
-    pub fn borrowed(&self) -> ProofConfigurationRef<S> {
+    pub fn borrowed(&'_ self) -> ProofConfigurationRef<'_, S> {
         ProofConfigurationRef {
             context: self.context.as_ref(),
             type_: &self.type_,

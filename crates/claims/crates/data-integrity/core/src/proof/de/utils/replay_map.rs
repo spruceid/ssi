@@ -37,9 +37,7 @@ impl<'de, M: serde::de::MapAccess<'de>> serde::de::MapAccess<'de> for ReplayMap<
         V: serde::de::DeserializeSeed<'de>,
     {
         match self.past_value.take() {
-            Some(value) => seed
-                .deserialize(value)
-                .map_err(|e| serde::de::Error::custom(e)),
+            Some(value) => seed.deserialize(value).map_err(serde::de::Error::custom),
             None => self.future.next_value_seed(seed),
         }
     }
