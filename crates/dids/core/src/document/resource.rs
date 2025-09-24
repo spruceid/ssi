@@ -9,7 +9,7 @@ use super::DIDVerificationMethod;
 #[serde(untagged)]
 pub enum Resource {
     /// DID document.
-    Document(Document),
+    Document(Box<Document>),
 
     /// Verification method.
     VerificationMethod(DIDVerificationMethod),
