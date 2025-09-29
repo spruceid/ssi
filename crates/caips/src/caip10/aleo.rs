@@ -8,7 +8,7 @@ pub(crate) fn encode_aleo_address(jwk: &JWK, network_id: &str) -> Result<String,
         return Err("Unexpected Aleo network id");
     }
     let params = match jwk.params {
-        Params::OKP(ref params) if params.curve == ssi_jwk::aleo::OKP_CURVE => params,
+        Params::OKP(ref params) if params.curve == ssi_jwk::okp::aleo::OKP_CURVE => params,
         _ => return Err("Invalid public key type for Aleo"),
     };
 

@@ -1,6 +1,6 @@
 //! Error types for `ssi-jwk` crate
 #[cfg(feature = "aleo")]
-use crate::aleo::AleoGeneratePrivateKeyError;
+use crate::okp::aleo::AleoGeneratePrivateKeyError;
 use crate::JWK;
 use base64::DecodeError as Base64Error;
 #[cfg(feature = "ring")]

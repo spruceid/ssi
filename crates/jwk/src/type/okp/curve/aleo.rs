@@ -8,7 +8,7 @@
 //! using static parameters ([struct@COM_PARAMS], [struct@ENC_PARAMS], [struct@SIG_PARAMS])
 //! and a [JWK-based keypair representation](OKP_CURVE).
 
-use crate::{Base64urlUInt, OctetParams, Params, JWK};
+use crate::{Base64urlUInt, Error, OctetParams, Params, JWK};
 use thiserror::Error;
 
 use blake2::Blake2s;
@@ -157,6 +157,12 @@ lazy_static::lazy_static! {
 /// [struct@ENC_PARAMS].
 pub const OKP_CURVE: &str = "AleoTestnet1Key";
 
+impl JWK {
+    pub fn generate_aleo() -> Result<JWK, Error> {
+        generate_private_key_jwk().map_err(Error::AleoGeneratePrivateKey)
+    }
+}
+
 /// Generate an Aleo private key in [unofficial JWK format][OKP_CURVE]. **CPU-intensive (slow)**.
 ///
 /// Uses [struct@SIG_PARAMS], [struct@COM_PARAMS], and [struct@ENC_PARAMS].
@@ -287,9 +293,10 @@ mod tests {
 
     #[test]
     fn parse_private_key_jwk() {
-        let key: JWK =
-            serde_json::from_str(include_str!("../../../tests/aleotestnet1-2021-11-22.json"))
-                .unwrap();
+        let key: JWK = serde_json::from_str(include_str!(
+            "../../../../../../tests/aleotestnet1-2021-11-22.json"
+        ))
+        .unwrap();
         let private_key = aleo_jwk_to_private_key(&key).unwrap();
         let private_key_str = private_key.to_string();
         assert_eq!(
@@ -311,9 +318,10 @@ mod tests {
 
     #[test]
     fn aleo_jwk_sign_verify() {
-        let private_key: JWK =
-            serde_json::from_str(include_str!("../../../tests/aleotestnet1-2021-11-22.json"))
-                .unwrap();
+        let private_key: JWK = serde_json::from_str(include_str!(
+            "../../../../../../tests/aleotestnet1-2021-11-22.json"
+        ))
+        .unwrap();
 
         let public_key = private_key.to_public();
         let msg1 = b"asdf";
