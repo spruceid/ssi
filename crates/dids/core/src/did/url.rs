@@ -726,4 +726,46 @@ mod tests {
             assert!(DIDURL::new(input).is_err())
         }
     }
+
+    #[test]
+    fn test_did_url_path_query_fragment() {
+        // Test all combinations of path, query, and fragment presence.
+        for path_str in ["", "/path", "/path/subpath"] {
+            for query_str in [None, Some("query=value")] {
+                for fragment_str in [None, Some("fragment")] {
+                    let mut did_url_str = "did:example:123".to_string();
+                    if !path_str.is_empty() {
+                        did_url_str.push_str(path_str);
+                    }
+                    if let Some(query_str) = query_str {
+                        did_url_str.push_str("?");
+                        did_url_str.push_str(query_str);
+                    }
+                    if let Some(fragment_str) = fragment_str {
+                        did_url_str.push_str("#");
+                        did_url_str.push_str(fragment_str);
+                    }
+                    let did_url = DIDURL::new(&did_url_str).unwrap();
+                    assert_eq!(
+                        did_url.path().as_str(),
+                        path_str,
+                        "did_url str: {:?}",
+                        did_url_str
+                    );
+                    assert_eq!(
+                        did_url.query().map(|x| x.as_str()),
+                        query_str,
+                        "did_url str: {:?}",
+                        did_url_str
+                    );
+                    assert_eq!(
+                        did_url.fragment().map(|x| x.as_str()),
+                        fragment_str,
+                        "did_url str: {:?}",
+                        did_url_str
+                    );
+                }
+            }
+        }
+    }
 }
