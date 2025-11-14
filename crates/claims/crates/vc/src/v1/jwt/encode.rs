@@ -36,15 +36,15 @@ pub fn encode_jwt_vc_claims<T: Serialize>(
         .ok_or(JwtVcEncodeError::ExpectedJsonObject)?;
     let mut claims = RegisteredClaims::default();
 
-    if let Some(date_value) =
-        take_object_property(&mut credential, "credentialSubject", "expirationDate")
-    {
-        match date_value.into_string() {
-            Some(date_value) => {
-                let date_value: xsd_types::DateTime = date_value
+    if let Some(expiration_date_entry) = credential.remove("expirationDate").next() {
+        match expiration_date_entry.value.into_string() {
+            Some(expiration_date_value) => {
+                let expiration_date_value: xsd_types::DateTime = expiration_date_value
                     .parse()
                     .map_err(|_| JwtVcEncodeError::InvalidDateValue)?;
-                claims.set(ssi_jwt::ExpirationTime(date_value.earliest().try_into()?));
+                claims.set(ssi_jwt::ExpirationTime(
+                    expiration_date_value.earliest().try_into()?,
+                ));
             }
             None => return Err(JwtVcEncodeError::InvalidDateValue),
         }
