@@ -325,12 +325,6 @@ async fn pick_default_vm(
     Err(err)
 }
 
-/// Helper function to check if a context string contains v2 without serialization overhead
-fn has_v2_context_string(ctx_str: &str) -> bool {
-    // Check for both common v2 context URIs
-    ctx_str.contains("/ns/credentials/v2") || ctx_str.contains("/credentials/v2")
-}
-
 pub struct LinkedDataProofs;
 impl LinkedDataProofs {
     // https://w3c-ccg.github.io/ld-proofs/#proof-algorithm
@@ -350,22 +344,7 @@ impl LinkedDataProofs {
         }
         // Otherwise pick proof type based on key and options.
         else {
-            let mut suite = ProofSuiteType::pick(key, options.verification_method.as_ref())?;
-            
-            // IMPORTANT: Ed25519Signature2018 is incompatible with credentials v2 context.
-            // If the document uses v2 context and we picked Ed25519Signature2018,
-            // upgrade to Ed25519Signature2020 which supports both v1 and v2 contexts.
-            // Only check if we actually picked Ed25519Signature2018 to minimize overhead.
-            #[cfg(feature = "ed25519")]
-            if matches!(suite, ProofSuiteType::Ed25519Signature2018) {
-                if let Ok(Some(ctx_str)) = document.get_contexts() {
-                    if has_v2_context_string(&ctx_str) {
-                        suite = ProofSuiteType::Ed25519Signature2020;
-                    }
-                }
-            }
-            
-            suite
+            ProofSuiteType::pick(key, options.verification_method.as_ref())?
         };
         suite
             .sign(
@@ -398,22 +377,7 @@ impl LinkedDataProofs {
         }
         // Otherwise pick proof type based on key and options.
         else {
-            let mut suite = ProofSuiteType::pick(public_key, options.verification_method.as_ref())?;
-            
-            // IMPORTANT: Ed25519Signature2018 is incompatible with credentials v2 context.
-            // If the document uses v2 context and we picked Ed25519Signature2018,
-            // upgrade to Ed25519Signature2020 which supports both v1 and v2 contexts.
-            // Only check if we actually picked Ed25519Signature2018 to minimize overhead.
-            #[cfg(feature = "ed25519")]
-            if matches!(suite, ProofSuiteType::Ed25519Signature2018) {
-                if let Ok(Some(ctx_str)) = document.get_contexts() {
-                    if has_v2_context_string(&ctx_str) {
-                        suite = ProofSuiteType::Ed25519Signature2020;
-                    }
-                }
-            }
-            
-            suite
+            ProofSuiteType::pick(public_key, options.verification_method.as_ref())?
         };
         suite
             .prepare(
