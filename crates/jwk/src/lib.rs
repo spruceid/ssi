@@ -1027,9 +1027,12 @@ pub fn serialize_p256(params: &ECParams) -> Result<Vec<u8>, Error> {
     // TODO: check that curve is P-256
     use p256::elliptic_curve::{sec1::EncodedPoint, FieldBytes};
 
+    #[allow(deprecated)] // TODO upgrade `digest` crate when possible.
     let x = FieldBytes::<p256::NistP256>::from_slice(
         &params.x_coordinate.as_ref().ok_or(Error::MissingPoint)?.0,
     );
+
+    #[allow(deprecated)] // TODO upgrade `digest` crate when possible.
     let y = FieldBytes::<p256::NistP256>::from_slice(
         &params.y_coordinate.as_ref().ok_or(Error::MissingPoint)?.0,
     );
@@ -1043,9 +1046,11 @@ pub fn serialize_p256(params: &ECParams) -> Result<Vec<u8>, Error> {
 pub fn serialize_p384(params: &ECParams) -> Result<Vec<u8>, Error> {
     // TODO: check that curve is P-384
     use p384::elliptic_curve::{sec1::EncodedPoint, FieldBytes};
+    #[allow(deprecated)] // TODO upgrade `digest` crate when possible.
     let x = FieldBytes::<p384::NistP384>::from_slice(
         &params.x_coordinate.as_ref().ok_or(Error::MissingPoint)?.0,
     );
+    #[allow(deprecated)] // TODO upgrade `digest` crate when possible.
     let y = FieldBytes::<p384::NistP384>::from_slice(
         &params.y_coordinate.as_ref().ok_or(Error::MissingPoint)?.0,
     );

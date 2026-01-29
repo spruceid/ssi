@@ -1,3 +1,4 @@
+#![allow(deprecated)] // TODO upgrade `digest` crate when possible.
 use digest::{
     consts::{U32, U48},
     generic_array::{ArrayLength, GenericArray},

@@ -150,43 +150,43 @@ impl<T: ?Sized + JwsSigner> JwsSigner for &T {
 
 impl<T: JwsSigner> JwsSigner for Box<T> {
     async fn fetch_info(&self) -> Result<JwsSignerInfo, SignatureError> {
-        T::fetch_info(&*self).await
+        T::fetch_info(self).await
     }
 
     async fn sign_bytes(&self, signing_bytes: &[u8]) -> Result<Vec<u8>, SignatureError> {
-        T::sign_bytes(&*self, signing_bytes).await
+        T::sign_bytes(self, signing_bytes).await
     }
 
     async fn sign(&self, payload: impl JwsPayload) -> Result<JwsBuf, SignatureError> {
-        T::sign(&*self, payload).await
+        T::sign(self, payload).await
     }
 }
 
 impl<T: JwsSigner> JwsSigner for Rc<T> {
     async fn fetch_info(&self) -> Result<JwsSignerInfo, SignatureError> {
-        T::fetch_info(&*self).await
+        T::fetch_info(self).await
     }
 
     async fn sign_bytes(&self, signing_bytes: &[u8]) -> Result<Vec<u8>, SignatureError> {
-        T::sign_bytes(&*self, signing_bytes).await
+        T::sign_bytes(self, signing_bytes).await
     }
 
     async fn sign(&self, payload: impl JwsPayload) -> Result<JwsBuf, SignatureError> {
-        T::sign(&*self, payload).await
+        T::sign(self, payload).await
     }
 }
 
 impl<T: JwsSigner> JwsSigner for Arc<T> {
     async fn fetch_info(&self) -> Result<JwsSignerInfo, SignatureError> {
-        T::fetch_info(&*self).await
+        T::fetch_info(self).await
     }
 
     async fn sign_bytes(&self, signing_bytes: &[u8]) -> Result<Vec<u8>, SignatureError> {
-        T::sign_bytes(&*self, signing_bytes).await
+        T::sign_bytes(self, signing_bytes).await
     }
 
     async fn sign(&self, payload: impl JwsPayload) -> Result<JwsBuf, SignatureError> {
-        T::sign(&*self, payload).await
+        T::sign(self, payload).await
     }
 }
 

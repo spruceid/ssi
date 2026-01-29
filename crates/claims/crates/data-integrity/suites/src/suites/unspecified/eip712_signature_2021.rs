@@ -95,7 +95,7 @@ impl StandardCryptographicSuite for Eip712Signature2021 {
 
     type ProofOptions = ();
 
-    fn type_(&self) -> TypeRef {
+    fn type_(&self) -> TypeRef<'_> {
         TypeRef::Other(Self::NAME)
     }
 }

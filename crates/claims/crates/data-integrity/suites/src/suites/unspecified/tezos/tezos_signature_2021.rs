@@ -64,7 +64,7 @@ impl StandardCryptographicSuite for TezosSignature2021 {
 
     type ProofOptions = Options;
 
-    fn type_(&self) -> TypeRef {
+    fn type_(&self) -> TypeRef<'_> {
         TypeRef::Other(Self::NAME)
     }
 }
