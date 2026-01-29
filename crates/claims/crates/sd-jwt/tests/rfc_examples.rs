@@ -99,6 +99,7 @@ async fn rfc_a_1_example_2_verification() {
             ADDRESS_COUNTRY_DISCLOSURE,
             BIRTHDATE_DISCLOSURE,
         ],
+        kb: None,
     };
 
     let params = VerificationParameters::from_resolver(&*JWK);
@@ -380,6 +381,7 @@ async fn rfc_a_2_example_3_verification() {
             SALUTATION_DISCLOSURE,
             MSISDN_DISCLOSURE,
         ],
+        kb: None,
     }
     .decode_reveal_verify(&params)
     .await
