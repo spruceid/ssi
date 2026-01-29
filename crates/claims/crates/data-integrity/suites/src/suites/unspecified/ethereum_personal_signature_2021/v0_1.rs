@@ -31,7 +31,7 @@ impl StandardCryptographicSuite for EthereumPersonalSignature2021v0_1 {
 
     type ProofOptions = ();
 
-    fn type_(&self) -> TypeRef {
+    fn type_(&self) -> TypeRef<'_> {
         TypeRef::Other(Self::NAME)
     }
 }

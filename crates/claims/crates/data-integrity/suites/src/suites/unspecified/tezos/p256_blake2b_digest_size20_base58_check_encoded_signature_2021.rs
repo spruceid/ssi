@@ -36,7 +36,7 @@ impl StandardCryptographicSuite for P256BLAKE2BDigestSize20Base58CheckEncodedSig
 
     type ProofOptions = Options;
 
-    fn type_(&self) -> TypeRef {
+    fn type_(&self) -> TypeRef<'_> {
         TypeRef::Other(Self::NAME)
     }
 }

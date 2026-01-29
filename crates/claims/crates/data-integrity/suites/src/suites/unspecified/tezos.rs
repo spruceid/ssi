@@ -99,7 +99,7 @@ impl Options {
 }
 
 impl RecoverPublicJwk for Options {
-    fn public_jwk(&self) -> Cow<JWK> {
+    fn public_jwk(&self) -> Cow<'_, JWK> {
         Cow::Borrowed(&self.public_key_jwk)
     }
 }

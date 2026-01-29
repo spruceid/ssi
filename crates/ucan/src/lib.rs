@@ -44,17 +44,12 @@ pub struct Ucan<F = JsonValue, A = JsonValue> {
     codec: UcanCodec,
 }
 
-#[derive(Clone, PartialEq, Debug)]
+#[derive(Default, Clone, PartialEq, Debug)]
 enum UcanCodec {
     // maintain serialization
     Raw(String),
+    #[default]
     DagJson,
-}
-
-impl Default for UcanCodec {
-    fn default() -> Self {
-        Self::DagJson
-    }
 }
 
 impl<F, A> Ucan<F, A> {

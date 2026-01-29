@@ -32,13 +32,13 @@ pub struct JsonCredential {
 }
 
 impl JsonLdObject for JsonCredential {
-    fn json_ld_context(&self) -> Option<Cow<ssi_json_ld::syntax::Context>> {
+    fn json_ld_context(&self) -> Option<Cow<'_, ssi_json_ld::syntax::Context>> {
         Some(Cow::Borrowed(&self.context))
     }
 }
 
 impl JsonLdNodeObject for JsonCredential {
-    fn json_ld_type(&self) -> JsonLdTypes {
+    fn json_ld_type(&self) -> JsonLdTypes<'_> {
         JsonLdTypes::new(&[], Cow::Borrowed(&self.types))
     }
 }

@@ -208,7 +208,7 @@ impl<'a> PartialEq<&'a Jws> for String {
 /// don't know if it is URL-safe.
 /// Use [`JwsVec`](crate::JwsVec) if you don't have any expectations about the
 /// encoding.
-#[derive(Clone, serde::Serialize)]
+#[derive(Clone, PartialEq, Eq, PartialOrd, Ord, Hash, serde::Serialize)]
 #[serde(transparent)]
 pub struct JwsBuf(String);
 

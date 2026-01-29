@@ -1,6 +1,6 @@
 use ssi_claims_core::SignatureError;
 use ssi_jwk::{Algorithm, JWK};
-use std::borrow::Cow;
+use std::{borrow::Cow, rc::Rc, sync::Arc};
 
 use crate::{DecodedJws, DecodedSigningBytes, Header, JwsBuf, JwsSignature};
 
@@ -134,7 +134,7 @@ pub trait JwsSigner {
     }
 }
 
-impl<T: JwsSigner> JwsSigner for &T {
+impl<T: ?Sized + JwsSigner> JwsSigner for &T {
     async fn fetch_info(&self) -> Result<JwsSignerInfo, SignatureError> {
         T::fetch_info(*self).await
     }
@@ -145,6 +145,48 @@ impl<T: JwsSigner> JwsSigner for &T {
 
     async fn sign(&self, payload: impl JwsPayload) -> Result<JwsBuf, SignatureError> {
         T::sign(*self, payload).await
+    }
+}
+
+impl<T: JwsSigner> JwsSigner for Box<T> {
+    async fn fetch_info(&self) -> Result<JwsSignerInfo, SignatureError> {
+        T::fetch_info(self).await
+    }
+
+    async fn sign_bytes(&self, signing_bytes: &[u8]) -> Result<Vec<u8>, SignatureError> {
+        T::sign_bytes(self, signing_bytes).await
+    }
+
+    async fn sign(&self, payload: impl JwsPayload) -> Result<JwsBuf, SignatureError> {
+        T::sign(self, payload).await
+    }
+}
+
+impl<T: JwsSigner> JwsSigner for Rc<T> {
+    async fn fetch_info(&self) -> Result<JwsSignerInfo, SignatureError> {
+        T::fetch_info(self).await
+    }
+
+    async fn sign_bytes(&self, signing_bytes: &[u8]) -> Result<Vec<u8>, SignatureError> {
+        T::sign_bytes(self, signing_bytes).await
+    }
+
+    async fn sign(&self, payload: impl JwsPayload) -> Result<JwsBuf, SignatureError> {
+        T::sign(self, payload).await
+    }
+}
+
+impl<T: JwsSigner> JwsSigner for Arc<T> {
+    async fn fetch_info(&self) -> Result<JwsSignerInfo, SignatureError> {
+        T::fetch_info(self).await
+    }
+
+    async fn sign_bytes(&self, signing_bytes: &[u8]) -> Result<Vec<u8>, SignatureError> {
+        T::sign_bytes(self, signing_bytes).await
+    }
+
+    async fn sign(&self, payload: impl JwsPayload) -> Result<JwsBuf, SignatureError> {
+        T::sign(self, payload).await
     }
 }
 

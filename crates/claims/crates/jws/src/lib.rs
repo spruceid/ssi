@@ -948,6 +948,7 @@ pub fn recover(algorithm: Algorithm, data: &[u8], signature: &[u8]) -> Result<JW
             let rec_id =
                 k256::ecdsa::RecoveryId::try_from(signature[64]).map_err(ssi_jwk::Error::from)?;
             let hash = ssi_crypto::hashes::sha256::sha256(data);
+            #[allow(deprecated)] // TODO upgrade `digest` crate when possible.
             let digest = k256::elliptic_curve::FieldBytes::<k256::Secp256k1>::from_slice(&hash);
             let recovered_key = VerifyingKey::recover_from_prehash(digest, &sig, rec_id)
                 .map_err(ssi_jwk::Error::from)?;

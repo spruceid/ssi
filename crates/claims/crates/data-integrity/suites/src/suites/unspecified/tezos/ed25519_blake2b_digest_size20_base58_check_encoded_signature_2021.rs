@@ -36,7 +36,7 @@ impl StandardCryptographicSuite for Ed25519BLAKE2BDigestSize20Base58CheckEncoded
 
     type ProofOptions = Options;
 
-    fn type_(&self) -> TypeRef {
+    fn type_(&self) -> TypeRef<'_> {
         TypeRef::Other(Self::NAME)
     }
 }

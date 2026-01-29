@@ -39,13 +39,13 @@ pub struct Credential {
 }
 
 impl ssi_json_ld::JsonLdObject for Credential {
-    fn json_ld_context(&self) -> Option<Cow<ssi_json_ld::syntax::Context>> {
+    fn json_ld_context(&self) -> Option<Cow<'_, ssi_json_ld::syntax::Context>> {
         Some(Cow::Borrowed(self.context.as_ref()))
     }
 }
 
 impl ssi_json_ld::JsonLdNodeObject for Credential {
-    fn json_ld_type(&self) -> ssi_json_ld::JsonLdTypes {
+    fn json_ld_type(&self) -> ssi_json_ld::JsonLdTypes<'_> {
         self.type_.to_json_ld_types()
     }
 }
@@ -278,7 +278,7 @@ impl VerificationMethodResolver for Keyring {
         _issuer: Option<&Iri>,
         method: Option<ReferenceOrOwnedRef<'_, Ed25519VerificationKey2020>>,
         _options: ssi_verification_methods::ResolutionOptions,
-    ) -> Result<Cow<Ed25519VerificationKey2020>, VerificationMethodResolutionError> {
+    ) -> Result<Cow<'_, Ed25519VerificationKey2020>, VerificationMethodResolutionError> {
         match method {
             Some(ReferenceOrOwnedRef::Owned(_key)) => {
                 // If we get here, this means the VC embeds the public key used

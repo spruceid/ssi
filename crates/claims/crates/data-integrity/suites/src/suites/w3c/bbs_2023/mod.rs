@@ -87,7 +87,7 @@ impl StandardCryptographicSuite for Bbs2023 {
 
     type SignatureAlgorithm = Bbs2023SignatureAlgorithm;
 
-    fn type_(&self) -> TypeRef {
+    fn type_(&self) -> TypeRef<'_> {
         TypeRef::DataIntegrityProof(CryptosuiteStr::new("bbs-2023").unwrap())
     }
 }

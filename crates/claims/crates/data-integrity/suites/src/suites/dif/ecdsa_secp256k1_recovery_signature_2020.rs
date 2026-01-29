@@ -36,7 +36,7 @@ impl StandardCryptographicSuite for EcdsaSecp256k1RecoverySignature2020 {
 
     type ProofOptions = ();
 
-    fn type_(&self) -> TypeRef {
+    fn type_(&self) -> TypeRef<'_> {
         TypeRef::Other(Self::NAME)
     }
 }

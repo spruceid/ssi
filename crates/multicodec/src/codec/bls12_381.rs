@@ -11,7 +11,7 @@ impl Codec for BBSplusPublicKey {
         BBSplusPublicKey::from_bytes(bytes).map_err(|_| Error::InvalidData)
     }
 
-    fn to_bytes(&self) -> std::borrow::Cow<[u8]> {
+    fn to_bytes(&self) -> std::borrow::Cow<'_, [u8]> {
         Cow::Owned(self.to_bytes().to_vec())
     }
 }
