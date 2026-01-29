@@ -143,6 +143,10 @@ impl JWTClaimsBuilder {
             })
         }
     }
+
+    pub fn build(self) -> Result<JWTClaims, InvalidJWTClaims> {
+        self.with_private_claims(AnyClaims::default())
+    }
 }
 
 #[derive(Debug, thiserror::Error)]

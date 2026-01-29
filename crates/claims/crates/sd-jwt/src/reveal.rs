@@ -56,12 +56,14 @@ impl<'a> DecodedSdJwt<'a> {
     /// Reveal the SD-JWT.
     pub fn reveal<T: DeserializeOwned>(self) -> Result<RevealedSdJwt<'a, T>, RevealError> {
         let mut pointers = Vec::with_capacity(self.disclosures.len());
+        let sd_alg = self.jwt.signing_bytes.payload.sd_alg;
         let jwt = self
             .jwt
             .try_map(|payload| payload.reveal(&self.disclosures, &mut pointers))?;
 
         Ok(RevealedSdJwt {
             jwt,
+            sd_alg,
             disclosures: pointers.into_iter().zip(self.disclosures).collect(),
         })
     }
@@ -115,7 +117,7 @@ impl<'a> InProgressDisclosure<'a> {
     fn new(disclosure: &'a DecodedDisclosure<'a>, sd_alg: SdAlg) -> Self {
         InProgressDisclosure {
             disclosure,
-            hash: sd_alg.hash(&disclosure.encoded),
+            hash: sd_alg.hash(&*disclosure.encoded),
             pointer: None,
         }
     }

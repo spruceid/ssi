@@ -5,7 +5,7 @@ use serde::{Deserialize, Serialize};
 use sha2::Digest;
 use ssi_jwt::Claim;
 
-use crate::{disclosure::Disclosure, DecodeError, SD_ALG_CLAIM_NAME};
+use crate::{DecodeError, SD_ALG_CLAIM_NAME};
 
 /// Elements of the _sd_alg claim
 #[non_exhaustive]
@@ -25,12 +25,26 @@ impl SdAlg {
         }
     }
 
-    /// Hash the given disclosure.
-    pub fn hash(&self, disclosure: &Disclosure) -> String {
+    /// Hash the given bytes.
+    pub fn hash(&self, bytes: impl AsRef<[u8]>) -> String {
         match self {
             Self::Sha256 => {
-                let digest = sha2::Sha256::digest(disclosure.as_bytes());
+                let digest = sha2::Sha256::digest(bytes.as_ref());
                 BASE64_URL_SAFE_NO_PAD.encode(digest)
+            }
+        }
+    }
+
+    /// Verifies the given hash.
+    #[allow(deprecated)] // TODO bump the `digest` crate whenever possible.
+    pub fn verify(&self, bytes: impl AsRef<[u8]>, hash: &str) -> bool {
+        match self {
+            Self::Sha256 => {
+                let Ok(rdigest) = BASE64_URL_SAFE_NO_PAD.decode(hash) else {
+                    return false;
+                };
+                let digest = sha2::Sha256::digest(bytes.as_ref());
+                digest.as_slice() == rdigest
             }
         }
     }
@@ -88,6 +102,8 @@ impl<'de> Deserialize<'de> for SdAlg {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    use crate::Disclosure;
 
     #[test]
     fn test_disclosure_hashing() {

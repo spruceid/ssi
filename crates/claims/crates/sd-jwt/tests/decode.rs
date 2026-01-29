@@ -117,7 +117,7 @@ const NATIONALITY_DE_DISCLOSURE: &Disclosure =
 async fn disclose_single() {
     let jwt = test_standard_sd_jwt().await;
 
-    let sd_jwt = PartsRef::new(&jwt, vec![EMAIL_DISCLOSURE]);
+    let sd_jwt = PartsRef::new(&jwt, vec![EMAIL_DISCLOSURE], None);
 
     let disclosed = sd_jwt.decode().unwrap().reveal::<ExampleClaims>().unwrap();
 
@@ -149,7 +149,7 @@ async fn disclose_single() {
 async fn decode_single_array_item() {
     let jwt = test_standard_sd_jwt().await;
 
-    let sd_jwt = PartsRef::new(&jwt, vec![NATIONALITY_DE_DISCLOSURE]);
+    let sd_jwt = PartsRef::new(&jwt, vec![NATIONALITY_DE_DISCLOSURE], None);
 
     let disclosed = sd_jwt.decode().unwrap().reveal::<ExampleClaims>().unwrap();
 

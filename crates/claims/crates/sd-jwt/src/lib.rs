@@ -29,17 +29,6 @@
 //! revealing the claims, a [`SdJwt::decode_reveal_verify`] function is provided
 //! to decode, reveal and verify the claims directly.
 #![warn(missing_docs)]
-use rand::{CryptoRng, RngCore};
-use serde::{de::DeserializeOwned, Deserialize, Serialize};
-use serde_json::Value;
-use ssi_claims_core::{
-    DateTimeProvider, ProofValidationError, ResolverProvider, SignatureError, ValidateClaims,
-    Verification,
-};
-use ssi_core::BytesBuf;
-use ssi_jwk::JWKResolver;
-use ssi_jws::{DecodedJws, Jws, JwsPayload, JwsSignature, JwsSigner, ValidateJwsHeader};
-use ssi_jwt::{AnyClaims, ClaimSet, DecodedJwt, JWTClaims};
 use std::{
     borrow::{Borrow, Cow},
     collections::BTreeMap,
@@ -48,25 +37,34 @@ use std::{
     str::FromStr,
 };
 
+use rand::{CryptoRng, RngCore};
+use serde::{de::DeserializeOwned, Deserialize, Serialize};
+use serde_json::Value;
+use ssi_claims_core::{
+    DateTimeProvider, ProofValidationError, ResolverProvider, SignatureError, ValidateClaims,
+    Verification,
+};
+use ssi_core::BytesBuf;
 pub use ssi_core::{json_pointer, JsonPointer, JsonPointerBuf};
-
-pub(crate) mod utils;
-use utils::is_url_safe_base64_char;
-
-mod digest;
-pub use digest::*;
-
-mod decode;
-pub use decode::*;
-
-mod disclosure;
-pub use disclosure::*;
+use ssi_jwk::JWKResolver;
+use ssi_jws::{DecodedJws, Jws, JwsPayload, JwsSignature, JwsSigner, ValidateJwsHeader};
+use ssi_jwt::{AnyClaims, ClaimSet, DecodedJwt, JWTClaims};
 
 mod conceal;
-pub use conceal::*;
-
+mod decode;
+mod digest;
+mod disclosure;
+mod kb;
 mod reveal;
+pub(crate) mod utils;
+
+pub use conceal::*;
+pub use decode::*;
+pub use digest::*;
+pub use disclosure::*;
+pub use kb::*;
 pub use reveal::*;
+use utils::is_url_safe_base64_char;
 
 const SD_CLAIM_NAME: &str = "_sd";
 const SD_ALG_CLAIM_NAME: &str = "_sd_alg";
@@ -96,7 +94,7 @@ macro_rules! sd_jwt {
     };
 }
 
-/// SD-JWT in compact form.
+/// SD-JWT, with an optional KB-JWT.
 ///
 /// # Grammar
 ///
@@ -136,37 +134,45 @@ impl SdJwt {
         }
     }
 
-    /// Checks that the given input is a SD-JWT.
+    /// Checks that the given input is a SD-JWT, with an optional KB-JWT.
     pub const fn validate(bytes: &[u8]) -> bool {
-        let mut i = 0;
+        let mut d_start = 0;
 
-        // Find the first `~`.
+        // Find the first `~` (start of disclosures).
         loop {
-            if i >= bytes.len() {
+            if d_start >= bytes.len() {
                 return false;
             }
 
-            if bytes[i] == b'~' {
+            if bytes[d_start] == b'~' {
                 break;
             }
 
-            i += 1
+            d_start += 1
         }
 
-        // Validate the JWS.
-        if !Jws::validate_range(bytes, 0, i) {
+        // Validate the JWT.
+        if !Jws::validate_range(bytes, 0, d_start) {
+            return false;
+        }
+
+        // Find the last `~` (end of disclosures).
+        let mut d_end = bytes.len() - 1;
+        while bytes[d_end] != b'~' {
+            d_end -= 1
+        }
+
+        // Validate the KB-JWT.
+        let kb_start = d_end + 1;
+        if kb_start != bytes.len() && !Jws::validate_range(bytes, kb_start, bytes.len()) {
             return false;
         }
 
         // Parse disclosures.
-        loop {
+        let mut i = d_start;
+        while i < d_end {
             // Skip the `~`
             i += 1;
-
-            // No more disclosures.
-            if i >= bytes.len() {
-                break true;
-            }
 
             loop {
                 if i >= bytes.len() {
@@ -187,6 +193,8 @@ impl SdJwt {
                 i += 1
             }
         }
+
+        true
     }
 
     /// Creates a new SD-JWT from the given `input` without validation.
@@ -212,8 +220,31 @@ impl SdJwt {
     }
 
     /// Returns the byte-position just after the issuer-signed JWT.
+    ///
+    /// This corresponds to the first `~` character.
     fn jwt_end(&self) -> usize {
         self.0.iter().copied().position(|c| c == b'~').unwrap()
+    }
+
+    /// Returns the byte-position ending the disclosure list.
+    ///
+    /// This corresponds to the last `~` character.
+    fn disclosures_end(&self) -> usize {
+        let mut i = self.0.len() - 1;
+        while self.0[i] != b'~' {
+            i -= 1;
+        }
+        i
+    }
+
+    /// Returns the byte-position of the start of the KB-JWT, if any.
+    fn kb_start(&self) -> Option<usize> {
+        let i = self.disclosures_end() + 1;
+        if i < self.0.len() {
+            Some(i)
+        } else {
+            None
+        }
     }
 
     /// Returns the issuer-signed JWT.
@@ -229,8 +260,37 @@ impl SdJwt {
     pub fn disclosures(&'_ self) -> Disclosures<'_> {
         Disclosures {
             bytes: &self.0,
-            offset: self.jwt_end() + 1,
+            offset: self.jwt_end(),
+            end: self.disclosures_end(),
         }
+    }
+
+    /// Checks whether or not this SD-JWT has an associated KB-JWT.
+    pub fn has_kb(&self) -> bool {
+        self.kb_start().is_some()
+    }
+
+    /// Returns the KB-JWT, if any.
+    pub fn kb(&self) -> Option<&Jws> {
+        self.kb_start()
+            .map(|i| unsafe { Jws::new_unchecked(&self.0[i..]) })
+    }
+
+    /// Decodes the KB-JWT, if any.
+    pub fn decode_kb(&self) -> Result<Option<DecodedJws<'_, KbJwtPayload>>, DecodeError> {
+        match self.kb() {
+            Some(kb_jwt) => Ok(Some(
+                kb_jwt
+                    .decode()?
+                    .try_map(|data| serde_json::from_slice(&data))?,
+            )),
+            None => Ok(None),
+        }
+    }
+
+    /// Returns this SD-JWT, without the eventual KB-JWT.
+    pub fn trim_kb(&self) -> &Self {
+        unsafe { Self::new_unchecked(&self.0[..self.kb_start().unwrap_or(self.0.len())]) }
     }
 
     /// Returns references to each part of this SD-JWT.
@@ -238,6 +298,7 @@ impl SdJwt {
         PartsRef {
             jwt: self.jwt(),
             disclosures: self.disclosures().collect(),
+            kb: self.kb(),
         }
     }
 
@@ -414,6 +475,21 @@ impl SdJwtBuf {
             String::from_utf8_unchecked(self.0)
         }
     }
+
+    /// Removes any eventual KB-JWT.
+    pub fn remove_kb(&mut self) {
+        if let Some(i) = self.kb_start() {
+            self.0.truncate(i);
+        }
+    }
+
+    /// Sets the KB-JWT part of this SD-JWT.
+    ///
+    /// This will replace any eventual KB-JWT.
+    pub fn set_kb(&mut self, jwt: &Jws) {
+        self.remove_kb();
+        self.0.extend_from_slice(jwt.as_bytes());
+    }
 }
 
 impl Deref for SdJwtBuf {
@@ -493,32 +569,36 @@ pub struct Disclosures<'a> {
     /// SD-JWT bytes.
     bytes: &'a [u8],
 
-    /// Offset of the beginning of the next disclosure (if any).
+    /// Offset of the beginning of the next disclosure (if any), including the
+    /// starting `~`.
     offset: usize,
+
+    /// Offset of the end of the disclosure list.
+    end: usize,
 }
 
 impl<'a> Iterator for Disclosures<'a> {
     type Item = &'a Disclosure;
 
     fn next(&mut self) -> Option<Self::Item> {
-        let mut i = self.offset;
+        if self.offset < self.end {
+            self.offset += 1;
+            let start = self.offset;
 
-        while i < self.bytes.len() {
-            if self.bytes[i] == b'~' {
-                let disclosure = unsafe {
-                    // SAFETY: we already validated the SD-JWT and know
-                    // it is composed of valid disclosures.
-                    Disclosure::new_unchecked(&self.bytes[self.offset..i])
-                };
-
-                self.offset = i + 1;
-                return Some(disclosure);
+            while self.bytes[self.offset] != b'~' {
+                self.offset += 1;
             }
 
-            i += 1
-        }
+            let disclosure = unsafe {
+                // SAFETY: we already validated the SD-JWT and know
+                // it is composed of valid disclosures.
+                Disclosure::new_unchecked(&self.bytes[start..self.offset])
+            };
 
-        None
+            Some(disclosure)
+        } else {
+            None
+        }
     }
 }
 
@@ -531,12 +611,19 @@ pub struct PartsRef<'a> {
 
     /// Disclosures for associated JWT
     pub disclosures: Vec<&'a Disclosure>,
+
+    /// Optional KB-JWT.
+    pub kb: Option<&'a Jws>,
 }
 
 impl<'a> PartsRef<'a> {
     /// Creates a new `PartsRef`.
-    pub fn new(jwt: &'a Jws, disclosures: Vec<&'a Disclosure>) -> Self {
-        Self { jwt, disclosures }
+    pub fn new(jwt: &'a Jws, disclosures: Vec<&'a Disclosure>, kb: Option<&'a Jws>) -> Self {
+        Self {
+            jwt,
+            disclosures,
+            kb,
+        }
     }
 
     /// Decodes and reveals the SD-JWT.
@@ -770,6 +857,9 @@ pub struct RevealedSdJwt<'a, T = AnyClaims> {
     /// decoded payload is revealed.
     pub jwt: DecodedJwt<'a, T>,
 
+    /// Hashing algorithm.
+    pub sd_alg: SdAlg,
+
     /// Disclosures bound to their JSON pointers.
     pub disclosures: BTreeMap<JsonPointerBuf, DecodedDisclosure<'a>>,
 }
@@ -944,7 +1034,8 @@ mod tests {
                 vec![
                     Disclosure::new(DISCLOSURE_0).unwrap(),
                     Disclosure::new(DISCLOSURE_1).unwrap()
-                ]
+                ],
+                None
             )
         )
     }
@@ -962,7 +1053,8 @@ mod tests {
                 vec![
                     Disclosure::new(DISCLOSURE_0).unwrap(),
                     Disclosure::new(DISCLOSURE_1).unwrap()
-                ]
+                ],
+                None
             )
             .to_string(),
             ENCODED,

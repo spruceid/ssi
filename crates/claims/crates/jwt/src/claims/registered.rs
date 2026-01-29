@@ -1,6 +1,7 @@
 use super::{Claim, InvalidClaimValue, JWTClaims};
 use crate::{CastClaim, ClaimSet, InfallibleClaimSet, NumericDate, StringOrURI};
-use ssi_claims_core::{ClaimsValidity, DateTimeProvider, ValidateClaims};
+use chrono::{DateTime, Utc};
+use ssi_claims_core::{ClaimsValidity, DateTimeProvider, InvalidClaims, ValidateClaims};
 use ssi_core::OneOrMany;
 use ssi_jws::JwsPayload;
 use std::{borrow::Cow, collections::BTreeMap};
@@ -408,4 +409,74 @@ registered_claims! {
     "vc": VerifiableCredential(json_syntax::Value),
 
     "vp": VerifiablePresentation(json_syntax::Value)
+}
+
+pub enum JwtClaimValidationFailed {
+    Premature {
+        now: DateTime<Utc>,
+        valid_from: DateTime<Utc>,
+    },
+    Expired {
+        now: DateTime<Utc>,
+        valid_until: DateTime<Utc>,
+    },
+}
+
+impl From<JwtClaimValidationFailed> for InvalidClaims {
+    fn from(value: JwtClaimValidationFailed) -> Self {
+        match value {
+            JwtClaimValidationFailed::Premature { now, valid_from } => {
+                Self::Premature { now, valid_from }
+            }
+            JwtClaimValidationFailed::Expired { now, valid_until } => {
+                Self::Expired { now, valid_until }
+            }
+        }
+    }
+}
+
+impl ExpirationTime {
+    pub fn verify(&self, now: DateTime<Utc>) -> Result<(), JwtClaimValidationFailed> {
+        let exp: DateTime<Utc> = self.0.into();
+        if exp > now {
+            Ok(())
+        } else {
+            Err(JwtClaimValidationFailed::Expired {
+                now,
+                valid_until: exp,
+            })
+        }
+    }
+}
+
+impl NotBefore {
+    pub fn verify(&self, now: DateTime<Utc>) -> Result<(), JwtClaimValidationFailed> {
+        let nbf: DateTime<Utc> = self.0.into();
+        if nbf <= now {
+            Ok(())
+        } else {
+            Err(JwtClaimValidationFailed::Premature {
+                now,
+                valid_from: nbf,
+            })
+        }
+    }
+}
+
+impl IssuedAt {
+    pub fn now() -> Self {
+        Self(Utc::now().try_into().unwrap())
+    }
+
+    pub fn verify(&self, now: DateTime<Utc>) -> Result<(), JwtClaimValidationFailed> {
+        let iat: DateTime<Utc> = self.0.into();
+        if iat <= now {
+            Ok(())
+        } else {
+            Err(JwtClaimValidationFailed::Premature {
+                now,
+                valid_from: iat,
+            })
+        }
+    }
 }
