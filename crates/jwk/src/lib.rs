@@ -17,6 +17,9 @@ pub use algorithm::Algorithm;
 mod resolver;
 pub use resolver::*;
 
+mod set;
+pub use set::*;
+
 #[cfg(feature = "ripemd-160")]
 pub mod ripemd160;
 
