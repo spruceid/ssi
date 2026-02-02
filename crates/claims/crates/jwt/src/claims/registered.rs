@@ -376,6 +376,7 @@ registered_claims! {
     /// processing. The processing of the `exp` claim requires that the current
     /// date/time MUST be before the expiration date/time listed in the `exp`
     /// claim.
+    #[derive(Copy)]
     "exp": ExpirationTime(NumericDate),
 
     /// Not Before (`nbf`) claim.
@@ -385,12 +386,14 @@ registered_claims! {
     /// be after or equal to the not-before date/time listed in the "nbf" claim.
     /// Implementers MAY provide for some small leeway, usually no more than a
     /// few minutes, to account for clock skew.
+    #[derive(Copy)]
     "nbf": NotBefore(NumericDate),
 
     /// Issued At (`iat`) claim.
     ///
     /// Time at which the JWT was issued. This claim can be used to determine
     /// the age of the JWT.
+    #[derive(Copy)]
     "iat": IssuedAt(NumericDate),
 
     /// JWT ID (`jti`) claim.
@@ -465,7 +468,7 @@ impl NotBefore {
 
 impl IssuedAt {
     pub fn now() -> Self {
-        Self(Utc::now().try_into().unwrap())
+        Self(Utc::now().into())
     }
 
     pub fn verify(&self, now: DateTime<Utc>) -> Result<(), JwtClaimValidationFailed> {

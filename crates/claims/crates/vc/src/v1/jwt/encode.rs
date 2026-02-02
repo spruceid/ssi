@@ -44,7 +44,7 @@ pub fn encode_jwt_vc_claims<T: Serialize>(
                 let date_value: xsd_types::DateTime = date_value
                     .parse()
                     .map_err(|_| JwtVcEncodeError::InvalidDateValue)?;
-                claims.set(ssi_jwt::ExpirationTime(date_value.earliest().try_into()?));
+                claims.set(ssi_jwt::ExpirationTime(date_value.earliest().into()));
             }
             None => return Err(JwtVcEncodeError::InvalidDateValue),
         }
@@ -65,7 +65,7 @@ pub fn encode_jwt_vc_claims<T: Serialize>(
                 let issuance_date_value: xsd_types::DateTime = issuance_date_value
                     .parse()
                     .map_err(|_| JwtVcEncodeError::InvalidDateValue)?;
-                claims.set(ssi_jwt::NotBefore(issuance_date_value.latest().try_into()?));
+                claims.set(ssi_jwt::NotBefore(issuance_date_value.latest().into()));
             }
             None => return Err(JwtVcEncodeError::InvalidDateValue),
         }
@@ -145,7 +145,7 @@ pub fn encode_jwt_vp_claims<T: Serialize>(
                 let issuance_date_value: xsd_types::DateTime = issuance_date_value
                     .parse()
                     .map_err(|_| JwtVpEncodeError::InvalidDateValue)?;
-                claims.set(ssi_jwt::NotBefore(issuance_date_value.latest().try_into()?));
+                claims.set(ssi_jwt::NotBefore(issuance_date_value.latest().into()));
             }
             None => return Err(JwtVpEncodeError::InvalidDateValue),
         }
