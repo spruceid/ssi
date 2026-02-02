@@ -4,18 +4,11 @@ use chrono::{prelude::*, Duration, LocalResult};
 use ordered_float::NotNan;
 use serde::{Deserialize, Serialize, Serializer};
 
-/// Represents NumericDate (see <https://datatracker.ietf.org/doc/html/rfc7519#section-2>)
-/// where the range is restricted to those in which microseconds can be exactly represented,
-/// which is approximately between the years 1685 and 2255, which was considered to be sufficient
-/// for the purposes of this crate.  Note that leap seconds are ignored by this type, just as
-/// they're ignored by NumericDate in the JWT standard.
+/// JSON numeric value representing the number of seconds from
+/// 1970-01-01T00:00:00Z UTC until the specified UTC date/time, ignoring leap
+/// seconds.
 ///
-/// An f64 value has 52 explicit mantissa bits, meaning that the biggest contiguous range
-/// of integer values is from -2^53 to 2^53 (52 zeros after the mantissa's implicit 1).
-/// Using this value to represent exact microseconds gives a maximum range of
-///     +-2^53 / (1000000 * 60 * 60 * 24 * 365.25) ~= +-285,
-/// which is centered around the Unix epoch start date Jan 1, 1970, 00:00:00 UTC, giving
-/// the years 1685 to 2255.
+/// See: <https://datatracker.ietf.org/doc/html/rfc7519#section-2>
 #[derive(Debug, Serialize, Deserialize, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct NumericDate(#[serde(serialize_with = "interop_serialize")] NotNan<f64>);
 
@@ -40,9 +33,6 @@ pub enum NumericDateConversionError {
 
     #[error("Invalid float literal")]
     InvalidFloatLiteral,
-
-    #[error("Out of valid microsecond-precision range of NumericDate")]
-    OutOfMicrosecondPrecisionRange,
 }
 
 impl From<ordered_float::FloatIsNan> for NumericDateConversionError {
@@ -52,28 +42,17 @@ impl From<ordered_float::FloatIsNan> for NumericDateConversionError {
 }
 
 impl NumericDate {
-    /// This is -2^53 / 1_000_000, which is the smallest NumericDate that faithfully
-    /// represents full microsecond precision.
-    pub const MIN: NumericDate =
-        NumericDate(unsafe { NotNan::new_unchecked(-9_007_199_254.740_992) });
-    /// This is 2^53 / 1_000_000, which is the largest NumericDate that faithfully
-    /// represents full microsecond precision.
-    pub const MAX: NumericDate =
-        NumericDate(unsafe { NotNan::new_unchecked(9_007_199_254.740_992) });
-
     /// Return the f64-valued number of seconds represented by this NumericDate.
     pub fn as_seconds(self) -> f64 {
         *self.0
     }
+
     /// Try to create NumericDate from a f64 value, returning error upon out-of-range.
     pub fn try_from_seconds(seconds: f64) -> Result<Self, NumericDateConversionError> {
         let seconds = NotNan::new(seconds)?;
-        if seconds.abs() > *Self::MAX.0 {
-            Err(NumericDateConversionError::OutOfMicrosecondPrecisionRange)
-        } else {
-            Ok(NumericDate(seconds))
-        }
+        Ok(NumericDate(seconds))
     }
+
     /// Decompose NumericDate for use in Utc.timestamp and Utc.timestamp_opt
     fn into_whole_seconds_and_fractional_nanoseconds(self) -> (i64, u32) {
         let whole_seconds = self.0.floor() as i64;
@@ -88,7 +67,7 @@ impl std::ops::Add<Duration> for NumericDate {
     type Output = NumericDate;
     fn add(self, rhs: Duration) -> Self::Output {
         let self_dtu: DateTime<Utc> = self.into();
-        Self::Output::try_from(self_dtu + rhs).unwrap()
+        Self::Output::from(self_dtu + rhs)
     }
 }
 
@@ -107,7 +86,7 @@ impl std::ops::Sub<Duration> for NumericDate {
     type Output = NumericDate;
     fn sub(self, rhs: Duration) -> Self::Output {
         let self_dtu: DateTime<Utc> = self.into();
-        Self::Output::try_from(self_dtu - rhs).unwrap()
+        Self::Output::from(self_dtu - rhs)
     }
 }
 
@@ -133,10 +112,8 @@ impl TryFrom<f64> for NumericDate {
     }
 }
 
-impl TryFrom<DateTime<Utc>> for NumericDate {
-    type Error = NumericDateConversionError;
-
-    fn try_from(dtu: DateTime<Utc>) -> Result<Self, Self::Error> {
+impl From<DateTime<Utc>> for NumericDate {
+    fn from(dtu: DateTime<Utc>) -> Self {
         // Have to take seconds and nanoseconds separately in order to get the full allowable
         // range of microsecond-precision values as described above.
         let whole_seconds = dtu.timestamp() as f64;
@@ -146,14 +123,14 @@ impl TryFrom<DateTime<Utc>> for NumericDate {
         };
 
         Self::try_from_seconds(whole_seconds + fractional_seconds)
+            // UNWRAP SAFETY: input value can't be NaN nor infinite.
+            .unwrap()
     }
 }
 
-impl TryFrom<DateTime<FixedOffset>> for NumericDate {
-    type Error = NumericDateConversionError;
-    fn try_from(dtfo: DateTime<FixedOffset>) -> Result<Self, Self::Error> {
-        let dtu = DateTime::<Utc>::from(dtfo);
-        NumericDate::try_from(dtu)
+impl From<DateTime<FixedOffset>> for NumericDate {
+    fn from(dtfo: DateTime<FixedOffset>) -> Self {
+        DateTime::<Utc>::from(dtfo).into()
     }
 }
 
