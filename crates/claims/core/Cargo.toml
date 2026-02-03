@@ -1,6 +1,6 @@
 [package]
 name = "ssi-claims-core"
-version = "0.1.3"
+version = "0.2.0"
 edition = "2021"
 authors = ["Spruce Systems, Inc."]
 license = "Apache-2.0"
@@ -14,14 +14,14 @@ default = ["serde", "linked-data"]
 ## Compatibility layer with the [`serde`] library.
 ##
 ## Adds claims serialization utilities.
-## 
+##
 ## [`serde`]: <https://serde.rs/>
 serde = ["dep:serde"]
 
 ## Compatibility layer with the [`linked-data`] library.
 ##
 ## Allows one to serialize verifiable LD claims.
-## 
+##
 ## [`linked-data`]: <https://github.com/spruceid/linked-data-rs>
 linked-data = ["dep:linked-data"]
 
