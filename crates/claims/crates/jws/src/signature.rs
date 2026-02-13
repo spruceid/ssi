@@ -77,9 +77,54 @@ impl JwsPayload for serde_json::Value {
     }
 }
 
+/// JWS Signer Information.
+///
+/// This corresponds to all the JWS header fields related to the signer.
+///
+/// The fields in this `struct` are marked as `non_exhaustive`, meaning you
+/// won't be able to construct it directly without using [`JwsSignerInfo::new`].
+/// This is to allow us to progressively add support for new fields without
+/// having to do a major release of `ssi`.
+///
+/// See: <https://datatracker.ietf.org/doc/html/rfc7515#section-4.1>
+#[derive(Default, Clone)]
+#[non_exhaustive]
 pub struct JwsSignerInfo {
-    pub key_id: Option<String>,
-    pub algorithm: Algorithm,
+    /// JSON Web Key.
+    ///
+    /// Public key that corresponds to the key used to digitally sign the JWS.
+    ///
+    /// See: <https://datatracker.ietf.org/doc/html/rfc7515#section-4.1.3>
+    pub jwk: Option<JWK>,
+
+    /// Key ID.
+    ///
+    /// Hint indicating which key was used to secure the JWS.
+    ///
+    /// See: <https://datatracker.ietf.org/doc/html/rfc7515#section-4.1.4>
+    pub kid: Option<String>,
+
+    /// Cryptographic algorithm used to secure the JWS.
+    ///
+    /// See: <https://datatracker.ietf.org/doc/html/rfc7515#section-4.1.1>
+    pub alg: Algorithm,
+
+    /// X.509 Certificate Chain.
+    ///
+    /// Each string in the array is a base64-encoded DER PKIX certificate value.
+    ///
+    /// See: <https://datatracker.ietf.org/doc/html/rfc7515#section-4.1.6>
+    pub x5c: Option<Vec<String>>,
+}
+
+impl JwsSignerInfo {
+    pub fn new(key_id: Option<String>, algorithm: Algorithm) -> Self {
+        Self {
+            kid: key_id,
+            alg: algorithm,
+            ..Default::default()
+        }
+    }
 }
 
 /// JWS Signer.
@@ -102,8 +147,10 @@ pub trait JwsSigner {
         let payload_bytes = payload.payload_bytes();
 
         let header = Header {
-            algorithm: info.algorithm,
-            key_id: info.key_id,
+            algorithm: info.alg,
+            key_id: info.kid,
+            jwk: info.jwk,
+            x509_certificate_chain: info.x5c,
             content_type: payload.cty().map(ToOwned::to_owned),
             type_: payload.typ().map(ToOwned::to_owned),
             ..Default::default()
@@ -207,10 +254,12 @@ impl<T: JwsSigner + Clone> JwsSigner for Cow<'_, T> {
 impl JwsSigner for JWK {
     async fn fetch_info(&self) -> Result<JwsSignerInfo, SignatureError> {
         Ok(JwsSignerInfo {
-            key_id: self.key_id.clone(),
-            algorithm: self
+            jwk: None, // Intentionally not copying the JWK here, it is rarely wanted.
+            kid: self.key_id.clone(),
+            alg: self
                 .get_algorithm()
                 .ok_or(SignatureError::MissingAlgorithm)?,
+            x5c: self.x509_certificate_chain.clone(),
         })
     }
 
@@ -236,8 +285,8 @@ impl<'a> JwkWithAlgorithm<'a> {
 impl JwsSigner for JwkWithAlgorithm<'_> {
     async fn fetch_info(&self) -> Result<JwsSignerInfo, SignatureError> {
         Ok(JwsSignerInfo {
-            key_id: self.jwk.key_id.clone(),
-            algorithm: self.algorithm,
+            alg: self.algorithm,
+            ..self.jwk.fetch_info().await?
         })
     }
 
