@@ -281,7 +281,7 @@ async fn collect_events<P: EthProvider>(
     registry: [u8; 20],
     identity: &[u8; 20],
     changed_block: u64,
-) -> Result<Vec<Erc1056Event>, String> {
+) -> Result<Vec<(u64, Erc1056Event)>, String> {
     if changed_block == 0 {
         return Ok(Vec::new());
     }
@@ -314,7 +314,7 @@ async fn collect_events<P: EthProvider>(
         for log in &logs {
             if let Some(event) = parse_erc1056_event(log) {
                 next_block = event.previous_change();
-                events.push(event);
+                events.push((log.block_number, event));
             }
         }
 
@@ -526,7 +526,7 @@ fn decode_delegate_type(delegate_type: &[u8; 32]) -> &[u8] {
 /// validity, ensuring stable `#delegate-N` IDs.
 fn apply_events(
     doc: &mut Document,
-    events: &[Erc1056Event],
+    events: &[(u64, Erc1056Event)],
     did: &DIDBuf,
     network_chain: &NetworkChain,
     json_ld_context: &mut JsonLdContext,
@@ -535,7 +535,7 @@ fn apply_events(
     let mut delegate_counter = 0u64;
     let mut service_counter = 0u64;
 
-    for event in events {
+    for (_block, event) in events {
         match event {
             Erc1056Event::DelegateChanged {
                 delegate_type,
@@ -1618,7 +1618,7 @@ mod tests {
 
         assert_eq!(events.len(), 1);
         match &events[0] {
-            Erc1056Event::OwnerChanged { identity: id, owner, previous_change } => {
+            (_, Erc1056Event::OwnerChanged { identity: id, owner, previous_change }) => {
                 assert_eq!(id, &[0xBB; 20]);
                 assert_eq!(owner, &[0xCC; 20]);
                 assert_eq!(*previous_change, 0);
@@ -1657,7 +1657,7 @@ mod tests {
 
         // First event (chronologically) should be from block 100
         match &events[0] {
-            Erc1056Event::OwnerChanged { owner, previous_change, .. } => {
+            (_, Erc1056Event::OwnerChanged { owner, previous_change, .. }) => {
                 assert_eq!(owner, &owner_a);
                 assert_eq!(*previous_change, 0);
             }
@@ -1666,7 +1666,7 @@ mod tests {
 
         // Second event should be from block 200
         match &events[1] {
-            Erc1056Event::OwnerChanged { owner, previous_change, .. } => {
+            (_, Erc1056Event::OwnerChanged { owner, previous_change, .. }) => {
                 assert_eq!(owner, &owner_b);
                 assert_eq!(*previous_change, 100);
             }
@@ -1715,13 +1715,13 @@ mod tests {
         assert_eq!(events.len(), 3);
 
         // Chronological: block 100 first
-        assert!(matches!(&events[0], Erc1056Event::OwnerChanged { .. }));
-        assert!(matches!(&events[1], Erc1056Event::DelegateChanged { .. }));
-        assert!(matches!(&events[2], Erc1056Event::AttributeChanged { .. }));
+        assert!(matches!(&events[0], (_, Erc1056Event::OwnerChanged { .. })));
+        assert!(matches!(&events[1], (_, Erc1056Event::DelegateChanged { .. })));
+        assert!(matches!(&events[2], (_, Erc1056Event::AttributeChanged { .. })));
 
         // Verify delegate event details
         match &events[1] {
-            Erc1056Event::DelegateChanged { delegate: d, valid_to, previous_change, .. } => {
+            (_, Erc1056Event::DelegateChanged { delegate: d, valid_to, previous_change, .. }) => {
                 assert_eq!(d, &delegate);
                 assert_eq!(*valid_to, u64::MAX);
                 assert_eq!(*previous_change, 100);
@@ -1731,7 +1731,7 @@ mod tests {
 
         // Verify attribute event details
         match &events[2] {
-            Erc1056Event::AttributeChanged { name, value, valid_to, previous_change, .. } => {
+            (_, Erc1056Event::AttributeChanged { name, value, valid_to, previous_change, .. }) => {
                 assert_eq!(name, &attr_name);
                 assert_eq!(value, b"\x04abc");
                 assert_eq!(*valid_to, u64::MAX);
@@ -2873,6 +2873,7 @@ mod tests {
             deactivated: Some(true),
             version_id: Some("42".to_string()),
             updated: Some("2024-06-01T12:00:00Z".to_string()),
+            ..Default::default()
         };
         let json = serde_json::to_value(&meta_full).unwrap();
         assert_eq!(json["deactivated"], true);
@@ -2891,6 +2892,7 @@ mod tests {
             deactivated: None,
             version_id: Some("100".to_string()),
             updated: Some("2024-01-15T09:50:00Z".to_string()),
+            ..Default::default()
         };
         let json = serde_json::to_value(&meta_partial).unwrap();
         assert!(json.get("deactivated").is_none());

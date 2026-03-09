@@ -179,6 +179,10 @@ pub struct Metadata {
     pub version_id: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub updated: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub next_version_id: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub next_update: Option<String>,
 }
 
 #[derive(Debug, Default, Serialize, Deserialize, Clone, PartialEq, Eq)]
