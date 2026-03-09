@@ -211,12 +211,10 @@ impl<P: EthProvider> DIDMethodResolver for DIDEthr<P> {
 
                     // Owner changed — build document with the new owner's address
                     let owner_address = format_address_eip55(&owner);
-                    let is_public_key_did = decoded_id.address_or_public_key.len() == 68;
                     return resolve_with_owner(
                         method_specific_id,
                         &decoded_id.network_chain,
                         &owner_address,
-                        is_public_key_did,
                         options,
                     );
                 }
@@ -272,20 +270,18 @@ fn resolve_offline(
 
 /// Resolve a DID when the on-chain owner differs from the identity address.
 ///
-/// For address-based DIDs: `#controller` and `Eip712Method2021` use the owner's address.
-/// For public-key DIDs: `#controllerKey` is omitted (the key no longer represents the owner).
+/// Both address-based and public-key DIDs with a changed owner produce the
+/// same document shape: `#controller` + `Eip712Method2021`, using the owner's
+/// address. For public-key DIDs this means `#controllerKey` is implicitly
+/// omitted since the public key no longer represents the current owner.
 fn resolve_with_owner(
     method_specific_id: &str,
     network_chain: &NetworkChain,
     owner_address: &str,
-    _is_public_key_did: bool,
     options: resolution::Options,
 ) -> Result<Output<Vec<u8>>, Error> {
     let mut json_ld_context = JsonLdContext::default();
 
-    // Both address-based and public-key DIDs with a changed owner produce
-    // the same document shape: #controller + Eip712Method2021, using the
-    // owner's address. For public-key DIDs, #controllerKey is omitted.
     let doc = resolve_address(
         &mut json_ld_context,
         method_specific_id,
