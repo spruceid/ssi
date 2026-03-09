@@ -385,7 +385,7 @@ impl<P: EthProvider> DIDMethodResolver for DIDEthr<P> {
 
                 if changed_block > 0 {
                     // Collect all events via linked-list walk
-                    let _events = collect_events(
+                    let events = collect_events(
                         &config.provider,
                         config.registry,
                         &addr,
@@ -403,21 +403,58 @@ impl<P: EthProvider> DIDMethodResolver for DIDEthr<P> {
                         .map_err(|e| Error::Internal(e.to_string()))?;
                     let owner = decode_address(&owner_result);
 
-                    if owner == addr {
-                        // Owner unchanged — use offline (genesis) document
-                        // TODO: Phase 4-5 will process _events for delegates/attributes
-                        return resolve_offline(method_specific_id, &decoded_id, options);
-                    }
+                    // Build base document from owner
+                    let mut json_ld_context = JsonLdContext::default();
+                    let (mut doc, _account_address) = if owner == addr {
+                        // Owner unchanged — build from the DID's own identity
+                        let doc = match decoded_id.address_or_public_key.len() {
+                            42 => resolve_address(
+                                &mut json_ld_context,
+                                method_specific_id,
+                                &decoded_id.network_chain,
+                                &decoded_id.address_or_public_key,
+                            ),
+                            68 => resolve_public_key(
+                                &mut json_ld_context,
+                                method_specific_id,
+                                &decoded_id.network_chain,
+                                &decoded_id.address_or_public_key,
+                            ),
+                            _ => Err(Error::InvalidMethodSpecificId(
+                                method_specific_id.to_owned(),
+                            )),
+                        }?;
+                        (doc, decoded_id.address_or_public_key.clone())
+                    } else {
+                        // Owner changed — build with the new owner's address
+                        let owner_address = format_address_eip55(&owner);
+                        let doc = resolve_address(
+                            &mut json_ld_context,
+                            method_specific_id,
+                            &decoded_id.network_chain,
+                            &owner_address,
+                        )?;
+                        (doc, owner_address)
+                    };
 
-                    // Owner changed — build document with the new owner's address
-                    // TODO: Phase 4-5 will process _events for delegates/attributes
-                    let owner_address = format_address_eip55(&owner);
-                    return resolve_with_owner(
-                        method_specific_id,
+                    // Apply delegate/attribute events
+                    let now = std::time::SystemTime::now()
+                        .duration_since(std::time::UNIX_EPOCH)
+                        .unwrap()
+                        .as_secs();
+
+                    let did = DIDBuf::from_string(format!("did:ethr:{method_specific_id}"))
+                        .unwrap();
+                    apply_events(
+                        &mut doc,
+                        &events,
+                        &did,
                         &decoded_id.network_chain,
-                        &owner_address,
-                        options,
+                        &mut json_ld_context,
+                        now,
                     );
+
+                    return serialize_document(doc, json_ld_context, options);
                 }
             }
         }
@@ -437,6 +474,117 @@ impl DIDMethodResolver for DIDEthr<()> {
         let decoded_id = DecodedMethodSpecificId::from_str(method_specific_id)
             .map_err(|_| Error::InvalidMethodSpecificId(method_specific_id.to_owned()))?;
         resolve_offline(method_specific_id, &decoded_id, options)
+    }
+}
+
+/// Decode the delegate_type bytes32 field by trimming trailing zeros
+fn decode_delegate_type(delegate_type: &[u8; 32]) -> &[u8] {
+    let end = delegate_type
+        .iter()
+        .rposition(|&b| b != 0)
+        .map(|i| i + 1)
+        .unwrap_or(0);
+    &delegate_type[..end]
+}
+
+/// Process ERC-1056 events and add delegate verification methods to the document.
+///
+/// `now` is the current timestamp (seconds since epoch) used for expiry checks.
+/// The delegate counter increments for every DelegateChanged event regardless of
+/// validity, ensuring stable `#delegate-N` IDs.
+fn apply_events(
+    doc: &mut Document,
+    events: &[Erc1056Event],
+    did: &DIDBuf,
+    network_chain: &NetworkChain,
+    json_ld_context: &mut JsonLdContext,
+    now: u64,
+) {
+    let mut delegate_counter = 0u64;
+
+    for event in events {
+        match event {
+            Erc1056Event::DelegateChanged {
+                delegate_type,
+                delegate,
+                valid_to,
+                ..
+            } => {
+                delegate_counter += 1;
+                let dt = decode_delegate_type(delegate_type);
+
+                let is_veri_key = dt == b"veriKey";
+                let is_sig_auth = dt == b"sigAuth";
+
+                if !is_veri_key && !is_sig_auth {
+                    continue;
+                }
+
+                // Skip expired/revoked delegates
+                if *valid_to < now {
+                    continue;
+                }
+
+                let delegate_addr = format_address_eip55(delegate);
+                let blockchain_account_id = BlockchainAccountId {
+                    account_address: delegate_addr,
+                    chain_id: ChainId {
+                        namespace: "eip155".to_string(),
+                        reference: network_chain.id().to_string(),
+                    },
+                };
+
+                let vm_id = format!("{did}#delegate-{delegate_counter}");
+                let eip712_id = format!("{did}#delegate-{delegate_counter}-Eip712Method2021");
+
+                let vm = VerificationMethod::EcdsaSecp256k1RecoveryMethod2020 {
+                    id: DIDURLBuf::from_string(vm_id).unwrap(),
+                    controller: did.clone(),
+                    blockchain_account_id: blockchain_account_id.clone(),
+                };
+
+                let eip712_vm = VerificationMethod::Eip712Method2021 {
+                    id: DIDURLBuf::from_string(eip712_id).unwrap(),
+                    controller: did.clone(),
+                    blockchain_account_id,
+                };
+
+                json_ld_context.add_verification_method_type(vm.type_());
+                json_ld_context.add_verification_method_type(eip712_vm.type_());
+
+                let vm_ref = vm.id().to_owned().into();
+                let eip712_ref = eip712_vm.id().to_owned().into();
+
+                doc.verification_method.push(vm.into());
+                doc.verification_method.push(eip712_vm.into());
+
+                doc.verification_relationships
+                    .assertion_method
+                    .push(vm_ref);
+                doc.verification_relationships
+                    .assertion_method
+                    .push(eip712_ref);
+
+                if is_sig_auth {
+                    let vm_ref2 = doc.verification_method[doc.verification_method.len() - 2]
+                        .id
+                        .to_owned()
+                        .into();
+                    let eip712_ref2 = doc.verification_method[doc.verification_method.len() - 1]
+                        .id
+                        .to_owned()
+                        .into();
+                    doc.verification_relationships
+                        .authentication
+                        .push(vm_ref2);
+                    doc.verification_relationships
+                        .authentication
+                        .push(eip712_ref2);
+                }
+            }
+            // OwnerChanged and AttributeChanged are handled elsewhere (Phase 2 / Phase 5)
+            _ => {}
+        }
     }
 }
 
@@ -465,30 +613,6 @@ fn resolve_offline(
             method_specific_id.to_owned(),
         )),
     }?;
-
-    serialize_document(doc, json_ld_context, options)
-}
-
-/// Resolve a DID when the on-chain owner differs from the identity address.
-///
-/// Both address-based and public-key DIDs with a changed owner produce the
-/// same document shape: `#controller` + `Eip712Method2021`, using the owner's
-/// address. For public-key DIDs this means `#controllerKey` is implicitly
-/// omitted since the public key no longer represents the current owner.
-fn resolve_with_owner(
-    method_specific_id: &str,
-    network_chain: &NetworkChain,
-    owner_address: &str,
-    options: resolution::Options,
-) -> Result<Output<Vec<u8>>, Error> {
-    let mut json_ld_context = JsonLdContext::default();
-
-    let doc = resolve_address(
-        &mut json_ld_context,
-        method_specific_id,
-        network_chain,
-        owner_address,
-    )?;
 
     serialize_document(doc, json_ld_context, options)
 }
@@ -1694,6 +1818,82 @@ mod tests {
             vm["id"].as_str().unwrap().ends_with("#controllerKey")
         }).unwrap();
         assert!(key_vm.get("publicKeyJwk").is_some(), "#controllerKey should have publicKeyJwk");
+    }
+
+    /// Helper: encode a delegate type string as bytes32 (right-padded with zeros)
+    fn encode_delegate_type(s: &str) -> [u8; 32] {
+        let mut b = [0u8; 32];
+        let bytes = s.as_bytes();
+        b[..bytes.len().min(32)].copy_from_slice(&bytes[..bytes.len().min(32)]);
+        b
+    }
+
+    #[tokio::test]
+    async fn resolve_verikey_delegate_adds_vm() {
+        // A DIDDelegateChanged event with delegate_type="veriKey" and valid_to=MAX
+        // should add EcdsaSecp256k1RecoveryMethod2020 + Eip712Method2021 VMs
+        // with #delegate-1 and #delegate-1-Eip712Method2021 IDs.
+        // The delegate VM is referenced in assertionMethod but NOT authentication.
+        let identity: [u8; 20] = [0xb9, 0xc5, 0x71, 0x40, 0x89, 0x47, 0x8a, 0x32, 0x7f, 0x09,
+                                   0x19, 0x79, 0x87, 0xf1, 0x6f, 0x9e, 0x5d, 0x93, 0x6e, 0x8a];
+        let delegate: [u8; 20] = [0xAA; 20];
+        let delegate_type = encode_delegate_type("veriKey");
+
+        let log = make_delegate_changed_log(100, &identity, &delegate_type, &delegate, u64::MAX, 0);
+
+        let mut resolver = DIDEthr::new();
+        resolver.add_network(
+            "mainnet",
+            NetworkConfig {
+                chain_id: 1,
+                registry: TEST_REGISTRY,
+                provider: MockProvider {
+                    changed_block: 100,
+                    identity_owner: None, // same as identity
+                    logs: HashMap::from([(100, vec![log])]),
+                },
+            },
+        );
+
+        let doc = resolver
+            .resolve(did!("did:ethr:0xb9c5714089478a327f09197987f16f9e5d936e8a"))
+            .await
+            .unwrap()
+            .document;
+
+        let doc_value = serde_json::to_value(&doc).unwrap();
+        eprintln!("{}", serde_json::to_string_pretty(&doc_value).unwrap());
+
+        let vms = doc_value["verificationMethod"].as_array().unwrap();
+
+        // Should have 4 VMs: #controller, #Eip712Method2021, #delegate-1, #delegate-1-Eip712Method2021
+        assert_eq!(vms.len(), 4, "expected 4 VMs, got {}", vms.len());
+
+        // Check #delegate-1 VM
+        let delegate_vm = vms.iter().find(|vm| {
+            vm["id"].as_str().unwrap().ends_with("#delegate-1")
+        }).expect("should have #delegate-1 VM");
+        assert_eq!(delegate_vm["type"], "EcdsaSecp256k1RecoveryMethod2020");
+        let delegate_addr = format_address_eip55(&delegate);
+        let expected_account_id = format!("eip155:1:{}", delegate_addr);
+        assert_eq!(delegate_vm["blockchainAccountId"], expected_account_id);
+
+        // Check #delegate-1-Eip712Method2021 VM
+        let delegate_eip712 = vms.iter().find(|vm| {
+            vm["id"].as_str().unwrap().ends_with("#delegate-1-Eip712Method2021")
+        }).expect("should have #delegate-1-Eip712Method2021 VM");
+        assert_eq!(delegate_eip712["type"], "Eip712Method2021");
+        assert_eq!(delegate_eip712["blockchainAccountId"], expected_account_id);
+
+        // #delegate-1 should be in assertionMethod but NOT authentication
+        let assertion = doc_value["assertionMethod"].as_array().unwrap();
+        let auth = doc_value["authentication"].as_array().unwrap();
+
+        let did_prefix = "did:ethr:0xb9c5714089478a327f09197987f16f9e5d936e8a";
+        assert!(assertion.iter().any(|v| v == &format!("{did_prefix}#delegate-1")));
+        assert!(assertion.iter().any(|v| v == &format!("{did_prefix}#delegate-1-Eip712Method2021")));
+        assert!(!auth.iter().any(|v| v == &format!("{did_prefix}#delegate-1")));
+        assert!(!auth.iter().any(|v| v == &format!("{did_prefix}#delegate-1-Eip712Method2021")));
     }
 
     #[tokio::test]
