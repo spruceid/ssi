@@ -1,4 +1,5 @@
 use iref::Iri;
+use chrono::{DateTime, Utc};
 use ssi_caips::caip10::BlockchainAccountId;
 use ssi_caips::caip2::ChainId;
 use ssi_crypto::hashes::keccak;
@@ -130,6 +131,13 @@ fn decode_address(data: &[u8]) -> [u8; 20] {
 fn format_address_eip55(addr: &[u8; 20]) -> String {
     let lowercase = format!("0x{}", hex::encode(addr));
     keccak::eip55_checksum_addr(&lowercase).unwrap_or(lowercase)
+}
+
+/// Format a Unix timestamp (seconds since epoch) as ISO 8601 UTC string
+fn format_timestamp_iso8601(unix_secs: u64) -> String {
+    DateTime::<Utc>::from_timestamp(unix_secs as i64, 0)
+        .map(|dt| dt.format("%Y-%m-%dT%H:%M:%SZ").to_string())
+        .unwrap_or_else(|| "1970-01-01T00:00:00Z".to_string())
 }
 
 // --- ERC-1056 event topic hashes ---
@@ -386,6 +394,18 @@ impl<P: EthProvider> DIDMethodResolver for DIDEthr<P> {
                 let changed_block = decode_uint256(&result);
 
                 if changed_block > 0 {
+                    // Build document metadata (versionId + updated)
+                    let block_ts = config
+                        .provider
+                        .block_timestamp(changed_block)
+                        .await
+                        .map_err(|e| Error::Internal(e.to_string()))?;
+                    let mut doc_metadata = document::Metadata {
+                        version_id: Some(changed_block.to_string()),
+                        updated: Some(format_timestamp_iso8601(block_ts)),
+                        ..Default::default()
+                    };
+
                     // Collect all events via linked-list walk
                     let events = collect_events(
                         &config.provider,
@@ -411,7 +431,7 @@ impl<P: EthProvider> DIDMethodResolver for DIDEthr<P> {
                         let did = DIDBuf::from_string(format!("did:ethr:{method_specific_id}")).unwrap();
                         let doc = Document::new(did);
                         let json_ld_context = JsonLdContext::default();
-                        let doc_metadata = document::Metadata { deactivated: Some(true), ..Default::default() };
+                        doc_metadata.deactivated = Some(true);
                         return serialize_document(doc, json_ld_context, options, doc_metadata);
                     }
 
@@ -466,7 +486,7 @@ impl<P: EthProvider> DIDMethodResolver for DIDEthr<P> {
                         now,
                     );
 
-                    return serialize_document(doc, json_ld_context, options, document::Metadata::default());
+                    return serialize_document(doc, json_ld_context, options, doc_metadata);
                 }
             }
         }
@@ -2697,7 +2717,7 @@ mod tests {
                 changed_block: 100,
                 identity_owner: Some(null_owner),
                 logs: HashMap::from([(100, vec![log])]),
-                block_timestamps: HashMap::new(),
+                block_timestamps: HashMap::from([(100, 1705312200)]),
             },
         });
 
@@ -2708,6 +2728,9 @@ mod tests {
 
         // Document metadata must have deactivated = true
         assert_eq!(output.document_metadata.deactivated, Some(true));
+        // Deactivation is an on-chain change, so versionId/updated must be set
+        assert_eq!(output.document_metadata.version_id.as_deref(), Some("100"));
+        assert_eq!(output.document_metadata.updated.as_deref(), Some("2024-01-15T09:50:00Z"));
 
         let doc_value = serde_json::to_value(&output.document).unwrap();
 
@@ -2787,5 +2810,91 @@ mod tests {
         // deactivated should be None (default)
         assert!(output.document_metadata.deactivated.is_none()
             || output.document_metadata.deactivated == Some(false));
+    }
+
+    #[tokio::test]
+    async fn metadata_no_changes_no_version_id_or_updated() {
+        // DID with no on-chain changes (changed=0) → no versionId/updated metadata
+        let mut resolver = DIDEthr::new();
+        resolver.add_network("mainnet", NetworkConfig {
+            chain_id: 1,
+            registry: TEST_REGISTRY,
+            provider: MockProvider::new_unchanged(),
+        });
+
+        let output = resolver
+            .resolve(did!("did:ethr:0xb9c5714089478a327f09197987f16f9e5d936e8a"))
+            .await
+            .unwrap();
+
+        assert!(output.document_metadata.version_id.is_none());
+        assert!(output.document_metadata.updated.is_none());
+    }
+
+    #[tokio::test]
+    async fn metadata_with_changes_has_version_id_and_updated() {
+        // DID with on-chain changes (changed_block=100) → versionId = "100",
+        // updated = ISO 8601 timestamp of block 100
+        let identity: [u8; 20] = [0xb9, 0xc5, 0x71, 0x40, 0x89, 0x47, 0x8a, 0x32, 0x7f, 0x09,
+                                   0x19, 0x79, 0x87, 0xf1, 0x6f, 0x9e, 0x5d, 0x93, 0x6e, 0x8a];
+        let delegate: [u8; 20] = [0xAA; 20];
+        let delegate_type = encode_delegate_type("veriKey");
+        let log = make_delegate_changed_log(100, &identity, &delegate_type, &delegate, u64::MAX, 0);
+
+        // Block 100 has timestamp 1705312200 = 2024-01-15T09:50:00Z
+        let mut resolver = DIDEthr::new();
+        resolver.add_network("mainnet", NetworkConfig {
+            chain_id: 1,
+            registry: TEST_REGISTRY,
+            provider: MockProvider {
+                changed_block: 100,
+                identity_owner: None,
+                logs: HashMap::from([(100, vec![log])]),
+                block_timestamps: HashMap::from([(100, 1705312200)]),
+            },
+        });
+
+        let output = resolver
+            .resolve(did!("did:ethr:0xb9c5714089478a327f09197987f16f9e5d936e8a"))
+            .await
+            .unwrap();
+
+        assert_eq!(output.document_metadata.version_id.as_deref(), Some("100"));
+        assert_eq!(output.document_metadata.updated.as_deref(), Some("2024-01-15T09:50:00Z"));
+    }
+
+    #[tokio::test]
+    async fn metadata_serializes_correctly_in_json() {
+        // Test 7.3: versionId/updated appear when present, omitted when None
+        use ssi_dids_core::document::Metadata;
+
+        // Metadata with all fields set
+        let meta_full = Metadata {
+            deactivated: Some(true),
+            version_id: Some("42".to_string()),
+            updated: Some("2024-06-01T12:00:00Z".to_string()),
+        };
+        let json = serde_json::to_value(&meta_full).unwrap();
+        assert_eq!(json["deactivated"], true);
+        assert_eq!(json["versionId"], "42");
+        assert_eq!(json["updated"], "2024-06-01T12:00:00Z");
+
+        // Metadata with no fields set — all should be omitted
+        let meta_empty = Metadata::default();
+        let json = serde_json::to_value(&meta_empty).unwrap();
+        assert!(json.get("deactivated").is_none());
+        assert!(json.get("versionId").is_none());
+        assert!(json.get("updated").is_none());
+
+        // Metadata with only versionId/updated (no deactivated)
+        let meta_partial = Metadata {
+            deactivated: None,
+            version_id: Some("100".to_string()),
+            updated: Some("2024-01-15T09:50:00Z".to_string()),
+        };
+        let json = serde_json::to_value(&meta_partial).unwrap();
+        assert!(json.get("deactivated").is_none());
+        assert_eq!(json["versionId"], "100");
+        assert_eq!(json["updated"], "2024-01-15T09:50:00Z");
     }
 }
