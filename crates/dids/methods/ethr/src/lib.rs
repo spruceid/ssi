@@ -405,6 +405,16 @@ impl<P: EthProvider> DIDMethodResolver for DIDEthr<P> {
                         .map_err(|e| Error::Internal(e.to_string()))?;
                     let owner = decode_address(&owner_result);
 
+                    // Check for deactivation (owner = null address)
+                    const NULL_ADDRESS: [u8; 20] = [0u8; 20];
+                    if owner == NULL_ADDRESS {
+                        let did = DIDBuf::from_string(format!("did:ethr:{method_specific_id}")).unwrap();
+                        let doc = Document::new(did);
+                        let json_ld_context = JsonLdContext::default();
+                        let doc_metadata = document::Metadata { deactivated: Some(true) };
+                        return serialize_document(doc, json_ld_context, options, doc_metadata);
+                    }
+
                     // Build base document from owner
                     let mut json_ld_context = JsonLdContext::default();
                     let (mut doc, _account_address) = if owner == addr {
@@ -456,7 +466,7 @@ impl<P: EthProvider> DIDMethodResolver for DIDEthr<P> {
                         now,
                     );
 
-                    return serialize_document(doc, json_ld_context, options);
+                    return serialize_document(doc, json_ld_context, options, document::Metadata::default());
                 }
             }
         }
@@ -744,13 +754,14 @@ fn resolve_offline(
         )),
     }?;
 
-    serialize_document(doc, json_ld_context, options)
+    serialize_document(doc, json_ld_context, options, document::Metadata::default())
 }
 
 fn serialize_document(
     doc: Document,
     json_ld_context: JsonLdContext,
     options: resolution::Options,
+    doc_metadata: document::Metadata,
 ) -> Result<Output<Vec<u8>>, Error> {
     let content_type = options.accept.unwrap_or(MediaType::JsonLd);
     let represented = doc.into_representation(representation::Options::from_media_type(
@@ -765,7 +776,7 @@ fn serialize_document(
 
     Ok(resolution::Output::new(
         represented.to_bytes(),
-        document::Metadata::default(),
+        doc_metadata,
         resolution::Metadata::from_content_type(Some(content_type.to_string())),
     ))
 }
@@ -2642,5 +2653,114 @@ mod tests {
             eip712_vm["blockchainAccountId"].as_str().unwrap(),
             expected_account_id,
         );
+    }
+
+    #[tokio::test]
+    async fn resolve_deactivated_null_owner_bare_doc() {
+        // When identityOwner() returns the null address (0x000...0),
+        // the DID is deactivated: bare doc with only `id`, empty VMs,
+        // and document_metadata.deactivated = true.
+        let identity: [u8; 20] = [0xb9, 0xc5, 0x71, 0x40, 0x89, 0x47, 0x8a, 0x32, 0x7f, 0x09,
+                                   0x19, 0x79, 0x87, 0xf1, 0x6f, 0x9e, 0x5d, 0x93, 0x6e, 0x8a];
+        let null_owner: [u8; 20] = [0u8; 20];
+
+        let log = make_owner_changed_log(100, &identity, &null_owner, 0);
+
+        let mut resolver = DIDEthr::new();
+        resolver.add_network("mainnet", NetworkConfig {
+            chain_id: 1,
+            registry: TEST_REGISTRY,
+            provider: MockProvider {
+                changed_block: 100,
+                identity_owner: Some(null_owner),
+                logs: HashMap::from([(100, vec![log])]),
+            },
+        });
+
+        let output = resolver
+            .resolve(did!("did:ethr:0xb9c5714089478a327f09197987f16f9e5d936e8a"))
+            .await
+            .unwrap();
+
+        // Document metadata must have deactivated = true
+        assert_eq!(output.document_metadata.deactivated, Some(true));
+
+        let doc_value = serde_json::to_value(&output.document).unwrap();
+
+        // ID preserved
+        assert_eq!(doc_value["id"], "did:ethr:0xb9c5714089478a327f09197987f16f9e5d936e8a");
+
+        // Empty verificationMethod, authentication, assertionMethod
+        let vms = doc_value.get("verificationMethod");
+        assert!(vms.is_none() || vms.unwrap().as_array().map_or(true, |a| a.is_empty()));
+        let auth = doc_value.get("authentication");
+        assert!(auth.is_none() || auth.unwrap().as_array().map_or(true, |a| a.is_empty()));
+        let assertion = doc_value.get("assertionMethod");
+        assert!(assertion.is_none() || assertion.unwrap().as_array().map_or(true, |a| a.is_empty()));
+    }
+
+    #[tokio::test]
+    async fn resolve_deactivated_ignores_events() {
+        // Even with delegate/attribute events, deactivation discards them all.
+        let identity: [u8; 20] = [0xb9, 0xc5, 0x71, 0x40, 0x89, 0x47, 0x8a, 0x32, 0x7f, 0x09,
+                                   0x19, 0x79, 0x87, 0xf1, 0x6f, 0x9e, 0x5d, 0x93, 0x6e, 0x8a];
+        let null_owner: [u8; 20] = [0u8; 20];
+        let delegate: [u8; 20] = [0xAA; 20];
+        let delegate_type = encode_delegate_type("veriKey");
+        let attr_name = encode_attr_name("did/svc/HubService");
+
+        let log_owner = make_owner_changed_log(100, &identity, &null_owner, 0);
+        let log_delegate = make_delegate_changed_log(200, &identity, &delegate_type, &delegate, u64::MAX, 100);
+        let log_attr = make_attribute_changed_log(300, &identity, &attr_name, b"https://hub.example.com", u64::MAX, 200);
+
+        let mut resolver = DIDEthr::new();
+        resolver.add_network("mainnet", NetworkConfig {
+            chain_id: 1,
+            registry: TEST_REGISTRY,
+            provider: MockProvider {
+                changed_block: 300,
+                identity_owner: Some(null_owner),
+                logs: HashMap::from([
+                    (100, vec![log_owner]),
+                    (200, vec![log_delegate]),
+                    (300, vec![log_attr]),
+                ]),
+            },
+        });
+
+        let output = resolver
+            .resolve(did!("did:ethr:0xb9c5714089478a327f09197987f16f9e5d936e8a"))
+            .await
+            .unwrap();
+
+        assert_eq!(output.document_metadata.deactivated, Some(true));
+
+        let doc_value = serde_json::to_value(&output.document).unwrap();
+
+        // No VMs, no services — all events discarded
+        let vms = doc_value.get("verificationMethod");
+        assert!(vms.is_none() || vms.unwrap().as_array().map_or(true, |a| a.is_empty()));
+        let services = doc_value.get("service");
+        assert!(services.is_none() || services.unwrap().as_array().map_or(true, |a| a.is_empty()));
+    }
+
+    #[tokio::test]
+    async fn resolve_non_null_owner_not_deactivated() {
+        // When the owner is non-null, deactivated should be None (not set).
+        let mut resolver = DIDEthr::new();
+        resolver.add_network("mainnet", NetworkConfig {
+            chain_id: 1,
+            registry: TEST_REGISTRY,
+            provider: MockProvider::new_same_owner(),
+        });
+
+        let output = resolver
+            .resolve(did!("did:ethr:0xb9c5714089478a327f09197987f16f9e5d936e8a"))
+            .await
+            .unwrap();
+
+        // deactivated should be None (default)
+        assert!(output.document_metadata.deactivated.is_none()
+            || output.document_metadata.deactivated == Some(false));
     }
 }
