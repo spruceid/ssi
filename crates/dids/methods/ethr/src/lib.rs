@@ -1046,7 +1046,7 @@ fn resolve_public_key(
     let vm = VerificationMethod::EcdsaSecp256k1RecoveryMethod2020 {
         id: DIDURLBuf::from_string(format!("{did}#controller")).unwrap(),
         controller: did.to_owned(),
-        blockchain_account_id,
+        blockchain_account_id: blockchain_account_id.clone(),
     };
 
     let key_vm = VerificationMethod::EcdsaSecp256k1VerificationKey2019 {
@@ -1055,15 +1055,28 @@ fn resolve_public_key(
         public_key_jwk: pk_jwk,
     };
 
+    let eip712_vm = VerificationMethod::Eip712Method2021 {
+        id: DIDURLBuf::from_string(format!("{did}#Eip712Method2021")).unwrap(),
+        controller: did.to_owned(),
+        blockchain_account_id,
+    };
+
     json_ld_context.add_verification_method_type(vm.type_());
     json_ld_context.add_verification_method_type(key_vm.type_());
+    json_ld_context.add_verification_method_type(eip712_vm.type_());
 
     let mut doc = Document::new(did);
-    doc.verification_relationships.assertion_method =
-        vec![vm.id().to_owned().into(), key_vm.id().to_owned().into()];
-    doc.verification_relationships.authentication =
-        vec![vm.id().to_owned().into(), key_vm.id().to_owned().into()];
-    doc.verification_method = vec![vm.into(), key_vm.into()];
+    doc.verification_relationships.assertion_method = vec![
+        vm.id().to_owned().into(),
+        key_vm.id().to_owned().into(),
+        eip712_vm.id().to_owned().into(),
+    ];
+    doc.verification_relationships.authentication = vec![
+        vm.id().to_owned().into(),
+        key_vm.id().to_owned().into(),
+        eip712_vm.id().to_owned().into(),
+    ];
+    doc.verification_method = vec![vm.into(), key_vm.into(), eip712_vm.into()];
 
     Ok(doc)
 }
@@ -3293,5 +3306,108 @@ mod tests {
             .resolve(did!("did:ethr:fakenet:0xb9c5714089478a327f09197987f16f9e5d936e8a"))
             .await;
         assert!(result.is_err());
+    }
+
+    // ── Phase 11: Eip712Method2021 for public-key DIDs ──
+
+    #[tokio::test]
+    async fn pubkey_did_genesis_includes_eip712method2021() {
+        // Public-key DID genesis doc should include Eip712Method2021 VM
+        // paired with #controller (same blockchainAccountId).
+        let resolver = DIDEthr::<()>::default();
+        let doc = resolver
+            .resolve(did!(
+                "did:ethr:0x03fdd57adec3d438ea237fe46b33ee1e016eda6b585c3e27ea66686c2ea5358479"
+            ))
+            .await
+            .unwrap()
+            .document;
+
+        let doc_value = serde_json::to_value(&doc).unwrap();
+        let vms = doc_value["verificationMethod"].as_array().unwrap();
+
+        // Should have 3 VMs: #controller, #controllerKey, #Eip712Method2021
+        assert_eq!(vms.len(), 3, "public-key DID should have 3 VMs");
+
+        // Find the Eip712Method2021 VM
+        let eip712_vm = vms.iter()
+            .find(|vm| vm["type"].as_str() == Some("Eip712Method2021"))
+            .expect("should have Eip712Method2021 VM");
+
+        assert!(
+            eip712_vm["id"].as_str().unwrap().ends_with("#Eip712Method2021"),
+            "Eip712Method2021 VM should have #Eip712Method2021 fragment"
+        );
+
+        // Same blockchainAccountId as #controller
+        let controller_vm = vms.iter()
+            .find(|vm| vm["id"].as_str().unwrap().ends_with("#controller"))
+            .unwrap();
+        assert_eq!(
+            eip712_vm["blockchainAccountId"],
+            controller_vm["blockchainAccountId"],
+            "Eip712Method2021 should share blockchainAccountId with #controller"
+        );
+
+        // Referenced in assertionMethod and authentication
+        let assertion = doc_value["assertionMethod"].as_array().unwrap();
+        let auth = doc_value["authentication"].as_array().unwrap();
+        let eip712_id = eip712_vm["id"].as_str().unwrap();
+        assert!(
+            assertion.iter().any(|r| r.as_str() == Some(eip712_id)),
+            "Eip712Method2021 should be in assertionMethod"
+        );
+        assert!(
+            auth.iter().any(|r| r.as_str() == Some(eip712_id)),
+            "Eip712Method2021 should be in authentication"
+        );
+    }
+
+    #[tokio::test]
+    async fn pubkey_did_with_provider_unchanged_includes_eip712method2021() {
+        // Public-key DID with MockProvider (changed_block=0) should also
+        // include Eip712Method2021, matching offline resolution.
+        let mut resolver = DIDEthr::new();
+        resolver.add_network(
+            "mainnet",
+            NetworkConfig {
+                chain_id: 1,
+                registry: TEST_REGISTRY,
+                provider: MockProvider::new_unchanged(),
+            },
+        );
+
+        let doc = resolver
+            .resolve(did!(
+                "did:ethr:0x03fdd57adec3d438ea237fe46b33ee1e016eda6b585c3e27ea66686c2ea5358479"
+            ))
+            .await
+            .unwrap()
+            .document;
+
+        let doc_value = serde_json::to_value(&doc).unwrap();
+        let vms = doc_value["verificationMethod"].as_array().unwrap();
+
+        assert_eq!(vms.len(), 3, "public-key DID with unchanged provider should have 3 VMs");
+
+        assert!(
+            vms.iter().any(|vm| vm["type"].as_str() == Some("Eip712Method2021")),
+            "should include Eip712Method2021"
+        );
+
+        // Should match offline resolution exactly
+        let doc_offline = DIDEthr::<()>::default()
+            .resolve(did!(
+                "did:ethr:0x03fdd57adec3d438ea237fe46b33ee1e016eda6b585c3e27ea66686c2ea5358479"
+            ))
+            .await
+            .unwrap()
+            .document;
+
+        assert_eq!(
+            serde_json::to_value(&doc).unwrap(),
+            serde_json::to_value(&doc_offline).unwrap(),
+            "unchanged provider should match offline for public-key DID"
+        );
     }
 }
