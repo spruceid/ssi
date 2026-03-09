@@ -411,7 +411,7 @@ impl<P: EthProvider> DIDMethodResolver for DIDEthr<P> {
                         let did = DIDBuf::from_string(format!("did:ethr:{method_specific_id}")).unwrap();
                         let doc = Document::new(did);
                         let json_ld_context = JsonLdContext::default();
-                        let doc_metadata = document::Metadata { deactivated: Some(true) };
+                        let doc_metadata = document::Metadata { deactivated: Some(true), ..Default::default() };
                         return serialize_document(doc, json_ld_context, options, doc_metadata);
                     }
 
@@ -1378,6 +1378,8 @@ mod tests {
         identity_owner: Option<[u8; 20]>,
         /// Logs to return for get_logs calls, keyed by block number
         logs: HashMap<u64, Vec<Log>>,
+        /// Block timestamps to return for block_timestamp calls
+        block_timestamps: HashMap<u64, u64>,
     }
 
     impl MockProvider {
@@ -1386,6 +1388,7 @@ mod tests {
                 changed_block: 0,
                 identity_owner: None,
                 logs: HashMap::new(),
+                block_timestamps: HashMap::new(),
             }
         }
 
@@ -1394,6 +1397,7 @@ mod tests {
                 changed_block: 1, // has changes
                 identity_owner: None, // but owner is the same
                 logs: HashMap::new(),
+                block_timestamps: HashMap::new(),
             }
         }
     }
@@ -1466,8 +1470,8 @@ mod tests {
             Ok(result)
         }
 
-        async fn block_timestamp(&self, _block: u64) -> Result<u64, Self::Error> {
-            Ok(0)
+        async fn block_timestamp(&self, block: u64) -> Result<u64, Self::Error> {
+            Ok(self.block_timestamps.get(&block).copied().unwrap_or(0))
         }
     }
 
@@ -1585,6 +1589,7 @@ mod tests {
             changed_block: 100,
             identity_owner: Some(new_owner),
             logs: HashMap::from([(100, vec![log])]),
+            block_timestamps: HashMap::new(),
         };
 
         let events = collect_events(&provider, TEST_REGISTRY, &identity, 100)
@@ -1621,6 +1626,7 @@ mod tests {
                 (100, vec![log_at_100]),
                 (200, vec![log_at_200]),
             ]),
+            block_timestamps: HashMap::new(),
         };
 
         let events = collect_events(&provider, TEST_REGISTRY, &identity, 200)
@@ -1679,6 +1685,7 @@ mod tests {
                 (200, vec![log_200]),
                 (300, vec![log_300]),
             ]),
+            block_timestamps: HashMap::new(),
         };
 
         let events = collect_events(&provider, TEST_REGISTRY, &identity, 300)
@@ -1771,6 +1778,7 @@ mod tests {
                     changed_block: 1,
                     identity_owner: Some(new_owner),
                     logs: HashMap::new(),
+                    block_timestamps: HashMap::new(),
                 },
             },
         );
@@ -1832,6 +1840,7 @@ mod tests {
                     changed_block: 1,
                     identity_owner: Some(new_owner),
                     logs: HashMap::new(),
+                    block_timestamps: HashMap::new(),
                 },
             },
         );
@@ -1992,6 +2001,7 @@ mod tests {
                     changed_block: 100,
                     identity_owner: None, // same as identity
                     logs: HashMap::from([(100, vec![log])]),
+                    block_timestamps: HashMap::new(),
                 },
             },
         );
@@ -2058,6 +2068,7 @@ mod tests {
                     changed_block: 100,
                     identity_owner: None,
                     logs: HashMap::from([(100, vec![log])]),
+                    block_timestamps: HashMap::new(),
                 },
             },
         );
@@ -2105,6 +2116,7 @@ mod tests {
                     changed_block: 100,
                     identity_owner: None,
                     logs: HashMap::from([(100, vec![log])]),
+                    block_timestamps: HashMap::new(),
                 },
             },
         );
@@ -2151,6 +2163,7 @@ mod tests {
                         (100, vec![log_a]),
                         (200, vec![log_b]),
                     ]),
+                    block_timestamps: HashMap::new(),
                 },
             },
         );
@@ -2205,6 +2218,7 @@ mod tests {
                         (100, vec![log_a]),
                         (200, vec![log_b]),
                     ]),
+                    block_timestamps: HashMap::new(),
                 },
             },
         );
@@ -2263,6 +2277,7 @@ mod tests {
                 changed_block: 200,
                 identity_owner: None,
                 logs: HashMap::from([(100, vec![log_delegate]), (200, vec![log_attr])]),
+                block_timestamps: HashMap::new(),
             },
         });
 
@@ -2305,6 +2320,7 @@ mod tests {
                 changed_block: 200,
                 identity_owner: None,
                 logs: HashMap::from([(100, vec![log_a]), (200, vec![log_b])]),
+                block_timestamps: HashMap::new(),
             },
         });
 
@@ -2346,6 +2362,7 @@ mod tests {
                 changed_block: 200,
                 identity_owner: None,
                 logs: HashMap::from([(100, vec![log_a]), (200, vec![log_b])]),
+                block_timestamps: HashMap::new(),
             },
         });
 
@@ -2387,6 +2404,7 @@ mod tests {
                 changed_block: 100,
                 identity_owner: None,
                 logs: HashMap::from([(100, vec![log])]),
+                block_timestamps: HashMap::new(),
             },
         });
 
@@ -2424,6 +2442,7 @@ mod tests {
                 changed_block: 100,
                 identity_owner: None,
                 logs: HashMap::from([(100, vec![log])]),
+                block_timestamps: HashMap::new(),
             },
         });
 
@@ -2461,6 +2480,7 @@ mod tests {
                 changed_block: 100,
                 identity_owner: None,
                 logs: HashMap::from([(100, vec![log])]),
+                block_timestamps: HashMap::new(),
             },
         });
 
@@ -2505,6 +2525,7 @@ mod tests {
                         (100, vec![log_owner]),
                         (200, vec![log_delegate]),
                     ]),
+                    block_timestamps: HashMap::new(),
                 },
             },
         );
@@ -2569,6 +2590,7 @@ mod tests {
                 changed_block: 100,
                 identity_owner: None,
                 logs: HashMap::from([(100, vec![log])]),
+                block_timestamps: HashMap::new(),
             },
         });
 
@@ -2619,6 +2641,7 @@ mod tests {
                     changed_block: 5, // multiple blocks of changes
                     identity_owner: Some(final_owner),
                     logs: HashMap::new(),
+                    block_timestamps: HashMap::new(),
                 },
             },
         );
@@ -2674,6 +2697,7 @@ mod tests {
                 changed_block: 100,
                 identity_owner: Some(null_owner),
                 logs: HashMap::from([(100, vec![log])]),
+                block_timestamps: HashMap::new(),
             },
         });
 
@@ -2725,6 +2749,7 @@ mod tests {
                     (200, vec![log_delegate]),
                     (300, vec![log_attr]),
                 ]),
+                block_timestamps: HashMap::new(),
             },
         });
 
