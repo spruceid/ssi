@@ -2230,6 +2230,245 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn resolve_delegate_and_attribute_key_share_counter() {
+        // Delegate events and attribute pub key events share the same delegate
+        // counter. A delegate at block 100 gets #delegate-1, an attribute key
+        // at block 200 gets #delegate-2.
+        let identity: [u8; 20] = [0xb9, 0xc5, 0x71, 0x40, 0x89, 0x47, 0x8a, 0x32, 0x7f, 0x09,
+                                   0x19, 0x79, 0x87, 0xf1, 0x6f, 0x9e, 0x5d, 0x93, 0x6e, 0x8a];
+        let delegate: [u8; 20] = [0xAA; 20];
+        let delegate_type = encode_delegate_type("veriKey");
+        let attr_name = encode_attr_name("did/pub/Secp256k1/veriKey/hex");
+        let pub_key: Vec<u8> = vec![0x04, 0xab, 0xcd];
+
+        let log_delegate = make_delegate_changed_log(100, &identity, &delegate_type, &delegate, u64::MAX, 0);
+        let log_attr = make_attribute_changed_log(200, &identity, &attr_name, &pub_key, u64::MAX, 100);
+
+        let mut resolver = DIDEthr::new();
+        resolver.add_network("mainnet", NetworkConfig {
+            chain_id: 1,
+            registry: TEST_REGISTRY,
+            provider: MockProvider {
+                changed_block: 200,
+                identity_owner: None,
+                logs: HashMap::from([(100, vec![log_delegate]), (200, vec![log_attr])]),
+            },
+        });
+
+        let doc = resolver
+            .resolve(did!("did:ethr:0xb9c5714089478a327f09197987f16f9e5d936e8a"))
+            .await.unwrap().document;
+
+        let doc_value = serde_json::to_value(&doc).unwrap();
+        let vms = doc_value["verificationMethod"].as_array().unwrap();
+
+        // 2 base + 2 delegate (RecoveryMethod + Eip712) + 1 attribute key = 5
+        assert_eq!(vms.len(), 5);
+
+        // #delegate-1 is the delegate event (EcdsaSecp256k1RecoveryMethod2020)
+        let d1 = vms.iter().find(|vm| vm["id"].as_str().unwrap().ends_with("#delegate-1")).unwrap();
+        assert_eq!(d1["type"], "EcdsaSecp256k1RecoveryMethod2020");
+
+        // #delegate-2 is the attribute key (EcdsaSecp256k1VerificationKey2019)
+        let d2 = vms.iter().find(|vm| vm["id"].as_str().unwrap().ends_with("#delegate-2")).unwrap();
+        assert_eq!(d2["type"], "EcdsaSecp256k1VerificationKey2019");
+        assert_eq!(d2["publicKeyHex"], hex::encode(&pub_key));
+    }
+
+    #[tokio::test]
+    async fn resolve_multiple_services_sequential_ids() {
+        // Multiple did/svc attributes produce #service-1, #service-2, etc.
+        let identity: [u8; 20] = [0xb9, 0xc5, 0x71, 0x40, 0x89, 0x47, 0x8a, 0x32, 0x7f, 0x09,
+                                   0x19, 0x79, 0x87, 0xf1, 0x6f, 0x9e, 0x5d, 0x93, 0x6e, 0x8a];
+        let attr_hub = encode_attr_name("did/svc/HubService");
+        let attr_msg = encode_attr_name("did/svc/MessagingService");
+
+        let log_a = make_attribute_changed_log(100, &identity, &attr_hub, b"https://hub.example.com", u64::MAX, 0);
+        let log_b = make_attribute_changed_log(200, &identity, &attr_msg, b"https://msg.example.com", u64::MAX, 100);
+
+        let mut resolver = DIDEthr::new();
+        resolver.add_network("mainnet", NetworkConfig {
+            chain_id: 1,
+            registry: TEST_REGISTRY,
+            provider: MockProvider {
+                changed_block: 200,
+                identity_owner: None,
+                logs: HashMap::from([(100, vec![log_a]), (200, vec![log_b])]),
+            },
+        });
+
+        let doc = resolver
+            .resolve(did!("did:ethr:0xb9c5714089478a327f09197987f16f9e5d936e8a"))
+            .await.unwrap().document;
+
+        let doc_value = serde_json::to_value(&doc).unwrap();
+        let services = doc_value["service"].as_array().unwrap();
+        assert_eq!(services.len(), 2);
+
+        let did_prefix = "did:ethr:0xb9c5714089478a327f09197987f16f9e5d936e8a";
+        assert_eq!(services[0]["id"], format!("{did_prefix}#service-1"));
+        assert_eq!(services[0]["type"], "HubService");
+        assert_eq!(services[1]["id"], format!("{did_prefix}#service-2"));
+        assert_eq!(services[1]["type"], "MessagingService");
+    }
+
+    #[tokio::test]
+    async fn resolve_expired_attribute_excluded_counter_increments() {
+        // An expired attribute (valid_to < now) is excluded but the delegate
+        // counter still increments, so the next valid entry gets #delegate-2.
+        let identity: [u8; 20] = [0xb9, 0xc5, 0x71, 0x40, 0x89, 0x47, 0x8a, 0x32, 0x7f, 0x09,
+                                   0x19, 0x79, 0x87, 0xf1, 0x6f, 0x9e, 0x5d, 0x93, 0x6e, 0x8a];
+        let attr_name = encode_attr_name("did/pub/Secp256k1/veriKey/hex");
+        let pub_key_a: Vec<u8> = vec![0x04, 0xaa];
+        let pub_key_b: Vec<u8> = vec![0x04, 0xbb];
+
+        // First key: expired (valid_to = 1000, well in the past)
+        let log_a = make_attribute_changed_log(100, &identity, &attr_name, &pub_key_a, 1000, 0);
+        // Second key: valid
+        let log_b = make_attribute_changed_log(200, &identity, &attr_name, &pub_key_b, u64::MAX, 100);
+
+        let mut resolver = DIDEthr::new();
+        resolver.add_network("mainnet", NetworkConfig {
+            chain_id: 1,
+            registry: TEST_REGISTRY,
+            provider: MockProvider {
+                changed_block: 200,
+                identity_owner: None,
+                logs: HashMap::from([(100, vec![log_a]), (200, vec![log_b])]),
+            },
+        });
+
+        let doc = resolver
+            .resolve(did!("did:ethr:0xb9c5714089478a327f09197987f16f9e5d936e8a"))
+            .await.unwrap().document;
+
+        let doc_value = serde_json::to_value(&doc).unwrap();
+        let vms = doc_value["verificationMethod"].as_array().unwrap();
+
+        // 2 base + 1 valid attribute key = 3 (expired one excluded)
+        assert_eq!(vms.len(), 3);
+
+        // No #delegate-1 (expired)
+        assert!(vms.iter().all(|vm| !vm["id"].as_str().unwrap().ends_with("#delegate-1")));
+
+        // Has #delegate-2 (counter incremented past expired)
+        let vm = vms.iter().find(|vm| {
+            vm["id"].as_str().unwrap().ends_with("#delegate-2")
+        }).expect("should have #delegate-2 VM");
+        assert_eq!(vm["publicKeyHex"], hex::encode(&pub_key_b));
+    }
+
+    #[tokio::test]
+    async fn resolve_service_endpoint_json() {
+        // did/svc/MessagingService with JSON object value → structured serviceEndpoint
+        let identity: [u8; 20] = [0xb9, 0xc5, 0x71, 0x40, 0x89, 0x47, 0x8a, 0x32, 0x7f, 0x09,
+                                   0x19, 0x79, 0x87, 0xf1, 0x6f, 0x9e, 0x5d, 0x93, 0x6e, 0x8a];
+        let attr_name = encode_attr_name("did/svc/MessagingService");
+        let endpoint = br#"{"uri":"https://msg.example.com","accept":["didcomm/v2"]}"#;
+
+        let log = make_attribute_changed_log(100, &identity, &attr_name, endpoint, u64::MAX, 0);
+
+        let mut resolver = DIDEthr::new();
+        resolver.add_network("mainnet", NetworkConfig {
+            chain_id: 1,
+            registry: TEST_REGISTRY,
+            provider: MockProvider {
+                changed_block: 100,
+                identity_owner: None,
+                logs: HashMap::from([(100, vec![log])]),
+            },
+        });
+
+        let doc = resolver
+            .resolve(did!("did:ethr:0xb9c5714089478a327f09197987f16f9e5d936e8a"))
+            .await.unwrap().document;
+
+        let doc_value = serde_json::to_value(&doc).unwrap();
+        let services = doc_value["service"].as_array().unwrap();
+        assert_eq!(services.len(), 1);
+
+        let svc = &services[0];
+        assert_eq!(svc["type"], "MessagingService");
+        // JSON endpoint should be a parsed object, not a string
+        assert!(svc["serviceEndpoint"].is_object());
+        assert_eq!(svc["serviceEndpoint"]["uri"], "https://msg.example.com");
+        assert_eq!(svc["serviceEndpoint"]["accept"], json!(["didcomm/v2"]));
+    }
+
+    #[tokio::test]
+    async fn resolve_service_endpoint_url() {
+        // did/svc/HubService with URL string → service entry
+        let identity: [u8; 20] = [0xb9, 0xc5, 0x71, 0x40, 0x89, 0x47, 0x8a, 0x32, 0x7f, 0x09,
+                                   0x19, 0x79, 0x87, 0xf1, 0x6f, 0x9e, 0x5d, 0x93, 0x6e, 0x8a];
+        let attr_name = encode_attr_name("did/svc/HubService");
+        let endpoint = b"https://hubs.uport.me";
+
+        let log = make_attribute_changed_log(100, &identity, &attr_name, endpoint, u64::MAX, 0);
+
+        let mut resolver = DIDEthr::new();
+        resolver.add_network("mainnet", NetworkConfig {
+            chain_id: 1,
+            registry: TEST_REGISTRY,
+            provider: MockProvider {
+                changed_block: 100,
+                identity_owner: None,
+                logs: HashMap::from([(100, vec![log])]),
+            },
+        });
+
+        let doc = resolver
+            .resolve(did!("did:ethr:0xb9c5714089478a327f09197987f16f9e5d936e8a"))
+            .await.unwrap().document;
+
+        let doc_value = serde_json::to_value(&doc).unwrap();
+        eprintln!("{}", serde_json::to_string_pretty(&doc_value).unwrap());
+        let services = doc_value["service"].as_array().unwrap();
+        assert_eq!(services.len(), 1);
+
+        let svc = &services[0];
+        assert_eq!(svc["id"], "did:ethr:0xb9c5714089478a327f09197987f16f9e5d936e8a#service-1");
+        assert_eq!(svc["type"], "HubService");
+        assert_eq!(svc["serviceEndpoint"], "https://hubs.uport.me");
+    }
+
+    #[tokio::test]
+    async fn resolve_secp256k1_sigauth_hex_attribute_in_authentication() {
+        // did/pub/Secp256k1/sigAuth/hex attribute adds VM referenced in
+        // verificationMethod + assertionMethod + authentication
+        let identity: [u8; 20] = [0xb9, 0xc5, 0x71, 0x40, 0x89, 0x47, 0x8a, 0x32, 0x7f, 0x09,
+                                   0x19, 0x79, 0x87, 0xf1, 0x6f, 0x9e, 0x5d, 0x93, 0x6e, 0x8a];
+        let attr_name = encode_attr_name("did/pub/Secp256k1/sigAuth/hex");
+        let pub_key_value: Vec<u8> = vec![0x04, 0xde, 0xad, 0xbe, 0xef];
+
+        let log = make_attribute_changed_log(100, &identity, &attr_name, &pub_key_value, u64::MAX, 0);
+
+        let mut resolver = DIDEthr::new();
+        resolver.add_network("mainnet", NetworkConfig {
+            chain_id: 1,
+            registry: TEST_REGISTRY,
+            provider: MockProvider {
+                changed_block: 100,
+                identity_owner: None,
+                logs: HashMap::from([(100, vec![log])]),
+            },
+        });
+
+        let doc = resolver
+            .resolve(did!("did:ethr:0xb9c5714089478a327f09197987f16f9e5d936e8a"))
+            .await.unwrap().document;
+
+        let doc_value = serde_json::to_value(&doc).unwrap();
+        let did_prefix = "did:ethr:0xb9c5714089478a327f09197987f16f9e5d936e8a";
+
+        let assertion = doc_value["assertionMethod"].as_array().unwrap();
+        let auth = doc_value["authentication"].as_array().unwrap();
+
+        // sigAuth should be in BOTH assertionMethod AND authentication
+        assert!(assertion.iter().any(|v| v == &format!("{did_prefix}#delegate-1")));
+        assert!(auth.iter().any(|v| v == &format!("{did_prefix}#delegate-1")));
+    }
+
+    #[tokio::test]
     async fn resolve_delegates_with_owner_change_integration() {
         // When the owner has changed AND there are delegates, both the
         // owner-derived controller VM and the delegate VMs appear.
