@@ -15,6 +15,8 @@ use static_iref::iri;
 use std::collections::HashMap;
 use std::str::FromStr;
 
+use base64::Engine as _;
+
 mod json_ld_context;
 use json_ld_context::JsonLdContext;
 use ssi_jwk::JWK;
@@ -501,6 +503,7 @@ fn apply_events(
     now: u64,
 ) {
     let mut delegate_counter = 0u64;
+    let mut service_counter = 0u64;
 
     for event in events {
         match event {
@@ -574,7 +577,142 @@ fn apply_events(
                         .push(eip712_id_url.into());
                 }
             }
-            // OwnerChanged and AttributeChanged are handled elsewhere (Phase 2 / Phase 5)
+            Erc1056Event::AttributeChanged {
+                name,
+                value,
+                valid_to,
+                ..
+            } => {
+                let attr_name = decode_delegate_type(name); // trims trailing zeros
+                let attr_str = match std::str::from_utf8(attr_name) {
+                    Ok(s) => s,
+                    Err(_) => continue,
+                };
+                let parts: Vec<&str> = attr_str.split('/').collect();
+
+                if parts.len() >= 3 && parts[0] == "did" && parts[1] == "pub" {
+                    // did/pub/<algo>/<purpose>/<encoding>
+                    delegate_counter += 1;
+
+                    if *valid_to < now {
+                        continue;
+                    }
+
+                    let algo = parts.get(2).copied().unwrap_or("");
+                    let purpose = parts.get(3).copied().unwrap_or("");
+                    let encoding = parts.get(4).copied().unwrap_or("hex");
+
+                    let vm_type = match algo {
+                        "Secp256k1" => "EcdsaSecp256k1VerificationKey2019",
+                        "Ed25519" => "Ed25519VerificationKey2018",
+                        "X25519" => "X25519KeyAgreementKey2019",
+                        _ => continue,
+                    };
+
+                    let prop_name = match encoding {
+                        "hex" | "" => "publicKeyHex",
+                        "base64" => "publicKeyBase64",
+                        "base58" => "publicKeyBase58",
+                        "pem" => "publicKeyPem",
+                        _ => continue,
+                    };
+
+                    let prop_value = match encoding {
+                        "hex" | "" => hex::encode(value),
+                        "base64" => base64::engine::general_purpose::STANDARD.encode(value),
+                        _ => String::from_utf8_lossy(value).into_owned(),
+                    };
+
+                    let vm_id = format!("{did}#delegate-{delegate_counter}");
+                    let vm_id_url = DIDURLBuf::from_string(vm_id).unwrap();
+
+                    let vm = DIDVerificationMethod {
+                        id: vm_id_url.clone(),
+                        type_: vm_type.to_owned(),
+                        controller: did.clone(),
+                        properties: [(
+                            prop_name.into(),
+                            serde_json::Value::String(prop_value),
+                        )]
+                        .into_iter()
+                        .collect(),
+                    };
+
+                    // Add context entries
+                    match algo {
+                        "Secp256k1" => json_ld_context.add_verification_method_type(
+                            VerificationMethodType::EcdsaSecp256k1VerificationKey2019,
+                        ),
+                        _ => {} // Ed25519/X25519 context handled in Phase 10+
+                    }
+                    json_ld_context.add_property(prop_name);
+
+                    doc.verification_method.push(vm);
+
+                    let is_veri_key = purpose == "veriKey";
+                    let is_sig_auth = purpose == "sigAuth";
+                    let is_enc = purpose == "enc";
+
+                    if is_veri_key || is_sig_auth {
+                        doc.verification_relationships
+                            .assertion_method
+                            .push(vm_id_url.clone().into());
+                    }
+
+                    if is_sig_auth {
+                        doc.verification_relationships
+                            .authentication
+                            .push(vm_id_url.clone().into());
+                    }
+
+                    if is_enc {
+                        doc.verification_relationships
+                            .key_agreement
+                            .push(vm_id_url.into());
+                    }
+                } else if parts.len() >= 3 && parts[0] == "did" && parts[1] == "svc" {
+                    // did/svc/<ServiceType>
+                    service_counter += 1;
+
+                    if *valid_to < now {
+                        continue;
+                    }
+
+                    let service_type = parts[2..].join("/");
+                    let service_id = format!("{did}#service-{service_counter}");
+
+                    let endpoint_str = String::from_utf8_lossy(value);
+                    let endpoint = if let Ok(json_val) = serde_json::from_str::<serde_json::Value>(&endpoint_str) {
+                        if json_val.is_object() || json_val.is_array() {
+                            document::service::Endpoint::Map(json_val)
+                        } else {
+                            match iref::UriBuf::new(endpoint_str.as_bytes().to_vec()) {
+                                Ok(uri) => document::service::Endpoint::Uri(uri),
+                                Err(e) => document::service::Endpoint::Map(
+                                    serde_json::Value::String(String::from_utf8_lossy(&e.0).into_owned()),
+                                ),
+                            }
+                        }
+                    } else {
+                        match iref::UriBuf::new(endpoint_str.as_bytes().to_vec()) {
+                            Ok(uri) => document::service::Endpoint::Uri(uri),
+                            Err(e) => document::service::Endpoint::Map(
+                                serde_json::Value::String(String::from_utf8_lossy(&e.0).into_owned()),
+                            ),
+                        }
+                    };
+
+                    let service = document::Service {
+                        id: iref::UriBuf::new(service_id.into_bytes()).unwrap(),
+                        type_: ssi_core::one_or_many::OneOrMany::One(service_type),
+                        service_endpoint: Some(ssi_core::one_or_many::OneOrMany::One(endpoint)),
+                        property_set: std::collections::BTreeMap::new(),
+                    };
+
+                    doc.service.push(service);
+                }
+            }
+            // OwnerChanged handled by identityOwner() (Phase 2)
             _ => {}
         }
     }
@@ -2152,6 +2290,62 @@ mod tests {
             delegate_vm["blockchainAccountId"],
             format!("eip155:1:{delegate_addr}")
         );
+    }
+
+    /// Helper: encode an attribute name string as bytes32 (right-padded with zeros)
+    fn encode_attr_name(s: &str) -> [u8; 32] {
+        let mut b = [0u8; 32];
+        let bytes = s.as_bytes();
+        b[..bytes.len().min(32)].copy_from_slice(&bytes[..bytes.len().min(32)]);
+        b
+    }
+
+    #[tokio::test]
+    async fn resolve_secp256k1_verikey_hex_attribute() {
+        // did/pub/Secp256k1/veriKey/hex attribute adds EcdsaSecp256k1VerificationKey2019
+        // with publicKeyHex to verificationMethod + assertionMethod, using #delegate-N ID
+        let identity: [u8; 20] = [0xb9, 0xc5, 0x71, 0x40, 0x89, 0x47, 0x8a, 0x32, 0x7f, 0x09,
+                                   0x19, 0x79, 0x87, 0xf1, 0x6f, 0x9e, 0x5d, 0x93, 0x6e, 0x8a];
+        let attr_name = encode_attr_name("did/pub/Secp256k1/veriKey/hex");
+        let pub_key_value: Vec<u8> = vec![0x04, 0xab, 0xcd, 0xef, 0x01, 0x23, 0x45, 0x67];
+
+        let log = make_attribute_changed_log(100, &identity, &attr_name, &pub_key_value, u64::MAX, 0);
+
+        let mut resolver = DIDEthr::new();
+        resolver.add_network("mainnet", NetworkConfig {
+            chain_id: 1,
+            registry: TEST_REGISTRY,
+            provider: MockProvider {
+                changed_block: 100,
+                identity_owner: None,
+                logs: HashMap::from([(100, vec![log])]),
+            },
+        });
+
+        let doc = resolver
+            .resolve(did!("did:ethr:0xb9c5714089478a327f09197987f16f9e5d936e8a"))
+            .await.unwrap().document;
+
+        let doc_value = serde_json::to_value(&doc).unwrap();
+        eprintln!("{}", serde_json::to_string_pretty(&doc_value).unwrap());
+        let vms = doc_value["verificationMethod"].as_array().unwrap();
+
+        // 2 base + 1 attribute key = 3
+        assert_eq!(vms.len(), 3);
+
+        let attr_vm = vms.iter().find(|vm| {
+            vm["id"].as_str().unwrap().ends_with("#delegate-1")
+        }).expect("should have #delegate-1 VM from attribute");
+        assert_eq!(attr_vm["type"], "EcdsaSecp256k1VerificationKey2019");
+        assert_eq!(attr_vm["publicKeyHex"], hex::encode(&pub_key_value));
+        assert_eq!(attr_vm["controller"], "did:ethr:0xb9c5714089478a327f09197987f16f9e5d936e8a");
+
+        // Should be in assertionMethod but NOT authentication
+        let did_prefix = "did:ethr:0xb9c5714089478a327f09197987f16f9e5d936e8a";
+        let assertion = doc_value["assertionMethod"].as_array().unwrap();
+        let auth = doc_value["authentication"].as_array().unwrap();
+        assert!(assertion.iter().any(|v| v == &format!("{did_prefix}#delegate-1")));
+        assert!(!auth.iter().any(|v| v == &format!("{did_prefix}#delegate-1")));
     }
 
     #[tokio::test]

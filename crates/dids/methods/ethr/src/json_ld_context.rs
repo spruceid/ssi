@@ -17,6 +17,10 @@ pub struct JsonLdContext {
     ecdsa_secp256k1_verification_key_2019: bool,
     ecdsa_secp256k1_recovery_method_2020: bool,
     eip712_method_2021: bool,
+    public_key_hex: bool,
+    public_key_base64: bool,
+    public_key_base58: bool,
+    public_key_pem: bool,
 }
 
 impl JsonLdContext {
@@ -29,6 +33,16 @@ impl JsonLdContext {
                 self.ecdsa_secp256k1_recovery_method_2020 = true
             }
             VerificationMethodType::Eip712Method2021 => self.eip712_method_2021 = true,
+        }
+    }
+
+    pub fn add_property(&mut self, prop: &str) {
+        match prop {
+            "publicKeyHex" => self.public_key_hex = true,
+            "publicKeyBase64" => self.public_key_base64 = true,
+            "publicKeyBase58" => self.public_key_base58 = true,
+            "publicKeyPem" => self.public_key_pem = true,
+            _ => {}
         }
     }
 
@@ -101,6 +115,54 @@ impl JsonLdContext {
                 "blockchainAccountId".into(),
                 TermDefinition::Simple(
                     iri!("https://w3id.org/security#blockchainAccountId")
+                        .to_owned()
+                        .into(),
+                )
+                .into(),
+            );
+        }
+
+        if self.public_key_hex {
+            def.bindings.insert(
+                "publicKeyHex".into(),
+                TermDefinition::Simple(
+                    iri!("https://w3id.org/security#publicKeyHex")
+                        .to_owned()
+                        .into(),
+                )
+                .into(),
+            );
+        }
+
+        if self.public_key_base64 {
+            def.bindings.insert(
+                "publicKeyBase64".into(),
+                TermDefinition::Simple(
+                    iri!("https://w3id.org/security#publicKeyBase64")
+                        .to_owned()
+                        .into(),
+                )
+                .into(),
+            );
+        }
+
+        if self.public_key_base58 {
+            def.bindings.insert(
+                "publicKeyBase58".into(),
+                TermDefinition::Simple(
+                    iri!("https://w3id.org/security#publicKeyBase58")
+                        .to_owned()
+                        .into(),
+                )
+                .into(),
+            );
+        }
+
+        if self.public_key_pem {
+            def.bindings.insert(
+                "publicKeyPem".into(),
+                TermDefinition::Simple(
+                    iri!("https://w3id.org/security#publicKeyPem")
                         .to_owned()
                         .into(),
                 )

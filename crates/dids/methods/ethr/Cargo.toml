@@ -15,12 +15,14 @@ documentation = "https://docs.rs/did-ethr/"
 ssi-dids-core.workspace = true
 ssi-caips = { workspace = true, features = ["eip"] }
 ssi-jwk.workspace = true
+ssi-core.workspace = true
 iref.workspace = true
 static-iref.workspace = true
 thiserror.workspace = true
 hex.workspace = true
 serde_json.workspace = true
 ssi-crypto = { workspace = true, features = ["keccak"] }
+base64.workspace = true
 
 [dev-dependencies]
 tokio = { version = "1.0", features = ["macros"] }
