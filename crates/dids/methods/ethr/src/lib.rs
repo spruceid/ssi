@@ -537,14 +537,17 @@ fn apply_events(
                 let vm_id = format!("{did}#delegate-{delegate_counter}");
                 let eip712_id = format!("{did}#delegate-{delegate_counter}-Eip712Method2021");
 
+                let vm_id_url = DIDURLBuf::from_string(vm_id).unwrap();
+                let eip712_id_url = DIDURLBuf::from_string(eip712_id).unwrap();
+
                 let vm = VerificationMethod::EcdsaSecp256k1RecoveryMethod2020 {
-                    id: DIDURLBuf::from_string(vm_id).unwrap(),
+                    id: vm_id_url.clone(),
                     controller: did.clone(),
                     blockchain_account_id: blockchain_account_id.clone(),
                 };
 
                 let eip712_vm = VerificationMethod::Eip712Method2021 {
-                    id: DIDURLBuf::from_string(eip712_id).unwrap(),
+                    id: eip712_id_url.clone(),
                     controller: did.clone(),
                     blockchain_account_id,
                 };
@@ -552,34 +555,23 @@ fn apply_events(
                 json_ld_context.add_verification_method_type(vm.type_());
                 json_ld_context.add_verification_method_type(eip712_vm.type_());
 
-                let vm_ref = vm.id().to_owned().into();
-                let eip712_ref = eip712_vm.id().to_owned().into();
-
                 doc.verification_method.push(vm.into());
                 doc.verification_method.push(eip712_vm.into());
 
                 doc.verification_relationships
                     .assertion_method
-                    .push(vm_ref);
+                    .push(vm_id_url.clone().into());
                 doc.verification_relationships
                     .assertion_method
-                    .push(eip712_ref);
+                    .push(eip712_id_url.clone().into());
 
                 if is_sig_auth {
-                    let vm_ref2 = doc.verification_method[doc.verification_method.len() - 2]
-                        .id
-                        .to_owned()
-                        .into();
-                    let eip712_ref2 = doc.verification_method[doc.verification_method.len() - 1]
-                        .id
-                        .to_owned()
-                        .into();
                     doc.verification_relationships
                         .authentication
-                        .push(vm_ref2);
+                        .push(vm_id_url.into());
                     doc.verification_relationships
                         .authentication
-                        .push(eip712_ref2);
+                        .push(eip712_id_url.into());
                 }
             }
             // OwnerChanged and AttributeChanged are handled elsewhere (Phase 2 / Phase 5)
