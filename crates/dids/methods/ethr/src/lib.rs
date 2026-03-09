@@ -1,6 +1,7 @@
 use iref::Iri;
 use ssi_caips::caip10::BlockchainAccountId;
 use ssi_caips::caip2::ChainId;
+use ssi_crypto::hashes::keccak;
 use ssi_dids_core::{
     document::{
         self,
@@ -119,6 +120,12 @@ fn decode_address(data: &[u8]) -> [u8; 20] {
     addr
 }
 
+/// Convert raw 20 bytes to an EIP-55 checksummed hex address string
+fn format_address_eip55(addr: &[u8; 20]) -> String {
+    let lowercase = format!("0x{}", hex::encode(addr));
+    keccak::eip55_checksum_addr(&lowercase).unwrap_or(lowercase)
+}
+
 // --- DIDEthr ---
 
 /// did:ethr DID Method
@@ -202,9 +209,16 @@ impl<P: EthProvider> DIDMethodResolver for DIDEthr<P> {
                         return resolve_offline(method_specific_id, &decoded_id, options);
                     }
 
-                    // Phase 2+ will handle different-owner resolution here.
-                    // For now, fall back to offline.
-                    return resolve_offline(method_specific_id, &decoded_id, options);
+                    // Owner changed — build document with the new owner's address
+                    let owner_address = format_address_eip55(&owner);
+                    let is_public_key_did = decoded_id.address_or_public_key.len() == 68;
+                    return resolve_with_owner(
+                        method_specific_id,
+                        &decoded_id.network_chain,
+                        &owner_address,
+                        is_public_key_did,
+                        options,
+                    );
                 }
             }
         }
@@ -253,6 +267,40 @@ fn resolve_offline(
         )),
     }?;
 
+    serialize_document(doc, json_ld_context, options)
+}
+
+/// Resolve a DID when the on-chain owner differs from the identity address.
+///
+/// For address-based DIDs: `#controller` and `Eip712Method2021` use the owner's address.
+/// For public-key DIDs: `#controllerKey` is omitted (the key no longer represents the owner).
+fn resolve_with_owner(
+    method_specific_id: &str,
+    network_chain: &NetworkChain,
+    owner_address: &str,
+    _is_public_key_did: bool,
+    options: resolution::Options,
+) -> Result<Output<Vec<u8>>, Error> {
+    let mut json_ld_context = JsonLdContext::default();
+
+    // Both address-based and public-key DIDs with a changed owner produce
+    // the same document shape: #controller + Eip712Method2021, using the
+    // owner's address. For public-key DIDs, #controllerKey is omitted.
+    let doc = resolve_address(
+        &mut json_ld_context,
+        method_specific_id,
+        network_chain,
+        owner_address,
+    )?;
+
+    serialize_document(doc, json_ld_context, options)
+}
+
+fn serialize_document(
+    doc: Document,
+    json_ld_context: JsonLdContext,
+    options: resolution::Options,
+) -> Result<Output<Vec<u8>>, Error> {
     let content_type = options.accept.unwrap_or(MediaType::JsonLd);
     let represented = doc.into_representation(representation::Options::from_media_type(
         content_type,
@@ -968,6 +1016,66 @@ mod tests {
             serde_json::to_value(&doc_offline).unwrap(),
             "mock provider with changed=0 should produce same doc as offline"
         );
+    }
+
+    #[tokio::test]
+    async fn resolve_with_mock_provider_owner_changed_address_did() {
+        // When identityOwner(addr) returns a different address, the #controller
+        // and Eip712Method2021 VMs should use the new owner's address in
+        // blockchainAccountId.
+        let new_owner: [u8; 20] = [0x11; 20];
+        let mut resolver = DIDEthr::new();
+        resolver.add_network(
+            "mainnet",
+            NetworkConfig {
+                chain_id: 1,
+                registry: [0xdc, 0xa7, 0xef, 0x03, 0xe9, 0x8e, 0x0d, 0xc2,
+                           0xb8, 0x55, 0xbe, 0x64, 0x7c, 0x39, 0xab, 0xe9,
+                           0x84, 0xfc, 0xf2, 0x1b],
+                provider: MockProvider {
+                    changed_block: 1,
+                    identity_owner: Some(new_owner),
+                },
+            },
+        );
+
+        let doc = resolver
+            .resolve(did!(
+                "did:ethr:0xb9c5714089478a327f09197987f16f9e5d936e8a"
+            ))
+            .await
+            .unwrap()
+            .document;
+
+        let doc_value = serde_json::to_value(&doc).unwrap();
+
+        // The DID id should still use the original address
+        assert_eq!(
+            doc_value["id"],
+            "did:ethr:0xb9c5714089478a327f09197987f16f9e5d936e8a"
+        );
+
+        // #controller VM should use the new owner's address
+        let vms = doc_value["verificationMethod"].as_array().unwrap();
+        let controller_vm = vms.iter().find(|vm| {
+            vm["id"].as_str().unwrap().ends_with("#controller")
+        }).expect("should have #controller VM");
+        assert_eq!(
+            controller_vm["blockchainAccountId"],
+            "eip155:1:0x1111111111111111111111111111111111111111"
+        );
+
+        // Eip712Method2021 should also use the new owner's address
+        let eip712_vm = vms.iter().find(|vm| {
+            vm["id"].as_str().unwrap().ends_with("#Eip712Method2021")
+        }).expect("should have #Eip712Method2021 VM");
+        assert_eq!(
+            eip712_vm["blockchainAccountId"],
+            "eip155:1:0x1111111111111111111111111111111111111111"
+        );
+
+        // Should only have 2 VMs (no controllerKey for address-based DID)
+        assert_eq!(vms.len(), 2);
     }
 
     #[tokio::test]

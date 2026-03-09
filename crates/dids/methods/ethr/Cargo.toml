@@ -20,6 +20,7 @@ static-iref.workspace = true
 thiserror.workspace = true
 hex.workspace = true
 serde_json.workspace = true
+ssi-crypto = { workspace = true, features = ["keccak"] }
 
 [dev-dependencies]
 tokio = { version = "1.0", features = ["macros"] }
