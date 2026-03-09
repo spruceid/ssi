@@ -175,33 +175,42 @@ impl<P: EthProvider> DIDMethodResolver for DIDEthr<P> {
         let network_name = decoded_id.network_name();
 
         // Check if we have a provider for this network
-        let use_onchain = if let Some(config) = self.networks.get(&network_name) {
-            // Parse address from the identifier
+        if let Some(config) = self.networks.get(&network_name) {
             let addr_hex = decoded_id.account_address_hex();
             if let Some(addr) = parse_address_bytes(&addr_hex) {
                 // Call changed(addr) to see if there are on-chain modifications
                 let calldata = encode_call(CHANGED_SELECTOR, &addr);
                 let result = config
                     .provider
-                    .call(config.registry, calldata, BlockRef::Latest)
+                    .call(config.registry, calldata.clone(), BlockRef::Latest)
                     .await
                     .map_err(|e| Error::Internal(e.to_string()))?;
                 let changed_block = decode_uint256(&result);
-                changed_block > 0
-            } else {
-                false
-            }
-        } else {
-            false
-        };
 
-        if use_onchain {
-            // For now, on-chain path with changed > 0 still resolves offline.
-            // Phase 2+ will implement full on-chain resolution.
-            resolve_offline(method_specific_id, &decoded_id, options)
-        } else {
-            resolve_offline(method_specific_id, &decoded_id, options)
+                if changed_block > 0 {
+                    // Check identityOwner(addr)
+                    let owner_calldata = encode_call(IDENTITY_OWNER_SELECTOR, &addr);
+                    let owner_result = config
+                        .provider
+                        .call(config.registry, owner_calldata, BlockRef::Latest)
+                        .await
+                        .map_err(|e| Error::Internal(e.to_string()))?;
+                    let owner = decode_address(&owner_result);
+
+                    if owner == addr {
+                        // Owner unchanged — use offline (genesis) document
+                        return resolve_offline(method_specific_id, &decoded_id, options);
+                    }
+
+                    // Phase 2+ will handle different-owner resolution here.
+                    // For now, fall back to offline.
+                    return resolve_offline(method_specific_id, &decoded_id, options);
+                }
+            }
         }
+
+        // No provider or changed=0 — offline resolution
+        resolve_offline(method_specific_id, &decoded_id, options)
     }
 }
 
@@ -838,5 +847,165 @@ mod tests {
             .await
             .unwrap()
             .is_ok())
+    }
+
+    // --- Mock provider for on-chain resolution tests ---
+
+    #[derive(Debug)]
+    struct MockProviderError(String);
+    impl std::fmt::Display for MockProviderError {
+        fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+            write!(f, "MockProviderError: {}", self.0)
+        }
+    }
+    impl std::error::Error for MockProviderError {}
+
+    /// Mock provider that returns configurable responses for changed() and identityOwner()
+    struct MockProvider {
+        /// Block number to return for changed(addr) calls
+        changed_block: u64,
+        /// Address to return for identityOwner(addr) calls (None = return the queried address)
+        identity_owner: Option<[u8; 20]>,
+    }
+
+    impl MockProvider {
+        fn new_unchanged() -> Self {
+            Self {
+                changed_block: 0,
+                identity_owner: None,
+            }
+        }
+
+        fn new_same_owner() -> Self {
+            Self {
+                changed_block: 1, // has changes
+                identity_owner: None, // but owner is the same
+            }
+        }
+    }
+
+    impl EthProvider for MockProvider {
+        type Error = MockProviderError;
+
+        async fn call(
+            &self,
+            _to: [u8; 20],
+            data: Vec<u8>,
+            _block: BlockRef,
+        ) -> Result<Vec<u8>, Self::Error> {
+            if data.len() < 4 {
+                return Err(MockProviderError("calldata too short".into()));
+            }
+            let selector: [u8; 4] = data[..4].try_into().unwrap();
+            match selector {
+                CHANGED_SELECTOR => {
+                    // Return changed_block as uint256
+                    let mut result = vec![0u8; 32];
+                    result[24..32].copy_from_slice(&self.changed_block.to_be_bytes());
+                    Ok(result)
+                }
+                IDENTITY_OWNER_SELECTOR => {
+                    // Return identity_owner or echo back the queried address
+                    let mut result = vec![0u8; 32];
+                    if let Some(owner) = self.identity_owner {
+                        result[12..32].copy_from_slice(&owner);
+                    } else if data.len() >= 36 {
+                        // Echo back the queried address (last 20 bytes of the 32-byte arg)
+                        result[12..32].copy_from_slice(&data[16..36]);
+                    }
+                    Ok(result)
+                }
+                _ => Err(MockProviderError(format!(
+                    "unknown selector: {:?}",
+                    selector
+                ))),
+            }
+        }
+
+        async fn get_logs(&self, _filter: LogFilter) -> Result<Vec<Log>, Self::Error> {
+            Ok(vec![])
+        }
+
+        async fn block_timestamp(&self, _block: u64) -> Result<u64, Self::Error> {
+            Ok(0)
+        }
+    }
+
+    #[tokio::test]
+    async fn resolve_with_mock_provider_changed_zero() {
+        // A mock provider where changed(addr) returns 0 should produce
+        // the same document as offline resolution.
+        let mut resolver = DIDEthr::new();
+        resolver.add_network(
+            "mainnet",
+            NetworkConfig {
+                chain_id: 1,
+                registry: [0xdc, 0xa7, 0xef, 0x03, 0xe9, 0x8e, 0x0d, 0xc2,
+                           0xb8, 0x55, 0xbe, 0x64, 0x7c, 0x39, 0xab, 0xe9,
+                           0x84, 0xfc, 0xf2, 0x1b],
+                provider: MockProvider::new_unchanged(),
+            },
+        );
+
+        let doc_onchain = resolver
+            .resolve(did!(
+                "did:ethr:0xb9c5714089478a327f09197987f16f9e5d936e8a"
+            ))
+            .await
+            .unwrap()
+            .document;
+
+        let doc_offline = DIDEthr::<()>::default()
+            .resolve(did!(
+                "did:ethr:0xb9c5714089478a327f09197987f16f9e5d936e8a"
+            ))
+            .await
+            .unwrap()
+            .document;
+
+        assert_eq!(
+            serde_json::to_value(&doc_onchain).unwrap(),
+            serde_json::to_value(&doc_offline).unwrap(),
+            "mock provider with changed=0 should produce same doc as offline"
+        );
+    }
+
+    #[tokio::test]
+    async fn resolve_with_mock_provider_identity_owner_same() {
+        // A mock provider where identityOwner(addr) returns the same address
+        // should produce the same document as offline resolution.
+        let mut resolver = DIDEthr::new();
+        resolver.add_network(
+            "mainnet",
+            NetworkConfig {
+                chain_id: 1,
+                registry: [0xdc, 0xa7, 0xef, 0x03, 0xe9, 0x8e, 0x0d, 0xc2,
+                           0xb8, 0x55, 0xbe, 0x64, 0x7c, 0x39, 0xab, 0xe9,
+                           0x84, 0xfc, 0xf2, 0x1b],
+                provider: MockProvider::new_same_owner(),
+            },
+        );
+
+        let doc_onchain = resolver
+            .resolve(did!(
+                "did:ethr:0xb9c5714089478a327f09197987f16f9e5d936e8a"
+            ))
+            .await
+            .unwrap()
+            .document;
+
+        let doc_offline = DIDEthr::<()>::default()
+            .resolve(did!(
+                "did:ethr:0xb9c5714089478a327f09197987f16f9e5d936e8a"
+            ))
+            .await
+            .unwrap()
+            .document;
+
+        assert_eq!(
+            serde_json::to_value(&doc_onchain).unwrap(),
+            serde_json::to_value(&doc_offline).unwrap(),
+            "mock provider with identityOwner=same should produce same doc as offline"
+        );
     }
 }
