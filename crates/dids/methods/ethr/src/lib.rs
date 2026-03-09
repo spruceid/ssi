@@ -1079,6 +1079,71 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn resolve_with_mock_provider_owner_changed_pubkey_did() {
+        // When a public-key DID has a changed owner, #controllerKey must be
+        // omitted (the pubkey no longer represents the current owner).
+        // Only #controller and Eip712Method2021 remain.
+        let new_owner: [u8; 20] = [0x22; 20];
+        let mut resolver = DIDEthr::new();
+        resolver.add_network(
+            "mainnet",
+            NetworkConfig {
+                chain_id: 1,
+                registry: [0xdc, 0xa7, 0xef, 0x03, 0xe9, 0x8e, 0x0d, 0xc2,
+                           0xb8, 0x55, 0xbe, 0x64, 0x7c, 0x39, 0xab, 0xe9,
+                           0x84, 0xfc, 0xf2, 0x1b],
+                provider: MockProvider {
+                    changed_block: 1,
+                    identity_owner: Some(new_owner),
+                },
+            },
+        );
+
+        let did_str = "did:ethr:0x03fdd57adec3d438ea237fe46b33ee1e016eda6b585c3e27ea66686c2ea5358479";
+        let doc = resolver
+            .resolve(did!(
+                "did:ethr:0x03fdd57adec3d438ea237fe46b33ee1e016eda6b585c3e27ea66686c2ea5358479"
+            ))
+            .await
+            .unwrap()
+            .document;
+
+        let doc_value = serde_json::to_value(&doc).unwrap();
+
+        // DID id still uses the original public key
+        assert_eq!(doc_value["id"], did_str);
+
+        let vms = doc_value["verificationMethod"].as_array().unwrap();
+
+        // Should have exactly 2 VMs: #controller and #Eip712Method2021
+        assert_eq!(vms.len(), 2, "should have 2 VMs, not 3 (no #controllerKey)");
+
+        // No #controllerKey
+        assert!(
+            vms.iter().all(|vm| !vm["id"].as_str().unwrap().ends_with("#controllerKey")),
+            "#controllerKey should be omitted when owner has changed"
+        );
+
+        // #controller uses new owner's blockchainAccountId
+        let controller_vm = vms.iter().find(|vm| {
+            vm["id"].as_str().unwrap().ends_with("#controller")
+        }).expect("should have #controller VM");
+        assert_eq!(
+            controller_vm["blockchainAccountId"],
+            "eip155:1:0x2222222222222222222222222222222222222222"
+        );
+
+        // Eip712Method2021 uses new owner's blockchainAccountId
+        let eip712_vm = vms.iter().find(|vm| {
+            vm["id"].as_str().unwrap().ends_with("#Eip712Method2021")
+        }).expect("should have #Eip712Method2021 VM");
+        assert_eq!(
+            eip712_vm["blockchainAccountId"],
+            "eip155:1:0x2222222222222222222222222222222222222222"
+        );
+    }
+
+    #[tokio::test]
     async fn resolve_with_mock_provider_identity_owner_same() {
         // A mock provider where identityOwner(addr) returns the same address
         // should produce the same document as offline resolution.
