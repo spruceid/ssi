@@ -384,7 +384,17 @@ impl<P: EthProvider> DIDMethodResolver for DIDEthr<P> {
                 let changed_block = decode_uint256(&result);
 
                 if changed_block > 0 {
-                    // Check identityOwner(addr)
+                    // Collect all events via linked-list walk
+                    let _events = collect_events(
+                        &config.provider,
+                        config.registry,
+                        &addr,
+                        changed_block,
+                    )
+                    .await
+                    .map_err(Error::Internal)?;
+
+                    // Check identityOwner(addr) for current owner
                     let owner_calldata = encode_call(IDENTITY_OWNER_SELECTOR, &addr);
                     let owner_result = config
                         .provider
@@ -395,10 +405,12 @@ impl<P: EthProvider> DIDMethodResolver for DIDEthr<P> {
 
                     if owner == addr {
                         // Owner unchanged — use offline (genesis) document
+                        // TODO: Phase 4-5 will process _events for delegates/attributes
                         return resolve_offline(method_specific_id, &decoded_id, options);
                     }
 
                     // Owner changed — build document with the new owner's address
+                    // TODO: Phase 4-5 will process _events for delegates/attributes
                     let owner_address = format_address_eip55(&owner);
                     return resolve_with_owner(
                         method_specific_id,
