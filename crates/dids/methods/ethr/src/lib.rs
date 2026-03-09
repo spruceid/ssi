@@ -1181,4 +1181,46 @@ mod tests {
             "mock provider with identityOwner=same should produce same doc as offline"
         );
     }
+
+    #[tokio::test]
+    async fn resolve_with_mock_provider_owner_same_pubkey_did_retains_controller_key() {
+        // When a public-key DID's owner hasn't changed, #controllerKey
+        // must be retained in the document.
+        let mut resolver = DIDEthr::new();
+        resolver.add_network(
+            "mainnet",
+            NetworkConfig {
+                chain_id: 1,
+                registry: [0xdc, 0xa7, 0xef, 0x03, 0xe9, 0x8e, 0x0d, 0xc2,
+                           0xb8, 0x55, 0xbe, 0x64, 0x7c, 0x39, 0xab, 0xe9,
+                           0x84, 0xfc, 0xf2, 0x1b],
+                provider: MockProvider::new_same_owner(),
+            },
+        );
+
+        let doc = resolver
+            .resolve(did!(
+                "did:ethr:0x03fdd57adec3d438ea237fe46b33ee1e016eda6b585c3e27ea66686c2ea5358479"
+            ))
+            .await
+            .unwrap()
+            .document;
+
+        let doc_value = serde_json::to_value(&doc).unwrap();
+        let vms = doc_value["verificationMethod"].as_array().unwrap();
+
+        // Should have 3 VMs: #controller, #controllerKey, Eip712Method2021
+        // (Note: Eip712Method2021 is only on the controller, not the key,
+        // so the exact set depends on the offline resolve_public_key behavior)
+        assert!(
+            vms.iter().any(|vm| vm["id"].as_str().unwrap().ends_with("#controllerKey")),
+            "#controllerKey should be retained when owner is unchanged"
+        );
+
+        // #controllerKey should have publicKeyJwk
+        let key_vm = vms.iter().find(|vm| {
+            vm["id"].as_str().unwrap().ends_with("#controllerKey")
+        }).unwrap();
+        assert!(key_vm.get("publicKeyJwk").is_some(), "#controllerKey should have publicKeyJwk");
+    }
 }
