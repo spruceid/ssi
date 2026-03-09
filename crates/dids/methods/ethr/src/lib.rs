@@ -11,16 +11,146 @@ use ssi_dids_core::{
     DIDBuf, DIDMethod, DIDURLBuf, Document, DIDURL,
 };
 use static_iref::iri;
+use std::collections::HashMap;
 use std::str::FromStr;
 
 mod json_ld_context;
 use json_ld_context::JsonLdContext;
 use ssi_jwk::JWK;
 
+// --- Ethereum provider types ---
+
+/// Block reference for eth_call
+pub enum BlockRef {
+    Latest,
+    Number(u64),
+}
+
+/// Log filter for eth_getLogs
+pub struct LogFilter {
+    pub address: [u8; 20],
+    pub topics: Vec<[u8; 32]>,
+    pub from_block: u64,
+    pub to_block: u64,
+}
+
+/// Ethereum event log
+pub struct Log {
+    pub address: [u8; 20],
+    pub topics: Vec<[u8; 32]>,
+    pub data: Vec<u8>,
+    pub block_number: u64,
+}
+
+/// Minimal async trait for Ethereum JSON-RPC interaction.
+/// Users implement this with their preferred client (ethers-rs, alloy, etc.)
+pub trait EthProvider: Send + Sync {
+    type Error: std::error::Error + Send + Sync + 'static;
+
+    /// eth_call — execute a read-only contract call
+    fn call(
+        &self,
+        to: [u8; 20],
+        data: Vec<u8>,
+        block: BlockRef,
+    ) -> impl std::future::Future<Output = Result<Vec<u8>, Self::Error>> + Send;
+
+    /// eth_getLogs — query event logs
+    fn get_logs(
+        &self,
+        filter: LogFilter,
+    ) -> impl std::future::Future<Output = Result<Vec<Log>, Self::Error>> + Send;
+
+    /// Get block timestamp (seconds since epoch)
+    fn block_timestamp(
+        &self,
+        block: u64,
+    ) -> impl std::future::Future<Output = Result<u64, Self::Error>> + Send;
+}
+
+/// Per-network Ethereum configuration
+pub struct NetworkConfig<P> {
+    pub chain_id: u64,
+    pub registry: [u8; 20],
+    pub provider: P,
+}
+
+// --- ERC-1056 ABI selectors ---
+
+/// `changed(address)` — selector 0xf96d0f9f
+const CHANGED_SELECTOR: [u8; 4] = [0xf9, 0x6d, 0x0f, 0x9f];
+
+/// `identityOwner(address)` — selector 0x8733d4e8
+const IDENTITY_OWNER_SELECTOR: [u8; 4] = [0x87, 0x33, 0xd4, 0xe8];
+
+/// Encode a 20-byte address as a 32-byte ABI-padded word
+fn abi_encode_address(addr: &[u8; 20]) -> [u8; 32] {
+    let mut word = [0u8; 32];
+    word[12..].copy_from_slice(addr);
+    word
+}
+
+/// Build calldata: 4-byte selector + 32-byte padded address
+fn encode_call(selector: [u8; 4], addr: &[u8; 20]) -> Vec<u8> {
+    let mut data = Vec::with_capacity(36);
+    data.extend_from_slice(&selector);
+    data.extend_from_slice(&abi_encode_address(addr));
+    data
+}
+
+/// Decode a 32-byte uint256 return value
+fn decode_uint256(data: &[u8]) -> u64 {
+    if data.len() < 32 {
+        return 0;
+    }
+    // Read last 8 bytes as u64 (ERC-1056 changed() returns small block numbers)
+    let mut bytes = [0u8; 8];
+    bytes.copy_from_slice(&data[24..32]);
+    u64::from_be_bytes(bytes)
+}
+
+/// Decode a 32-byte ABI-encoded address return value
+fn decode_address(data: &[u8]) -> [u8; 20] {
+    if data.len() < 32 {
+        return [0u8; 20];
+    }
+    let mut addr = [0u8; 20];
+    addr.copy_from_slice(&data[12..32]);
+    addr
+}
+
+// --- DIDEthr ---
+
 /// did:ethr DID Method
 ///
 /// [Specification](https://github.com/decentralized-identity/ethr-did-resolver/)
-pub struct DIDEthr;
+///
+/// Generic over `P`: when `P = ()` (the default), only offline resolution is
+/// available. When `P` implements [`EthProvider`], on-chain resolution is used
+/// for networks that have a configured provider.
+pub struct DIDEthr<P = ()> {
+    networks: HashMap<String, NetworkConfig<P>>,
+}
+
+impl<P> Default for DIDEthr<P> {
+    fn default() -> Self {
+        Self {
+            networks: HashMap::new(),
+        }
+    }
+}
+
+impl<P> DIDEthr<P> {
+    /// Create a new `DIDEthr` resolver with no networks configured.
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Add a named network configuration.
+    pub fn add_network(&mut self, name: &str, config: NetworkConfig<P>) {
+        self.networks.insert(name.to_owned(), config);
+    }
+}
 
 impl DIDEthr {
     pub fn generate(jwk: &JWK) -> Result<DIDBuf, ssi_jwk::Error> {
@@ -29,11 +159,11 @@ impl DIDEthr {
     }
 }
 
-impl DIDMethod for DIDEthr {
+impl<P: Send + Sync> DIDMethod for DIDEthr<P> {
     const DID_METHOD_NAME: &'static str = "ethr";
 }
 
-impl DIDMethodResolver for DIDEthr {
+impl<P: EthProvider> DIDMethodResolver for DIDEthr<P> {
     async fn resolve_method_representation<'a>(
         &'a self,
         method_specific_id: &'a str,
@@ -42,48 +172,133 @@ impl DIDMethodResolver for DIDEthr {
         let decoded_id = DecodedMethodSpecificId::from_str(method_specific_id)
             .map_err(|_| Error::InvalidMethodSpecificId(method_specific_id.to_owned()))?;
 
-        let mut json_ld_context = JsonLdContext::default();
+        let network_name = decoded_id.network_name();
 
-        let doc = match decoded_id.address_or_public_key.len() {
-            42 => resolve_address(
-                &mut json_ld_context,
-                method_specific_id,
-                decoded_id.network_chain,
-                decoded_id.address_or_public_key,
-            ),
-            68 => resolve_public_key(
-                &mut json_ld_context,
-                method_specific_id,
-                decoded_id.network_chain,
-                &decoded_id.address_or_public_key,
-            ),
-            _ => Err(Error::InvalidMethodSpecificId(
-                method_specific_id.to_owned(),
-            )),
-        }?;
+        // Check if we have a provider for this network
+        let use_onchain = if let Some(config) = self.networks.get(&network_name) {
+            // Parse address from the identifier
+            let addr_hex = decoded_id.account_address_hex();
+            if let Some(addr) = parse_address_bytes(&addr_hex) {
+                // Call changed(addr) to see if there are on-chain modifications
+                let calldata = encode_call(CHANGED_SELECTOR, &addr);
+                let result = config
+                    .provider
+                    .call(config.registry, calldata, BlockRef::Latest)
+                    .await
+                    .map_err(|e| Error::Internal(e.to_string()))?;
+                let changed_block = decode_uint256(&result);
+                changed_block > 0
+            } else {
+                false
+            }
+        } else {
+            false
+        };
 
-        let content_type = options.accept.unwrap_or(MediaType::JsonLd);
-        let represented = doc.into_representation(representation::Options::from_media_type(
-            content_type,
-            move || representation::json_ld::Options {
-                context: representation::json_ld::Context::array(
-                    representation::json_ld::DIDContext::V1,
-                    json_ld_context.into_entries(),
-                ),
-            },
-        ));
-
-        Ok(resolution::Output::new(
-            represented.to_bytes(),
-            document::Metadata::default(),
-            resolution::Metadata::from_content_type(Some(content_type.to_string())),
-        ))
+        if use_onchain {
+            // For now, on-chain path with changed > 0 still resolves offline.
+            // Phase 2+ will implement full on-chain resolution.
+            resolve_offline(method_specific_id, &decoded_id, options)
+        } else {
+            resolve_offline(method_specific_id, &decoded_id, options)
+        }
     }
 }
 
+/// DIDMethodResolver impl for DIDEthr<()> — offline-only resolution
+impl DIDMethodResolver for DIDEthr<()> {
+    async fn resolve_method_representation<'a>(
+        &'a self,
+        method_specific_id: &'a str,
+        options: resolution::Options,
+    ) -> Result<Output<Vec<u8>>, Error> {
+        let decoded_id = DecodedMethodSpecificId::from_str(method_specific_id)
+            .map_err(|_| Error::InvalidMethodSpecificId(method_specific_id.to_owned()))?;
+        resolve_offline(method_specific_id, &decoded_id, options)
+    }
+}
+
+/// Resolve a DID using the offline (genesis document) path
+fn resolve_offline(
+    method_specific_id: &str,
+    decoded_id: &DecodedMethodSpecificId,
+    options: resolution::Options,
+) -> Result<Output<Vec<u8>>, Error> {
+    let mut json_ld_context = JsonLdContext::default();
+
+    let doc = match decoded_id.address_or_public_key.len() {
+        42 => resolve_address(
+            &mut json_ld_context,
+            method_specific_id,
+            &decoded_id.network_chain,
+            &decoded_id.address_or_public_key,
+        ),
+        68 => resolve_public_key(
+            &mut json_ld_context,
+            method_specific_id,
+            &decoded_id.network_chain,
+            &decoded_id.address_or_public_key,
+        ),
+        _ => Err(Error::InvalidMethodSpecificId(
+            method_specific_id.to_owned(),
+        )),
+    }?;
+
+    let content_type = options.accept.unwrap_or(MediaType::JsonLd);
+    let represented = doc.into_representation(representation::Options::from_media_type(
+        content_type,
+        move || representation::json_ld::Options {
+            context: representation::json_ld::Context::array(
+                representation::json_ld::DIDContext::V1,
+                json_ld_context.into_entries(),
+            ),
+        },
+    ));
+
+    Ok(resolution::Output::new(
+        represented.to_bytes(),
+        document::Metadata::default(),
+        resolution::Metadata::from_content_type(Some(content_type.to_string())),
+    ))
+}
+
 struct DecodedMethodSpecificId {
+    network_name: String,
     network_chain: NetworkChain,
     address_or_public_key: String,
+}
+
+impl DecodedMethodSpecificId {
+    /// Return the network name used for provider lookup
+    fn network_name(&self) -> String {
+        self.network_name.clone()
+    }
+
+    /// Extract the Ethereum address hex string (with 0x prefix).
+    /// For public-key DIDs, derives the address from the public key.
+    fn account_address_hex(&self) -> String {
+        if self.address_or_public_key.len() == 42 {
+            self.address_or_public_key.clone()
+        } else {
+            // Public key DID — derive the address
+            let pk_hex = &self.address_or_public_key;
+            if !pk_hex.starts_with("0x") {
+                return String::new();
+            }
+            let pk_bytes = match hex::decode(&pk_hex[2..]) {
+                Ok(b) => b,
+                Err(_) => return String::new(),
+            };
+            let pk_jwk = match ssi_jwk::secp256k1_parse(&pk_bytes) {
+                Ok(j) => j,
+                Err(_) => return String::new(),
+            };
+            match ssi_jwk::eip155::hash_public_key_eip55(&pk_jwk) {
+                Ok(addr) => addr,
+                Err(_) => String::new(),
+            }
+        }
+    }
 }
 
 impl FromStr for DecodedMethodSpecificId {
@@ -100,9 +315,24 @@ impl FromStr for DecodedMethodSpecificId {
 
         Ok(DecodedMethodSpecificId {
             network_chain: network_name.parse()?,
+            network_name,
             address_or_public_key,
         })
     }
+}
+
+/// Parse a hex address string (with 0x prefix) into 20 bytes
+fn parse_address_bytes(addr_hex: &str) -> Option<[u8; 20]> {
+    if !addr_hex.starts_with("0x") || addr_hex.len() != 42 {
+        return None;
+    }
+    let bytes = hex::decode(&addr_hex[2..]).ok()?;
+    if bytes.len() != 20 {
+        return None;
+    }
+    let mut addr = [0u8; 20];
+    addr.copy_from_slice(&bytes);
+    Some(addr)
 }
 
 #[derive(Debug, thiserror::Error)]
@@ -158,11 +388,11 @@ impl FromStr for NetworkChain {
 fn resolve_address(
     json_ld_context: &mut JsonLdContext,
     method_specific_id: &str,
-    network_chain: NetworkChain,
-    account_address: String,
+    network_chain: &NetworkChain,
+    account_address: &str,
 ) -> Result<Document, Error> {
     let blockchain_account_id = BlockchainAccountId {
-        account_address,
+        account_address: account_address.to_owned(),
         chain_id: ChainId {
             namespace: "eip155".to_string(),
             reference: network_chain.id().to_string(),
@@ -200,7 +430,7 @@ fn resolve_address(
 fn resolve_public_key(
     json_ld_context: &mut JsonLdContext,
     method_specific_id: &str,
-    network_chain: NetworkChain,
+    network_chain: &NetworkChain,
     public_key_hex: &str,
 ) -> Result<Document, Error> {
     if !public_key_hex.starts_with("0x") {
@@ -408,7 +638,8 @@ mod tests {
     #[tokio::test]
     async fn resolve_did_ethr_addr() {
         // https://github.com/decentralized-identity/ethr-did-resolver/blob/master/doc/did-method-spec.md#create-register
-        let doc = DIDEthr
+        let resolver = DIDEthr::<()>::default();
+        let doc = resolver
             .resolve(did!("did:ethr:0xb9c5714089478a327f09197987f16f9e5d936e8a"))
             .await
             .unwrap()
@@ -451,7 +682,8 @@ mod tests {
 
     #[tokio::test]
     async fn resolve_did_ethr_pk() {
-        let doc = DIDEthr
+        let resolver = DIDEthr::<()>::default();
+        let doc = resolver
             .resolve(did!(
                 "did:ethr:0x03fdd57adec3d438ea237fe46b33ee1e016eda6b585c3e27ea66686c2ea5358479"
             ))
@@ -476,7 +708,7 @@ mod tests {
     }
 
     async fn credential_prove_verify_did_ethr2(eip712: bool) {
-        let didethr = DIDEthr.into_vm_resolver();
+        let didethr = DIDEthr::<()>::default().into_vm_resolver();
         let verifier = VerificationParameters::from_resolver(&didethr);
         let key: JWK = serde_json::from_value(json!({
             "alg": "ES256K-R",
@@ -595,7 +827,7 @@ mod tests {
 
     #[tokio::test]
     async fn credential_verify_eip712vm() {
-        let didethr = DIDEthr.into_vm_resolver();
+        let didethr = DIDEthr::<()>::default().into_vm_resolver();
         let vc = ssi_claims::vc::v1::data_integrity::any_credential_from_json_str(include_str!(
             "../tests/vc.jsonld"
         ))
