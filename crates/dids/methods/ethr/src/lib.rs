@@ -384,6 +384,13 @@ impl<P: EthProvider> DIDMethodResolver for DIDEthr<P> {
         if let Some(config) = self.networks.get(&network_name) {
             let addr_hex = decoded_id.account_address_hex();
             if let Some(addr) = parse_address_bytes(&addr_hex) {
+                // Parse historical resolution target block from ?versionId=N
+                let target_block: Option<u64> = options
+                    .parameters
+                    .version_id
+                    .as_deref()
+                    .and_then(|v| v.parse::<u64>().ok());
+
                 // Call changed(addr) to see if there are on-chain modifications
                 let calldata = encode_call(CHANGED_SELECTOR, &addr);
                 let result = config
@@ -394,20 +401,8 @@ impl<P: EthProvider> DIDMethodResolver for DIDEthr<P> {
                 let changed_block = decode_uint256(&result);
 
                 if changed_block > 0 {
-                    // Build document metadata (versionId + updated)
-                    let block_ts = config
-                        .provider
-                        .block_timestamp(changed_block)
-                        .await
-                        .map_err(|e| Error::Internal(e.to_string()))?;
-                    let mut doc_metadata = document::Metadata {
-                        version_id: Some(changed_block.to_string()),
-                        updated: Some(format_timestamp_iso8601(block_ts)),
-                        ..Default::default()
-                    };
-
                     // Collect all events via linked-list walk
-                    let events = collect_events(
+                    let all_events = collect_events(
                         &config.provider,
                         config.registry,
                         &addr,
@@ -416,11 +411,61 @@ impl<P: EthProvider> DIDMethodResolver for DIDEthr<P> {
                     .await
                     .map_err(Error::Internal)?;
 
-                    // Check identityOwner(addr) for current owner
+                    // Partition events for historical resolution
+                    let (events, events_after) = if let Some(tb) = target_block {
+                        let before: Vec<_> = all_events.iter().filter(|(b, _)| *b <= tb).cloned().collect();
+                        let after: Vec<_> = all_events.iter().filter(|(b, _)| *b > tb).cloned().collect();
+                        (before, after)
+                    } else {
+                        (all_events, Vec::new())
+                    };
+
+                    // For historical resolution at a block before any changes,
+                    // return the genesis (default) document
+                    if target_block.is_some() && events.is_empty() {
+                        return resolve_offline(method_specific_id, &decoded_id, options);
+                    }
+
+                    // Build document metadata (versionId + updated)
+                    let meta_block = if let Some(tb) = target_block {
+                        // Latest event block at or before target
+                        events.iter().map(|(b, _)| *b).max().unwrap_or(tb)
+                    } else {
+                        changed_block
+                    };
+                    let block_ts = config
+                        .provider
+                        .block_timestamp(meta_block)
+                        .await
+                        .map_err(|e| Error::Internal(e.to_string()))?;
+                    let mut doc_metadata = document::Metadata {
+                        version_id: Some(meta_block.to_string()),
+                        updated: Some(format_timestamp_iso8601(block_ts)),
+                        ..Default::default()
+                    };
+
+                    // Populate nextVersionId/nextUpdate from first event after target
+                    if target_block.is_some() {
+                        if let Some((next_block, _)) = events_after.first() {
+                            let next_ts = config
+                                .provider
+                                .block_timestamp(*next_block)
+                                .await
+                                .map_err(|e| Error::Internal(e.to_string()))?;
+                            doc_metadata.next_version_id = Some(next_block.to_string());
+                            doc_metadata.next_update = Some(format_timestamp_iso8601(next_ts));
+                        }
+                    }
+
+                    // Check identityOwner(addr) — at target block for historical, Latest otherwise
+                    let owner_block = match target_block {
+                        Some(tb) => BlockRef::Number(tb),
+                        None => BlockRef::Latest,
+                    };
                     let owner_calldata = encode_call(IDENTITY_OWNER_SELECTOR, &addr);
                     let owner_result = config
                         .provider
-                        .call(config.registry, owner_calldata, BlockRef::Latest)
+                        .call(config.registry, owner_calldata, owner_block)
                         .await
                         .map_err(|e| Error::Internal(e.to_string()))?;
                     let owner = decode_address(&owner_result);
@@ -470,10 +515,15 @@ impl<P: EthProvider> DIDMethodResolver for DIDEthr<P> {
                     };
 
                     // Apply delegate/attribute events
-                    let now = std::time::SystemTime::now()
-                        .duration_since(std::time::UNIX_EPOCH)
-                        .unwrap()
-                        .as_secs();
+                    // For historical resolution, use target block's timestamp as "now"
+                    let now = if let Some(_) = target_block {
+                        block_ts
+                    } else {
+                        std::time::SystemTime::now()
+                            .duration_since(std::time::UNIX_EPOCH)
+                            .unwrap()
+                            .as_secs()
+                    };
 
                     let did = DIDBuf::from_string(format!("did:ethr:{method_specific_id}"))
                         .unwrap();
@@ -2940,5 +2990,240 @@ mod tests {
         assert!(json.get("deactivated").is_none());
         assert_eq!(json["versionId"], "100");
         assert_eq!(json["updated"], "2024-01-15T09:50:00Z");
+    }
+
+    // --- Phase 8: Historical Resolution (?versionId=N) tests ---
+
+    #[tokio::test]
+    async fn historical_version_id_skips_events_after_target_block() {
+        // Events at blocks 100 and 200. Resolving with versionId=100
+        // should only include events from block 100.
+        let identity: [u8; 20] = [0xb9, 0xc5, 0x71, 0x40, 0x89, 0x47, 0x8a, 0x32, 0x7f, 0x09,
+                                   0x19, 0x79, 0x87, 0xf1, 0x6f, 0x9e, 0x5d, 0x93, 0x6e, 0x8a];
+        let delegate_a: [u8; 20] = [0xAA; 20];
+        let delegate_b: [u8; 20] = [0xBB; 20];
+        let delegate_type = encode_delegate_type("veriKey");
+
+        let log_100 = make_delegate_changed_log(100, &identity, &delegate_type, &delegate_a, u64::MAX, 0);
+        let log_200 = make_delegate_changed_log(200, &identity, &delegate_type, &delegate_b, u64::MAX, 100);
+
+        let mut resolver = DIDEthr::new();
+        resolver.add_network("mainnet", NetworkConfig {
+            chain_id: 1,
+            registry: TEST_REGISTRY,
+            provider: MockProvider {
+                changed_block: 200,
+                identity_owner: None,
+                identity_owner_at_block: HashMap::new(),
+                logs: HashMap::from([
+                    (100, vec![log_100]),
+                    (200, vec![log_200]),
+                ]),
+                block_timestamps: HashMap::from([
+                    (100, 1705312200), // 2024-01-15T09:50:00Z
+                    (200, 1705398600), // 2024-01-16T09:50:00Z
+                ]),
+            },
+        });
+
+        let options = resolution::Options {
+            parameters: resolution::Parameters {
+                version_id: Some("100".to_string()),
+                ..Default::default()
+            },
+            ..Default::default()
+        };
+
+        let output = resolver
+            .resolve_with(
+                did!("did:ethr:0xb9c5714089478a327f09197987f16f9e5d936e8a"),
+                options,
+            )
+            .await
+            .unwrap();
+
+        let doc_value = serde_json::to_value(&output.document).unwrap();
+        let vms = doc_value["verificationMethod"].as_array().unwrap();
+
+        // Should have 4 VMs: 2 base + 2 delegate (only delegate_a from block 100)
+        assert_eq!(vms.len(), 4, "only events at/before block 100 should be applied");
+
+        // delegate_a (#delegate-1) present
+        let d1 = vms.iter().find(|vm| vm["id"].as_str().unwrap().ends_with("#delegate-1"));
+        assert!(d1.is_some(), "delegate from block 100 should be present");
+
+        // delegate_b (#delegate-2) NOT present
+        let d2 = vms.iter().find(|vm| vm["id"].as_str().unwrap().ends_with("#delegate-2"));
+        assert!(d2.is_none(), "delegate from block 200 should NOT be present");
+
+        // Metadata: versionId should be "100" (latest event at or before target)
+        assert_eq!(output.document_metadata.version_id.as_deref(), Some("100"));
+        assert_eq!(output.document_metadata.updated.as_deref(), Some("2024-01-15T09:50:00Z"));
+    }
+
+    #[tokio::test]
+    async fn historical_valid_to_uses_target_block_timestamp() {
+        // Delegate valid_to = 1705315800 (block 100 timestamp + 1 hour).
+        // Block 100 timestamp = 1705312200. At block 100 the delegate is still valid.
+        // At wall-clock time (far future) it would be expired.
+        // ?versionId=100 should include the delegate.
+        let identity: [u8; 20] = [0xb9, 0xc5, 0x71, 0x40, 0x89, 0x47, 0x8a, 0x32, 0x7f, 0x09,
+                                   0x19, 0x79, 0x87, 0xf1, 0x6f, 0x9e, 0x5d, 0x93, 0x6e, 0x8a];
+        let delegate_a: [u8; 20] = [0xAA; 20];
+        let delegate_type = encode_delegate_type("veriKey");
+        let valid_to = 1705315800u64; // 1 hour after block 100 timestamp
+
+        let log_100 = make_delegate_changed_log(100, &identity, &delegate_type, &delegate_a, valid_to, 0);
+
+        let mut resolver = DIDEthr::new();
+        resolver.add_network("mainnet", NetworkConfig {
+            chain_id: 1,
+            registry: TEST_REGISTRY,
+            provider: MockProvider {
+                changed_block: 100,
+                identity_owner: None,
+                identity_owner_at_block: HashMap::new(),
+                logs: HashMap::from([
+                    (100, vec![log_100]),
+                ]),
+                block_timestamps: HashMap::from([
+                    (100, 1705312200), // 2024-01-15T09:50:00Z
+                ]),
+            },
+        });
+
+        let options = resolution::Options {
+            parameters: resolution::Parameters {
+                version_id: Some("100".to_string()),
+                ..Default::default()
+            },
+            ..Default::default()
+        };
+
+        let output = resolver
+            .resolve_with(
+                did!("did:ethr:0xb9c5714089478a327f09197987f16f9e5d936e8a"),
+                options,
+            )
+            .await
+            .unwrap();
+
+        let doc_value = serde_json::to_value(&output.document).unwrap();
+        let vms = doc_value["verificationMethod"].as_array().unwrap();
+
+        // 2 base + 2 delegate VMs (delegate is valid at block 100's timestamp)
+        assert_eq!(vms.len(), 4, "delegate valid at block timestamp should be included");
+
+        let d1 = vms.iter().find(|vm| vm["id"].as_str().unwrap().ends_with("#delegate-1"));
+        assert!(d1.is_some(), "delegate still valid at block 100 timestamp should be present");
+    }
+
+    #[tokio::test]
+    async fn historical_next_version_id_and_next_update() {
+        // Events at blocks 100 and 200. Resolving at versionId=100 should set
+        // nextVersionId=200 and nextUpdate to block 200's timestamp.
+        let identity: [u8; 20] = [0xb9, 0xc5, 0x71, 0x40, 0x89, 0x47, 0x8a, 0x32, 0x7f, 0x09,
+                                   0x19, 0x79, 0x87, 0xf1, 0x6f, 0x9e, 0x5d, 0x93, 0x6e, 0x8a];
+        let delegate_a: [u8; 20] = [0xAA; 20];
+        let delegate_b: [u8; 20] = [0xBB; 20];
+        let delegate_type = encode_delegate_type("veriKey");
+
+        let log_100 = make_delegate_changed_log(100, &identity, &delegate_type, &delegate_a, u64::MAX, 0);
+        let log_200 = make_delegate_changed_log(200, &identity, &delegate_type, &delegate_b, u64::MAX, 100);
+
+        let mut resolver = DIDEthr::new();
+        resolver.add_network("mainnet", NetworkConfig {
+            chain_id: 1,
+            registry: TEST_REGISTRY,
+            provider: MockProvider {
+                changed_block: 200,
+                identity_owner: None,
+                identity_owner_at_block: HashMap::new(),
+                logs: HashMap::from([
+                    (100, vec![log_100]),
+                    (200, vec![log_200]),
+                ]),
+                block_timestamps: HashMap::from([
+                    (100, 1705312200), // 2024-01-15T09:50:00Z
+                    (200, 1705398600), // 2024-01-16T09:50:00Z
+                ]),
+            },
+        });
+
+        let options = resolution::Options {
+            parameters: resolution::Parameters {
+                version_id: Some("100".to_string()),
+                ..Default::default()
+            },
+            ..Default::default()
+        };
+
+        let output = resolver
+            .resolve_with(
+                did!("did:ethr:0xb9c5714089478a327f09197987f16f9e5d936e8a"),
+                options,
+            )
+            .await
+            .unwrap();
+
+        assert_eq!(output.document_metadata.version_id.as_deref(), Some("100"));
+        assert_eq!(output.document_metadata.updated.as_deref(), Some("2024-01-15T09:50:00Z"));
+        assert_eq!(output.document_metadata.next_version_id.as_deref(), Some("200"));
+        assert_eq!(output.document_metadata.next_update.as_deref(), Some("2024-01-16T09:50:00Z"));
+    }
+
+    #[tokio::test]
+    async fn historical_before_any_changes_returns_genesis() {
+        // Events only at block 100. Resolving at versionId=50 (before any changes)
+        // should return the default genesis document (no delegates/attributes).
+        let identity: [u8; 20] = [0xb9, 0xc5, 0x71, 0x40, 0x89, 0x47, 0x8a, 0x32, 0x7f, 0x09,
+                                   0x19, 0x79, 0x87, 0xf1, 0x6f, 0x9e, 0x5d, 0x93, 0x6e, 0x8a];
+        let delegate_a: [u8; 20] = [0xAA; 20];
+        let delegate_type = encode_delegate_type("veriKey");
+
+        let log_100 = make_delegate_changed_log(100, &identity, &delegate_type, &delegate_a, u64::MAX, 0);
+
+        let mut resolver = DIDEthr::new();
+        resolver.add_network("mainnet", NetworkConfig {
+            chain_id: 1,
+            registry: TEST_REGISTRY,
+            provider: MockProvider {
+                changed_block: 100,
+                identity_owner: None,
+                identity_owner_at_block: HashMap::new(),
+                logs: HashMap::from([
+                    (100, vec![log_100]),
+                ]),
+                block_timestamps: HashMap::from([
+                    (100, 1705312200),
+                ]),
+            },
+        });
+
+        let options = resolution::Options {
+            parameters: resolution::Parameters {
+                version_id: Some("50".to_string()),
+                ..Default::default()
+            },
+            ..Default::default()
+        };
+
+        let output = resolver
+            .resolve_with(
+                did!("did:ethr:0xb9c5714089478a327f09197987f16f9e5d936e8a"),
+                options,
+            )
+            .await
+            .unwrap();
+
+        let doc_value = serde_json::to_value(&output.document).unwrap();
+        let vms = doc_value["verificationMethod"].as_array().unwrap();
+
+        // Genesis document: only 2 base VMs, no delegates
+        assert_eq!(vms.len(), 2, "genesis doc should have only base VMs");
+
+        // No metadata versionId/updated (offline genesis)
+        assert!(output.document_metadata.version_id.is_none());
+        assert!(output.document_metadata.updated.is_none());
     }
 }
