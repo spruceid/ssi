@@ -1897,6 +1897,272 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn resolve_sigauth_delegate_also_in_authentication() {
+        // A DIDDelegateChanged with delegate_type="sigAuth" should add VMs
+        // referenced in BOTH assertionMethod AND authentication.
+        let identity: [u8; 20] = [0xb9, 0xc5, 0x71, 0x40, 0x89, 0x47, 0x8a, 0x32, 0x7f, 0x09,
+                                   0x19, 0x79, 0x87, 0xf1, 0x6f, 0x9e, 0x5d, 0x93, 0x6e, 0x8a];
+        let delegate: [u8; 20] = [0xBB; 20];
+        let delegate_type = encode_delegate_type("sigAuth");
+
+        let log = make_delegate_changed_log(100, &identity, &delegate_type, &delegate, u64::MAX, 0);
+
+        let mut resolver = DIDEthr::new();
+        resolver.add_network(
+            "mainnet",
+            NetworkConfig {
+                chain_id: 1,
+                registry: TEST_REGISTRY,
+                provider: MockProvider {
+                    changed_block: 100,
+                    identity_owner: None,
+                    logs: HashMap::from([(100, vec![log])]),
+                },
+            },
+        );
+
+        let doc = resolver
+            .resolve(did!("did:ethr:0xb9c5714089478a327f09197987f16f9e5d936e8a"))
+            .await
+            .unwrap()
+            .document;
+
+        let doc_value = serde_json::to_value(&doc).unwrap();
+        let did_prefix = "did:ethr:0xb9c5714089478a327f09197987f16f9e5d936e8a";
+
+        let vms = doc_value["verificationMethod"].as_array().unwrap();
+        assert_eq!(vms.len(), 4);
+
+        // #delegate-1 should be in BOTH assertionMethod AND authentication
+        let assertion = doc_value["assertionMethod"].as_array().unwrap();
+        let auth = doc_value["authentication"].as_array().unwrap();
+
+        assert!(assertion.iter().any(|v| v == &format!("{did_prefix}#delegate-1")));
+        assert!(assertion.iter().any(|v| v == &format!("{did_prefix}#delegate-1-Eip712Method2021")));
+        assert!(auth.iter().any(|v| v == &format!("{did_prefix}#delegate-1")));
+        assert!(auth.iter().any(|v| v == &format!("{did_prefix}#delegate-1-Eip712Method2021")));
+    }
+
+    #[tokio::test]
+    async fn resolve_expired_delegate_not_included() {
+        // A delegate with valid_to < now is NOT included in the document.
+        let identity: [u8; 20] = [0xb9, 0xc5, 0x71, 0x40, 0x89, 0x47, 0x8a, 0x32, 0x7f, 0x09,
+                                   0x19, 0x79, 0x87, 0xf1, 0x6f, 0x9e, 0x5d, 0x93, 0x6e, 0x8a];
+        let delegate: [u8; 20] = [0xCC; 20];
+        let delegate_type = encode_delegate_type("veriKey");
+
+        // valid_to = 1000 (well in the past)
+        let log = make_delegate_changed_log(100, &identity, &delegate_type, &delegate, 1000, 0);
+
+        let mut resolver = DIDEthr::new();
+        resolver.add_network(
+            "mainnet",
+            NetworkConfig {
+                chain_id: 1,
+                registry: TEST_REGISTRY,
+                provider: MockProvider {
+                    changed_block: 100,
+                    identity_owner: None,
+                    logs: HashMap::from([(100, vec![log])]),
+                },
+            },
+        );
+
+        let doc = resolver
+            .resolve(did!("did:ethr:0xb9c5714089478a327f09197987f16f9e5d936e8a"))
+            .await
+            .unwrap()
+            .document;
+
+        let doc_value = serde_json::to_value(&doc).unwrap();
+        let vms = doc_value["verificationMethod"].as_array().unwrap();
+
+        // Should only have the 2 base VMs (no delegate VMs)
+        assert_eq!(vms.len(), 2, "expired delegate should not be in document");
+        assert!(vms.iter().all(|vm| !vm["id"].as_str().unwrap().contains("delegate")));
+    }
+
+    #[tokio::test]
+    async fn resolve_revoked_delegate_skipped_but_counter_increments() {
+        // A revoked delegate (valid_to=0) is not included, but the counter
+        // still increments. So a subsequent valid delegate gets #delegate-2.
+        let identity: [u8; 20] = [0xb9, 0xc5, 0x71, 0x40, 0x89, 0x47, 0x8a, 0x32, 0x7f, 0x09,
+                                   0x19, 0x79, 0x87, 0xf1, 0x6f, 0x9e, 0x5d, 0x93, 0x6e, 0x8a];
+        let delegate_a: [u8; 20] = [0xDD; 20];
+        let delegate_b: [u8; 20] = [0xEE; 20];
+        let delegate_type = encode_delegate_type("veriKey");
+
+        // First delegate: revoked (valid_to=0)
+        let log_a = make_delegate_changed_log(100, &identity, &delegate_type, &delegate_a, 0, 0);
+        // Second delegate: valid
+        let log_b = make_delegate_changed_log(200, &identity, &delegate_type, &delegate_b, u64::MAX, 100);
+
+        let mut resolver = DIDEthr::new();
+        resolver.add_network(
+            "mainnet",
+            NetworkConfig {
+                chain_id: 1,
+                registry: TEST_REGISTRY,
+                provider: MockProvider {
+                    changed_block: 200,
+                    identity_owner: None,
+                    logs: HashMap::from([
+                        (100, vec![log_a]),
+                        (200, vec![log_b]),
+                    ]),
+                },
+            },
+        );
+
+        let doc = resolver
+            .resolve(did!("did:ethr:0xb9c5714089478a327f09197987f16f9e5d936e8a"))
+            .await
+            .unwrap()
+            .document;
+
+        let doc_value = serde_json::to_value(&doc).unwrap();
+        let vms = doc_value["verificationMethod"].as_array().unwrap();
+
+        // Should have 4 VMs: 2 base + 2 delegate (only delegate_b)
+        assert_eq!(vms.len(), 4);
+
+        // No #delegate-1 (revoked)
+        assert!(vms.iter().all(|vm| !vm["id"].as_str().unwrap().ends_with("#delegate-1")));
+
+        // Has #delegate-2 (counter still incremented past revoked)
+        let delegate_vm = vms.iter().find(|vm| {
+            vm["id"].as_str().unwrap().ends_with("#delegate-2")
+        }).expect("should have #delegate-2 VM");
+
+        let delegate_addr = format_address_eip55(&delegate_b);
+        assert_eq!(delegate_vm["blockchainAccountId"], format!("eip155:1:{delegate_addr}"));
+    }
+
+    #[tokio::test]
+    async fn resolve_multiple_valid_delegates_sequential_ids() {
+        // Multiple valid delegates produce sequential #delegate-1, #delegate-2, etc.
+        let identity: [u8; 20] = [0xb9, 0xc5, 0x71, 0x40, 0x89, 0x47, 0x8a, 0x32, 0x7f, 0x09,
+                                   0x19, 0x79, 0x87, 0xf1, 0x6f, 0x9e, 0x5d, 0x93, 0x6e, 0x8a];
+        let delegate_a: [u8; 20] = [0x11; 20];
+        let delegate_b: [u8; 20] = [0x22; 20];
+        let veri_key = encode_delegate_type("veriKey");
+        let sig_auth = encode_delegate_type("sigAuth");
+
+        let log_a = make_delegate_changed_log(100, &identity, &veri_key, &delegate_a, u64::MAX, 0);
+        let log_b = make_delegate_changed_log(200, &identity, &sig_auth, &delegate_b, u64::MAX, 100);
+
+        let mut resolver = DIDEthr::new();
+        resolver.add_network(
+            "mainnet",
+            NetworkConfig {
+                chain_id: 1,
+                registry: TEST_REGISTRY,
+                provider: MockProvider {
+                    changed_block: 200,
+                    identity_owner: None,
+                    logs: HashMap::from([
+                        (100, vec![log_a]),
+                        (200, vec![log_b]),
+                    ]),
+                },
+            },
+        );
+
+        let doc = resolver
+            .resolve(did!("did:ethr:0xb9c5714089478a327f09197987f16f9e5d936e8a"))
+            .await
+            .unwrap()
+            .document;
+
+        let doc_value = serde_json::to_value(&doc).unwrap();
+        let vms = doc_value["verificationMethod"].as_array().unwrap();
+
+        // 2 base + 2 for delegate_a + 2 for delegate_b = 6
+        assert_eq!(vms.len(), 6);
+
+        // #delegate-1 is veriKey (assertionMethod only, NOT authentication)
+        assert!(vms.iter().any(|vm| vm["id"].as_str().unwrap().ends_with("#delegate-1")));
+        assert!(vms.iter().any(|vm| vm["id"].as_str().unwrap().ends_with("#delegate-1-Eip712Method2021")));
+
+        // #delegate-2 is sigAuth (both assertionMethod AND authentication)
+        assert!(vms.iter().any(|vm| vm["id"].as_str().unwrap().ends_with("#delegate-2")));
+        assert!(vms.iter().any(|vm| vm["id"].as_str().unwrap().ends_with("#delegate-2-Eip712Method2021")));
+
+        let did_prefix = "did:ethr:0xb9c5714089478a327f09197987f16f9e5d936e8a";
+        let auth = doc_value["authentication"].as_array().unwrap();
+
+        // delegate-1 should NOT be in auth (veriKey)
+        assert!(!auth.iter().any(|v| v == &format!("{did_prefix}#delegate-1")));
+
+        // delegate-2 SHOULD be in auth (sigAuth)
+        assert!(auth.iter().any(|v| v == &format!("{did_prefix}#delegate-2")));
+        assert!(auth.iter().any(|v| v == &format!("{did_prefix}#delegate-2-Eip712Method2021")));
+    }
+
+    #[tokio::test]
+    async fn resolve_delegates_with_owner_change_integration() {
+        // When the owner has changed AND there are delegates, both the
+        // owner-derived controller VM and the delegate VMs appear.
+        let identity: [u8; 20] = [0xb9, 0xc5, 0x71, 0x40, 0x89, 0x47, 0x8a, 0x32, 0x7f, 0x09,
+                                   0x19, 0x79, 0x87, 0xf1, 0x6f, 0x9e, 0x5d, 0x93, 0x6e, 0x8a];
+        let new_owner: [u8; 20] = [0xFF; 20];
+        let delegate: [u8; 20] = [0xAA; 20];
+        let delegate_type = encode_delegate_type("veriKey");
+
+        let log_owner = make_owner_changed_log(100, &identity, &new_owner, 0);
+        let log_delegate = make_delegate_changed_log(200, &identity, &delegate_type, &delegate, u64::MAX, 100);
+
+        let mut resolver = DIDEthr::new();
+        resolver.add_network(
+            "mainnet",
+            NetworkConfig {
+                chain_id: 1,
+                registry: TEST_REGISTRY,
+                provider: MockProvider {
+                    changed_block: 200,
+                    identity_owner: Some(new_owner),
+                    logs: HashMap::from([
+                        (100, vec![log_owner]),
+                        (200, vec![log_delegate]),
+                    ]),
+                },
+            },
+        );
+
+        let doc = resolver
+            .resolve(did!("did:ethr:0xb9c5714089478a327f09197987f16f9e5d936e8a"))
+            .await
+            .unwrap()
+            .document;
+
+        let doc_value = serde_json::to_value(&doc).unwrap();
+        let vms = doc_value["verificationMethod"].as_array().unwrap();
+
+        // 2 base (with new owner) + 2 delegate = 4
+        assert_eq!(vms.len(), 4);
+
+        // #controller uses the new owner's address
+        let controller_vm = vms.iter().find(|vm| {
+            vm["id"].as_str().unwrap().ends_with("#controller")
+        }).unwrap();
+        let owner_addr = format_address_eip55(&new_owner);
+        assert_eq!(
+            controller_vm["blockchainAccountId"],
+            format!("eip155:1:{owner_addr}")
+        );
+
+        // #delegate-1 uses the delegate's address
+        let delegate_vm = vms.iter().find(|vm| {
+            vm["id"].as_str().unwrap().ends_with("#delegate-1")
+        }).unwrap();
+        let delegate_addr = format_address_eip55(&delegate);
+        assert_eq!(
+            delegate_vm["blockchainAccountId"],
+            format!("eip155:1:{delegate_addr}")
+        );
+    }
+
+    #[tokio::test]
     async fn resolve_with_mock_provider_multiple_owner_changes() {
         // Simulate multiple ownership transfers: identityOwner() returns the
         // final owner. The document should use that address regardless of
