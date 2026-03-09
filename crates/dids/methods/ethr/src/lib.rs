@@ -930,11 +930,8 @@ struct InvalidNetwork(String);
 
 enum NetworkChain {
     Mainnet,
-    Morden,
-    Ropsten,
-    Rinkeby,
-    Georli,
-    Kovan,
+    Goerli,
+    Sepolia,
     Other(u64),
 }
 
@@ -942,11 +939,8 @@ impl NetworkChain {
     pub fn id(&self) -> u64 {
         match self {
             Self::Mainnet => 1,
-            Self::Morden => 2,
-            Self::Ropsten => 3,
-            Self::Rinkeby => 4,
-            Self::Georli => 5,
-            Self::Kovan => 42,
+            Self::Goerli => 5,
+            Self::Sepolia => 11155111,
             Self::Other(i) => *i,
         }
     }
@@ -958,11 +952,13 @@ impl FromStr for NetworkChain {
     fn from_str(network_name: &str) -> Result<Self, Self::Err> {
         match network_name {
             "mainnet" => Ok(Self::Mainnet),
-            "morden" => Ok(Self::Morden),
-            "ropsten" => Ok(Self::Ropsten),
-            "rinkeby" => Ok(Self::Rinkeby),
-            "goerli" => Ok(Self::Georli),
-            "kovan" => Ok(Self::Kovan),
+            "goerli" => Ok(Self::Goerli),
+            "sepolia" => Ok(Self::Sepolia),
+            // Deprecated testnets — still parse for backward compatibility
+            "morden" => Ok(Self::Other(2)),
+            "ropsten" => Ok(Self::Other(3)),
+            "rinkeby" => Ok(Self::Other(4)),
+            "kovan" => Ok(Self::Other(42)),
             network_chain_id if network_chain_id.starts_with("0x") => {
                 match u64::from_str_radix(&network_chain_id[2..], 16) {
                     Ok(chain_id) => Ok(Self::Other(chain_id)),
@@ -3225,5 +3221,77 @@ mod tests {
         // No metadata versionId/updated (offline genesis)
         assert!(output.document_metadata.version_id.is_none());
         assert!(output.document_metadata.updated.is_none());
+    }
+
+    // ── Phase 9: Network Configuration Cleanup ──
+
+    #[tokio::test]
+    async fn sepolia_network_parses_with_correct_chain_id() {
+        let resolver = DIDEthr::<()>::default();
+        let output = resolver
+            .resolve(did!("did:ethr:sepolia:0xb9c5714089478a327f09197987f16f9e5d936e8a"))
+            .await
+            .unwrap();
+        let doc_value = serde_json::to_value(&output.document).unwrap();
+        // blockchainAccountId should use eip155:11155111
+        let vm = &doc_value["verificationMethod"][0];
+        assert_eq!(
+            vm["blockchainAccountId"],
+            "eip155:11155111:0xb9c5714089478a327f09197987f16f9e5d936e8a"
+        );
+    }
+
+    #[tokio::test]
+    async fn goerli_network_still_works() {
+        let resolver = DIDEthr::<()>::default();
+        let output = resolver
+            .resolve(did!("did:ethr:goerli:0xb9c5714089478a327f09197987f16f9e5d936e8a"))
+            .await
+            .unwrap();
+        let doc_value = serde_json::to_value(&output.document).unwrap();
+        let vm = &doc_value["verificationMethod"][0];
+        assert_eq!(
+            vm["blockchainAccountId"],
+            "eip155:5:0xb9c5714089478a327f09197987f16f9e5d936e8a"
+        );
+    }
+
+    #[tokio::test]
+    async fn deprecated_network_ropsten_still_parses() {
+        let resolver = DIDEthr::<()>::default();
+        let output = resolver
+            .resolve(did!("did:ethr:ropsten:0xb9c5714089478a327f09197987f16f9e5d936e8a"))
+            .await
+            .unwrap();
+        let doc_value = serde_json::to_value(&output.document).unwrap();
+        let vm = &doc_value["verificationMethod"][0];
+        assert_eq!(
+            vm["blockchainAccountId"],
+            "eip155:3:0xb9c5714089478a327f09197987f16f9e5d936e8a"
+        );
+    }
+
+    #[tokio::test]
+    async fn hex_chain_id_works() {
+        let resolver = DIDEthr::<()>::default();
+        let output = resolver
+            .resolve(did!("did:ethr:0x5:0xb9c5714089478a327f09197987f16f9e5d936e8a"))
+            .await
+            .unwrap();
+        let doc_value = serde_json::to_value(&output.document).unwrap();
+        let vm = &doc_value["verificationMethod"][0];
+        assert_eq!(
+            vm["blockchainAccountId"],
+            "eip155:5:0xb9c5714089478a327f09197987f16f9e5d936e8a"
+        );
+    }
+
+    #[tokio::test]
+    async fn unknown_network_name_returns_error() {
+        let resolver = DIDEthr::<()>::default();
+        let result = resolver
+            .resolve(did!("did:ethr:fakenet:0xb9c5714089478a327f09197987f16f9e5d936e8a"))
+            .await;
+        assert!(result.is_err());
     }
 }
