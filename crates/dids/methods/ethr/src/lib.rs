@@ -1396,6 +1396,10 @@ mod tests {
         changed_block: u64,
         /// Address to return for identityOwner(addr) calls (None = return the queried address)
         identity_owner: Option<[u8; 20]>,
+        /// Per-block identity owners for historical resolution (block -> owner)
+        /// When identityOwner is called at BlockRef::Number(n), returns the owner for
+        /// the highest block <= n, falling back to identity_owner
+        identity_owner_at_block: HashMap<u64, [u8; 20]>,
         /// Logs to return for get_logs calls, keyed by block number
         logs: HashMap<u64, Vec<Log>>,
         /// Block timestamps to return for block_timestamp calls
@@ -1407,6 +1411,7 @@ mod tests {
             Self {
                 changed_block: 0,
                 identity_owner: None,
+                identity_owner_at_block: HashMap::new(),
                 logs: HashMap::new(),
                 block_timestamps: HashMap::new(),
             }
@@ -1416,6 +1421,7 @@ mod tests {
             Self {
                 changed_block: 1, // has changes
                 identity_owner: None, // but owner is the same
+                identity_owner_at_block: HashMap::new(),
                 logs: HashMap::new(),
                 block_timestamps: HashMap::new(),
             }
@@ -1429,7 +1435,7 @@ mod tests {
             &self,
             _to: [u8; 20],
             data: Vec<u8>,
-            _block: BlockRef,
+            block: BlockRef,
         ) -> Result<Vec<u8>, Self::Error> {
             if data.len() < 4 {
                 return Err(MockProviderError("calldata too short".into()));
@@ -1443,12 +1449,26 @@ mod tests {
                     Ok(result)
                 }
                 IDENTITY_OWNER_SELECTOR => {
-                    // Return identity_owner or echo back the queried address
                     let mut result = vec![0u8; 32];
+                    // For block-specific queries, check identity_owner_at_block first
+                    if let BlockRef::Number(n) = block {
+                        if !self.identity_owner_at_block.is_empty() {
+                            // Find the owner at or before block n
+                            let owner = self.identity_owner_at_block
+                                .iter()
+                                .filter(|(&b, _)| b <= n)
+                                .max_by_key(|(&b, _)| b)
+                                .map(|(_, o)| *o);
+                            if let Some(o) = owner {
+                                result[12..32].copy_from_slice(&o);
+                                return Ok(result);
+                            }
+                        }
+                    }
+                    // Fallback to identity_owner or echo back the queried address
                     if let Some(owner) = self.identity_owner {
                         result[12..32].copy_from_slice(&owner);
                     } else if data.len() >= 36 {
-                        // Echo back the queried address (last 20 bytes of the 32-byte arg)
                         result[12..32].copy_from_slice(&data[16..36]);
                     }
                     Ok(result)
@@ -1610,6 +1630,7 @@ mod tests {
             identity_owner: Some(new_owner),
             logs: HashMap::from([(100, vec![log])]),
             block_timestamps: HashMap::new(),
+            identity_owner_at_block: HashMap::new(),
         };
 
         let events = collect_events(&provider, TEST_REGISTRY, &identity, 100)
@@ -1647,6 +1668,7 @@ mod tests {
                 (200, vec![log_at_200]),
             ]),
             block_timestamps: HashMap::new(),
+            identity_owner_at_block: HashMap::new(),
         };
 
         let events = collect_events(&provider, TEST_REGISTRY, &identity, 200)
@@ -1706,6 +1728,7 @@ mod tests {
                 (300, vec![log_300]),
             ]),
             block_timestamps: HashMap::new(),
+            identity_owner_at_block: HashMap::new(),
         };
 
         let events = collect_events(&provider, TEST_REGISTRY, &identity, 300)
@@ -1799,6 +1822,7 @@ mod tests {
                     identity_owner: Some(new_owner),
                     logs: HashMap::new(),
                     block_timestamps: HashMap::new(),
+                    identity_owner_at_block: HashMap::new(),
                 },
             },
         );
@@ -1861,6 +1885,7 @@ mod tests {
                     identity_owner: Some(new_owner),
                     logs: HashMap::new(),
                     block_timestamps: HashMap::new(),
+                    identity_owner_at_block: HashMap::new(),
                 },
             },
         );
@@ -2022,6 +2047,7 @@ mod tests {
                     identity_owner: None, // same as identity
                     logs: HashMap::from([(100, vec![log])]),
                     block_timestamps: HashMap::new(),
+                    identity_owner_at_block: HashMap::new(),
                 },
             },
         );
@@ -2089,6 +2115,7 @@ mod tests {
                     identity_owner: None,
                     logs: HashMap::from([(100, vec![log])]),
                     block_timestamps: HashMap::new(),
+                    identity_owner_at_block: HashMap::new(),
                 },
             },
         );
@@ -2137,6 +2164,7 @@ mod tests {
                     identity_owner: None,
                     logs: HashMap::from([(100, vec![log])]),
                     block_timestamps: HashMap::new(),
+                    identity_owner_at_block: HashMap::new(),
                 },
             },
         );
@@ -2184,6 +2212,7 @@ mod tests {
                         (200, vec![log_b]),
                     ]),
                     block_timestamps: HashMap::new(),
+                    identity_owner_at_block: HashMap::new(),
                 },
             },
         );
@@ -2239,6 +2268,7 @@ mod tests {
                         (200, vec![log_b]),
                     ]),
                     block_timestamps: HashMap::new(),
+                    identity_owner_at_block: HashMap::new(),
                 },
             },
         );
@@ -2298,6 +2328,7 @@ mod tests {
                 identity_owner: None,
                 logs: HashMap::from([(100, vec![log_delegate]), (200, vec![log_attr])]),
                 block_timestamps: HashMap::new(),
+                identity_owner_at_block: HashMap::new(),
             },
         });
 
@@ -2341,6 +2372,7 @@ mod tests {
                 identity_owner: None,
                 logs: HashMap::from([(100, vec![log_a]), (200, vec![log_b])]),
                 block_timestamps: HashMap::new(),
+                identity_owner_at_block: HashMap::new(),
             },
         });
 
@@ -2383,6 +2415,7 @@ mod tests {
                 identity_owner: None,
                 logs: HashMap::from([(100, vec![log_a]), (200, vec![log_b])]),
                 block_timestamps: HashMap::new(),
+                identity_owner_at_block: HashMap::new(),
             },
         });
 
@@ -2425,6 +2458,7 @@ mod tests {
                 identity_owner: None,
                 logs: HashMap::from([(100, vec![log])]),
                 block_timestamps: HashMap::new(),
+                identity_owner_at_block: HashMap::new(),
             },
         });
 
@@ -2463,6 +2497,7 @@ mod tests {
                 identity_owner: None,
                 logs: HashMap::from([(100, vec![log])]),
                 block_timestamps: HashMap::new(),
+                identity_owner_at_block: HashMap::new(),
             },
         });
 
@@ -2501,6 +2536,7 @@ mod tests {
                 identity_owner: None,
                 logs: HashMap::from([(100, vec![log])]),
                 block_timestamps: HashMap::new(),
+                identity_owner_at_block: HashMap::new(),
             },
         });
 
@@ -2546,6 +2582,7 @@ mod tests {
                         (200, vec![log_delegate]),
                     ]),
                     block_timestamps: HashMap::new(),
+                    identity_owner_at_block: HashMap::new(),
                 },
             },
         );
@@ -2611,6 +2648,7 @@ mod tests {
                 identity_owner: None,
                 logs: HashMap::from([(100, vec![log])]),
                 block_timestamps: HashMap::new(),
+                identity_owner_at_block: HashMap::new(),
             },
         });
 
@@ -2662,6 +2700,7 @@ mod tests {
                     identity_owner: Some(final_owner),
                     logs: HashMap::new(),
                     block_timestamps: HashMap::new(),
+                    identity_owner_at_block: HashMap::new(),
                 },
             },
         );
@@ -2718,6 +2757,7 @@ mod tests {
                 identity_owner: Some(null_owner),
                 logs: HashMap::from([(100, vec![log])]),
                 block_timestamps: HashMap::from([(100, 1705312200)]),
+                identity_owner_at_block: HashMap::new(),
             },
         });
 
@@ -2773,6 +2813,7 @@ mod tests {
                     (300, vec![log_attr]),
                 ]),
                 block_timestamps: HashMap::new(),
+                identity_owner_at_block: HashMap::new(),
             },
         });
 
@@ -2851,6 +2892,7 @@ mod tests {
                 identity_owner: None,
                 logs: HashMap::from([(100, vec![log])]),
                 block_timestamps: HashMap::from([(100, 1705312200)]),
+                identity_owner_at_block: HashMap::new(),
             },
         });
 
