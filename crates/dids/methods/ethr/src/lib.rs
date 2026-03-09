@@ -1223,4 +1223,60 @@ mod tests {
         }).unwrap();
         assert!(key_vm.get("publicKeyJwk").is_some(), "#controllerKey should have publicKeyJwk");
     }
+
+    #[tokio::test]
+    async fn resolve_with_mock_provider_multiple_owner_changes() {
+        // Simulate multiple ownership transfers: identityOwner() returns the
+        // final owner. The document should use that address regardless of
+        // how many transfers occurred.
+        let final_owner: [u8; 20] = [
+            0xAB, 0xCD, 0xEF, 0x01, 0x23, 0x45, 0x67, 0x89, 0xAB, 0xCD,
+            0xEF, 0x01, 0x23, 0x45, 0x67, 0x89, 0xAB, 0xCD, 0xEF, 0x01,
+        ];
+        let mut resolver = DIDEthr::new();
+        resolver.add_network(
+            "mainnet",
+            NetworkConfig {
+                chain_id: 1,
+                registry: [0xdc, 0xa7, 0xef, 0x03, 0xe9, 0x8e, 0x0d, 0xc2,
+                           0xb8, 0x55, 0xbe, 0x64, 0x7c, 0x39, 0xab, 0xe9,
+                           0x84, 0xfc, 0xf2, 0x1b],
+                provider: MockProvider {
+                    changed_block: 5, // multiple blocks of changes
+                    identity_owner: Some(final_owner),
+                },
+            },
+        );
+
+        let doc = resolver
+            .resolve(did!(
+                "did:ethr:0xb9c5714089478a327f09197987f16f9e5d936e8a"
+            ))
+            .await
+            .unwrap()
+            .document;
+
+        let doc_value = serde_json::to_value(&doc).unwrap();
+        let vms = doc_value["verificationMethod"].as_array().unwrap();
+
+        // Compute expected checksummed address
+        let expected_addr = format_address_eip55(&final_owner);
+        let expected_account_id = format!("eip155:1:{expected_addr}");
+
+        let controller_vm = vms.iter().find(|vm| {
+            vm["id"].as_str().unwrap().ends_with("#controller")
+        }).expect("should have #controller VM");
+        assert_eq!(
+            controller_vm["blockchainAccountId"].as_str().unwrap(),
+            expected_account_id,
+        );
+
+        let eip712_vm = vms.iter().find(|vm| {
+            vm["id"].as_str().unwrap().ends_with("#Eip712Method2021")
+        }).expect("should have #Eip712Method2021 VM");
+        assert_eq!(
+            eip712_vm["blockchainAccountId"].as_str().unwrap(),
+            expected_account_id,
+        );
+    }
 }
