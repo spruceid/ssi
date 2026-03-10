@@ -16,7 +16,7 @@ use static_iref::iri;
 use std::collections::HashMap;
 use std::str::FromStr;
 
-use base64::Engine as _;
+use indexmap::IndexMap;
 
 mod json_ld_context;
 use json_ld_context::JsonLdContext;
@@ -571,9 +571,15 @@ fn decode_delegate_type(delegate_type: &[u8; 32]) -> &[u8] {
 
 /// Process ERC-1056 events and add delegate verification methods to the document.
 ///
+/// Uses a map-accumulation model: each delegate/attribute event is keyed by its
+/// content (delegate_type+delegate or name+value). When a valid event arrives the
+/// entry is inserted; when a revoked/expired event arrives the entry is removed.
+/// This correctly handles the case where a previously-valid key is later revoked.
+///
 /// `now` is the current timestamp (seconds since epoch) used for expiry checks.
-/// The delegate counter increments for every DelegateChanged event regardless of
-/// validity, ensuring stable `#delegate-N` IDs.
+/// The delegate counter increments for every recognised DelegateChanged /
+/// AttributeChanged-pub event regardless of validity, ensuring stable `#delegate-N`
+/// IDs. Likewise for service_counter / `#service-N`.
 fn apply_events(
     doc: &mut Document,
     events: &[(u64, Erc1056Event)],
@@ -585,6 +591,12 @@ fn apply_events(
     let mut delegate_counter = 0u64;
     let mut service_counter = 0u64;
 
+    // Content-keyed maps for deduplication and revocation support.
+    // Key = delegate_type[32] ++ delegate[20] for delegates,
+    //       name[32] ++ value[..] for attribute keys / services.
+    let mut vms: IndexMap<Vec<u8>, PendingVm> = IndexMap::new();
+    let mut svcs: IndexMap<Vec<u8>, PendingService> = IndexMap::new();
+
     for (_block, event) in events {
         match event {
             Erc1056Event::DelegateChanged {
@@ -593,7 +605,6 @@ fn apply_events(
                 valid_to,
                 ..
             } => {
-                delegate_counter += 1;
                 let dt = decode_delegate_type(delegate_type);
 
                 let is_veri_key = dt == b"veriKey";
@@ -603,22 +614,149 @@ fn apply_events(
                     continue;
                 }
 
-                // Skip expired/revoked delegates
-                if *valid_to < now {
-                    continue;
+                delegate_counter += 1;
+
+                // Content key: delegate_type[32] ++ delegate[20]
+                let mut key = Vec::with_capacity(52);
+                key.extend_from_slice(delegate_type);
+                key.extend_from_slice(delegate);
+
+                if *valid_to >= now {
+                    let delegate_addr = format_address_eip55(delegate);
+                    let blockchain_account_id = BlockchainAccountId {
+                        account_address: delegate_addr,
+                        chain_id: ChainId {
+                            namespace: "eip155".to_string(),
+                            reference: network_chain.id().to_string(),
+                        },
+                    };
+
+                    vms.insert(key, PendingVm {
+                        counter: delegate_counter,
+                        payload: PendingVmPayload::Delegate { blockchain_account_id },
+                        is_sig_auth,
+                    });
+                } else {
+                    vms.shift_remove(&key);
                 }
-
-                let delegate_addr = format_address_eip55(delegate);
-                let blockchain_account_id = BlockchainAccountId {
-                    account_address: delegate_addr,
-                    chain_id: ChainId {
-                        namespace: "eip155".to_string(),
-                        reference: network_chain.id().to_string(),
-                    },
+            }
+            Erc1056Event::AttributeChanged {
+                name,
+                value,
+                valid_to,
+                ..
+            } => {
+                let attr_name = decode_delegate_type(name); // trims trailing zeros
+                let attr_str = match std::str::from_utf8(attr_name) {
+                    Ok(s) => s,
+                    Err(_) => continue,
                 };
+                let parts: Vec<&str> = attr_str.split('/').collect();
 
-                let vm_id = format!("{did}#delegate-{delegate_counter}");
-                let eip712_id = format!("{did}#delegate-{delegate_counter}-Eip712Method2021");
+                if parts.len() >= 3 && parts[0] == "did" && parts[1] == "pub" {
+                    // did/pub/<algo>/<purpose>/<encoding>
+                    delegate_counter += 1;
+
+                    let algo = parts.get(2).copied().unwrap_or("");
+                    let purpose = parts.get(3).copied().unwrap_or("");
+
+                    // Content key: name[32] ++ value[..]
+                    let mut key = Vec::with_capacity(32 + value.len());
+                    key.extend_from_slice(name);
+                    key.extend_from_slice(value);
+
+                    if *valid_to >= now {
+                        // Determine VM type and build the property value.
+                        // Encoding hint from the attribute name is ignored; we
+                        // always use the canonical property for each VM type.
+                        let pending = match algo {
+                            "Secp256k1" => {
+                                match ssi_jwk::secp256k1_parse(value) {
+                                    Ok(jwk) => Some(PendingVmPayload::AttributeKey {
+                                        vm_type: VerificationMethodType::EcdsaSecp256k1VerificationKey2019,
+                                        prop_name: "publicKeyJwk",
+                                        prop_value: serde_json::to_value(&jwk).unwrap(),
+                                    }),
+                                    Err(_) => None,
+                                }
+                            }
+                            "Ed25519" => {
+                                let multibase = format!("z{}", bs58::encode(value).into_string());
+                                Some(PendingVmPayload::AttributeKey {
+                                    vm_type: VerificationMethodType::Ed25519VerificationKey2020,
+                                    prop_name: "publicKeyMultibase",
+                                    prop_value: serde_json::Value::String(multibase),
+                                })
+                            }
+                            "X25519" => {
+                                let multibase = format!("z{}", bs58::encode(value).into_string());
+                                Some(PendingVmPayload::AttributeKey {
+                                    vm_type: VerificationMethodType::X25519KeyAgreementKey2020,
+                                    prop_name: "publicKeyMultibase",
+                                    prop_value: serde_json::Value::String(multibase),
+                                })
+                            }
+                            _ => None,
+                        };
+
+                        if let Some(payload) = pending {
+                            let is_enc = purpose == "enc";
+                            let is_sig_auth = purpose == "sigAuth";
+                            vms.insert(key, PendingVm {
+                                counter: delegate_counter,
+                                payload,
+                                is_sig_auth: is_sig_auth || is_enc,
+                            });
+                        }
+                    } else {
+                        vms.shift_remove(&key);
+                    }
+                } else if parts.len() >= 3 && parts[0] == "did" && parts[1] == "svc" {
+                    // did/svc/<ServiceType>
+                    service_counter += 1;
+
+                    // Content key: name[32] ++ value[..]
+                    let mut key = Vec::with_capacity(32 + value.len());
+                    key.extend_from_slice(name);
+                    key.extend_from_slice(value);
+
+                    if *valid_to >= now {
+                        let service_type = parts[2..].join("/");
+                        let endpoint_str = String::from_utf8_lossy(value);
+                        let endpoint = if let Ok(json_val) = serde_json::from_str::<serde_json::Value>(&endpoint_str) {
+                            if json_val.is_object() || json_val.is_array() {
+                                document::service::Endpoint::Map(json_val)
+                            } else {
+                                parse_uri_endpoint(&endpoint_str)
+                            }
+                        } else {
+                            parse_uri_endpoint(&endpoint_str)
+                        };
+
+                        svcs.insert(key, PendingService {
+                            counter: service_counter,
+                            service_type,
+                            endpoint,
+                        });
+                    } else {
+                        svcs.shift_remove(&key);
+                    }
+                }
+            }
+            // OwnerChanged handled by identityOwner() call
+            _ => {}
+        }
+    }
+
+    // Materialise VMs from the map, sorted by counter for stable ordering.
+    let mut vm_entries: Vec<_> = vms.into_values().collect();
+    vm_entries.sort_by_key(|v| v.counter);
+
+    for vm_entry in vm_entries {
+        match vm_entry.payload {
+            PendingVmPayload::Delegate { blockchain_account_id } => {
+                let vm_id = format!("{did}#delegate-{}", vm_entry.counter);
+                let eip712_id = format!("{did}#delegate-{}-Eip712Method2021", vm_entry.counter);
 
                 let vm_id_url = DIDURLBuf::from_string(vm_id).unwrap();
                 let eip712_id_url = DIDURLBuf::from_string(eip712_id).unwrap();
@@ -648,7 +786,7 @@ fn apply_events(
                     .assertion_method
                     .push(eip712_id_url.clone().into());
 
-                if is_sig_auth {
+                if vm_entry.is_sig_auth {
                     doc.verification_relationships
                         .authentication
                         .push(vm_id_url.into());
@@ -657,145 +795,109 @@ fn apply_events(
                         .push(eip712_id_url.into());
                 }
             }
-            Erc1056Event::AttributeChanged {
-                name,
-                value,
-                valid_to,
-                ..
-            } => {
-                let attr_name = decode_delegate_type(name); // trims trailing zeros
-                let attr_str = match std::str::from_utf8(attr_name) {
-                    Ok(s) => s,
-                    Err(_) => continue,
-                };
-                let parts: Vec<&str> = attr_str.split('/').collect();
+            PendingVmPayload::AttributeKey { vm_type, prop_name, prop_value } => {
+                let vm_id = format!("{did}#delegate-{}", vm_entry.counter);
+                let vm_id_url = DIDURLBuf::from_string(vm_id).unwrap();
 
-                if parts.len() >= 3 && parts[0] == "did" && parts[1] == "pub" {
-                    // did/pub/<algo>/<purpose>/<encoding>
-                    delegate_counter += 1;
-
-                    if *valid_to < now {
-                        continue;
-                    }
-
-                    let algo = parts.get(2).copied().unwrap_or("");
-                    let purpose = parts.get(3).copied().unwrap_or("");
-                    let encoding = parts.get(4).copied().unwrap_or("hex");
-
-                    let vm_type = match algo {
-                        "Secp256k1" => "EcdsaSecp256k1VerificationKey2019",
-                        "Ed25519" => "Ed25519VerificationKey2018",
-                        "X25519" => "X25519KeyAgreementKey2019",
-                        _ => continue,
-                    };
-
-                    let prop_name = match encoding {
-                        "hex" | "" => "publicKeyHex",
-                        "base64" => "publicKeyBase64",
-                        "base58" => "publicKeyBase58",
-                        "pem" => "publicKeyPem",
-                        _ => continue,
-                    };
-
-                    let prop_value = match encoding {
-                        "hex" | "" => hex::encode(value),
-                        "base64" => base64::engine::general_purpose::STANDARD.encode(value),
-                        _ => String::from_utf8_lossy(value).into_owned(),
-                    };
-
-                    let vm_id = format!("{did}#delegate-{delegate_counter}");
-                    let vm_id_url = DIDURLBuf::from_string(vm_id).unwrap();
-
-                    let vm = DIDVerificationMethod {
-                        id: vm_id_url.clone(),
-                        type_: vm_type.to_owned(),
-                        controller: did.clone(),
-                        properties: [(
-                            prop_name.into(),
-                            serde_json::Value::String(prop_value),
-                        )]
+                let vm = DIDVerificationMethod {
+                    id: vm_id_url.clone(),
+                    type_: vm_type.name().to_owned(),
+                    controller: did.clone(),
+                    properties: [(prop_name.into(), prop_value)]
                         .into_iter()
                         .collect(),
-                    };
+                };
 
-                    // Add context entries
-                    match algo {
-                        "Secp256k1" => json_ld_context.add_verification_method_type(
-                            VerificationMethodType::EcdsaSecp256k1VerificationKey2019,
-                        ),
-                        _ => {} // Ed25519/X25519 context handled in Phase 10+
-                    }
-                    json_ld_context.add_property(prop_name);
+                json_ld_context.add_verification_method_type(vm_type);
+                json_ld_context.add_property(prop_name);
 
-                    doc.verification_method.push(vm);
+                doc.verification_method.push(vm);
 
-                    let is_veri_key = purpose == "veriKey";
-                    let is_sig_auth = purpose == "sigAuth";
-                    let is_enc = purpose == "enc";
-
-                    if is_veri_key || is_sig_auth {
-                        doc.verification_relationships
-                            .assertion_method
-                            .push(vm_id_url.clone().into());
-                    }
-
-                    if is_sig_auth {
-                        doc.verification_relationships
-                            .authentication
-                            .push(vm_id_url.clone().into());
-                    }
-
-                    if is_enc {
+                // Determine purpose from the attribute name embedded in is_sig_auth.
+                // For attribute keys, is_sig_auth encodes whether the key goes into
+                // authentication/keyAgreement (true for sigAuth and enc purposes).
+                //
+                // We need to re-derive the purpose from the original attribute, but
+                // since we only store is_sig_auth, we use a simpler approach:
+                // - X25519 keys → keyAgreement
+                // - is_sig_auth && not X25519 → assertionMethod + authentication
+                // - else → assertionMethod only
+                match vm_type {
+                    VerificationMethodType::X25519KeyAgreementKey2020 => {
                         doc.verification_relationships
                             .key_agreement
                             .push(vm_id_url.into());
                     }
-                } else if parts.len() >= 3 && parts[0] == "did" && parts[1] == "svc" {
-                    // did/svc/<ServiceType>
-                    service_counter += 1;
-
-                    if *valid_to < now {
-                        continue;
+                    _ if vm_entry.is_sig_auth => {
+                        doc.verification_relationships
+                            .assertion_method
+                            .push(vm_id_url.clone().into());
+                        doc.verification_relationships
+                            .authentication
+                            .push(vm_id_url.into());
                     }
-
-                    let service_type = parts[2..].join("/");
-                    let service_id = format!("{did}#service-{service_counter}");
-
-                    let endpoint_str = String::from_utf8_lossy(value);
-                    let endpoint = if let Ok(json_val) = serde_json::from_str::<serde_json::Value>(&endpoint_str) {
-                        if json_val.is_object() || json_val.is_array() {
-                            document::service::Endpoint::Map(json_val)
-                        } else {
-                            match iref::UriBuf::new(endpoint_str.as_bytes().to_vec()) {
-                                Ok(uri) => document::service::Endpoint::Uri(uri),
-                                Err(e) => document::service::Endpoint::Map(
-                                    serde_json::Value::String(String::from_utf8_lossy(&e.0).into_owned()),
-                                ),
-                            }
-                        }
-                    } else {
-                        match iref::UriBuf::new(endpoint_str.as_bytes().to_vec()) {
-                            Ok(uri) => document::service::Endpoint::Uri(uri),
-                            Err(e) => document::service::Endpoint::Map(
-                                serde_json::Value::String(String::from_utf8_lossy(&e.0).into_owned()),
-                            ),
-                        }
-                    };
-
-                    let service = document::Service {
-                        id: iref::UriBuf::new(service_id.into_bytes()).unwrap(),
-                        type_: ssi_core::one_or_many::OneOrMany::One(service_type),
-                        service_endpoint: Some(ssi_core::one_or_many::OneOrMany::One(endpoint)),
-                        property_set: std::collections::BTreeMap::new(),
-                    };
-
-                    doc.service.push(service);
+                    _ => {
+                        doc.verification_relationships
+                            .assertion_method
+                            .push(vm_id_url.into());
+                    }
                 }
             }
-            // OwnerChanged handled by identityOwner() (Phase 2)
-            _ => {}
         }
     }
+
+    // Materialise services from the map, sorted by counter.
+    let mut svc_entries: Vec<_> = svcs.into_values().collect();
+    svc_entries.sort_by_key(|s| s.counter);
+
+    for svc_entry in svc_entries {
+        let service_id = format!("{did}#service-{}", svc_entry.counter);
+        let service = document::Service {
+            id: iref::UriBuf::new(service_id.into_bytes()).unwrap(),
+            type_: ssi_core::one_or_many::OneOrMany::One(svc_entry.service_type),
+            service_endpoint: Some(ssi_core::one_or_many::OneOrMany::One(svc_entry.endpoint)),
+            property_set: std::collections::BTreeMap::new(),
+        };
+        doc.service.push(service);
+    }
+}
+
+/// Helper to parse a string as a URI endpoint, falling back to a string-valued Map.
+fn parse_uri_endpoint(s: &str) -> document::service::Endpoint {
+    match iref::UriBuf::new(s.as_bytes().to_vec()) {
+        Ok(uri) => document::service::Endpoint::Uri(uri),
+        Err(e) => document::service::Endpoint::Map(
+            serde_json::Value::String(String::from_utf8_lossy(&e.0).into_owned()),
+        ),
+    }
+}
+
+/// Intermediate representation for a verification method accumulated during
+/// event processing, before materialisation into the DID document.
+struct PendingVm {
+    counter: u64,
+    payload: PendingVmPayload,
+    /// For delegates: true if sigAuth. For attribute keys: true if sigAuth or enc purpose.
+    is_sig_auth: bool,
+}
+
+enum PendingVmPayload {
+    Delegate {
+        blockchain_account_id: BlockchainAccountId,
+    },
+    AttributeKey {
+        vm_type: VerificationMethodType,
+        prop_name: &'static str,
+        prop_value: serde_json::Value,
+    },
+}
+
+/// Intermediate representation for a service endpoint accumulated during
+/// event processing.
+struct PendingService {
+    counter: u64,
+    service_type: String,
+    endpoint: document::service::Endpoint,
 }
 
 /// Resolve a DID using the offline (genesis document) path
@@ -1064,6 +1166,7 @@ fn resolve_public_key(
     json_ld_context.add_verification_method_type(vm.type_());
     json_ld_context.add_verification_method_type(key_vm.type_());
     json_ld_context.add_verification_method_type(eip712_vm.type_());
+    json_ld_context.add_property("publicKeyJwk");
 
     let mut doc = Document::new(did);
     doc.verification_relationships.assertion_method = vec![
@@ -1122,9 +1225,12 @@ impl VerificationMethod {
     }
 }
 
+#[derive(Clone, Copy)]
 pub enum VerificationMethodType {
     EcdsaSecp256k1VerificationKey2019,
     EcdsaSecp256k1RecoveryMethod2020,
+    Ed25519VerificationKey2020,
+    X25519KeyAgreementKey2020,
     Eip712Method2021,
 }
 
@@ -1133,6 +1239,8 @@ impl VerificationMethodType {
         match self {
             Self::EcdsaSecp256k1VerificationKey2019 => "EcdsaSecp256k1VerificationKey2019",
             Self::EcdsaSecp256k1RecoveryMethod2020 => "EcdsaSecp256k1RecoveryMethod2020",
+            Self::Ed25519VerificationKey2020 => "Ed25519VerificationKey2020",
+            Self::X25519KeyAgreementKey2020 => "X25519KeyAgreementKey2020",
             Self::Eip712Method2021 => "Eip712Method2021",
         }
     }
@@ -1141,7 +1249,9 @@ impl VerificationMethodType {
         match self {
             Self::EcdsaSecp256k1VerificationKey2019 => iri!("https://w3id.org/security#EcdsaSecp256k1VerificationKey2019"),
             Self::EcdsaSecp256k1RecoveryMethod2020 => iri!("https://identity.foundation/EcdsaSecp256k1RecoverySignature2020#EcdsaSecp256k1RecoveryMethod2020"),
-            Self::Eip712Method2021 => iri!("https://w3id.org/security#Eip712Method2021")
+            Self::Ed25519VerificationKey2020 => iri!("https://w3id.org/security#Ed25519VerificationKey2020"),
+            Self::X25519KeyAgreementKey2020 => iri!("https://w3id.org/security#X25519KeyAgreementKey2020"),
+            Self::Eip712Method2021 => iri!("https://w3id.org/security#Eip712Method2021"),
         }
     }
 }
@@ -2373,10 +2483,9 @@ mod tests {
         let delegate: [u8; 20] = [0xAA; 20];
         let delegate_type = encode_delegate_type("veriKey");
         let attr_name = encode_attr_name("did/pub/Secp256k1/veriKey/hex");
-        let pub_key: Vec<u8> = vec![0x04, 0xab, 0xcd];
 
         let log_delegate = make_delegate_changed_log(100, &identity, &delegate_type, &delegate, u64::MAX, 0);
-        let log_attr = make_attribute_changed_log(200, &identity, &attr_name, &pub_key, u64::MAX, 100);
+        let log_attr = make_attribute_changed_log(200, &identity, &attr_name, &TEST_SECP256K1_COMPRESSED, u64::MAX, 100);
 
         let mut resolver = DIDEthr::new();
         resolver.add_network("mainnet", NetworkConfig {
@@ -2405,10 +2514,12 @@ mod tests {
         let d1 = vms.iter().find(|vm| vm["id"].as_str().unwrap().ends_with("#delegate-1")).unwrap();
         assert_eq!(d1["type"], "EcdsaSecp256k1RecoveryMethod2020");
 
-        // #delegate-2 is the attribute key (EcdsaSecp256k1VerificationKey2019)
+        // #delegate-2 is the attribute key (EcdsaSecp256k1VerificationKey2019 with publicKeyJwk)
         let d2 = vms.iter().find(|vm| vm["id"].as_str().unwrap().ends_with("#delegate-2")).unwrap();
         assert_eq!(d2["type"], "EcdsaSecp256k1VerificationKey2019");
-        assert_eq!(d2["publicKeyHex"], hex::encode(&pub_key));
+        assert!(d2["publicKeyJwk"].is_object(), "attribute key should have publicKeyJwk");
+        assert_eq!(d2["publicKeyJwk"]["kty"], "EC");
+        assert_eq!(d2["publicKeyJwk"]["crv"], "secp256k1");
     }
 
     #[tokio::test]
@@ -2457,13 +2568,11 @@ mod tests {
         let identity: [u8; 20] = [0xb9, 0xc5, 0x71, 0x40, 0x89, 0x47, 0x8a, 0x32, 0x7f, 0x09,
                                    0x19, 0x79, 0x87, 0xf1, 0x6f, 0x9e, 0x5d, 0x93, 0x6e, 0x8a];
         let attr_name = encode_attr_name("did/pub/Secp256k1/veriKey/hex");
-        let pub_key_a: Vec<u8> = vec![0x04, 0xaa];
-        let pub_key_b: Vec<u8> = vec![0x04, 0xbb];
 
         // First key: expired (valid_to = 1000, well in the past)
-        let log_a = make_attribute_changed_log(100, &identity, &attr_name, &pub_key_a, 1000, 0);
-        // Second key: valid
-        let log_b = make_attribute_changed_log(200, &identity, &attr_name, &pub_key_b, u64::MAX, 100);
+        let log_a = make_attribute_changed_log(100, &identity, &attr_name, &TEST_SECP256K1_COMPRESSED, 1000, 0);
+        // Second key: valid (different key bytes so they have different content keys)
+        let log_b = make_attribute_changed_log(200, &identity, &attr_name, &TEST_SECP256K1_COMPRESSED_2, u64::MAX, 100);
 
         let mut resolver = DIDEthr::new();
         resolver.add_network("mainnet", NetworkConfig {
@@ -2495,7 +2604,7 @@ mod tests {
         let vm = vms.iter().find(|vm| {
             vm["id"].as_str().unwrap().ends_with("#delegate-2")
         }).expect("should have #delegate-2 VM");
-        assert_eq!(vm["publicKeyHex"], hex::encode(&pub_key_b));
+        assert!(vm["publicKeyJwk"].is_object(), "should have publicKeyJwk as object");
     }
 
     #[tokio::test]
@@ -2578,13 +2687,13 @@ mod tests {
     #[tokio::test]
     async fn resolve_secp256k1_sigauth_hex_attribute_in_authentication() {
         // did/pub/Secp256k1/sigAuth/hex attribute adds VM referenced in
-        // verificationMethod + assertionMethod + authentication
+        // verificationMethod + assertionMethod + authentication.
+        // Uses a real compressed secp256k1 key so secp256k1_parse succeeds.
         let identity: [u8; 20] = [0xb9, 0xc5, 0x71, 0x40, 0x89, 0x47, 0x8a, 0x32, 0x7f, 0x09,
                                    0x19, 0x79, 0x87, 0xf1, 0x6f, 0x9e, 0x5d, 0x93, 0x6e, 0x8a];
         let attr_name = encode_attr_name("did/pub/Secp256k1/sigAuth/hex");
-        let pub_key_value: Vec<u8> = vec![0x04, 0xde, 0xad, 0xbe, 0xef];
 
-        let log = make_attribute_changed_log(100, &identity, &attr_name, &pub_key_value, u64::MAX, 0);
+        let log = make_attribute_changed_log(100, &identity, &attr_name, &TEST_SECP256K1_COMPRESSED, u64::MAX, 0);
 
         let mut resolver = DIDEthr::new();
         resolver.add_network("mainnet", NetworkConfig {
@@ -2605,6 +2714,16 @@ mod tests {
 
         let doc_value = serde_json::to_value(&doc).unwrap();
         let did_prefix = "did:ethr:0xb9c5714089478a327f09197987f16f9e5d936e8a";
+
+        let vms = doc_value["verificationMethod"].as_array().unwrap();
+        // 2 base + 1 attribute key = 3
+        assert_eq!(vms.len(), 3);
+
+        let attr_vm = vms.iter().find(|vm| {
+            vm["id"].as_str().unwrap().ends_with("#delegate-1")
+        }).expect("should have #delegate-1 VM");
+        assert_eq!(attr_vm["type"], "EcdsaSecp256k1VerificationKey2019");
+        assert!(attr_vm["publicKeyJwk"].is_object(), "should have publicKeyJwk");
 
         let assertion = doc_value["assertionMethod"].as_array().unwrap();
         let auth = doc_value["authentication"].as_array().unwrap();
@@ -2687,16 +2806,30 @@ mod tests {
         b
     }
 
+    /// A valid compressed secp256k1 public key (33 bytes) for use in tests.
+    const TEST_SECP256K1_COMPRESSED: [u8; 33] = [
+        0x03, 0xfd, 0xd5, 0x7a, 0xde, 0xc3, 0xd4, 0x38, 0xea, 0x23, 0x7f,
+        0xe4, 0x6b, 0x33, 0xee, 0x1e, 0x01, 0x6e, 0xda, 0x6b, 0x58, 0x5c,
+        0x3e, 0x27, 0xea, 0x66, 0x68, 0x6c, 0x2e, 0xa5, 0x35, 0x84, 0x79,
+    ];
+
+    /// A second valid compressed secp256k1 public key (different from the first).
+    const TEST_SECP256K1_COMPRESSED_2: [u8; 33] = [
+        0x02, 0xb9, 0x7c, 0x30, 0xde, 0x76, 0x7f, 0x08, 0x4c, 0xe3, 0x08,
+        0x09, 0x68, 0xd8, 0x53, 0xd0, 0x3c, 0x3a, 0x28, 0x86, 0x53, 0xf8,
+        0x12, 0x64, 0xa0, 0x90, 0xcd, 0x20, 0x3a, 0x12, 0xe5, 0x60, 0x40,
+    ];
+
     #[tokio::test]
     async fn resolve_secp256k1_verikey_hex_attribute() {
         // did/pub/Secp256k1/veriKey/hex attribute adds EcdsaSecp256k1VerificationKey2019
-        // with publicKeyHex to verificationMethod + assertionMethod, using #delegate-N ID
+        // with publicKeyJwk to verificationMethod + assertionMethod, using #delegate-N ID.
+        // Encoding hint ("hex") is ignored; we always convert to JWK.
         let identity: [u8; 20] = [0xb9, 0xc5, 0x71, 0x40, 0x89, 0x47, 0x8a, 0x32, 0x7f, 0x09,
                                    0x19, 0x79, 0x87, 0xf1, 0x6f, 0x9e, 0x5d, 0x93, 0x6e, 0x8a];
         let attr_name = encode_attr_name("did/pub/Secp256k1/veriKey/hex");
-        let pub_key_value: Vec<u8> = vec![0x04, 0xab, 0xcd, 0xef, 0x01, 0x23, 0x45, 0x67];
 
-        let log = make_attribute_changed_log(100, &identity, &attr_name, &pub_key_value, u64::MAX, 0);
+        let log = make_attribute_changed_log(100, &identity, &attr_name, &TEST_SECP256K1_COMPRESSED, u64::MAX, 0);
 
         let mut resolver = DIDEthr::new();
         resolver.add_network("mainnet", NetworkConfig {
@@ -2726,7 +2859,11 @@ mod tests {
             vm["id"].as_str().unwrap().ends_with("#delegate-1")
         }).expect("should have #delegate-1 VM from attribute");
         assert_eq!(attr_vm["type"], "EcdsaSecp256k1VerificationKey2019");
-        assert_eq!(attr_vm["publicKeyHex"], hex::encode(&pub_key_value));
+        // Must have publicKeyJwk (a JSON object), NOT publicKeyHex
+        assert!(attr_vm["publicKeyJwk"].is_object(), "should have publicKeyJwk as object");
+        assert_eq!(attr_vm["publicKeyJwk"]["kty"], "EC");
+        assert_eq!(attr_vm["publicKeyJwk"]["crv"], "secp256k1");
+        assert!(attr_vm.get("publicKeyHex").is_none(), "should NOT have publicKeyHex");
         assert_eq!(attr_vm["controller"], "did:ethr:0xb9c5714089478a327f09197987f16f9e5d936e8a");
 
         // Should be in assertionMethod but NOT authentication
@@ -2735,6 +2872,11 @@ mod tests {
         let auth = doc_value["authentication"].as_array().unwrap();
         assert!(assertion.iter().any(|v| v == &format!("{did_prefix}#delegate-1")));
         assert!(!auth.iter().any(|v| v == &format!("{did_prefix}#delegate-1")));
+
+        // Context should include publicKeyJwk binding
+        let context = doc_value["@context"].as_array().unwrap();
+        let ctx_obj = context.iter().find(|c| c.is_object()).unwrap();
+        assert!(ctx_obj.get("publicKeyJwk").is_some(), "context should include publicKeyJwk");
     }
 
     #[tokio::test]
@@ -3408,6 +3550,337 @@ mod tests {
             serde_json::to_value(&doc).unwrap(),
             serde_json::to_value(&doc_offline).unwrap(),
             "unchanged provider should match offline for public-key DID"
+        );
+    }
+
+    // ── Revocation tests ──
+
+    #[tokio::test]
+    async fn resolve_previously_valid_delegate_then_revoked() {
+        // A delegate is added valid at block 100, then revoked at block 200.
+        // The revoked delegate must NOT appear in the final document.
+        let identity: [u8; 20] = [0xb9, 0xc5, 0x71, 0x40, 0x89, 0x47, 0x8a, 0x32, 0x7f, 0x09,
+                                   0x19, 0x79, 0x87, 0xf1, 0x6f, 0x9e, 0x5d, 0x93, 0x6e, 0x8a];
+        let delegate: [u8; 20] = [0xAA; 20];
+        let delegate_type = encode_delegate_type("veriKey");
+
+        // Block 100: delegate added, valid_to = far future
+        let log_add = make_delegate_changed_log(100, &identity, &delegate_type, &delegate, u64::MAX, 0);
+        // Block 200: same delegate revoked (valid_to = 0)
+        let log_revoke = make_delegate_changed_log(200, &identity, &delegate_type, &delegate, 0, 100);
+
+        let mut resolver = DIDEthr::new();
+        resolver.add_network("mainnet", NetworkConfig {
+            chain_id: 1,
+            registry: TEST_REGISTRY,
+            provider: MockProvider {
+                changed_block: 200,
+                identity_owner: None,
+                logs: HashMap::from([
+                    (100, vec![log_add]),
+                    (200, vec![log_revoke]),
+                ]),
+                block_timestamps: HashMap::new(),
+                identity_owner_at_block: HashMap::new(),
+            },
+        });
+
+        let doc = resolver
+            .resolve(did!("did:ethr:0xb9c5714089478a327f09197987f16f9e5d936e8a"))
+            .await.unwrap().document;
+
+        let doc_value = serde_json::to_value(&doc).unwrap();
+        let vms = doc_value["verificationMethod"].as_array().unwrap();
+
+        // Only 2 base VMs — delegate was revoked
+        assert_eq!(vms.len(), 2, "revoked delegate should not appear in document");
+        assert!(vms.iter().all(|vm| !vm["id"].as_str().unwrap().contains("delegate")),
+            "no delegate VMs should be present");
+    }
+
+    #[tokio::test]
+    async fn resolve_previously_valid_service_then_revoked() {
+        // A service is added valid at block 100, then revoked at block 200.
+        let identity: [u8; 20] = [0xb9, 0xc5, 0x71, 0x40, 0x89, 0x47, 0x8a, 0x32, 0x7f, 0x09,
+                                   0x19, 0x79, 0x87, 0xf1, 0x6f, 0x9e, 0x5d, 0x93, 0x6e, 0x8a];
+        let attr_name = encode_attr_name("did/svc/HubService");
+        let endpoint = b"https://hub.example.com";
+
+        // Block 100: service added
+        let log_add = make_attribute_changed_log(100, &identity, &attr_name, endpoint, u64::MAX, 0);
+        // Block 200: same service revoked (valid_to = 0)
+        let log_revoke = make_attribute_changed_log(200, &identity, &attr_name, endpoint, 0, 100);
+
+        let mut resolver = DIDEthr::new();
+        resolver.add_network("mainnet", NetworkConfig {
+            chain_id: 1,
+            registry: TEST_REGISTRY,
+            provider: MockProvider {
+                changed_block: 200,
+                identity_owner: None,
+                logs: HashMap::from([
+                    (100, vec![log_add]),
+                    (200, vec![log_revoke]),
+                ]),
+                block_timestamps: HashMap::new(),
+                identity_owner_at_block: HashMap::new(),
+            },
+        });
+
+        let doc = resolver
+            .resolve(did!("did:ethr:0xb9c5714089478a327f09197987f16f9e5d936e8a"))
+            .await.unwrap().document;
+
+        let doc_value = serde_json::to_value(&doc).unwrap();
+        let services = doc_value.get("service");
+
+        // No services — the service was revoked
+        assert!(
+            services.is_none() || services.unwrap().as_array().map_or(true, |a| a.is_empty()),
+            "revoked service should not appear in document"
+        );
+    }
+
+    #[tokio::test]
+    async fn resolve_revoked_then_readded_gets_new_id() {
+        // A delegate is added, revoked, then re-added. The re-added delegate
+        // should get a higher counter ID (#delegate-3, not #delegate-1).
+        let identity: [u8; 20] = [0xb9, 0xc5, 0x71, 0x40, 0x89, 0x47, 0x8a, 0x32, 0x7f, 0x09,
+                                   0x19, 0x79, 0x87, 0xf1, 0x6f, 0x9e, 0x5d, 0x93, 0x6e, 0x8a];
+        let delegate: [u8; 20] = [0xAA; 20];
+        let delegate_type = encode_delegate_type("veriKey");
+
+        // Block 100: add (counter=1)
+        let log1 = make_delegate_changed_log(100, &identity, &delegate_type, &delegate, u64::MAX, 0);
+        // Block 200: revoke (counter=2)
+        let log2 = make_delegate_changed_log(200, &identity, &delegate_type, &delegate, 0, 100);
+        // Block 300: re-add (counter=3)
+        let log3 = make_delegate_changed_log(300, &identity, &delegate_type, &delegate, u64::MAX, 200);
+
+        let mut resolver = DIDEthr::new();
+        resolver.add_network("mainnet", NetworkConfig {
+            chain_id: 1,
+            registry: TEST_REGISTRY,
+            provider: MockProvider {
+                changed_block: 300,
+                identity_owner: None,
+                logs: HashMap::from([
+                    (100, vec![log1]),
+                    (200, vec![log2]),
+                    (300, vec![log3]),
+                ]),
+                block_timestamps: HashMap::new(),
+                identity_owner_at_block: HashMap::new(),
+            },
+        });
+
+        let doc = resolver
+            .resolve(did!("did:ethr:0xb9c5714089478a327f09197987f16f9e5d936e8a"))
+            .await.unwrap().document;
+
+        let doc_value = serde_json::to_value(&doc).unwrap();
+        let vms = doc_value["verificationMethod"].as_array().unwrap();
+
+        // 2 base + 2 delegate (RecoveryMethod + Eip712) = 4
+        assert_eq!(vms.len(), 4);
+
+        // Should NOT have #delegate-1 or #delegate-2
+        assert!(vms.iter().all(|vm| !vm["id"].as_str().unwrap().ends_with("#delegate-1")));
+        assert!(vms.iter().all(|vm| !vm["id"].as_str().unwrap().ends_with("#delegate-2")));
+
+        // Should have #delegate-3 (the re-added entry)
+        let d3 = vms.iter().find(|vm| vm["id"].as_str().unwrap().ends_with("#delegate-3"))
+            .expect("should have #delegate-3 VM");
+        assert_eq!(d3["type"], "EcdsaSecp256k1RecoveryMethod2020");
+    }
+
+    #[tokio::test]
+    async fn resolve_secp256k1_attr_key_uses_jwk() {
+        // Secp256k1 attribute key (any encoding hint) must produce
+        // EcdsaSecp256k1VerificationKey2019 with publicKeyJwk (a JSON object).
+        let identity: [u8; 20] = [0xb9, 0xc5, 0x71, 0x40, 0x89, 0x47, 0x8a, 0x32, 0x7f, 0x09,
+                                   0x19, 0x79, 0x87, 0xf1, 0x6f, 0x9e, 0x5d, 0x93, 0x6e, 0x8a];
+        let attr_name = encode_attr_name("did/pub/Secp256k1/veriKey/base64");
+
+        let log = make_attribute_changed_log(100, &identity, &attr_name, &TEST_SECP256K1_COMPRESSED, u64::MAX, 0);
+
+        let mut resolver = DIDEthr::new();
+        resolver.add_network("mainnet", NetworkConfig {
+            chain_id: 1,
+            registry: TEST_REGISTRY,
+            provider: MockProvider {
+                changed_block: 100,
+                identity_owner: None,
+                logs: HashMap::from([(100, vec![log])]),
+                block_timestamps: HashMap::new(),
+                identity_owner_at_block: HashMap::new(),
+            },
+        });
+
+        let doc = resolver
+            .resolve(did!("did:ethr:0xb9c5714089478a327f09197987f16f9e5d936e8a"))
+            .await.unwrap().document;
+
+        let doc_value = serde_json::to_value(&doc).unwrap();
+        let vms = doc_value["verificationMethod"].as_array().unwrap();
+
+        let attr_vm = vms.iter().find(|vm| {
+            vm["id"].as_str().unwrap().ends_with("#delegate-1")
+        }).expect("should have #delegate-1 VM");
+        assert_eq!(attr_vm["type"], "EcdsaSecp256k1VerificationKey2019");
+        assert!(attr_vm["publicKeyJwk"].is_object(), "should use publicKeyJwk");
+        assert_eq!(attr_vm["publicKeyJwk"]["kty"], "EC");
+        assert_eq!(attr_vm["publicKeyJwk"]["crv"], "secp256k1");
+    }
+
+    #[tokio::test]
+    async fn resolve_ed25519_attr_key() {
+        // Ed25519 attribute key → Ed25519VerificationKey2020 + publicKeyMultibase
+        let identity: [u8; 20] = [0xb9, 0xc5, 0x71, 0x40, 0x89, 0x47, 0x8a, 0x32, 0x7f, 0x09,
+                                   0x19, 0x79, 0x87, 0xf1, 0x6f, 0x9e, 0x5d, 0x93, 0x6e, 0x8a];
+        let attr_name = encode_attr_name("did/pub/Ed25519/veriKey/base64");
+        // 32-byte Ed25519 public key
+        let ed_key: [u8; 32] = [
+            0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08,
+            0x09, 0x0a, 0x0b, 0x0c, 0x0d, 0x0e, 0x0f, 0x10,
+            0x11, 0x12, 0x13, 0x14, 0x15, 0x16, 0x17, 0x18,
+            0x19, 0x1a, 0x1b, 0x1c, 0x1d, 0x1e, 0x1f, 0x20,
+        ];
+
+        let log = make_attribute_changed_log(100, &identity, &attr_name, &ed_key, u64::MAX, 0);
+
+        let mut resolver = DIDEthr::new();
+        resolver.add_network("mainnet", NetworkConfig {
+            chain_id: 1,
+            registry: TEST_REGISTRY,
+            provider: MockProvider {
+                changed_block: 100,
+                identity_owner: None,
+                logs: HashMap::from([(100, vec![log])]),
+                block_timestamps: HashMap::new(),
+                identity_owner_at_block: HashMap::new(),
+            },
+        });
+
+        let doc = resolver
+            .resolve(did!("did:ethr:0xb9c5714089478a327f09197987f16f9e5d936e8a"))
+            .await.unwrap().document;
+
+        let doc_value = serde_json::to_value(&doc).unwrap();
+        eprintln!("{}", serde_json::to_string_pretty(&doc_value).unwrap());
+        let vms = doc_value["verificationMethod"].as_array().unwrap();
+
+        // 2 base + 1 Ed25519 = 3
+        assert_eq!(vms.len(), 3);
+
+        let attr_vm = vms.iter().find(|vm| {
+            vm["id"].as_str().unwrap().ends_with("#delegate-1")
+        }).expect("should have #delegate-1 VM");
+        assert_eq!(attr_vm["type"], "Ed25519VerificationKey2020");
+        let expected_multibase = format!("z{}", bs58::encode(&ed_key).into_string());
+        assert_eq!(attr_vm["publicKeyMultibase"], expected_multibase);
+        assert!(attr_vm.get("publicKeyJwk").is_none(), "should NOT have publicKeyJwk");
+
+        // Should be in assertionMethod (veriKey purpose)
+        let did_prefix = "did:ethr:0xb9c5714089478a327f09197987f16f9e5d936e8a";
+        let assertion = doc_value["assertionMethod"].as_array().unwrap();
+        assert!(assertion.iter().any(|v| v == &format!("{did_prefix}#delegate-1")));
+
+        // Context should include Ed25519VerificationKey2020 and publicKeyMultibase
+        let context = doc_value["@context"].as_array().unwrap();
+        let ctx_obj = context.iter().find(|c| c.is_object()).unwrap();
+        assert!(ctx_obj.get("Ed25519VerificationKey2020").is_some(),
+            "context should include Ed25519VerificationKey2020");
+        assert!(ctx_obj.get("publicKeyMultibase").is_some(),
+            "context should include publicKeyMultibase");
+    }
+
+    #[tokio::test]
+    async fn resolve_x25519_attr_key() {
+        // X25519 attribute key → X25519KeyAgreementKey2020 + publicKeyMultibase + keyAgreement
+        let identity: [u8; 20] = [0xb9, 0xc5, 0x71, 0x40, 0x89, 0x47, 0x8a, 0x32, 0x7f, 0x09,
+                                   0x19, 0x79, 0x87, 0xf1, 0x6f, 0x9e, 0x5d, 0x93, 0x6e, 0x8a];
+        let attr_name = encode_attr_name("did/pub/X25519/enc/base64");
+        // 32-byte X25519 public key
+        let x_key: [u8; 32] = [
+            0xAA, 0xBB, 0xCC, 0xDD, 0x01, 0x02, 0x03, 0x04,
+            0x05, 0x06, 0x07, 0x08, 0x09, 0x0a, 0x0b, 0x0c,
+            0x0d, 0x0e, 0x0f, 0x10, 0x11, 0x12, 0x13, 0x14,
+            0x15, 0x16, 0x17, 0x18, 0x19, 0x1a, 0x1b, 0x1c,
+        ];
+
+        let log = make_attribute_changed_log(100, &identity, &attr_name, &x_key, u64::MAX, 0);
+
+        let mut resolver = DIDEthr::new();
+        resolver.add_network("mainnet", NetworkConfig {
+            chain_id: 1,
+            registry: TEST_REGISTRY,
+            provider: MockProvider {
+                changed_block: 100,
+                identity_owner: None,
+                logs: HashMap::from([(100, vec![log])]),
+                block_timestamps: HashMap::new(),
+                identity_owner_at_block: HashMap::new(),
+            },
+        });
+
+        let doc = resolver
+            .resolve(did!("did:ethr:0xb9c5714089478a327f09197987f16f9e5d936e8a"))
+            .await.unwrap().document;
+
+        let doc_value = serde_json::to_value(&doc).unwrap();
+        eprintln!("{}", serde_json::to_string_pretty(&doc_value).unwrap());
+        let vms = doc_value["verificationMethod"].as_array().unwrap();
+
+        // 2 base + 1 X25519 = 3
+        assert_eq!(vms.len(), 3);
+
+        let attr_vm = vms.iter().find(|vm| {
+            vm["id"].as_str().unwrap().ends_with("#delegate-1")
+        }).expect("should have #delegate-1 VM");
+        assert_eq!(attr_vm["type"], "X25519KeyAgreementKey2020");
+        let expected_multibase = format!("z{}", bs58::encode(&x_key).into_string());
+        assert_eq!(attr_vm["publicKeyMultibase"], expected_multibase);
+
+        // X25519 enc purpose → keyAgreement (not assertionMethod or authentication)
+        let did_prefix = "did:ethr:0xb9c5714089478a327f09197987f16f9e5d936e8a";
+        let key_agreement = doc_value["keyAgreement"].as_array()
+            .expect("should have keyAgreement array");
+        assert!(key_agreement.iter().any(|v| v == &format!("{did_prefix}#delegate-1")),
+            "X25519 should be in keyAgreement");
+
+        let assertion = doc_value["assertionMethod"].as_array().unwrap();
+        assert!(!assertion.iter().any(|v| v == &format!("{did_prefix}#delegate-1")),
+            "X25519 should NOT be in assertionMethod");
+
+        // Context
+        let context = doc_value["@context"].as_array().unwrap();
+        let ctx_obj = context.iter().find(|c| c.is_object()).unwrap();
+        assert!(ctx_obj.get("X25519KeyAgreementKey2020").is_some(),
+            "context should include X25519KeyAgreementKey2020");
+        assert!(ctx_obj.get("publicKeyMultibase").is_some(),
+            "context should include publicKeyMultibase");
+    }
+
+    #[tokio::test]
+    async fn resolve_address_did_has_no_public_key_jwk_in_context() {
+        // An address-only DID (no public key, no attribute keys) should NOT
+        // have publicKeyJwk in the @context — it was a bug where any
+        // EcdsaSecp256k1VerificationKey2019 VM triggered publicKeyJwk context.
+        let resolver = DIDEthr::<()>::default();
+        let doc = resolver
+            .resolve(did!("did:ethr:0xb9c5714089478a327f09197987f16f9e5d936e8a"))
+            .await
+            .unwrap()
+            .document;
+
+        let doc_value = serde_json::to_value(&doc).unwrap();
+        let context = doc_value["@context"].as_array().unwrap();
+        let ctx_obj = context.iter().find(|c| c.is_object()).unwrap();
+
+        assert!(
+            ctx_obj.get("publicKeyJwk").is_none(),
+            "address-only DID should NOT have publicKeyJwk in context"
         );
     }
 }
