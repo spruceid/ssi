@@ -79,10 +79,8 @@ impl<P: EthProvider> DIDMethodResolver for DIDEthr<P> {
         let decoded_id = DecodedMethodSpecificId::from_str(method_specific_id)
             .map_err(|_| Error::InvalidMethodSpecificId(method_specific_id.to_owned()))?;
 
-        let network_name = decoded_id.network_name();
-
         // Check if we have a provider for this network
-        if let Some(config) = self.networks.get(&network_name) {
+        if let Some(config) = self.networks.get(decoded_id.network_name()) {
             let addr_hex = decoded_id.account_address_hex();
             if let Some(addr) = crate::network::parse_address_bytes(&addr_hex) {
                 // Parse historical resolution target block from ?versionId=N
@@ -96,7 +94,7 @@ impl<P: EthProvider> DIDMethodResolver for DIDEthr<P> {
                 let calldata = encode_call(CHANGED_SELECTOR, &addr);
                 let result = config
                     .provider
-                    .call(config.registry, calldata.clone(), BlockRef::Latest)
+                    .call(config.registry, calldata, BlockRef::Latest)
                     .await
                     .map_err(|e| Error::Internal(e.to_string()))?;
                 let changed_block = decode_uint256(&result);
@@ -114,9 +112,7 @@ impl<P: EthProvider> DIDMethodResolver for DIDEthr<P> {
 
                     // Partition events for historical resolution
                     let (events, events_after) = if let Some(tb) = target_block {
-                        let before: Vec<_> = all_events.iter().filter(|(b, _)| *b <= tb).cloned().collect();
-                        let after: Vec<_> = all_events.iter().filter(|(b, _)| *b > tb).cloned().collect();
-                        (before, after)
+                        all_events.into_iter().partition(|(b, _)| *b <= tb)
                     } else {
                         (all_events, Vec::new())
                     };

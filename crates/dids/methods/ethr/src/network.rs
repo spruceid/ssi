@@ -54,8 +54,8 @@ pub(crate) struct DecodedMethodSpecificId {
 
 impl DecodedMethodSpecificId {
     /// Return the network name used for provider lookup
-    pub(crate) fn network_name(&self) -> String {
-        self.network_name.clone()
+    pub(crate) fn network_name(&self) -> &str {
+        &self.network_name
     }
 
     /// Extract the Ethereum address hex string (with 0x prefix).

@@ -58,7 +58,4 @@ pub(crate) fn format_timestamp_iso8601(unix_secs: u64) -> String {
         .unwrap_or_else(|| "1970-01-01T00:00:00Z".to_string())
 }
 
-/// Compute keccak256 hash of an event signature string
-pub(crate) fn keccak256(data: &[u8]) -> [u8; 32] {
-    keccak::keccak256(data)
-}
+pub(crate) use keccak::keccak256;
