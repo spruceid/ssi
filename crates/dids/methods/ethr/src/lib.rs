@@ -295,8 +295,13 @@ async fn collect_events<P: EthProvider>(
 
     let mut events = Vec::new();
     let mut current_block = changed_block;
+    let mut visited = std::collections::HashSet::new();
 
     while current_block > 0 {
+        if !visited.insert(current_block) {
+            break; // cycle guard
+        }
+
         let filter = LogFilter {
             address: registry,
             topic0: topic0s.clone(),
@@ -313,8 +318,13 @@ async fn collect_events<P: EthProvider>(
         let mut next_block = 0u64;
         for log in &logs {
             if let Some(event) = parse_erc1056_event(log) {
-                next_block = event.previous_change();
-                events.push((log.block_number, event));
+                events.push((log.block_number, event.clone()));
+                let prev = event.previous_change();
+                // Only follow pointers that strictly retreat; ignore same-block
+                // self-references (prev == current_block) which cause cycles.
+                if prev < current_block {
+                    next_block = next_block.max(prev);
+                }
             }
         }
 
@@ -1931,6 +1941,60 @@ mod tests {
             }
             _ => unreachable!(),
         }
+    }
+
+    #[tokio::test]
+    async fn collect_events_same_block_events_all_collected() {
+        // Simulate the same-block cycle bug:
+        // Block 100 has two events:
+        //   - first event: previousChange=50 (normal retreat)
+        //   - second event: previousChange=100 (self-reference due to changed[identity]
+        //     already updated to current_block in the same block)
+        // Both events should be collected; next block is 50; loop terminates.
+        let identity: [u8; 20] = [0xFF; 20];
+        let new_owner: [u8; 20] = [0x11; 20];
+
+        let mut attr_name = [0u8; 32];
+        attr_name[..29].copy_from_slice(b"did/pub/Secp256k1/veriKey/hex");
+
+        // First event in block 100: previousChange=50 (normal)
+        let log_100_first = make_owner_changed_log(100, &identity, &new_owner, 50);
+        // Second event in block 100: previousChange=100 (self-reference / cycle)
+        let log_100_second = make_attribute_changed_log(
+            100, &identity, &attr_name, b"\x04abc", u64::MAX, 100,
+        );
+        // Event at block 50 (to ensure walk continues correctly)
+        let owner_at_50: [u8; 20] = [0x22; 20];
+        let log_50 = make_owner_changed_log(50, &identity, &owner_at_50, 0);
+
+        let provider = MockProvider {
+            changed_block: 100,
+            identity_owner: Some(new_owner),
+            logs: HashMap::from([
+                (100, vec![log_100_first, log_100_second]),
+                (50, vec![log_50]),
+            ]),
+            block_timestamps: HashMap::new(),
+            identity_owner_at_block: HashMap::new(),
+        };
+
+        let events = collect_events(&provider, TEST_REGISTRY, &identity, 100)
+            .await
+            .unwrap();
+
+        // Both block-100 events plus the block-50 event should all be collected
+        assert_eq!(events.len(), 3, "expected 3 events: one at block 50 and two at block 100");
+
+        // Chronological by block: block 50 first, then block 100 events
+        assert!(matches!(&events[0], (50, _)));
+        // Both events from block 100 are present (order within same block is reversed by
+        // the final events.reverse())
+        let block_100_events: Vec<_> = events.iter().filter(|(b, _)| *b == 100).collect();
+        assert_eq!(block_100_events.len(), 2);
+        let has_owner = block_100_events.iter().any(|(_, e)| matches!(e, Erc1056Event::OwnerChanged { .. }));
+        let has_attr = block_100_events.iter().any(|(_, e)| matches!(e, Erc1056Event::AttributeChanged { .. }));
+        assert!(has_owner, "expected an OwnerChanged event at block 100");
+        assert!(has_attr, "expected an AttributeChanged event at block 100");
     }
 
     #[tokio::test]
