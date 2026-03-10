@@ -3,17 +3,19 @@ use crate::provider::{EthProvider, Log, LogFilter};
 
 // --- ERC-1056 event topic hashes ---
 
-/// Lazily compute event topic hashes from their Solidity signatures
 pub(crate) fn topic_owner_changed() -> [u8; 32] {
-    keccak256(b"DIDOwnerChanged(address,address,uint256)")
+    static HASH: std::sync::OnceLock<[u8; 32]> = std::sync::OnceLock::new();
+    *HASH.get_or_init(|| keccak256(b"DIDOwnerChanged(address,address,uint256)"))
 }
 
 pub(crate) fn topic_delegate_changed() -> [u8; 32] {
-    keccak256(b"DIDDelegateChanged(address,bytes32,address,uint256,uint256)")
+    static HASH: std::sync::OnceLock<[u8; 32]> = std::sync::OnceLock::new();
+    *HASH.get_or_init(|| keccak256(b"DIDDelegateChanged(address,bytes32,address,uint256,uint256)"))
 }
 
 pub(crate) fn topic_attribute_changed() -> [u8; 32] {
-    keccak256(b"DIDAttributeChanged(address,bytes32,bytes,uint256,uint256)")
+    static HASH: std::sync::OnceLock<[u8; 32]> = std::sync::OnceLock::new();
+    *HASH.get_or_init(|| keccak256(b"DIDAttributeChanged(address,bytes32,bytes,uint256,uint256)"))
 }
 
 // --- ERC-1056 event types ---

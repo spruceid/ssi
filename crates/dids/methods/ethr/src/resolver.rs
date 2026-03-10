@@ -643,11 +643,14 @@ pub(crate) fn resolve_address(
     json_ld_context.add_verification_method_type(vm.type_());
     json_ld_context.add_verification_method_type(eip712_vm.type_());
 
+    let vm_id = vm.id().to_owned();
+    let eip712_vm_id = eip712_vm.id().to_owned();
+
     let mut doc = Document::new(did);
     doc.verification_relationships.assertion_method =
-        vec![vm.id().to_owned().into(), eip712_vm.id().to_owned().into()];
+        vec![vm_id.clone().into(), eip712_vm_id.clone().into()];
     doc.verification_relationships.authentication =
-        vec![vm.id().to_owned().into(), eip712_vm.id().to_owned().into()];
+        vec![vm_id.into(), eip712_vm_id.into()];
     doc.verification_method = vec![vm.into(), eip712_vm.into()];
 
     Ok(doc)
