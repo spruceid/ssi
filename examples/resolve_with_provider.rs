@@ -8,7 +8,7 @@
 
 use did_ethr::{BlockRef, DIDEthr, EthProvider, Log, LogFilter, NetworkConfig};
 use serde::{de::DeserializeOwned, Serialize};
-use ssi_dids_core::{did, DIDResolver};
+use ssi_dids_core::DIDResolver;
 
 // ── Hex helpers ──────────────────────────────────────────────────────────────
 
@@ -33,27 +33,27 @@ impl HttpProvider {
         &self,
         method: &str,
         params: P,
-    ) -> Result<R, String> {
+    ) -> Result<R, ProviderError> {
         let body = serde_json::json!({
             "jsonrpc": "2.0",
             "method": method,
             "params": params,
             "id": 1,
         });
-        let resp: serde_json::Value = self
+        let mut resp: serde_json::Value = self
             .client
             .post(&self.url)
             .json(&body)
             .send()
             .await
-            .map_err(|e| e.to_string())?
+            .map_err(|e| ProviderError(e.to_string()))?
             .json()
             .await
-            .map_err(|e| e.to_string())?;
+            .map_err(|e| ProviderError(e.to_string()))?;
         if let Some(err) = resp.get("error") {
-            return Err(err.to_string());
+            return Err(ProviderError(err.to_string()));
         }
-        serde_json::from_value(resp["result"].clone()).map_err(|e| e.to_string())
+        serde_json::from_value(resp["result"].take()).map_err(|e| ProviderError(e.to_string()))
     }
 }
 
@@ -89,8 +89,7 @@ impl EthProvider for HttpProvider {
                     block_param,
                 ]),
             )
-            .await
-            .map_err(ProviderError)?;
+            .await?;
         hex_decode(&result).map_err(ProviderError)
     }
 
@@ -114,8 +113,7 @@ impl EthProvider for HttpProvider {
                     "toBlock": format!("0x{:x}", filter.to_block),
                 }]),
             )
-            .await
-            .map_err(ProviderError)?;
+            .await?;
 
         raw.into_iter()
             .map(|entry| {
@@ -124,24 +122,28 @@ impl EthProvider for HttpProvider {
                     .ok_or_else(|| ProviderError("missing topics".into()))?
                     .iter()
                     .map(|t| {
-                        let bytes = hex_decode(t.as_str().unwrap_or(""))
-                            .map_err(ProviderError)?;
-                        bytes
-                            .try_into()
-                            .map_err(|_| ProviderError("topic not 32 bytes".into()))
+                        let s = t.as_str().ok_or_else(|| ProviderError("topic not a string".into()))?;
+                        let bytes = hex_decode(s).map_err(ProviderError)?;
+                        bytes.try_into().map_err(|_| ProviderError("topic not 32 bytes".into()))
                     })
                     .collect::<Result<Vec<[u8; 32]>, _>>()?;
 
-                let data = hex_decode(entry["data"].as_str().unwrap_or("0x"))
-                    .map_err(ProviderError)?;
+                let data = hex_decode(
+                    entry["data"].as_str().ok_or_else(|| ProviderError("missing data".into()))?,
+                )
+                .map_err(ProviderError)?;
 
-                let addr_bytes = hex_decode(entry["address"].as_str().unwrap_or("0x"))
-                    .map_err(ProviderError)?;
+                let addr_bytes = hex_decode(
+                    entry["address"].as_str().ok_or_else(|| ProviderError("missing address".into()))?,
+                )
+                .map_err(ProviderError)?;
                 let address: [u8; 20] = addr_bytes
                     .try_into()
                     .map_err(|_| ProviderError("address not 20 bytes".into()))?;
 
-                let bn_str = entry["blockNumber"].as_str().unwrap_or("0x0");
+                let bn_str = entry["blockNumber"]
+                    .as_str()
+                    .ok_or_else(|| ProviderError("missing blockNumber".into()))?;
                 let block_number = u64::from_str_radix(bn_str.trim_start_matches("0x"), 16)
                     .map_err(|e| ProviderError(e.to_string()))?;
 
@@ -156,8 +158,7 @@ impl EthProvider for HttpProvider {
                 "eth_getBlockByNumber",
                 serde_json::json!([format!("0x{block:x}"), false]),
             )
-            .await
-            .map_err(ProviderError)?;
+            .await?;
         let ts_str = result["timestamp"]
             .as_str()
             .ok_or_else(|| ProviderError("missing timestamp".into()))?;
@@ -167,15 +168,23 @@ impl EthProvider for HttpProvider {
 }
 
 // ── main ──────────────────────────────────────────────────────────────────────
+//
+// Usage: resolve_with_provider [DID] [RPC_URL]
+//
+// Defaults:
+//   DID     = did:ethr:0x3ec96eb0ca7e28bdda8345dba863ff62d3a0f603
+//   RPC_URL = https://mainnet.gateway.tenderly.co
 
-#[tokio::main]
-async fn main() {
-    const MAINNET_REGISTRY: [u8; 20] = [
-        0xdc, 0xa7, 0xef, 0x03, 0xe9, 0x8e, 0x0d, 0xc2,
-        0xb8, 0x55, 0xbe, 0x64, 0x7c, 0x39, 0xab, 0xe9,
-        0x84, 0xfc, 0xf2, 0x1b,
-    ];
+const DEFAULT_DID: &str = "did:ethr:0x3ec96eb0ca7e28bdda8345dba863ff62d3a0f603";
+const DEFAULT_RPC: &str = "https://mainnet.gateway.tenderly.co";
 
+const MAINNET_REGISTRY: [u8; 20] = [
+    0xdc, 0xa7, 0xef, 0x03, 0xe9, 0x8e, 0x0d, 0xc2,
+    0xb8, 0x55, 0xbe, 0x64, 0x7c, 0x39, 0xab, 0xe9,
+    0x84, 0xfc, 0xf2, 0x1b,
+];
+
+async fn resolve_did(did_str: &str, rpc_url: &str) -> Result<serde_json::Value, String> {
     let mut resolver = DIDEthr::new();
     resolver.add_network(
         "mainnet",
@@ -184,15 +193,34 @@ async fn main() {
             registry: MAINNET_REGISTRY,
             provider: HttpProvider {
                 client: reqwest::Client::new(),
-                url: "https://mainnet.gateway.tenderly.co".to_owned(),
+                url: rpc_url.to_owned(),
             },
         },
     );
 
+    let did = ssi_dids_core::DIDBuf::from_string(did_str.to_owned())
+        .map_err(|e| format!("invalid DID: {e}"))?;
     let output = resolver
-        .resolve(did!("did:ethr:0xee9bddd4cdd24174f91949293f415bfad57cfa22"))
+        .resolve(&did)
         .await
-        .expect("resolution failed");
+        .map_err(|e| format!("resolution failed: {e}"))?;
+    serde_json::to_value(&output.document).map_err(|e| e.to_string())
+}
 
-    println!("{}", serde_json::to_string_pretty(&output.document).unwrap());
+#[tokio::main]
+async fn main() {
+    let args: Vec<String> = std::env::args().collect();
+    let did_str = args.get(1).map(String::as_str).unwrap_or(DEFAULT_DID);
+    let rpc_url = args.get(2).map(String::as_str).unwrap_or(DEFAULT_RPC);
+
+    eprintln!("DID: {did_str}");
+    eprintln!("RPC: {rpc_url}");
+
+    match resolve_did(did_str, rpc_url).await {
+        Ok(doc) => println!("{}", serde_json::to_string_pretty(&doc).unwrap()),
+        Err(e) => {
+            eprintln!("error: {e}");
+            std::process::exit(1);
+        }
+    }
 }
