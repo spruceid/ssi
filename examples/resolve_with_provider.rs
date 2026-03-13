@@ -4,7 +4,7 @@
 //! walks the ERC-1056 event chain, and prints the resolved DID document.
 //!
 //! Run with:
-//!   cargo run --example resolve_with_provider
+//!   cargo run --example resolve_with_provider -- [DID] [RPC_URL] [REGISTRY]
 
 use did_ethr::{BlockRef, DIDEthr, EthProvider, Log, LogFilter, NetworkConfig};
 use serde::{de::DeserializeOwned, Serialize};
@@ -169,28 +169,64 @@ impl EthProvider for HttpProvider {
 
 // ── main ──────────────────────────────────────────────────────────────────────
 //
-// Usage: resolve_with_provider [DID] [RPC_URL]
+// Usage: resolve_with_provider [DID] [RPC_URL] [REGISTRY]
 //
 // Defaults:
-//   DID     = did:ethr:0x3ec96eb0ca7e28bdda8345dba863ff62d3a0f603
-//   RPC_URL = https://mainnet.gateway.tenderly.co
+//   DID      = did:ethr:0x3ec96eb0ca7e28bdda8345dba863ff62d3a0f603
+//   RPC_URL  = https://mainnet.gateway.tenderly.co
+//   REGISTRY = 0xdca7ef03e98e0dc2b855be647c39abe984fcf21b (mainnet default)
 
 const DEFAULT_DID: &str = "did:ethr:0x3ec96eb0ca7e28bdda8345dba863ff62d3a0f603";
 const DEFAULT_RPC: &str = "https://mainnet.gateway.tenderly.co";
+const DEFAULT_REGISTRY: &str = "0xdca7ef03e98e0dc2b855be647c39abe984fcf21b";
 
-const MAINNET_REGISTRY: [u8; 20] = [
-    0xdc, 0xa7, 0xef, 0x03, 0xe9, 0x8e, 0x0d, 0xc2,
-    0xb8, 0x55, 0xbe, 0x64, 0x7c, 0x39, 0xab, 0xe9,
-    0x84, 0xfc, 0xf2, 0x1b,
-];
+/// Well-known ERC-1056 registries per network name.
+fn default_registry(network: &str) -> Option<&'static str> {
+    match network {
+        "mainnet" => Some("0xdca7ef03e98e0dc2b855be647c39abe984fcf21b"),
+        "sepolia" => Some("0x03d5003bf0e79C5F5223588F347ebA39AfbC3818"),
+        _ => None,
+    }
+}
 
-async fn resolve_did(did_str: &str, rpc_url: &str) -> Result<serde_json::Value, String> {
+/// Well-known chain IDs per network name.
+fn chain_id_for(network: &str) -> u64 {
+    match network {
+        "mainnet" => 1,
+        "sepolia" => 11155111,
+        _ => 1,
+    }
+}
+
+/// Extract the network name from a did:ethr DID string.
+/// Returns "mainnet" if no network segment is present.
+fn network_from_did(did_str: &str) -> &str {
+    // did:ethr:<network>:<address> or did:ethr:<address>
+    let rest = did_str
+        .strip_prefix("did:ethr:")
+        .unwrap_or(did_str);
+    match rest.split_once(':') {
+        Some((network, _)) if !network.starts_with("0x") => network,
+        _ => "mainnet",
+    }
+}
+
+fn parse_registry(hex_str: &str) -> Result<[u8; 20], String> {
+    let hex_str = hex_str.strip_prefix("0x").unwrap_or(hex_str);
+    let bytes = hex::decode(hex_str).map_err(|e| format!("bad registry hex: {e}"))?;
+    bytes.try_into().map_err(|_| "registry must be 20 bytes".into())
+}
+
+async fn resolve_did(did_str: &str, rpc_url: &str, registry_hex: &str) -> Result<serde_json::Value, String> {
+    let network = network_from_did(did_str);
+    let registry = parse_registry(registry_hex)?;
+
     let mut resolver = DIDEthr::new();
     resolver.add_network(
-        "mainnet",
+        network,
         NetworkConfig {
-            chain_id: 1,
-            registry: MAINNET_REGISTRY,
+            chain_id: chain_id_for(network),
+            registry,
             provider: HttpProvider {
                 client: reqwest::Client::new(),
                 url: rpc_url.to_owned(),
@@ -212,11 +248,20 @@ async fn main() {
     let args: Vec<String> = std::env::args().collect();
     let did_str = args.get(1).map(String::as_str).unwrap_or(DEFAULT_DID);
     let rpc_url = args.get(2).map(String::as_str).unwrap_or(DEFAULT_RPC);
+    let registry_arg = args.get(3).map(String::as_str);
 
-    eprintln!("DID: {did_str}");
-    eprintln!("RPC: {rpc_url}");
+    // Resolve registry: CLI arg > well-known default for network > global default
+    let network = network_from_did(did_str);
+    let registry_hex = registry_arg
+        .or_else(|| default_registry(network))
+        .unwrap_or(DEFAULT_REGISTRY);
 
-    match resolve_did(did_str, rpc_url).await {
+    eprintln!("DID:      {did_str}");
+    eprintln!("RPC:      {rpc_url}");
+    eprintln!("Network:  {network}");
+    eprintln!("Registry: {registry_hex}");
+
+    match resolve_did(did_str, rpc_url, registry_hex).await {
         Ok(doc) => println!("{}", serde_json::to_string_pretty(&doc).unwrap()),
         Err(e) => {
             eprintln!("error: {e}");
