@@ -255,6 +255,11 @@ serde = { workspace = true, features = ["derive"] }
 serde_json.workspace = true
 json-syntax.workspace = true
 ssi-dids = { workspace = true, features = ["example"] }
+did-ethr.workspace = true
+ssi-dids-core.workspace = true
+hex.workspace = true
+reqwest = { version = "0.12", features = ["json"] }
+tokio = { version = "1.0", features = ["macros", "rt-multi-thread"] }
 
 [package.metadata.docs.rs]
 all-features = true
