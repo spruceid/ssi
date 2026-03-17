@@ -168,6 +168,9 @@ fn decode_jwt_vp_specific_headers(
     mut jwt: impl ClaimSet,
     target: &mut json_syntax::Object,
 ) -> Result<(), JwtVpDecodeError> {
+    let exp = jwt
+        .try_remove::<ssi_jwt::ExpirationTime>()
+        .map_err(JwtVpDecodeError::claim)?;
     let iss = jwt
         .try_remove::<ssi_jwt::Issuer>()
         .map_err(JwtVpDecodeError::claim)?;
@@ -185,6 +188,16 @@ fn decode_jwt_vp_specific_headers(
 
     if let Some(ssi_jwt::Issuer(iss)) = iss {
         target.insert("holder".into(), iss.into_string().into());
+    }
+
+    if let Some(ssi_jwt::ExpirationTime(exp)) = exp {
+        let exp_date_time: chrono::LocalResult<DateTime<Utc>> = exp.into();
+        if let Some(time) = exp_date_time.latest() {
+            target.insert(
+                "expirationDate".into(),
+                xsd_types::DateTime::from(time).to_string().into(),
+            );
+        }
     }
 
     if let Some(nbf) = iat.or(nbf) {

@@ -130,6 +130,20 @@ pub fn encode_jwt_vp_claims<T: Serialize>(
         .ok_or(JwtVpEncodeError::ExpectedJsonObject)?;
     let mut claims = RegisteredClaims::default();
 
+    if let Some(expiration_date_entry) = vp.remove("expirationDate").next() {
+        match expiration_date_entry.value.into_string() {
+            Some(expiration_date_value) => {
+                let expiration_date_value: xsd_types::DateTime = expiration_date_value
+                    .parse()
+                    .map_err(|_| JwtVpEncodeError::InvalidDateValue)?;
+                claims.set(ssi_jwt::ExpirationTime(
+                    expiration_date_value.latest().try_into()?,
+                ));
+            }
+            None => return Err(JwtVpEncodeError::InvalidDateValue),
+        }
+    }
+
     if let Some(holder_entry) = vp.remove("holder").next() {
         match holder_entry.value.into_string() {
             Some(holder_value) => {
