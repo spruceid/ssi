@@ -51,6 +51,14 @@ async fn verify_with_selective_disclosure() {
     // Re-encode the SD-JWT with only the selected disclosures
     let selective_sd_jwt = revealed.into_encoded();
 
+    // Save the selectively-disclosed SD-JWT so learners can compare
+    // the full credential (credential.sd-jwt) with the email-only version.
+    let disclosed_path = std::env::var("DISCLOSED_PATH")
+        .unwrap_or_else(|_| "credential-email-only.sd-jwt".to_string());
+    std::fs::write(&disclosed_path, selective_sd_jwt.as_str())
+        .expect("failed to write selective SD-JWT");
+    println!("Email-only SD-JWT saved to {disclosed_path}");
+
     // === Step 3: Verify the selectively-disclosed SD-JWT ===
     // This is what the verifier would do after receiving the holder's SD-JWT.
     let (verified, verification) = selective_sd_jwt

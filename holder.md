@@ -62,6 +62,10 @@ revealed.retain(&[json_pointer!("/email")]);
 
 // Re-encode the SD-JWT with only the selected disclosures
 let selective_sd_jwt = revealed.into_encoded();
+
+// Save the email-only version so you can compare the two files
+std::fs::write("credential-email-only.sd-jwt", selective_sd_jwt.as_str())
+    .expect("failed to write selective SD-JWT");
 ```
 
 The re-encoded `selective_sd_jwt` can be sent to a verifier. It contains the same signed JWT but with fewer disclosure tokens — the verifier can only see the fields the holder chose to reveal.
@@ -100,6 +104,22 @@ To use a custom SD-JWT path:
 ```bash
 $ VC_PATH=path/to/credential.sd-jwt cargo test --test holder
 ```
+
+## Comparing the Two Files
+
+After running both tests, you'll have two files to compare:
+
+- `credential.sd-jwt` — the full SD-JWT from the issuer (all disclosure tokens included)
+- `credential-email-only.sd-jwt` — the holder's version with only the email disclosure
+
+An SD-JWT is structured as `<JWT>~<disclosure1>~<disclosure2>~...~`. Each `~`-separated segment after the JWT is a Base64url-encoded disclosure token containing a salt, claim name, and value.
+
+Open both files and you'll see:
+- **The JWT portion (before the first `~`) is identical** — the signature is untouched because it covers the hashed digests, not the raw claim values.
+- **The full version has two disclosure tokens** (one for `name`, one for `email`).
+- **The email-only version has one disclosure token** — the `name` token has been stripped out.
+
+Without the `name` disclosure token, a verifier has no way to recover the name value from the hash in the JWT payload. This is the mechanism behind selective disclosure: the cryptography doesn't change, the holder simply withholds the preimage.
 
 ## How SD-JWT Selective Disclosure Works
 
