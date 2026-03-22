@@ -1,19 +1,18 @@
-# Holder Onboarding: Verifying a Verifiable Credential
+# Holder Onboarding: Selective Disclosure Verification
 
 ## Overview
 
-This document walks through how a **holder** (or verifier) reads a signed Verifiable Credential (VC) from a JSON file and verifies its Data Integrity proof. This is the second half of the credential lifecycle — see `issue.md` for how to issue the VC.
+This document walks through how a **holder** takes an SD-JWT credential (issued per `issue.md`), selectively discloses only the `email` field (hiding `name`), and verifies it. This demonstrates the core value of SD-JWT: the holder controls which claims the verifier sees.
 
 ## Prerequisites
 
 - Rust installed (https://www.rust-lang.org/learn/get-started)
 - Cargo, the Rust package manager
 - Git installed
-- A signed VC file (produced by the issuer — see `issue.md`)
+- An SD-JWT credential file (produced by the issuer — see `issue.md`)
 
 ## Setup
 
-Clone the repository and initialize submodules (if not already done):
 ```bash
 $ git clone https://github.com/spruceid/ssi.git
 $ cd ssi
@@ -22,68 +21,106 @@ $ git submodule update --init
 
 ## Step-by-Step Walkthrough
 
-### Step 1: Read the VC from a File
-
-The holder receives the signed VC as a JSON file (e.g. `verifiable_credential.json`):
+### Step 1: Read the SD-JWT
 
 ```rust
-let vc_path = "verifiable_credential.json";
-let vc_json = std::fs::read_to_string(vc_path)
-    .expect("failed to read VC file");
+use ssi::claims::sd_jwt::SdJwtBuf;
+
+let sd_jwt_str = std::fs::read_to_string("credential.sd-jwt")
+    .expect("failed to read SD-JWT file");
+let sd_jwt = SdJwtBuf::new(sd_jwt_str).expect("invalid SD-JWT format");
 ```
 
-### Step 2: Deserialize the VC
+### Step 2: Decode, Reveal, and Verify
 
-Parse the JSON into a generic signed credential type. `AnyDataIntegrity<AnyJsonCredential>` accepts any Data Integrity suite and any JSON credential shape:
+First decode the SD-JWT to see all claims. With DID:JWK, the issuer's public key is embedded in the JWT's `kid` header — no separate key file needed:
 
 ```rust
 use ssi::prelude::*;
 
-let vc: AnyDataIntegrity<AnyJsonCredential> =
-    serde_json::from_str(&vc_json).expect("failed to parse VC JSON");
+let vm_resolver = DIDJWK.into_vm_resolver::<AnyJwkMethod>();
+let params = VerificationParameters::from_resolver(&vm_resolver);
+
+let (mut revealed, verification) = sd_jwt
+    .decode_reveal_verify::<CredentialClaims, _>(&params)
+    .await
+    .expect("SD-JWT decode/reveal failed");
+
+assert_eq!(verification, Ok(()));
+// revealed.claims().private => { name: Some("Alice Doe"), email: Some("alice.doe@example.com") }
 ```
 
-### Step 3: Verify the Signature
+### Step 3: Selectively Disclose Only Email
 
-With DID:JWK, the issuer's public key is embedded directly in the DID URL inside the VC's proof. The `DIDJWK` resolver extracts it automatically — **no separate key file or key exchange is needed**.
+The holder calls `retain` with the JSON pointers of the fields to keep. Everything else is hidden:
 
 ```rust
-let vm_resolver = DIDJWK.into_vm_resolver();
-let params = VerificationParameters::from_resolver(vm_resolver);
+use ssi::json_pointer;
 
-vc.verify(params)
-    .await
-    .expect("verification error")
-    .unwrap();
+// Only reveal email — hide name
+revealed.retain(&[json_pointer!("/email")]);
+
+// Re-encode the SD-JWT with only the selected disclosures
+let selective_sd_jwt = revealed.into_encoded();
 ```
 
-If verification fails, `verify()` returns an error describing what went wrong (e.g. invalid signature, unresolvable DID, expired proof).
+The re-encoded `selective_sd_jwt` can be sent to a verifier. It contains the same signed JWT but with fewer disclosure tokens — the verifier can only see the fields the holder chose to reveal.
 
-### Step 4: Run It
+### Step 4: Verifier Verifies the Selective SD-JWT
 
-First, generate a VC if you don't have one:
+```rust
+let (verified, verification) = selective_sd_jwt
+    .decode_reveal_verify::<CredentialClaims, _>(params)
+    .await
+    .expect("selective SD-JWT verification failed");
+
+assert_eq!(verification, Ok(()));
+
+// Only email is visible — name is concealed
+assert_eq!(verified.claims().private.name, None);
+assert_eq!(
+    verified.claims().private.email,
+    Some("alice.doe@example.com".to_string())
+);
+```
+
+### Step 5: Run It
+
+First issue a credential (if you haven't already):
 ```bash
 $ cargo test --test issue
 ```
 
-Then verify it:
+Then run the holder test:
 ```bash
 $ cargo test --test holder
 ```
 
-To verify a VC at a custom path:
+To use a custom SD-JWT path:
 ```bash
-$ VC_PATH=path/to/my_vc.json cargo test --test holder
+$ VC_PATH=path/to/credential.sd-jwt cargo test --test holder
 ```
 
-## Why No Key File Is Needed
+## How SD-JWT Selective Disclosure Works
 
-In other verification systems, the verifier needs the issuer's public key out-of-band. With **DID:JWK**, the public key is encoded in the DID URL itself (e.g. `did:jwk:eyJrdH...`). When the DIDJWK resolver sees this DID, it base64-decodes the JWK directly from the URL — no network request, no key file, no trust registry lookup.
+| Step | Who | What happens |
+|------|-----|-------------|
+| 1. Issuance | Issuer | Marks claims as concealable via `conceal_and_sign`. Each concealed claim gets a random salt + hash in the JWT payload, and a disclosure token appended after the JWT. |
+| 2. Full reveal | Holder | `decode_reveal_verify` decodes all disclosure tokens, matches them to hashes in the JWT, and reconstructs the full claims. |
+| 3. Selective retain | Holder | `retain` drops disclosure tokens for fields the holder wants to hide. Without the token, the verifier can't reverse the hash. |
+| 4. Verification | Verifier | `decode_reveal_verify` on the subset SD-JWT only sees fields whose disclosure tokens are present. Hidden fields deserialize as `None`. |
 
-This makes DID:JWK convenient for testing and self-contained demos. In production, issuers typically use DID methods that resolve via a network (e.g. `did:web`, `did:key`) and verifiers maintain a trust list of accepted issuer DIDs.
+The JWT signature covers the hashes (not the raw values), so it remains valid regardless of which disclosures the holder includes.
+
+## Key Types
+
+- `SdJwtBuf` — an SD-JWT string (JWT + `~`-separated disclosure tokens)
+- `RevealedSdJwt<T>` — decoded SD-JWT with revealed claims of type `T`
+- `retain(&[json_pointer!(...)])` — keep only the specified disclosures
+- `into_encoded()` — re-encode back to `SdJwtBuf` for transmission
 
 ## Next Steps
 
-- Try modifying the VC JSON file and re-running the holder test to see verification fail
-- Look at `tests/issue.rs` to see how the issuer side works
-- Explore other DID methods in `crates/dids/methods/`
+- Try revealing different combinations of fields (both, neither, just name)
+- Look at `crates/claims/crates/sd-jwt/tests/full_pathway.rs` for more examples including nested claims and arrays
+- Explore BBS+ (`bbs-2023`) for zero-knowledge selective disclosure with Data Integrity proofs
