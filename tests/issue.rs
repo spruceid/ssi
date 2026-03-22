@@ -1,25 +1,24 @@
 use serde::{Deserialize, Serialize};
-use ssi::claims::vc::syntax::NonEmptyVec;
-use ssi::claims::vc::v1::JsonCredential;
+use ssi::claims::sd_jwt::{ConcealJwtClaims, SdAlg};
+use ssi::json_pointer;
 use ssi::prelude::*;
-use static_iref::uri;
 
-#[derive(Serialize, Deserialize)]
-struct CredentialSubject {
-    #[serde(rename = "https://example.org/#name")]
-    name: String,
-    #[serde(rename = "https://example.org/#email")]
-    email: String,
+#[derive(Debug, Serialize, Deserialize, PartialEq)]
+struct CredentialClaims {
+    name: Option<String>,
+    email: Option<String>,
 }
+
+impl ssi::claims::jwt::ClaimSet for CredentialClaims {}
+impl<E, P> ssi::claims::ValidateClaims<E, P> for CredentialClaims {}
 
 #[async_std::test]
 async fn issue_vc() {
     // Load the issuer's key from file, or generate a new one and save it.
-    // Persisting the key lets the issuer reuse the same DID across issuances.
     let key_path = std::env::var("ISSUER_KEY_PATH")
         .unwrap_or_else(|_| "issuer_key.jwk".to_string());
 
-    let key: JWK = match std::fs::read_to_string(&key_path) {
+    let mut key: JWK = match std::fs::read_to_string(&key_path) {
         Ok(contents) => {
             println!("Loaded issuer key from {key_path}");
             serde_json::from_str(&contents).expect("failed to parse issuer key")
@@ -34,44 +33,37 @@ async fn issue_vc() {
         }
     };
 
-    // Create a DID from the public key
+    // Set the key ID to a DID:JWK URL so verifiers can resolve the public key
     let did = DIDJWK::generate_url(&key.to_public());
+    key.key_id = Some(did.into());
 
-    // Create the credential
-    let credential = JsonCredential::<CredentialSubject>::new(
-        Some(uri!("https://example.org/#CredentialId").to_owned()),
-        did.as_uri().to_owned().into(), // issuer = the DID
-        DateTime::now().into(),
-        NonEmptyVec::new(CredentialSubject {
-            name: "Alice Doe".to_string(),
-            email: "alice.doe@example.com".to_string(),
-        }),
-    );
+    // Build JWT claims with custom credential data.
+    // Both name and email are marked as concealable — the holder can choose
+    // which fields to disclose later.
+    let claims = JWTClaims::builder()
+        .iss("https://example.org/issuer")
+        .sub("alice")
+        .with_private_claims(CredentialClaims {
+            name: Some("Alice Doe".to_string()),
+            email: Some("alice.doe@example.com".to_string()),
+        })
+        .unwrap();
 
-    // Set up resolver, signer, and verification method
-    let vm_resolver = DIDJWK.into_vm_resolver();
-    let signer = SingleSecretSigner::new(key.clone()).into_local();
-    let verification_method = did.into_iri().into();
-
-    // Pick a cryptosuite and sign the credential
-    let cryptosuite = AnySuite::pick(&key, Some(&verification_method))
-        .expect("could not find appropriate cryptosuite");
-
-    let vc = cryptosuite
-        .sign(
-            credential,
-            &vm_resolver,
-            &signer,
-            ProofOptions::from_method(verification_method),
+    // Conceal both fields and sign as an SD-JWT.
+    // The issuer decides which claims CAN be selectively disclosed.
+    let sd_jwt = claims
+        .conceal_and_sign(
+            SdAlg::Sha256,
+            &[json_pointer!("/name"), json_pointer!("/email")],
+            &key,
         )
         .await
-        .expect("signature failed");
+        .expect("SD-JWT signing failed");
 
-    // Save the signed VC to a JSON file
+    // Save the SD-JWT to a file
     let vc_path = std::env::var("VC_PATH")
-        .unwrap_or_else(|_| "verifiable_credential.json".to_string());
-    let json = serde_json::to_string_pretty(&vc).expect("failed to serialize VC");
-    std::fs::write(&vc_path, json).expect("failed to write VC file");
+        .unwrap_or_else(|_| "credential.sd-jwt".to_string());
+    std::fs::write(&vc_path, sd_jwt.as_str()).expect("failed to write SD-JWT file");
 
-    println!("Verifiable Credential saved to {vc_path}");
+    println!("SD-JWT saved to {vc_path}");
 }

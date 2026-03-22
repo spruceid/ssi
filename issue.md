@@ -1,8 +1,10 @@
-# Issuer Onboarding: Generating a Verifiable Credential
+# Issuer Onboarding: Issuing an SD-JWT Credential
 
 ## Overview
 
-This document walks through how an **issuer** generates a signing key, creates a Verifiable Credential (VC), signs it with Data Integrity, and saves both the key and the VC to files. See `holder.md` for how to verify the VC.
+This document walks through how an **issuer** generates a signing key, creates an SD-JWT (Selective Disclosure JWT) credential, and saves both to files. The issuer decides which claims *can* be selectively disclosed — the holder later chooses which of those to actually reveal.
+
+See `holder.md` for how the holder verifies and selectively presents the credential.
 
 ## Prerequisites
 
@@ -12,7 +14,6 @@ This document walks through how an **issuer** generates a signing key, creates a
 
 ## Setup
 
-Clone the repository and initialize submodules:
 ```bash
 $ git clone https://github.com/spruceid/ssi.git
 $ cd ssi
@@ -23,14 +24,14 @@ $ git submodule update --init
 
 ### Step 1: Generate and Persist an Issuer Key
 
-The issuer needs a persistent key pair so the same DID identity can be reused across issuances. The test loads an existing key from file, or generates a new P256 key and saves it:
+The issuer needs a persistent key pair so the same identity can be reused across issuances. The key is saved as a JWK file:
 
 ```rust
 use ssi::prelude::*;
 
 let key_path = "issuer_key.jwk";
 
-let key: JWK = match std::fs::read_to_string(key_path) {
+let mut key: JWK = match std::fs::read_to_string(key_path) {
     Ok(contents) => serde_json::from_str(&contents).expect("failed to parse key"),
     Err(_) => {
         let new_key = JWK::generate_p256();
@@ -40,87 +41,84 @@ let key: JWK = match std::fs::read_to_string(key_path) {
         new_key
     }
 };
-```
 
-The saved `issuer_key.jwk` file contains both the private and public key in JWK format. Keep this file secure — the private key is used for signing.
-
-### Step 2: Create a DID from the Key
-
-A DID:JWK encodes the public key directly in the DID URL, so anyone who sees the DID can resolve the public key without a separate exchange:
-
-```rust
+// Set the key ID to a DID:JWK URL so verifiers can resolve the public key
 let did = DIDJWK::generate_url(&key.to_public());
+key.key_id = Some(did.into());
 ```
 
-### Step 3: Build and Sign the Credential
+The saved `issuer_key.jwk` contains both the private and public key. Keep it secure.
 
-Define a credential subject type with `#[serde(rename)]` attributes for linked-data compatibility, then create and sign the VC:
+### Step 2: Define the Credential Claims
+
+Define a claims type where concealable fields are `Option<T>`. When the holder hides a field, it deserializes as `None`:
 
 ```rust
 use serde::{Deserialize, Serialize};
-use ssi::claims::vc::syntax::NonEmptyVec;
-use ssi::claims::vc::v1::JsonCredential;
-use static_iref::uri;
 
-#[derive(Serialize, Deserialize)]
-struct CredentialSubject {
-    #[serde(rename = "https://example.org/#name")]
-    name: String,
-    #[serde(rename = "https://example.org/#email")]
-    email: String,
+#[derive(Debug, Serialize, Deserialize, PartialEq)]
+struct CredentialClaims {
+    name: Option<String>,
+    email: Option<String>,
 }
 
-let credential = JsonCredential::<CredentialSubject>::new(
-    Some(uri!("https://example.org/#CredentialId").to_owned()),
-    did.as_uri().to_owned().into(), // issuer = the DID
-    DateTime::now().into(),
-    NonEmptyVec::new(CredentialSubject {
-        name: "Alice Doe".to_string(),
-        email: "alice.doe@example.com".to_string(),
-    }),
-);
-
-let vm_resolver = DIDJWK.into_vm_resolver();
-let signer = SingleSecretSigner::new(key.clone()).into_local();
-let verification_method = did.into_iri().into();
-
-let cryptosuite = AnySuite::pick(&key, Some(&verification_method))
-    .expect("could not find appropriate cryptosuite");
-
-let vc = cryptosuite
-    .sign(
-        credential,
-        &vm_resolver,
-        &signer,
-        ProofOptions::from_method(verification_method),
-    )
-    .await
-    .expect("signature failed");
+// Required trait impls for SD-JWT claims
+impl ssi::claims::jwt::ClaimSet for CredentialClaims {}
+impl<E, P> ssi::claims::ValidateClaims<E, P> for CredentialClaims {}
 ```
 
-### Step 4: Save the Signed VC
+### Step 3: Build and Sign the SD-JWT
+
+Use `conceal_and_sign` to mark which claims can be selectively disclosed. The issuer conceals both `name` and `email` — the holder can later choose to reveal any combination:
 
 ```rust
-let json = serde_json::to_string_pretty(&vc).expect("failed to serialize VC");
-std::fs::write("verifiable_credential.json", json).expect("failed to write file");
+use ssi::claims::sd_jwt::{ConcealJwtClaims, SdAlg};
+use ssi::json_pointer;
+
+let claims = JWTClaims::builder()
+    .iss("https://example.org/issuer")
+    .sub("alice")
+    .with_private_claims(CredentialClaims {
+        name: Some("Alice Doe".to_string()),
+        email: Some("alice.doe@example.com".to_string()),
+    })
+    .unwrap();
+
+// Conceal both fields — holder decides what to reveal
+let sd_jwt = claims
+    .conceal_and_sign(
+        SdAlg::Sha256,
+        &[json_pointer!("/name"), json_pointer!("/email")],
+        &key,
+    )
+    .await
+    .expect("SD-JWT signing failed");
+```
+
+The `json_pointer!` macro specifies JSON Pointer paths (RFC 6901) to the fields to conceal.
+
+### Step 4: Save the SD-JWT
+
+```rust
+std::fs::write("credential.sd-jwt", sd_jwt.as_str())
+    .expect("failed to write SD-JWT file");
 ```
 
 ### Step 5: Run It
 
-The full working example is in `tests/issue.rs`:
 ```bash
 $ cargo test --test issue
 ```
 
-This produces two files:
+This produces:
 - `issuer_key.jwk` — the issuer's key pair (reused on subsequent runs)
-- `verifiable_credential.json` — the signed VC
+- `credential.sd-jwt` — the SD-JWT credential
 
-Both file paths are configurable via environment variables:
+Both paths are configurable:
 ```bash
-$ ISSUER_KEY_PATH=my_key.jwk VC_PATH=my_vc.json cargo test --test issue
+$ ISSUER_KEY_PATH=my_key.jwk VC_PATH=my_credential.sd-jwt cargo test --test issue
 ```
 
 ## Next Step
 
-Hand the `verifiable_credential.json` file to a holder/verifier. See `holder.md` for how to verify it.
+Hand the `credential.sd-jwt` to a holder. See `holder.md` for how to selectively disclose and verify it.
