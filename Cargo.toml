@@ -245,6 +245,7 @@ ssi-ssh.workspace = true
 ssi-bbs = { workspace = true, optional = true }
 xsd-types.workspace = true                      # public reexport
 document-features = "0.2"
+tokio = { version = "1", features = ["full"] }
 
 [dev-dependencies]
 async-std = { workspace = true, features = ["attributes"] }
