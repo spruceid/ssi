@@ -112,11 +112,10 @@ pub(crate) fn parse_erc1056_event(log: &Log) -> Option<Erc1056Event> {
         let valid_to = decode_uint256(&log.data[64..96]).ok()?;
         let previous_change = decode_uint256(&log.data[96..128]).ok()?;
         let value_len = decode_uint256(&log.data[128..160]).ok()? as usize;
-        let value = if log.data.len() >= 160 + value_len {
-            log.data[160..160 + value_len].to_vec()
-        } else {
-            Vec::new()
-        };
+        if log.data.len() < 160 + value_len {
+            return None;
+        }
+        let value = log.data[160..160 + value_len].to_vec();
         Some(Erc1056Event::AttributeChanged {
             identity,
             name,
@@ -569,5 +568,31 @@ mod tests {
             }
             other => panic!("expected DelegateChanged revoke at index 1, got {other:?}"),
         }
+    }
+
+    #[test]
+    fn parse_attribute_changed_truncated_value_returns_none() {
+        let identity: [u8; 20] = [0xAA; 20];
+        let identity_topic = abi_encode_address(&identity);
+        let mut name = [0u8; 32];
+        name[..29].copy_from_slice(b"did/pub/Secp256k1/veriKey/hex");
+
+        // Build data with value_len=33 but only 10 bytes of actual value
+        let mut data = vec![0u8; 160 + 10];
+        data[0..32].copy_from_slice(&name);
+        data[56..64].copy_from_slice(&160u64.to_be_bytes()); // offset
+        data[88..96].copy_from_slice(&u64::MAX.to_be_bytes()); // valid_to
+        data[120..128].copy_from_slice(&0u64.to_be_bytes()); // previous_change
+        data[152..160].copy_from_slice(&33u64.to_be_bytes()); // value_len (exceeds available)
+
+        let log = Log {
+            address: TEST_REGISTRY,
+            topics: vec![topic_attribute_changed(), identity_topic],
+            data,
+            block_number: 1,
+            log_index: 0,
+        };
+
+        assert_eq!(parse_erc1056_event(&log), None, "truncated value should return None");
     }
 }
