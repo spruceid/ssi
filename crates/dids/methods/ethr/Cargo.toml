@@ -22,7 +22,6 @@ thiserror.workspace = true
 hex.workspace = true
 serde_json.workspace = true
 ssi-crypto = { workspace = true, features = ["keccak"] }
-bs58.workspace = true
 ssi-multicodec.workspace = true
 multibase.workspace = true
 chrono.workspace = true

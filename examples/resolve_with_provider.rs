@@ -176,6 +176,7 @@ impl EthProvider for HttpProvider {
 //   RPC_URL  = https://mainnet.gateway.tenderly.co
 //   REGISTRY = 0xdca7ef03e98e0dc2b855be647c39abe984fcf21b (mainnet default)
 
+// a DID that had an owner change. The blockchainAccountId of the #controller entry should be different than the address of the DID
 const DEFAULT_DID: &str = "did:ethr:0x3ec96eb0ca7e28bdda8345dba863ff62d3a0f603";
 const DEFAULT_RPC: &str = "https://mainnet.gateway.tenderly.co";
 const DEFAULT_REGISTRY: &str = "0xdca7ef03e98e0dc2b855be647c39abe984fcf21b";
