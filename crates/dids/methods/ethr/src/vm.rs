@@ -1,16 +1,30 @@
 use iref::Iri;
 use ssi_caips::caip10::BlockchainAccountId;
-use ssi_dids_core::{document::{self, DIDVerificationMethod}, DIDURLBuf, DIDBuf};
+use ssi_dids_core::{
+    document::{self, DIDVerificationMethod},
+    DIDBuf, DIDURLBuf,
+};
 use ssi_jwk::JWK;
 use static_iref::iri;
+
+/// The purpose of a verification method, derived from the delegate type or
+/// attribute name purpose field.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum KeyPurpose {
+    /// `veriKey` — assertionMethod only.
+    VeriKey,
+    /// `sigAuth` — assertionMethod + authentication.
+    SigAuth,
+    /// `enc` — keyAgreement.
+    Enc,
+}
 
 /// Intermediate representation for a verification method accumulated during
 /// event processing, before materialisation into the DID document.
 pub(crate) struct PendingVm {
     pub(crate) counter: u64,
     pub(crate) payload: PendingVmPayload,
-    /// For delegates: true if sigAuth. For attribute keys: true if sigAuth or enc purpose.
-    pub(crate) is_sig_auth: bool,
+    pub(crate) purpose: KeyPurpose,
 }
 
 pub(crate) enum PendingVmPayload {

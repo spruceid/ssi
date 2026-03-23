@@ -22,8 +22,8 @@ use crate::json_ld_context::JsonLdContext;
 use crate::network::{DecodedMethodSpecificId, NetworkChain};
 use crate::provider::{BlockRef, EthProvider, NetworkConfig};
 use crate::vm::{
-    decode_delegate_type, PendingService, PendingVm, PendingVmPayload, VerificationMethod,
-    VerificationMethodType,
+    decode_delegate_type, KeyPurpose, PendingService, PendingVm, PendingVmPayload,
+    VerificationMethod, VerificationMethodType,
 };
 
 // --- DIDEthr ---
@@ -313,12 +313,13 @@ pub(crate) fn apply_events(
             } => {
                 let dt = decode_delegate_type(delegate_type);
 
-                let is_veri_key = dt == b"veriKey";
-                let is_sig_auth = dt == b"sigAuth";
-
-                if !is_veri_key && !is_sig_auth {
+                let purpose = if dt == b"veriKey" {
+                    KeyPurpose::VeriKey
+                } else if dt == b"sigAuth" {
+                    KeyPurpose::SigAuth
+                } else {
                     continue;
-                }
+                };
 
                 delegate_counter += 1;
 
@@ -340,7 +341,7 @@ pub(crate) fn apply_events(
                     vms.insert(key, PendingVm {
                         counter: delegate_counter,
                         payload: PendingVmPayload::Delegate { blockchain_account_id },
-                        is_sig_auth,
+                        purpose,
                     });
                 } else {
                     vms.shift_remove(&key);
@@ -364,7 +365,7 @@ pub(crate) fn apply_events(
                     delegate_counter += 1;
 
                     let algo = parts.get(2).copied().unwrap_or("");
-                    let purpose = parts.get(3).copied().unwrap_or("");
+                    let purpose_str = parts.get(3).copied().unwrap_or("");
 
                     // Content key: name[32] ++ value[..]
                     let mut key = Vec::with_capacity(32 + value.len());
@@ -410,12 +411,15 @@ pub(crate) fn apply_events(
                         };
 
                         if let Some(payload) = pending {
-                            let is_enc = purpose == "enc";
-                            let is_sig_auth = purpose == "sigAuth";
+                            let purpose = match purpose_str {
+                                "sigAuth" => KeyPurpose::SigAuth,
+                                "enc" => KeyPurpose::Enc,
+                                _ => KeyPurpose::VeriKey,
+                            };
                             vms.insert(key, PendingVm {
                                 counter: delegate_counter,
                                 payload,
-                                is_sig_auth: is_sig_auth || is_enc,
+                                purpose,
                             });
                         }
                     } else {
@@ -496,7 +500,7 @@ pub(crate) fn apply_events(
                     .assertion_method
                     .push(eip712_id_url.clone().into());
 
-                if vm_entry.is_sig_auth {
+                if vm_entry.purpose == KeyPurpose::SigAuth {
                     doc.verification_relationships
                         .authentication
                         .push(vm_id_url.into());
@@ -523,22 +527,15 @@ pub(crate) fn apply_events(
 
                 doc.verification_method.push(vm);
 
-                // Determine purpose from the attribute name embedded in is_sig_auth.
-                // For attribute keys, is_sig_auth encodes whether the key goes into
-                // authentication/keyAgreement (true for sigAuth and enc purposes).
-                //
-                // We need to re-derive the purpose from the original attribute, but
-                // since we only store is_sig_auth, we use a simpler approach:
-                // - X25519 keys → keyAgreement
-                // - is_sig_auth && not X25519 → assertionMethod + authentication
-                // - else → assertionMethod only
-                match vm_type {
-                    VerificationMethodType::X25519KeyAgreementKey2020 => {
+                // Route to the correct verification relationship based on
+                // the explicit purpose from the attribute name.
+                match vm_entry.purpose {
+                    KeyPurpose::Enc => {
                         doc.verification_relationships
                             .key_agreement
                             .push(vm_id_url.into());
                     }
-                    _ if vm_entry.is_sig_auth => {
+                    KeyPurpose::SigAuth => {
                         doc.verification_relationships
                             .assertion_method
                             .push(vm_id_url.clone().into());
@@ -546,7 +543,7 @@ pub(crate) fn apply_events(
                             .authentication
                             .push(vm_id_url.into());
                     }
-                    _ => {
+                    KeyPurpose::VeriKey => {
                         doc.verification_relationships
                             .assertion_method
                             .push(vm_id_url.into());
@@ -2752,6 +2749,52 @@ mod tests {
             "context should include X25519KeyAgreementKey2020");
         assert!(ctx_obj.get("publicKeyMultibase").is_some(),
             "context should include publicKeyMultibase");
+    }
+
+    #[tokio::test]
+    async fn resolve_secp256k1_enc_attribute_goes_to_key_agreement() {
+        // did/pub/Secp256k1/enc/hex must route to keyAgreement, NOT
+        // authentication/assertionMethod. This was previously broken because
+        // `enc` purpose was folded into `is_sig_auth`.
+        let identity: [u8; 20] = [0xb9, 0xc5, 0x71, 0x40, 0x89, 0x47, 0x8a, 0x32, 0x7f, 0x09,
+                                   0x19, 0x79, 0x87, 0xf1, 0x6f, 0x9e, 0x5d, 0x93, 0x6e, 0x8a];
+        let attr_name = encode_attr_name("did/pub/Secp256k1/enc/hex");
+
+        let log = make_attribute_changed_log(100, &identity, &attr_name, &TEST_SECP256K1_COMPRESSED, u64::MAX, 0);
+
+        let mut resolver = DIDEthr::new();
+        resolver.add_network("mainnet", NetworkConfig {
+            chain_id: 1,
+            registry: TEST_REGISTRY,
+            provider: MockProvider {
+                changed_block: 100,
+                identity_owner: None,
+                logs: HashMap::from([(100, vec![log])]),
+                block_timestamps: HashMap::new(),
+                identity_owner_at_block: HashMap::new(),
+            },
+        });
+
+        let doc = resolver
+            .resolve(did!("did:ethr:0xb9c5714089478a327f09197987f16f9e5d936e8a"))
+            .await.unwrap().document;
+
+        let doc_value = serde_json::to_value(&doc).unwrap();
+        let did_prefix = "did:ethr:0xb9c5714089478a327f09197987f16f9e5d936e8a";
+
+        // Should be in keyAgreement
+        let key_agreement = doc_value["keyAgreement"].as_array()
+            .expect("should have keyAgreement array");
+        assert!(key_agreement.iter().any(|v| v == &format!("{did_prefix}#delegate-1")),
+            "Secp256k1/enc should be in keyAgreement");
+
+        // Should NOT be in assertionMethod or authentication
+        let assertion = doc_value["assertionMethod"].as_array().unwrap();
+        assert!(!assertion.iter().any(|v| v == &format!("{did_prefix}#delegate-1")),
+            "Secp256k1/enc should NOT be in assertionMethod");
+        let auth = doc_value["authentication"].as_array().unwrap();
+        assert!(!auth.iter().any(|v| v == &format!("{did_prefix}#delegate-1")),
+            "Secp256k1/enc should NOT be in authentication");
     }
 
     #[tokio::test]
