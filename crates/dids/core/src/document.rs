@@ -170,10 +170,19 @@ pub enum InvalidData {
 }
 
 /// Document metadata.
-#[derive(Debug, Default, Clone, Copy, Serialize, Deserialize)]
+#[derive(Debug, Default, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Metadata {
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub deactivated: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub version_id: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub updated: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub next_version_id: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub next_update: Option<String>,
 }
 
 #[derive(Debug, Default, Serialize, Deserialize, Clone, PartialEq, Eq)]

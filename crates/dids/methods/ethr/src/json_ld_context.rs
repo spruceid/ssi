@@ -16,7 +16,11 @@ use crate::VerificationMethodType;
 pub struct JsonLdContext {
     ecdsa_secp256k1_verification_key_2019: bool,
     ecdsa_secp256k1_recovery_method_2020: bool,
+    ed25519_verification_key_2020: bool,
+    x25519_key_agreement_key_2020: bool,
     eip712_method_2021: bool,
+    public_key_jwk: bool,
+    public_key_multibase: bool,
 }
 
 impl JsonLdContext {
@@ -28,27 +32,28 @@ impl JsonLdContext {
             VerificationMethodType::EcdsaSecp256k1RecoveryMethod2020 => {
                 self.ecdsa_secp256k1_recovery_method_2020 = true
             }
+            VerificationMethodType::Ed25519VerificationKey2020 => {
+                self.ed25519_verification_key_2020 = true
+            }
+            VerificationMethodType::X25519KeyAgreementKey2020 => {
+                self.x25519_key_agreement_key_2020 = true
+            }
             VerificationMethodType::Eip712Method2021 => self.eip712_method_2021 = true,
+        }
+    }
+
+    pub fn add_property(&mut self, prop: &str) {
+        match prop {
+            "publicKeyJwk" => self.public_key_jwk = true,
+            "publicKeyMultibase" => self.public_key_multibase = true,
+            _ => {}
         }
     }
 
     pub fn into_entries(self) -> Vec<representation::json_ld::ContextEntry> {
         let mut def = Definition::new();
 
-        let mut public_key_jwk = false;
         let mut blockchain_account_id = false;
-        // let mut public_key_base_58 = false;
-        // let mut public_key_multibase = false;
-
-        // if self.ed25519_verification_key_2018 {
-        //     let ty = VerificationMethodType::Ed25519VerificationKey2018;
-        //     def.bindings.insert(
-        //         ty.name().into(),
-        //         TermDefinition::Simple(ty.iri().to_owned().into()).into(),
-        //     );
-
-        //     public_key_base_58 = true;
-        // }
 
         if self.ecdsa_secp256k1_verification_key_2019 {
             let ty = VerificationMethodType::EcdsaSecp256k1VerificationKey2019;
@@ -56,8 +61,6 @@ impl JsonLdContext {
                 ty.name().into(),
                 TermDefinition::Simple(ty.iri().to_owned().into()).into(),
             );
-
-            public_key_jwk = true;
         }
 
         if self.ecdsa_secp256k1_recovery_method_2020 {
@@ -70,6 +73,22 @@ impl JsonLdContext {
             blockchain_account_id = true;
         }
 
+        if self.ed25519_verification_key_2020 {
+            let ty = VerificationMethodType::Ed25519VerificationKey2020;
+            def.bindings.insert(
+                ty.name().into(),
+                TermDefinition::Simple(ty.iri().to_owned().into()).into(),
+            );
+        }
+
+        if self.x25519_key_agreement_key_2020 {
+            let ty = VerificationMethodType::X25519KeyAgreementKey2020;
+            def.bindings.insert(
+                ty.name().into(),
+                TermDefinition::Simple(ty.iri().to_owned().into()).into(),
+            );
+        }
+
         if self.eip712_method_2021 {
             let ty = VerificationMethodType::Eip712Method2021;
             def.bindings.insert(
@@ -80,7 +99,7 @@ impl JsonLdContext {
             blockchain_account_id = true;
         }
 
-        if public_key_jwk {
+        if self.public_key_jwk {
             def.bindings.insert(
                 "publicKeyJwk".into(),
                 TermDefinition::Expanded(Box::new(Expanded {
@@ -92,6 +111,18 @@ impl JsonLdContext {
                     type_: Some(Nullable::Some(Type::Keyword(TypeKeyword::Json))),
                     ..Default::default()
                 }))
+                .into(),
+            );
+        }
+
+        if self.public_key_multibase {
+            def.bindings.insert(
+                "publicKeyMultibase".into(),
+                TermDefinition::Simple(
+                    iri!("https://w3id.org/security#publicKeyMultibase")
+                        .to_owned()
+                        .into(),
+                )
                 .into(),
             );
         }
