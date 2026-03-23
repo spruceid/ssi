@@ -71,6 +71,14 @@ impl std::error::Error for ProviderError {}
 impl EthProvider for HttpProvider {
     type Error = ProviderError;
 
+    async fn chain_id(&self) -> Result<u64, Self::Error> {
+        let result: String = self
+            .rpc("eth_chainId", serde_json::json!([]))
+            .await?;
+        u64::from_str_radix(result.trim_start_matches("0x"), 16)
+            .map_err(|e| ProviderError(e.to_string()))
+    }
+
     async fn call(
         &self,
         to: [u8; 20],
@@ -195,15 +203,6 @@ fn default_registry(network: &str) -> Option<&'static str> {
     }
 }
 
-/// Well-known chain IDs per network name.
-fn chain_id_for(network: &str) -> u64 {
-    match network {
-        "mainnet" => 1,
-        "sepolia" => 11155111,
-        _ => 1,
-    }
-}
-
 /// Extract the network name from a did:ethr DID string.
 /// Returns "mainnet" if no network segment is present.
 fn network_from_did(did_str: &str) -> &str {
@@ -231,7 +230,6 @@ async fn resolve_did(did_str: &str, rpc_url: &str, registry_hex: &str) -> Result
     resolver.add_network(
         network,
         NetworkConfig {
-            chain_id: chain_id_for(network),
             registry,
             provider: HttpProvider {
                 client: reqwest::Client::new(),

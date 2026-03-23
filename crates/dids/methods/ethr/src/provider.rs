@@ -32,6 +32,9 @@ pub struct Log {
 pub trait EthProvider: Send + Sync {
     type Error: std::error::Error + Send + Sync + 'static;
 
+    /// eth_chainId — return the connected chain's numeric ID
+    fn chain_id(&self) -> impl std::future::Future<Output = Result<u64, Self::Error>> + Send;
+
     /// eth_call — execute a read-only contract call
     fn call(
         &self,
@@ -55,7 +58,6 @@ pub trait EthProvider: Send + Sync {
 
 /// Per-network Ethereum configuration
 pub struct NetworkConfig<P> {
-    pub chain_id: u64,
     pub registry: [u8; 20],
     pub provider: P,
 }

@@ -223,6 +223,10 @@ mod tests {
     impl EthProvider for MockProvider {
         type Error = MockProviderError;
 
+        async fn chain_id(&self) -> Result<u64, Self::Error> {
+            Ok(1)
+        }
+
         async fn call(
             &self,
             _to: [u8; 20],

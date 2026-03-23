@@ -11,6 +11,7 @@ use ssi_dids_core::{
     DIDBuf, DIDMethod, DIDURLBuf, Document,
 };
 use std::collections::HashMap;
+use std::sync::OnceLock;
 use std::str::FromStr;
 
 use crate::abi::{
@@ -37,12 +38,14 @@ use crate::vm::{
 /// for networks that have a configured provider.
 pub struct DIDEthr<P = ()> {
     networks: HashMap<String, NetworkConfig<P>>,
+    chain_id_cache: HashMap<String, OnceLock<u64>>,
 }
 
 impl<P> Default for DIDEthr<P> {
     fn default() -> Self {
         Self {
             networks: HashMap::new(),
+            chain_id_cache: HashMap::new(),
         }
     }
 }
@@ -56,6 +59,7 @@ impl<P> DIDEthr<P> {
     /// Add a named network configuration.
     pub fn add_network(&mut self, name: &str, config: NetworkConfig<P>) {
         self.networks.insert(name.to_owned(), config);
+        self.chain_id_cache.insert(name.to_owned(), OnceLock::new());
     }
 }
 
@@ -81,6 +85,24 @@ impl<P: EthProvider> DIDMethodResolver for DIDEthr<P> {
 
         // Check if we have a provider for this network
         if let Some(config) = self.networks.get(decoded_id.network_name()) {
+            // Validate that the provider's chain matches the DID's expected chain
+            let expected_chain = decoded_id.network_chain.id();
+            let cache = self.chain_id_cache.get(decoded_id.network_name()).unwrap();
+            let actual_chain = match cache.get() {
+                Some(&id) => id,
+                None => {
+                    let id = config.provider.chain_id().await
+                        .map_err(|e| Error::Internal(e.to_string()))?;
+                    let _ = cache.set(id);
+                    id
+                }
+            };
+            if actual_chain != expected_chain {
+                return Err(Error::Internal(format!(
+                    "chain ID mismatch: provider reports {actual_chain}, DID expects {expected_chain}"
+                )));
+            }
+
             let addr_hex = decoded_id.account_address_hex()
                 .ok_or_else(|| Error::InvalidMethodSpecificId(method_specific_id.to_owned()))?;
             if let Some(addr) = crate::network::parse_address_bytes(&addr_hex) {
@@ -807,6 +829,10 @@ mod tests {
     impl EthProvider for MockProvider {
         type Error = MockProviderError;
 
+        async fn chain_id(&self) -> Result<u64, Self::Error> {
+            Ok(1)
+        }
+
         async fn call(
             &self,
             _to: [u8; 20],
@@ -1024,7 +1050,6 @@ mod tests {
         resolver.add_network(
             "mainnet",
             NetworkConfig {
-                chain_id: 1,
                 registry: [0xdc, 0xa7, 0xef, 0x03, 0xe9, 0x8e, 0x0d, 0xc2,
                            0xb8, 0x55, 0xbe, 0x64, 0x7c, 0x39, 0xab, 0xe9,
                            0x84, 0xfc, 0xf2, 0x1b],
@@ -1065,7 +1090,6 @@ mod tests {
         resolver.add_network(
             "mainnet",
             NetworkConfig {
-                chain_id: 1,
                 registry: [0xdc, 0xa7, 0xef, 0x03, 0xe9, 0x8e, 0x0d, 0xc2,
                            0xb8, 0x55, 0xbe, 0x64, 0x7c, 0x39, 0xab, 0xe9,
                            0x84, 0xfc, 0xf2, 0x1b],
@@ -1128,7 +1152,6 @@ mod tests {
         resolver.add_network(
             "mainnet",
             NetworkConfig {
-                chain_id: 1,
                 registry: [0xdc, 0xa7, 0xef, 0x03, 0xe9, 0x8e, 0x0d, 0xc2,
                            0xb8, 0x55, 0xbe, 0x64, 0x7c, 0x39, 0xab, 0xe9,
                            0x84, 0xfc, 0xf2, 0x1b],
@@ -1194,7 +1217,6 @@ mod tests {
         resolver.add_network(
             "mainnet",
             NetworkConfig {
-                chain_id: 1,
                 registry: [0xdc, 0xa7, 0xef, 0x03, 0xe9, 0x8e, 0x0d, 0xc2,
                            0xb8, 0x55, 0xbe, 0x64, 0x7c, 0x39, 0xab, 0xe9,
                            0x84, 0xfc, 0xf2, 0x1b],
@@ -1233,7 +1255,6 @@ mod tests {
         resolver.add_network(
             "mainnet",
             NetworkConfig {
-                chain_id: 1,
                 registry: [0xdc, 0xa7, 0xef, 0x03, 0xe9, 0x8e, 0x0d, 0xc2,
                            0xb8, 0x55, 0xbe, 0x64, 0x7c, 0x39, 0xab, 0xe9,
                            0x84, 0xfc, 0xf2, 0x1b],
@@ -1284,7 +1305,6 @@ mod tests {
         resolver.add_network(
             "mainnet",
             NetworkConfig {
-                chain_id: 1,
                 registry: TEST_REGISTRY,
                 provider: MockProvider {
                     changed_block: 100,
@@ -1352,7 +1372,6 @@ mod tests {
         resolver.add_network(
             "mainnet",
             NetworkConfig {
-                chain_id: 1,
                 registry: TEST_REGISTRY,
                 provider: MockProvider {
                     changed_block: 100,
@@ -1401,7 +1420,6 @@ mod tests {
         resolver.add_network(
             "mainnet",
             NetworkConfig {
-                chain_id: 1,
                 registry: TEST_REGISTRY,
                 provider: MockProvider {
                     changed_block: 100,
@@ -1446,7 +1464,6 @@ mod tests {
         resolver.add_network(
             "mainnet",
             NetworkConfig {
-                chain_id: 1,
                 registry: TEST_REGISTRY,
                 provider: MockProvider {
                     changed_block: 200,
@@ -1502,7 +1519,6 @@ mod tests {
         resolver.add_network(
             "mainnet",
             NetworkConfig {
-                chain_id: 1,
                 registry: TEST_REGISTRY,
                 provider: MockProvider {
                     changed_block: 200,
@@ -1564,7 +1580,6 @@ mod tests {
 
         let mut resolver = DIDEthr::new();
         resolver.add_network("mainnet", NetworkConfig {
-            chain_id: 1,
             registry: TEST_REGISTRY,
             provider: MockProvider {
                 changed_block: 200,
@@ -1610,7 +1625,6 @@ mod tests {
 
         let mut resolver = DIDEthr::new();
         resolver.add_network("mainnet", NetworkConfig {
-            chain_id: 1,
             registry: TEST_REGISTRY,
             provider: MockProvider {
                 changed_block: 200,
@@ -1651,7 +1665,6 @@ mod tests {
 
         let mut resolver = DIDEthr::new();
         resolver.add_network("mainnet", NetworkConfig {
-            chain_id: 1,
             registry: TEST_REGISTRY,
             provider: MockProvider {
                 changed_block: 200,
@@ -1694,7 +1707,6 @@ mod tests {
 
         let mut resolver = DIDEthr::new();
         resolver.add_network("mainnet", NetworkConfig {
-            chain_id: 1,
             registry: TEST_REGISTRY,
             provider: MockProvider {
                 changed_block: 100,
@@ -1733,7 +1745,6 @@ mod tests {
 
         let mut resolver = DIDEthr::new();
         resolver.add_network("mainnet", NetworkConfig {
-            chain_id: 1,
             registry: TEST_REGISTRY,
             provider: MockProvider {
                 changed_block: 100,
@@ -1772,7 +1783,6 @@ mod tests {
 
         let mut resolver = DIDEthr::new();
         resolver.add_network("mainnet", NetworkConfig {
-            chain_id: 1,
             registry: TEST_REGISTRY,
             provider: MockProvider {
                 changed_block: 100,
@@ -1825,7 +1835,6 @@ mod tests {
         resolver.add_network(
             "mainnet",
             NetworkConfig {
-                chain_id: 1,
                 registry: TEST_REGISTRY,
                 provider: MockProvider {
                     changed_block: 200,
@@ -1886,7 +1895,6 @@ mod tests {
         resolver.add_network(
             "mainnet",
             NetworkConfig {
-                chain_id: 1,
                 registry: [0xdc, 0xa7, 0xef, 0x03, 0xe9, 0x8e, 0x0d, 0xc2,
                            0xb8, 0x55, 0xbe, 0x64, 0x7c, 0x39, 0xab, 0xe9,
                            0x84, 0xfc, 0xf2, 0x1b],
@@ -1945,7 +1953,6 @@ mod tests {
 
         let mut resolver = DIDEthr::new();
         resolver.add_network("mainnet", NetworkConfig {
-            chain_id: 1,
             registry: TEST_REGISTRY,
             provider: MockProvider {
                 changed_block: 100,
@@ -1997,7 +2004,6 @@ mod tests {
 
         let mut resolver = DIDEthr::new();
         resolver.add_network("mainnet", NetworkConfig {
-            chain_id: 1,
             registry: TEST_REGISTRY,
             provider: MockProvider {
                 changed_block: 300,
@@ -2033,7 +2039,6 @@ mod tests {
         // When the owner is non-null, deactivated should be None (not set).
         let mut resolver = DIDEthr::new();
         resolver.add_network("mainnet", NetworkConfig {
-            chain_id: 1,
             registry: TEST_REGISTRY,
             provider: MockProvider::new_same_owner(),
         });
@@ -2053,7 +2058,6 @@ mod tests {
         // DID with no on-chain changes (changed=0) → no versionId/updated metadata
         let mut resolver = DIDEthr::new();
         resolver.add_network("mainnet", NetworkConfig {
-            chain_id: 1,
             registry: TEST_REGISTRY,
             provider: MockProvider::new_unchanged(),
         });
@@ -2080,7 +2084,6 @@ mod tests {
         // Block 100 has timestamp 1705312200 = 2024-01-15T09:50:00Z
         let mut resolver = DIDEthr::new();
         resolver.add_network("mainnet", NetworkConfig {
-            chain_id: 1,
             registry: TEST_REGISTRY,
             provider: MockProvider {
                 changed_block: 100,
@@ -2117,7 +2120,6 @@ mod tests {
 
         let mut resolver = DIDEthr::new();
         resolver.add_network("mainnet", NetworkConfig {
-            chain_id: 1,
             registry: TEST_REGISTRY,
             provider: MockProvider {
                 changed_block: 200,
@@ -2185,7 +2187,6 @@ mod tests {
 
         let mut resolver = DIDEthr::new();
         resolver.add_network("mainnet", NetworkConfig {
-            chain_id: 1,
             registry: TEST_REGISTRY,
             provider: MockProvider {
                 changed_block: 100,
@@ -2241,7 +2242,6 @@ mod tests {
 
         let mut resolver = DIDEthr::new();
         resolver.add_network("mainnet", NetworkConfig {
-            chain_id: 1,
             registry: TEST_REGISTRY,
             provider: MockProvider {
                 changed_block: 200,
@@ -2293,7 +2293,6 @@ mod tests {
 
         let mut resolver = DIDEthr::new();
         resolver.add_network("mainnet", NetworkConfig {
-            chain_id: 1,
             registry: TEST_REGISTRY,
             provider: MockProvider {
                 changed_block: 100,
@@ -2343,7 +2342,6 @@ mod tests {
         resolver.add_network(
             "mainnet",
             NetworkConfig {
-                chain_id: 1,
                 registry: TEST_REGISTRY,
                 provider: MockProvider::new_unchanged(),
             },
@@ -2401,7 +2399,6 @@ mod tests {
 
         let mut resolver = DIDEthr::new();
         resolver.add_network("mainnet", NetworkConfig {
-            chain_id: 1,
             registry: TEST_REGISTRY,
             provider: MockProvider {
                 changed_block: 200,
@@ -2443,7 +2440,6 @@ mod tests {
 
         let mut resolver = DIDEthr::new();
         resolver.add_network("mainnet", NetworkConfig {
-            chain_id: 1,
             registry: TEST_REGISTRY,
             provider: MockProvider {
                 changed_block: 200,
@@ -2489,7 +2485,6 @@ mod tests {
 
         let mut resolver = DIDEthr::new();
         resolver.add_network("mainnet", NetworkConfig {
-            chain_id: 1,
             registry: TEST_REGISTRY,
             provider: MockProvider {
                 changed_block: 300,
@@ -2537,7 +2532,6 @@ mod tests {
 
         let mut resolver = DIDEthr::new();
         resolver.add_network("mainnet", NetworkConfig {
-            chain_id: 1,
             registry: TEST_REGISTRY,
             provider: MockProvider {
                 changed_block: 100,
@@ -2595,7 +2589,6 @@ mod tests {
 
         let mut resolver = DIDEthr::new();
         resolver.add_network("mainnet", NetworkConfig {
-            chain_id: 1,
             registry: TEST_REGISTRY,
             provider: MockProvider {
                 changed_block: 100,
@@ -2640,7 +2633,6 @@ mod tests {
 
         let mut resolver = DIDEthr::new();
         resolver.add_network("mainnet", NetworkConfig {
-            chain_id: 1,
             registry: TEST_REGISTRY,
             provider: MockProvider {
                 changed_block: 100,
@@ -2702,7 +2694,6 @@ mod tests {
 
         let mut resolver = DIDEthr::new();
         resolver.add_network("mainnet", NetworkConfig {
-            chain_id: 1,
             registry: TEST_REGISTRY,
             provider: MockProvider {
                 changed_block: 100,
@@ -2764,7 +2755,6 @@ mod tests {
 
         let mut resolver = DIDEthr::new();
         resolver.add_network("mainnet", NetworkConfig {
-            chain_id: 1,
             registry: TEST_REGISTRY,
             provider: MockProvider {
                 changed_block: 100,
@@ -2820,7 +2810,6 @@ mod tests {
 
         let mut resolver = DIDEthr::new();
         resolver.add_network("mainnet", NetworkConfig {
-            chain_id: 1,
             registry: TEST_REGISTRY,
             provider: MockProvider {
                 changed_block: 100,
