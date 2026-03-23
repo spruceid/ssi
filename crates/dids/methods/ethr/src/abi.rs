@@ -1,5 +1,5 @@
-use ssi_crypto::hashes::keccak;
 use chrono::{DateTime, Utc};
+use ssi_crypto::hashes::keccak;
 
 // --- ERC-1056 ABI selectors ---
 
@@ -24,15 +24,18 @@ pub(crate) fn encode_call(selector: [u8; 4], addr: &[u8; 20]) -> Vec<u8> {
     data
 }
 
-/// Decode a 32-byte uint256 return value
-pub(crate) fn decode_uint256(data: &[u8]) -> u64 {
+/// Decode a 32-byte uint256 return value.
+/// Returns an error if the value overflows u64 (high 24 bytes non-zero).
+pub(crate) fn decode_uint256(data: &[u8]) -> Result<u64, &'static str> {
     if data.len() < 32 {
-        return 0;
+        return Err("uint256 data too short");
     }
-    // Read last 8 bytes as u64 (ERC-1056 changed() returns small block numbers)
+    if data[..24].iter().any(|&b| b != 0) {
+        return Err("uint256 overflows u64");
+    }
     let mut bytes = [0u8; 8];
     bytes.copy_from_slice(&data[24..32]);
-    u64::from_be_bytes(bytes)
+    Ok(u64::from_be_bytes(bytes))
 }
 
 /// Decode a 32-byte ABI-encoded address return value
@@ -53,7 +56,8 @@ pub(crate) fn format_address_eip55(addr: &[u8; 20]) -> String {
 
 /// Format a Unix timestamp (seconds since epoch) as ISO 8601 UTC string
 pub(crate) fn format_timestamp_iso8601(unix_secs: u64) -> String {
-    DateTime::<Utc>::from_timestamp(unix_secs as i64, 0)
+    let secs = i64::try_from(unix_secs).ok();
+    secs.and_then(|s| DateTime::<Utc>::from_timestamp(s, 0))
         .map(|dt| dt.format("%Y-%m-%dT%H:%M:%SZ").to_string())
         .unwrap_or_else(|| "1970-01-01T00:00:00Z".to_string())
 }

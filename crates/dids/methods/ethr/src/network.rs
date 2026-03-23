@@ -60,27 +60,16 @@ impl DecodedMethodSpecificId {
 
     /// Extract the Ethereum address hex string (with 0x prefix).
     /// For public-key DIDs, derives the address from the public key.
-    pub(crate) fn account_address_hex(&self) -> String {
+    /// Returns `None` if the public key is malformed or address derivation fails.
+    pub(crate) fn account_address_hex(&self) -> Option<String> {
         if self.address_or_public_key.len() == 42 {
-            self.address_or_public_key.clone()
+            Some(self.address_or_public_key.clone())
         } else {
             // Public key DID — derive the address
             let pk_hex = &self.address_or_public_key;
-            if !pk_hex.starts_with("0x") {
-                return String::new();
-            }
-            let pk_bytes = match hex::decode(&pk_hex[2..]) {
-                Ok(b) => b,
-                Err(_) => return String::new(),
-            };
-            let pk_jwk = match ssi_jwk::secp256k1_parse(&pk_bytes) {
-                Ok(j) => j,
-                Err(_) => return String::new(),
-            };
-            match ssi_jwk::eip155::hash_public_key_eip55(&pk_jwk) {
-                Ok(addr) => addr,
-                Err(_) => String::new(),
-            }
+            let pk_bytes = hex::decode(pk_hex.strip_prefix("0x")?).ok()?;
+            let pk_jwk = ssi_jwk::secp256k1_parse(&pk_bytes).ok()?;
+            ssi_jwk::eip155::hash_public_key_eip55(&pk_jwk).ok()
         }
     }
 }

@@ -81,7 +81,8 @@ impl<P: EthProvider> DIDMethodResolver for DIDEthr<P> {
 
         // Check if we have a provider for this network
         if let Some(config) = self.networks.get(decoded_id.network_name()) {
-            let addr_hex = decoded_id.account_address_hex();
+            let addr_hex = decoded_id.account_address_hex()
+                .ok_or_else(|| Error::InvalidMethodSpecificId(method_specific_id.to_owned()))?;
             if let Some(addr) = crate::network::parse_address_bytes(&addr_hex) {
                 // Parse historical resolution target block from ?versionId=N
                 let target_block: Option<u64> = options
@@ -97,7 +98,8 @@ impl<P: EthProvider> DIDMethodResolver for DIDEthr<P> {
                     .call(config.registry, calldata, BlockRef::Latest)
                     .await
                     .map_err(|e| Error::Internal(e.to_string()))?;
-                let changed_block = decode_uint256(&result);
+                let changed_block = decode_uint256(&result)
+                    .map_err(|e| Error::Internal(e.to_string()))?;
 
                 if changed_block > 0 {
                     // Collect all events via linked-list walk
@@ -212,9 +214,18 @@ impl<P: EthProvider> DIDMethodResolver for DIDEthr<P> {
                     };
 
                     // Apply delegate/attribute events
-                    // For historical resolution, use target block's timestamp as "now"
-                    let now = if let Some(_) = target_block {
-                        block_ts
+                    // For historical resolution, use the actual target block's
+                    // timestamp as "now" (not meta_block's, which may be earlier)
+                    let now = if let Some(tb) = target_block {
+                        if meta_block == tb {
+                            block_ts
+                        } else {
+                            config
+                                .provider
+                                .block_timestamp(tb)
+                                .await
+                                .map_err(|e| Error::Internal(e.to_string()))?
+                        }
                     } else {
                         std::time::SystemTime::now()
                             .duration_since(std::time::UNIX_EPOCH)
@@ -254,6 +265,14 @@ impl DIDMethodResolver for DIDEthr<()> {
             .map_err(|_| Error::InvalidMethodSpecificId(method_specific_id.to_owned()))?;
         resolve_offline(method_specific_id, &decoded_id, options)
     }
+}
+
+/// Encode raw key bytes as multibase(base58btc) with a multicodec varint prefix.
+/// Matches the encoding expected by Ed25519VerificationKey2020 and
+/// X25519KeyAgreementKey2020 verification method types per W3C spec.
+fn encode_multibase_multicodec(codec: u64, key_bytes: &[u8]) -> String {
+    let encoded = ssi_multicodec::MultiEncodedBuf::encode_bytes(codec, key_bytes);
+    multibase::encode(multibase::Base::Base58Btc, encoded.as_bytes())
 }
 
 /// Process ERC-1056 events and add delegate verification methods to the document.
@@ -368,7 +387,9 @@ pub(crate) fn apply_events(
                                 }
                             }
                             "Ed25519" => {
-                                let multibase = format!("z{}", bs58::encode(value).into_string());
+                                let multibase = encode_multibase_multicodec(
+                                    ssi_multicodec::ED25519_PUB, value,
+                                );
                                 Some(PendingVmPayload::AttributeKey {
                                     vm_type: VerificationMethodType::Ed25519VerificationKey2020,
                                     prop_name: "publicKeyMultibase",
@@ -376,7 +397,9 @@ pub(crate) fn apply_events(
                                 })
                             }
                             "X25519" => {
-                                let multibase = format!("z{}", bs58::encode(value).into_string());
+                                let multibase = encode_multibase_multicodec(
+                                    ssi_multicodec::X25519_PUB, value,
+                                );
                                 Some(PendingVmPayload::AttributeKey {
                                     vm_type: VerificationMethodType::X25519KeyAgreementKey2020,
                                     prop_name: "publicKeyMultibase",
@@ -2642,7 +2665,7 @@ mod tests {
             vm["id"].as_str().unwrap().ends_with("#delegate-1")
         }).expect("should have #delegate-1 VM");
         assert_eq!(attr_vm["type"], "Ed25519VerificationKey2020");
-        let expected_multibase = format!("z{}", bs58::encode(&ed_key).into_string());
+        let expected_multibase = encode_multibase_multicodec(ssi_multicodec::ED25519_PUB, &ed_key);
         assert_eq!(attr_vm["publicKeyMultibase"], expected_multibase);
         assert!(attr_vm.get("publicKeyJwk").is_none(), "should NOT have publicKeyJwk");
 
@@ -2704,7 +2727,7 @@ mod tests {
             vm["id"].as_str().unwrap().ends_with("#delegate-1")
         }).expect("should have #delegate-1 VM");
         assert_eq!(attr_vm["type"], "X25519KeyAgreementKey2020");
-        let expected_multibase = format!("z{}", bs58::encode(&x_key).into_string());
+        let expected_multibase = encode_multibase_multicodec(ssi_multicodec::X25519_PUB, &x_key);
         assert_eq!(attr_vm["publicKeyMultibase"], expected_multibase);
 
         // X25519 enc purpose → keyAgreement (not assertionMethod or authentication)
@@ -2725,5 +2748,74 @@ mod tests {
             "context should include X25519KeyAgreementKey2020");
         assert!(ctx_obj.get("publicKeyMultibase").is_some(),
             "context should include publicKeyMultibase");
+    }
+
+    #[tokio::test]
+    async fn historical_expiry_uses_target_block_timestamp_not_meta_block() {
+        // Bug regression: when target_block > meta_block, `now` must be the
+        // target block's timestamp, not meta_block's. A delegate whose
+        // valid_to falls between the two timestamps must be expired.
+        //
+        // Setup:
+        //   Block 100 (timestamp 1000): delegate added, valid_to = 1500
+        //   Block 150 (timestamp 2000): no events, but this is the target
+        //
+        // meta_block = 100 (latest event at or before 150)
+        // Before fix: now = 1000 → 1500 >= 1000 → delegate included (WRONG)
+        // After fix:  now = 2000 → 1500 < 2000  → delegate excluded (CORRECT)
+        let identity: [u8; 20] = [0xb9, 0xc5, 0x71, 0x40, 0x89, 0x47, 0x8a, 0x32, 0x7f, 0x09,
+                                   0x19, 0x79, 0x87, 0xf1, 0x6f, 0x9e, 0x5d, 0x93, 0x6e, 0x8a];
+        let delegate: [u8; 20] = [0xAA; 20];
+        let delegate_type = encode_delegate_type("veriKey");
+
+        // Delegate valid_to = 1500, between block 100 ts (1000) and block 150 ts (2000)
+        let log = make_delegate_changed_log(100, &identity, &delegate_type, &delegate, 1500, 0);
+
+        let mut resolver = DIDEthr::new();
+        resolver.add_network("mainnet", NetworkConfig {
+            chain_id: 1,
+            registry: TEST_REGISTRY,
+            provider: MockProvider {
+                changed_block: 100,
+                identity_owner: None,
+                identity_owner_at_block: HashMap::new(),
+                logs: HashMap::from([
+                    (100, vec![log]),
+                ]),
+                block_timestamps: HashMap::from([
+                    (100, 1000),  // meta_block timestamp
+                    (150, 2000),  // target block timestamp
+                ]),
+            },
+        });
+
+        let options = resolution::Options {
+            parameters: resolution::Parameters {
+                version_id: Some("150".to_string()),
+                ..Default::default()
+            },
+            ..Default::default()
+        };
+
+        let output = resolver
+            .resolve_with(
+                did!("did:ethr:0xb9c5714089478a327f09197987f16f9e5d936e8a"),
+                options,
+            )
+            .await
+            .unwrap();
+
+        let doc_value = serde_json::to_value(&output.document).unwrap();
+        let vms = doc_value["verificationMethod"].as_array().unwrap();
+
+        // Delegate valid_to (1500) < target block timestamp (2000) → expired
+        assert_eq!(vms.len(), 2, "delegate expired at target block should NOT be included");
+        assert!(
+            vms.iter().all(|vm| !vm["id"].as_str().unwrap().contains("delegate")),
+            "no delegate VMs should be present — delegate expired before target block"
+        );
+
+        // Metadata should still use meta_block (100) for versionId/updated
+        assert_eq!(output.document_metadata.version_id.as_deref(), Some("100"));
     }
 }

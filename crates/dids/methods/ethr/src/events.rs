@@ -78,7 +78,7 @@ pub(crate) fn parse_erc1056_event(log: &Log) -> Option<Erc1056Event> {
         }
         let mut owner = [0u8; 20];
         owner.copy_from_slice(&log.data[12..32]);
-        let previous_change = decode_uint256(&log.data[32..64]);
+        let previous_change = decode_uint256(&log.data[32..64]).ok()?;
         Some(Erc1056Event::OwnerChanged {
             identity,
             owner,
@@ -93,8 +93,8 @@ pub(crate) fn parse_erc1056_event(log: &Log) -> Option<Erc1056Event> {
         delegate_type.copy_from_slice(&log.data[0..32]);
         let mut delegate = [0u8; 20];
         delegate.copy_from_slice(&log.data[44..64]);
-        let valid_to = decode_uint256(&log.data[64..96]);
-        let previous_change = decode_uint256(&log.data[96..128]);
+        let valid_to = decode_uint256(&log.data[64..96]).ok()?;
+        let previous_change = decode_uint256(&log.data[96..128]).ok()?;
         Some(Erc1056Event::DelegateChanged {
             identity,
             delegate_type,
@@ -109,9 +109,9 @@ pub(crate) fn parse_erc1056_event(log: &Log) -> Option<Erc1056Event> {
         }
         let mut name = [0u8; 32];
         name.copy_from_slice(&log.data[0..32]);
-        let valid_to = decode_uint256(&log.data[64..96]);
-        let previous_change = decode_uint256(&log.data[96..128]);
-        let value_len = decode_uint256(&log.data[128..160]) as usize;
+        let valid_to = decode_uint256(&log.data[64..96]).ok()?;
+        let previous_change = decode_uint256(&log.data[96..128]).ok()?;
+        let value_len = decode_uint256(&log.data[128..160]).ok()? as usize;
         let value = if log.data.len() >= 160 + value_len {
             log.data[160..160 + value_len].to_vec()
         } else {
