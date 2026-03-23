@@ -882,6 +882,7 @@ mod tests {
                             topics: log.topics.clone(),
                             data: log.data.clone(),
                             block_number: log.block_number,
+                            log_index: log.log_index,
                         });
                     }
                 }
@@ -919,6 +920,7 @@ mod tests {
             topics: vec![topic_owner_changed(), identity_topic],
             data,
             block_number: block,
+            log_index: 0,
         }
     }
 
@@ -947,6 +949,7 @@ mod tests {
             topics: vec![topic_delegate_changed(), identity_topic],
             data,
             block_number: block,
+            log_index: 0,
         }
     }
 
@@ -982,6 +985,7 @@ mod tests {
             topics: vec![topic_attribute_changed(), identity_topic],
             data,
             block_number: block,
+            log_index: 0,
         }
     }
 

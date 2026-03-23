@@ -151,7 +151,7 @@ pub(crate) async fn collect_events<P: EthProvider>(
         topic_attribute_changed(),
     ];
 
-    let mut events = Vec::new();
+    let mut events: Vec<(u64, u64, Erc1056Event)> = Vec::new();
     let mut current_block = changed_block;
     let mut visited = std::collections::HashSet::new();
 
@@ -176,7 +176,7 @@ pub(crate) async fn collect_events<P: EthProvider>(
         let mut next_block = 0u64;
         for log in &logs {
             if let Some(event) = parse_erc1056_event(log) {
-                events.push((log.block_number, event.clone()));
+                events.push((log.block_number, log.log_index, event.clone()));
                 let prev = event.previous_change();
                 // Only follow pointers that strictly retreat; ignore same-block
                 // self-references (prev == current_block) which cause cycles.
@@ -189,8 +189,11 @@ pub(crate) async fn collect_events<P: EthProvider>(
         current_block = next_block;
     }
 
-    events.reverse(); // chronological order
-    Ok(events)
+    // Sort into chronological order by (block_number, log_index).
+    // This preserves intra-block ordering — critical when multiple events
+    // in the same block have order-dependent semantics (e.g. add then revoke).
+    events.sort_by_key(|(block, log_idx, _)| (*block, *log_idx));
+    Ok(events.into_iter().map(|(block, _, event)| (block, event)).collect())
 }
 
 #[cfg(test)]
@@ -250,6 +253,7 @@ mod tests {
                             topics: log.topics.clone(),
                             data: log.data.clone(),
                             block_number: log.block_number,
+                            log_index: log.log_index,
                         });
                     }
                 }
@@ -277,6 +281,7 @@ mod tests {
             topics: vec![topic_owner_changed(), identity_topic],
             data,
             block_number: block,
+            log_index: 0,
         }
     }
 
@@ -303,6 +308,7 @@ mod tests {
             topics: vec![topic_attribute_changed(), identity_topic],
             data,
             block_number: block,
+            log_index: 0,
         }
     }
 
@@ -325,6 +331,7 @@ mod tests {
             topics: vec![topic_delegate_changed(), identity_topic],
             data,
             block_number: block,
+            log_index: 0,
         }
     }
 
@@ -467,8 +474,8 @@ mod tests {
     async fn collect_events_same_block_events_all_collected() {
         // Simulate the same-block cycle bug:
         // Block 100 has two events:
-        //   - first event: previousChange=50 (normal retreat)
-        //   - second event: previousChange=100 (self-reference due to changed[identity]
+        //   - first event (log_index=0): previousChange=50 (normal retreat)
+        //   - second event (log_index=1): previousChange=100 (self-reference due to changed[identity]
         //     already updated to current_block in the same block)
         // Both events should be collected; next block is 50; loop terminates.
         let identity: [u8; 20] = [0xFF; 20];
@@ -478,11 +485,13 @@ mod tests {
         attr_name[..29].copy_from_slice(b"did/pub/Secp256k1/veriKey/hex");
 
         // First event in block 100: previousChange=50 (normal)
-        let log_100_first = make_owner_changed_log(100, &identity, &new_owner, 50);
+        let mut log_100_first = make_owner_changed_log(100, &identity, &new_owner, 50);
+        log_100_first.log_index = 0;
         // Second event in block 100: previousChange=100 (self-reference / cycle)
-        let log_100_second = make_attribute_changed_log(
+        let mut log_100_second = make_attribute_changed_log(
             100, &identity, &attr_name, b"\x04abc", u64::MAX, 100,
         );
+        log_100_second.log_index = 1;
         // Event at block 50 (to ensure walk continues correctly)
         let owner_at_50: [u8; 20] = [0x22; 20];
         let log_50 = make_owner_changed_log(50, &identity, &owner_at_50, 0);
@@ -503,13 +512,62 @@ mod tests {
 
         // Chronological by block: block 50 first, then block 100 events
         assert!(matches!(&events[0], (50, _)));
-        // Both events from block 100 are present (order within same block is reversed by
-        // the final events.reverse())
-        let block_100_events: Vec<_> = events.iter().filter(|(b, _)| *b == 100).collect();
-        assert_eq!(block_100_events.len(), 2);
-        let has_owner = block_100_events.iter().any(|(_, e)| matches!(e, Erc1056Event::OwnerChanged { .. }));
-        let has_attr = block_100_events.iter().any(|(_, e)| matches!(e, Erc1056Event::AttributeChanged { .. }));
-        assert!(has_owner, "expected an OwnerChanged event at block 100");
-        assert!(has_attr, "expected an AttributeChanged event at block 100");
+        // Intra-block order preserved: OwnerChanged (log_index=0) before AttributeChanged (log_index=1)
+        assert!(matches!(&events[1], (100, Erc1056Event::OwnerChanged { .. })),
+            "expected OwnerChanged at index 1 (log_index=0)");
+        assert!(matches!(&events[2], (100, Erc1056Event::AttributeChanged { .. })),
+            "expected AttributeChanged at index 2 (log_index=1)");
+    }
+
+    #[tokio::test]
+    async fn collect_events_preserves_intra_block_order() {
+        // Two events in the same block with distinct log_index values.
+        // After collect_events, they must appear in log_index order (not reversed).
+        let identity: [u8; 20] = [0xAA; 20];
+        let delegate: [u8; 20] = [0xBB; 20];
+
+        let mut delegate_type = [0u8; 32];
+        delegate_type[..7].copy_from_slice(b"veriKey");
+
+        let mut attr_name = [0u8; 32];
+        attr_name[..29].copy_from_slice(b"did/pub/Secp256k1/veriKey/hex");
+
+        // log_index=0: add delegate
+        let mut log_add = make_delegate_changed_log(
+            100, &identity, &delegate_type, &delegate, u64::MAX, 0,
+        );
+        log_add.log_index = 0;
+
+        // log_index=1: revoke delegate (valid_to=0)
+        let mut log_revoke = make_delegate_changed_log(
+            100, &identity, &delegate_type, &delegate, 0, 100,
+        );
+        log_revoke.log_index = 1;
+
+        let provider = MockProvider {
+            logs: HashMap::from([(100, vec![log_add, log_revoke])]),
+        };
+
+        let events = collect_events(&provider, TEST_REGISTRY, &identity, 100)
+            .await
+            .unwrap();
+
+        assert_eq!(events.len(), 2);
+
+        // First event: add (valid_to = MAX)
+        match &events[0] {
+            (100, Erc1056Event::DelegateChanged { valid_to, .. }) => {
+                assert_eq!(*valid_to, u64::MAX, "first event should be the add (valid_to=MAX)");
+            }
+            other => panic!("expected DelegateChanged add at index 0, got {other:?}"),
+        }
+
+        // Second event: revoke (valid_to = 0)
+        match &events[1] {
+            (100, Erc1056Event::DelegateChanged { valid_to, .. }) => {
+                assert_eq!(*valid_to, 0, "second event should be the revoke (valid_to=0)");
+            }
+            other => panic!("expected DelegateChanged revoke at index 1, got {other:?}"),
+        }
     }
 }

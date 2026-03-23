@@ -22,6 +22,9 @@ pub struct Log {
     pub topics: Vec<[u8; 32]>,
     pub data: Vec<u8>,
     pub block_number: u64,
+    /// Position of the log within its block (from eth_getLogs `logIndex`).
+    /// Used to preserve intra-block event ordering.
+    pub log_index: u64,
 }
 
 /// Minimal async trait for Ethereum JSON-RPC interaction.

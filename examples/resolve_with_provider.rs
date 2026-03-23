@@ -147,7 +147,12 @@ impl EthProvider for HttpProvider {
                 let block_number = u64::from_str_radix(bn_str.trim_start_matches("0x"), 16)
                     .map_err(|e| ProviderError(e.to_string()))?;
 
-                Ok(Log { address, topics, data, block_number })
+                let log_index = entry["logIndex"]
+                    .as_str()
+                    .and_then(|s| u64::from_str_radix(s.trim_start_matches("0x"), 16).ok())
+                    .unwrap_or(0);
+
+                Ok(Log { address, topics, data, block_number, log_index })
             })
             .collect()
     }
