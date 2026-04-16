@@ -96,8 +96,6 @@ allow = [
     "ISC",
     "MIT",
     "MPL-2.0",
-    "OpenSSL",
-    "Unicode-DFS-2016",
     "Unicode-3.0",
 ]
 # The confidence threshold for detecting a license from license text.
@@ -129,6 +127,20 @@ expression = "MIT AND ISC AND OpenSSL"
 license-files = [
     # Each entry is a crate relative path, and the (opaque) hash of its contents
     { path = "LICENSE", hash = 0xbd0eed23 },
+]
+
+[[licenses.clarify]]
+# The package spec the clarification applies to
+crate = "sshkeys"
+# The SPDX expression for the license requirements of the crate
+expression = "BSD-2-Clause"
+# One or more files in the crate's source used as the "source of truth" for
+# the license expression. If the contents match, the clarification will be used
+# when running the license check, otherwise the clarification will be ignored
+# and the crate will be checked normally, which may produce warnings or errors
+# depending on the rest of your configuration
+license-files = [
+   # https://github.com/dnaeon/rust-sshkeys/tree/1ce4435bc36efe581fa1388b66157eca06d9543f#license
 ]
 
 [licenses.private]
