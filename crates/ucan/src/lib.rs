@@ -1,8 +1,8 @@
 pub mod error;
 use base64::{prelude::BASE64_URL_SAFE_NO_PAD, Engine};
+use cid::Cid;
 pub use error::Error;
 use iref::UriBuf;
-use cid::Cid;
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use serde_json::Value as JsonValue;
 use serde_with::{
@@ -19,10 +19,7 @@ use ssi_jwk::{Algorithm, JWK};
 use ssi_jws::{decode_jws_parts, sign_bytes, split_jws, verify_bytes, Header, JwsSignature};
 use ssi_jwt::NumericDate;
 use ssi_verification_methods::{GenericVerificationMethod, InvalidVerificationMethod};
-use std::{
-    borrow::Cow,
-    fmt::Display,
-};
+use std::{borrow::Cow, fmt::Display};
 
 #[derive(Clone, PartialEq, Debug)]
 pub struct Ucan<F = JsonValue, A = JsonValue> {
@@ -145,8 +142,7 @@ impl<F, A> Ucan<F, A> {
         Ok(match &self.codec {
             UcanCodec::Raw(r) => r.clone(),
             UcanCodec::DagJson => [
-                BASE64_URL_SAFE_NO_PAD
-                    .encode(serde_ipld_dagjson::to_vec(&self.header)?),
+                BASE64_URL_SAFE_NO_PAD.encode(serde_ipld_dagjson::to_vec(&self.header)?),
                 BASE64_URL_SAFE_NO_PAD.encode(serde_ipld_dagjson::to_vec(&self.payload)?),
                 BASE64_URL_SAFE_NO_PAD.encode(&self.signature),
             ]
@@ -235,8 +231,7 @@ impl<F, A> Payload<F, A> {
         let signature = sign_bytes(
             algorithm,
             [
-                BASE64_URL_SAFE_NO_PAD
-                    .encode(serde_ipld_dagjson::to_vec(&header)?),
+                BASE64_URL_SAFE_NO_PAD.encode(serde_ipld_dagjson::to_vec(&header)?),
                 BASE64_URL_SAFE_NO_PAD.encode(serde_ipld_dagjson::to_vec(&self)?),
             ]
             .join(".")
