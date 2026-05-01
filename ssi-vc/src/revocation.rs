@@ -9,7 +9,10 @@ use serde_json::Value;
 use ssi_core::one_or_many::OneOrMany;
 use ssi_core::uri::URI;
 use ssi_dids::did_resolve::DIDResolver;
-use ssi_json_ld::{ContextLoader, REVOCATION_LIST_2020_V1_CONTEXT, STATUS_LIST_2021_V1_CONTEXT};
+use ssi_json_ld::{
+    ContextLoader, CREDENTIALS_STATUS_V1_CONTEXT, REVOCATION_LIST_2020_V1_CONTEXT,
+    STATUS_LIST_2021_V1_CONTEXT,
+};
 use ssi_ldp::VerificationResult;
 use thiserror::Error;
 
@@ -64,6 +67,40 @@ pub struct StatusList2021Entry {
     pub status_list_credential: URL,
 }
 
+/// Bitstring Status List status object, for use in a Verifiable Credential's
+/// credentialStatus property.
+/// <https://www.w3.org/TR/vc-bitstring-status-list/#bitstringstatuslistentry>
+#[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct BitstringStatusListEntry {
+    /// Optional URL for status information of the verifiable credential - but not the URL of the
+    /// status list.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub id: Option<URI>,
+    /// Status purpose.
+    pub status_purpose: String,
+    /// Index of this credential's status in the status list credential.
+    pub status_list_index: RevocationListIndex,
+    /// URL to a [BitstringStatusListCredential].
+    pub status_list_credential: URL,
+    /// Size of the status entry in bits. If omitted, the status size is 1.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub status_size: Option<usize>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub status_message: Option<Vec<BitstringStatusMessage>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub status_reference: Option<OneOrMany<URL>>,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct BitstringStatusMessage {
+    pub status: String,
+    pub message: String,
+    #[serde(flatten)]
+    pub more_properties: Value,
+}
+
 /// Integer identifying a bit position of the revocation status of a verifiable credential in a
 /// revocation list, e.g. in a [RevocationList2020].
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -97,6 +134,14 @@ pub enum StatusList2021Subject {
     StatusList2021(StatusList2021),
 }
 
+/// [Credential subject](https://www.w3.org/TR/vc-data-model-2.0/#credential-subject)
+/// of a [BitstringStatusListCredential].
+#[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(tag = "type")]
+pub enum BitstringStatusListSubject {
+    BitstringStatusList(BitstringStatusList),
+}
+
 /// Verifiable Credential of type StatusList2021Credential.
 /// <https://w3c-ccg.github.io/vc-status-list-2021/#statuslist2021credential>
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -105,6 +150,19 @@ pub struct StatusList2021Credential {
     pub id: URI,
     pub issuer: Issuer,
     pub credential_subject: StatusList2021Subject,
+    #[serde(flatten)]
+    pub more_properties: Value,
+}
+
+/// Verifiable Credential of type BitstringStatusListCredential.
+/// <https://www.w3.org/TR/vc-bitstring-status-list/#bitstringstatuslistcredential>
+#[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct BitstringStatusListCredential {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub id: Option<URI>,
+    pub issuer: Issuer,
+    pub credential_subject: BitstringStatusListSubject,
     #[serde(flatten)]
     pub more_properties: Value,
 }
@@ -128,8 +186,30 @@ pub struct StatusList2021 {
     pub more_properties: Value,
 }
 
+/// Credential subject of type BitstringStatusList, expected to be used in a Verifiable Credential
+/// of type [BitstringStatusListCredential](https://www.w3.org/TR/vc-bitstring-status-list/#bitstringstatuslistcredential).
+#[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct BitstringStatusList {
+    pub status_purpose: OneOrMany<String>,
+    pub encoded_list: BitstringStatusListEncodedList,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub status_size: Option<usize>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub status_message: Option<Vec<BitstringStatusMessage>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub status_reference: Option<OneOrMany<URL>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub ttl: Option<u64>,
+    #[serde(flatten)]
+    pub more_properties: Value,
+}
+
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq)]
 pub struct EncodedList(pub String);
+
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq)]
+pub struct BitstringStatusListEncodedList(pub String);
 
 /// A decoded [revocation list][EncodedList].
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -226,6 +306,44 @@ impl StatusList2021 {
     }
 }
 
+impl BitstringStatusList {
+    /// Construct a new empty [BitstringStatusList] for the given status purpose.
+    pub fn new(len: usize, status_purpose: impl Into<String>) -> Result<Self, NewStatusListError> {
+        Ok(BitstringStatusList {
+            status_purpose: OneOrMany::One(status_purpose.into()),
+            encoded_list: BitstringStatusListEncodedList::new(len)
+                .map_err(NewStatusListError::EncodedList)?,
+            status_size: None,
+            status_message: None,
+            status_reference: None,
+            ttl: None,
+            more_properties: serde_json::Value::Null,
+        })
+    }
+
+    /// Set the status for a given index in the list.
+    pub fn set_status(&mut self, index: usize, status: bool) -> Result<(), SetStatusError> {
+        let mut list = List::try_from(&self.encoded_list)?;
+        let bitstring_len = list.0.len() * 8;
+        let mut bitstring = BitVec::<Lsb0, u8>::try_from_vec(list.0)
+            .map_err(|_| SetStatusError::ListTooLarge(bitstring_len))?;
+        if bitstring_len < MIN_BITSTRING_LENGTH {
+            return Err(SetStatusError::ListTooSmall(
+                bitstring_len,
+                MIN_BITSTRING_LENGTH,
+            ));
+        }
+        if let Some(mut bitref) = bitstring.get_mut(index) {
+            *bitref = status;
+        } else {
+            return Err(SetStatusError::OutOfBounds(index, bitstring_len));
+        }
+        list.0 = bitstring.into_vec();
+        self.encoded_list = BitstringStatusListEncodedList::try_from(&list)?;
+        Ok(())
+    }
+}
+
 #[derive(Error, Debug)]
 pub enum ListIterDecodeError {
     #[error("Unable to reference indexes: {0}")]
@@ -256,6 +374,8 @@ pub enum DecodeListError {
     Build(#[from] base64::DecodeError),
     #[error("Decompression: {0}")]
     Decompress(#[from] std::io::Error),
+    #[error("Invalid multibase encoding; expected base64url-no-pad prefix 'u'")]
+    InvalidMultibasePrefix,
 }
 
 #[derive(Error, Debug)]
@@ -268,6 +388,13 @@ impl Default for EncodedList {
     /// Generate a 16KB list of zeros.
     fn default() -> Self {
         Self(EMPTY_RLIST.to_string())
+    }
+}
+
+impl Default for BitstringStatusListEncodedList {
+    /// Generate a 16KB list of zeros as multibase base64url-no-pad.
+    fn default() -> Self {
+        Self(format!("u{}", EMPTY_RLIST))
     }
 }
 
@@ -295,16 +422,43 @@ impl EncodedList {
     }
 }
 
+impl BitstringStatusListEncodedList {
+    /// Construct a new empty [BitstringStatusListEncodedList] of a given bit length.
+    ///
+    /// Given length must be a multiple of 8.
+    pub fn new(bit_len: usize) -> Result<Self, NewEncodedListError> {
+        if bit_len % 8 != 0 {
+            return Err(NewEncodedListError::LengthMultiple8(bit_len));
+        }
+        let byte_len = bit_len / 8;
+        let vec: Vec<u8> = vec![0; byte_len];
+        let list = List(vec);
+        BitstringStatusListEncodedList::try_from(&list).map_err(NewEncodedListError::Encode)
+    }
+}
+
+fn decode_base64url_gzip(string: &str) -> Result<List, DecodeListError> {
+    let bytes = base64::decode_config(string, base64::URL_SAFE)?;
+    let mut data = Vec::new();
+    use flate2::bufread::GzDecoder;
+    use std::io::Read;
+    GzDecoder::new(bytes.as_slice()).read_to_end(&mut data)?;
+    Ok(List(data))
+}
+
+fn encode_base64url_gzip(list: &List) -> Result<String, EncodeListError> {
+    use flate2::{write::GzEncoder, Compression};
+    use std::io::Write;
+    let mut e = GzEncoder::new(Vec::new(), Compression::default());
+    e.write_all(&list.0)?;
+    let bytes = e.finish()?;
+    Ok(base64::encode_config(bytes, base64::URL_SAFE_NO_PAD))
+}
+
 impl TryFrom<&EncodedList> for List {
     type Error = DecodeListError;
     fn try_from(encoded_list: &EncodedList) -> Result<Self, Self::Error> {
-        let string = &encoded_list.0;
-        let bytes = base64::decode_config(string, base64::URL_SAFE)?;
-        let mut data = Vec::new();
-        use flate2::bufread::GzDecoder;
-        use std::io::Read;
-        GzDecoder::new(bytes.as_slice()).read_to_end(&mut data)?;
-        Ok(Self(data))
+        decode_base64url_gzip(&encoded_list.0)
         // TODO: streaming decode the revocation list, for less memory use for large bitvecs.
     }
 }
@@ -312,14 +466,36 @@ impl TryFrom<&EncodedList> for List {
 impl TryFrom<&List> for EncodedList {
     type Error = EncodeListError;
     fn try_from(list: &List) -> Result<Self, Self::Error> {
-        use flate2::{write::GzEncoder, Compression};
-        use std::io::Write;
-        let mut e = GzEncoder::new(Vec::new(), Compression::default());
-        e.write_all(&list.0)?;
-        let bytes = e.finish()?;
-        let string = base64::encode_config(bytes, base64::URL_SAFE_NO_PAD);
-        Ok(EncodedList(string))
+        Ok(EncodedList(encode_base64url_gzip(list)?))
     }
+}
+
+impl TryFrom<&BitstringStatusListEncodedList> for List {
+    type Error = DecodeListError;
+    fn try_from(encoded_list: &BitstringStatusListEncodedList) -> Result<Self, Self::Error> {
+        let string = encoded_list
+            .0
+            .strip_prefix('u')
+            .ok_or(DecodeListError::InvalidMultibasePrefix)?;
+        decode_base64url_gzip(string)
+    }
+}
+
+impl TryFrom<&List> for BitstringStatusListEncodedList {
+    type Error = EncodeListError;
+    fn try_from(list: &List) -> Result<Self, Self::Error> {
+        Ok(BitstringStatusListEncodedList(format!(
+            "u{}",
+            encode_base64url_gzip(list)?
+        )))
+    }
+}
+
+fn has_bitstring_status_list_context(credential: &Credential) -> bool {
+    credential.context.contains_uri(crate::DEFAULT_CONTEXT_V2)
+        || credential
+            .context
+            .contains_uri(CREDENTIALS_STATUS_V1_CONTEXT.into_str())
 }
 
 #[cfg_attr(target_arch = "wasm32", async_trait(?Send))]
@@ -579,6 +755,166 @@ impl CredentialStatus for StatusList2021Entry {
     }
 }
 
+#[cfg_attr(target_arch = "wasm32", async_trait(?Send))]
+#[cfg_attr(not(target_arch = "wasm32"), async_trait)]
+impl CredentialStatus for BitstringStatusListEntry {
+    /// Validate a credential's status according to [Bitstring Status List](https://www.w3.org/TR/vc-bitstring-status-list/#validate-algorithm).
+    async fn check(
+        &self,
+        credential: &Credential,
+        resolver: &dyn DIDResolver,
+        context_loader: &mut ContextLoader,
+    ) -> VerificationResult {
+        let mut result = VerificationResult::new();
+        let _issuer_id = match &credential.issuer {
+            Some(issuer) => issuer.get_id().clone(),
+            None => {
+                return result.with_error("Credential is missing issuer".to_string());
+            }
+        };
+        if !has_bitstring_status_list_context(credential) {
+            // TODO: support JSON-LD credentials defining the terms elsewhere.
+            return result.with_error(
+                "Missing expected context URI for credential using BitstringStatusList".to_string(),
+            );
+        }
+        if self.id == Some(URI::String(self.status_list_credential.clone())) {
+            return result.with_error(format!(
+                "Expected statusListCredential to be different from status id: {}",
+                self.status_list_credential
+            ));
+        }
+        let status_size = match self.status_size {
+            Some(0) => return result.with_error("Invalid statusSize: 0".to_string()),
+            Some(status_size) => status_size,
+            None => 1,
+        };
+        if status_size != 1 {
+            return result.with_error(format!(
+                "Unsupported statusSize: {}. Only statusSize 1 is supported",
+                status_size
+            ));
+        }
+        // Check the status list URL before attempting to load it.
+        match self.status_list_credential.split_once(':') {
+            Some(("https", _)) => (),
+            Some(("http", _)) => (),
+            // TODO: an option to allow other URL schemes.
+            Some((_scheme, _)) => {
+                return result
+                    .with_error(format!("Invalid schema: {}", self.status_list_credential))
+            }
+            _ => {
+                return result.with_error(format!("Invalid rsrc: {}", self.status_list_credential))
+            }
+        }
+        let status_list_credential = match load_credential(&self.status_list_credential).await {
+            Ok(credential) => credential,
+            Err(e) => {
+                return result.with_error(format!("Unable to fetch status list credential: {}", e));
+            }
+        };
+        let _list_issuer_id = match &status_list_credential.issuer {
+            Some(issuer) => issuer.get_id().clone(),
+            None => {
+                return result.with_error("Status list credential is missing issuer".to_string());
+            }
+        };
+
+        if let Err(e) = status_list_credential.validate() {
+            return result.with_error(format!("Invalid list credential: {}", e));
+        }
+        let vc_result = status_list_credential
+            .verify(None, resolver, context_loader)
+            .await;
+        for warning in vc_result.warnings {
+            result.warnings.push(format!("Status list: {}", warning));
+        }
+        if let Some(error) = vc_result.errors.into_iter().next() {
+            result.errors.push(format!("Status list: {}", error));
+            return result;
+        }
+        // Note: vc_result.checks is not checked here. It is assumed that default checks passed.
+
+        let status_list_credential =
+            match BitstringStatusListCredential::try_from(status_list_credential) {
+                Ok(credential) => credential,
+                Err(e) => {
+                    return result
+                        .with_error(format!("Unable to parse status list credential: {}", e));
+                }
+            };
+        if let Some(id) = status_list_credential.id {
+            if id != URI::String(self.status_list_credential.to_string()) {
+                return result.with_error(format!(
+                    "Status list credential id mismatch. statusListCredential: {}, id: {}",
+                    self.status_list_credential, id
+                ));
+            }
+        }
+        let BitstringStatusListSubject::BitstringStatusList(status_list) =
+            status_list_credential.credential_subject;
+        if !status_list.status_purpose.contains(&self.status_purpose) {
+            return result.with_error(format!(
+                "Status list purpose mismatch. credentialStatus: {}, statusListCredential: {:?}",
+                self.status_purpose, status_list.status_purpose
+            ));
+        }
+        if let Some(0) = status_list.status_size {
+            return result.with_error("Invalid status list statusSize: 0".to_string());
+        }
+        if let Some(status_size) = status_list.status_size {
+            if status_size != 1 {
+                return result.with_error(format!(
+                    "Unsupported status list statusSize: {}. Only statusSize 1 is supported",
+                    status_size
+                ));
+            }
+        }
+
+        let list = match List::try_from(&status_list.encoded_list) {
+            Ok(list) => list,
+            Err(e) => return result.with_error(format!("Unable to decode status list: {}", e)),
+        };
+        let credential_index = self.status_list_index.0;
+        use bitvec::prelude::*;
+        let bitstring = match BitVec::<Lsb0, u8>::try_from_vec(list.0) {
+            Ok(bitstring) => bitstring,
+            Err(list) => {
+                return result.with_error(format!(
+                    "Status list is too large for bitvec: {}",
+                    list.len()
+                ))
+            }
+        };
+        if bitstring.len() / status_size < MIN_BITSTRING_LENGTH {
+            return result.with_error(format!(
+                "Status list bitstring is too small: {}. Minimum entries: {}",
+                bitstring.len() / status_size,
+                MIN_BITSTRING_LENGTH
+            ));
+        }
+        let status = match bitstring.get(credential_index * status_size) {
+            Some(bitref) => *bitref,
+            None => {
+                return result
+                    .with_error("Credential index in status list is invalid.".to_string());
+            }
+        };
+        if status {
+            return match self.status_purpose.as_str() {
+                "revocation" => result.with_error("Credential is revoked.".to_string()),
+                "suspension" => result.with_error("Credential is suspended.".to_string()),
+                status_purpose => result.with_error(format!(
+                    "Credential status is set for purpose: {}",
+                    status_purpose
+                )),
+            };
+        }
+        result
+    }
+}
+
 #[derive(Error, Debug)]
 pub enum LoadResourceError {
     #[error("Error building HTTP client: {0}")]
@@ -614,6 +950,9 @@ async fn load_resource(url: &str) -> Result<Vec<u8>, LoadResourceError> {
         }
         crate::tests::EXAMPLE_STATUS_LIST_2021_URL => {
             return Ok(crate::tests::EXAMPLE_STATUS_LIST_2021.to_vec());
+        }
+        crate::tests::EXAMPLE_BITSTRING_STATUS_LIST_URL => {
+            return Ok(crate::tests::example_bitstring_status_list().await);
         }
         _ => {}
     }
@@ -825,6 +1164,49 @@ impl TryFrom<StatusList2021Credential> for Credential {
     }
 }
 
+/// Convert Credential to a [BitstringStatusListCredential], while
+/// [validating](https://www.w3.org/TR/vc-bitstring-status-list/#validate-algorithm) it.
+///
+/// Note: this is a lossy operation. Only known BitstringStatusListCredential fields are preserved.
+impl TryFrom<Credential> for BitstringStatusListCredential {
+    type Error = CredentialConversionError;
+    fn try_from(credential: Credential) -> Result<Self, Self::Error> {
+        if !has_bitstring_status_list_context(&credential) {
+            return Err(CredentialConversionError::MissingContext(
+                crate::DEFAULT_CONTEXT_V2,
+            ));
+        }
+        if !credential
+            .type_
+            .contains(&"BitstringStatusListCredential".to_string())
+        {
+            return Err(CredentialConversionError::MissingType(
+                "BitstringStatusListCredential",
+                credential.type_,
+            ));
+        }
+        let credential =
+            serde_json::to_value(credential).map_err(CredentialConversionError::ToValue)?;
+        let credential =
+            serde_json::from_value(credential).map_err(CredentialConversionError::FromValue)?;
+        Ok(credential)
+    }
+}
+
+impl TryFrom<BitstringStatusListCredential> for Credential {
+    type Error = CredentialConversionError;
+    fn try_from(credential: BitstringStatusListCredential) -> Result<Self, Self::Error> {
+        let mut credential =
+            serde_json::to_value(credential).map_err(CredentialConversionError::ToValue)?;
+        use serde_json::json;
+        credential["@context"] = json!([crate::DEFAULT_CONTEXT_V2]);
+        credential["type"] = json!(["VerifiableCredential", "BitstringStatusListCredential"]);
+        let credential =
+            serde_json::from_value(credential).map_err(CredentialConversionError::FromValue)?;
+        Ok(credential)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -837,6 +1219,15 @@ mod tests {
         let el = EncodedList::try_from(&list).unwrap();
         assert_eq!(EncodedList::default(), el);
         let decoded_list = List::try_from(&el).unwrap();
+        assert_eq!(decoded_list, list);
+    }
+
+    #[test]
+    fn bitstring_status_list_encoded_list() {
+        let list = List(vec![0; MIN_BITSTRING_LENGTH / 8]);
+        let encoded = BitstringStatusListEncodedList::try_from(&list).unwrap();
+        assert!(encoded.0.starts_with('u'));
+        let decoded_list = List::try_from(&encoded).unwrap();
         assert_eq!(decoded_list, list);
     }
 

@@ -64,6 +64,7 @@ pub const REVOCATION_LIST_2020_V1_CONTEXT: Iri =
     iri!("https://w3id.org/vc-revocation-list-2020/v1");
 pub const BBS_V1_CONTEXT: Iri = iri!("https://w3id.org/security/bbs/v1");
 pub const STATUS_LIST_2021_V1_CONTEXT: Iri = iri!("https://w3id.org/vc/status-list/2021/v1");
+pub const CREDENTIALS_STATUS_V1_CONTEXT: Iri = iri!("https://www.w3.org/ns/credentials/status/v1");
 pub const EIP712SIG_V0_1_CONTEXT: Iri =
     iri!("https://demo.spruceid.com/ld/eip712sig-2021/v0.1.jsonld");
 pub const EIP712SIG_V1_CONTEXT: Iri = iri!("https://w3id.org/security/suites/eip712sig-2021/v1");
@@ -217,6 +218,10 @@ lazy_static::lazy_static! {
     pub static ref STATUS_LIST_2021_V1_CONTEXT_DOCUMENT: RemoteDocument = load_static_context(
         STATUS_LIST_2021_V1_CONTEXT,
         ssi_contexts::STATUS_LIST_2021_V1
+    );
+    pub static ref CREDENTIALS_STATUS_V1_CONTEXT_DOCUMENT: RemoteDocument = load_static_context(
+        CREDENTIALS_STATUS_V1_CONTEXT,
+        ssi_contexts::CREDENTIALS_STATUS_V1
     );
     pub static ref EIP712SIG_V0_1_CONTEXT_DOCUMENT: RemoteDocument = load_static_context(
         EIP712SIG_V0_1_CONTEXT,
@@ -399,6 +404,9 @@ impl Loader<IriBuf, Span> for StaticLoader {
                         Ok(REVOCATION_LIST_2020_V1_CONTEXT_DOCUMENT.clone())
                     },
                     STATUS_LIST_2021_V1_CONTEXT => Ok(STATUS_LIST_2021_V1_CONTEXT_DOCUMENT.clone()),
+                    CREDENTIALS_STATUS_V1_CONTEXT => {
+                        Ok(CREDENTIALS_STATUS_V1_CONTEXT_DOCUMENT.clone())
+                    },
                     EIP712SIG_V0_1_CONTEXT => Ok(EIP712SIG_V0_1_CONTEXT_DOCUMENT.clone()),
                     BBS_V1_CONTEXT => Ok(BBS_V1_CONTEXT_DOCUMENT.clone()),
                     EIP712SIG_V1_CONTEXT => Ok(EIP712SIG_V1_CONTEXT_DOCUMENT.clone()),

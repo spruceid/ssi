@@ -200,6 +200,8 @@ pub struct Evidence {
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct Status {
+    #[serde(default = "empty_status_id")]
+    #[serde(skip_serializing_if = "is_empty_status_id")]
     pub id: URI,
     #[serde(rename = "type")]
     pub type_: String,
@@ -208,11 +210,20 @@ pub struct Status {
     pub property_set: Option<Map<String, Value>>,
 }
 
+fn empty_status_id() -> URI {
+    URI::String(String::new())
+}
+
+fn is_empty_status_id(id: &URI) -> bool {
+    id.as_str().is_empty()
+}
+
 #[derive(Debug, Serialize, Deserialize, Clone)]
 #[serde(tag = "type")]
 pub enum CheckableStatus {
     RevocationList2020Status(revocation::RevocationList2020Status),
     StatusList2021Entry(revocation::StatusList2021Entry),
+    BitstringStatusListEntry(revocation::BitstringStatusListEntry),
 }
 
 #[cfg_attr(target_arch = "wasm32", async_trait(?Send))]
@@ -1079,7 +1090,7 @@ impl Credential {
             // Clear the proof's context since it's now at the top level
             proof.context = Value::Null;
         }
-        
+
         self.proof = match self.proof.take() {
             None => Some(OneOrMany::One(proof)),
             Some(OneOrMany::One(existing_proof)) => {
@@ -1091,12 +1102,12 @@ impl Credential {
             }
         }
     }
-    
+
     /// Merge proof context into credential's top-level context
     fn merge_proof_context(&mut self, proof_context: &Value) {
         use ssi_ldp::Context;
         use std::collections::HashMap;
-        
+
         // Convert proof context Value to Context objects
         let proof_contexts: Vec<Context> = match proof_context {
             Value::String(s) => vec![Context::URI(URI::String(s.clone()))],
@@ -1124,11 +1135,11 @@ impl Credential {
             },
             _ => return, // Skip invalid context values
         };
-        
+
         if proof_contexts.is_empty() {
             return;
         }
-        
+
         // Merge into credential's context
         match &mut self.context {
             Contexts::One(existing_context) => {
@@ -1238,6 +1249,9 @@ impl CheckableStatus {
                 status.check(credential, resolver, context_loader).await
             }
             Self::StatusList2021Entry(status) => {
+                status.check(credential, resolver, context_loader).await
+            }
+            Self::BitstringStatusListEntry(status) => {
                 status.check(credential, resolver, context_loader).await
             }
         }
@@ -2133,6 +2147,8 @@ pub(crate) mod tests {
 
     pub const EXAMPLE_STATUS_LIST_2021_URL: &str = "https://example.com/credentials/status/3";
     pub const EXAMPLE_STATUS_LIST_2021: &[u8] = include_bytes!("../../tests/statusList.json");
+    pub const EXAMPLE_BITSTRING_STATUS_LIST_URL: &str =
+        "https://example.com/credentials/bitstring-status/3";
 
     pub const EXAMPLE_CREDENTIAL_SCHEMA_URL: &str =
         "https://purl.imsglobal.org/spec/clr/v2p0/schema/json/clr_v2p0_clrcredential_schema.json";
@@ -2140,6 +2156,35 @@ pub(crate) mod tests {
 
     const JWK_JSON: &str = include_str!("../../tests/rsa2048-2020-08-25.json");
     const JWK_JSON_BAR: &str = include_str!("../../tests/ed25519-2021-06-16.json");
+
+    pub(crate) async fn example_bitstring_status_list() -> Vec<u8> {
+        use crate::revocation::{
+            BitstringStatusList, BitstringStatusListCredential, BitstringStatusListSubject,
+            MIN_BITSTRING_LENGTH,
+        };
+
+        let key: JWK = serde_json::from_str(JWK_JSON).unwrap();
+        let resolver = &DIDExample;
+        let mut status_list = BitstringStatusList::new(MIN_BITSTRING_LENGTH, "revocation").unwrap();
+        status_list.set_status(1, true).unwrap();
+        let status_list_vc = BitstringStatusListCredential {
+            issuer: Issuer::URI(URI::String("did:example:12345".to_string())),
+            id: Some(URI::String(EXAMPLE_BITSTRING_STATUS_LIST_URL.to_string())),
+            credential_subject: BitstringStatusListSubject::BitstringStatusList(status_list),
+            more_properties: serde_json::Value::Null,
+        };
+        let mut vc = Credential::try_from(status_list_vc).unwrap();
+        vc.valid_from = Some(VCDateTime::from(ssi_ldp::now_ms()));
+        let mut proof_options = LinkedDataProofOptions::default();
+        proof_options.verification_method = Some(URI::String("did:example:12345#key1".to_string()));
+        let mut context_loader = ssi_json_ld::ContextLoader::default();
+        let proof = vc
+            .generate_proof(&key, &proof_options, resolver, &mut context_loader)
+            .await
+            .unwrap();
+        vc.add_proof(proof);
+        serde_json::to_vec(&vc).unwrap()
+    }
 
     #[test]
     fn credential_from_json() {
@@ -3038,6 +3083,66 @@ _:c14n0 <https://w3id.org/security#verificationMethod> <https://example.org/foo/
             "statusPurpose": "revocation",
             "statusListIndex": "1",
             "statusListCredential": EXAMPLE_STATUS_LIST_2021_URL
+          },
+          "credentialSubject": {
+            "id": "did:example:6789",
+            "type": "Person"
+          }
+        }))
+        .unwrap();
+        let mut context_loader = ssi_json_ld::ContextLoader::default();
+        let vres = revoked_credential
+            .check_status(&DIDExample, &mut context_loader)
+            .await;
+        println!("{:#?}", vres);
+        assert_ne!(vres.errors.len(), 0);
+    }
+
+    #[async_std::test]
+    async fn credential_bitstring_status_list() {
+        use serde_json::json;
+
+        let unrevoked_credential: Credential = serde_json::from_value(json!({
+          "@context": [
+            "https://www.w3.org/ns/credentials/v2"
+          ],
+          "id": "https://example.com/credentials/23894672394",
+          "type": ["VerifiableCredential"],
+          "issuer": "did:example:12345",
+          "validFrom": "2021-04-05T14:27:42Z",
+          "credentialStatus": {
+            "type": "BitstringStatusListEntry",
+            "statusPurpose": "revocation",
+            "statusListIndex": "94567",
+            "statusListCredential": EXAMPLE_BITSTRING_STATUS_LIST_URL
+          },
+          "credentialSubject": {
+            "id": "did:example:6789",
+            "type": "Person"
+          }
+        }))
+        .unwrap();
+        let mut context_loader = ssi_json_ld::ContextLoader::default();
+        let vres = unrevoked_credential
+            .check_status(&DIDExample, &mut context_loader)
+            .await;
+        println!("{:#?}", vres);
+        assert_eq!(vres.errors.len(), 0);
+
+        let revoked_credential: Credential = serde_json::from_value(json!({
+          "@context": [
+            "https://www.w3.org/ns/credentials/v2"
+          ],
+          "id": "https://example.com/credentials/23894672394",
+          "type": ["VerifiableCredential"],
+          "issuer": "did:example:12345",
+          "validFrom": "2021-04-05T14:27:42Z",
+          "credentialStatus": {
+            "id": "https://example.com/credentials/bitstring-status/3#1",
+            "type": "BitstringStatusListEntry",
+            "statusPurpose": "revocation",
+            "statusListIndex": "1",
+            "statusListCredential": EXAMPLE_BITSTRING_STATUS_LIST_URL
           },
           "credentialSubject": {
             "id": "did:example:6789",
