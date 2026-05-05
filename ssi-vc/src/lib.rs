@@ -71,8 +71,15 @@ pub struct Credential {
     pub proof: Option<OneOrMany<Proof>>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub expiration_date: Option<VCDateTime>,
+    /// `credentialStatus` per the W3C VC Data Model. The 1.x model
+    /// allowed a single object; the 2.0 model explicitly allows a
+    /// set (`OneOrMany<Status>`). We accept either to stay
+    /// spec-conformant for both versions — a single object
+    /// deserializes to `OneOrMany::One`, an array to
+    /// `OneOrMany::Many`. `Credential::check_status` walks every
+    /// entry independently and aggregates results.
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub credential_status: Option<Status>,
+    pub credential_status: Option<OneOrMany<Status>>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub terms_of_use: Option<Vec<TermsOfUse>>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -1153,7 +1160,17 @@ impl Credential {
         }
     }
 
-    /// Check the credentials [status](https://www.w3.org/TR/vc-data-model/#status)
+    /// Check the credential's [status](https://www.w3.org/TR/vc-data-model/#status).
+    ///
+    /// VC 2.0 explicitly allows `credentialStatus` to be a set of
+    /// entries (e.g., a separate revocation entry and suspension
+    /// entry). VC 1.1 producers in the wild use a single object.
+    /// Both shapes round-trip through `OneOrMany<Status>`; this
+    /// method walks every entry, aggregating each per-entry
+    /// `VerificationResult` (errors, warnings, structured `status`
+    /// rows) into one combined result. The `Check::Status` marker is
+    /// only appended once, after every entry has been processed
+    /// without errors.
     pub async fn check_status(
         &self,
         resolver: &dyn DIDResolver,
@@ -1163,28 +1180,47 @@ impl Credential {
             Some(ref status) => status,
             None => return VerificationResult::error("Missing credentialStatus"),
         };
-        let status_value = match serde_json::to_value(status.clone()) {
-            Ok(status) => status,
-            Err(e) => {
-                return VerificationResult::error(&format!(
-                    "Unable to convert credentialStatus: {}",
-                    e
-                ))
+
+        let mut result = VerificationResult::new();
+
+        for entry in status.into_iter() {
+            let status_value = match serde_json::to_value(entry.clone()) {
+                Ok(status) => status,
+                Err(e) => {
+                    result.errors.push(format!(
+                        "Unable to convert credentialStatus: {}",
+                        e
+                    ));
+                    return result;
+                }
+            };
+
+            let checkable_status: CheckableStatus =
+                match serde_json::from_value(status_value) {
+                    Ok(checkable_status) => checkable_status,
+                    Err(e) => {
+                        result.errors.push(format!(
+                            "Unable to parse credentialStatus: {}",
+                            e
+                        ));
+                        return result;
+                    }
+                };
+
+            let mut entry_result =
+                checkable_status.check(self, resolver, context_loader).await;
+            result.append(&mut entry_result);
+
+            // Stop on the first failing entry — the credential is
+            // already not honourable, no need to consult the rest of
+            // the list (and the rest may have unrelated network
+            // failures we don't want to mask the real revocation
+            // with).
+            if !result.errors.is_empty() {
+                return result;
             }
-        };
-        let checkable_status: CheckableStatus = match serde_json::from_value(status_value) {
-            Ok(checkable_status) => checkable_status,
-            Err(e) => {
-                return VerificationResult::error(&format!(
-                    "Unable to parse credentialStatus: {}",
-                    e
-                ))
-            }
-        };
-        let mut result = checkable_status.check(self, resolver, context_loader).await;
-        if !result.errors.is_empty() {
-            return result;
         }
+
         result.checks.push(Check::Status);
         result
     }
@@ -3024,6 +3060,15 @@ _:c14n0 <https://w3id.org/security#verificationMethod> <https://example.org/foo/
             .await;
         println!("{:#?}", verification_result);
         assert_eq!(verification_result.errors.len(), 0);
+        // RevocationList2020Status synthesizes statusPurpose
+        // = "revocation" since the type itself doesn't carry one.
+        assert_eq!(verification_result.status.len(), 1);
+        assert_eq!(
+            verification_result.status[0].entry_type,
+            "RevocationList2020Status"
+        );
+        assert_eq!(verification_result.status[0].status_purpose, "revocation");
+        assert!(!verification_result.status[0].is_set);
 
         // Verify revoked VC
         let verification_result = revoked_vc
@@ -3031,6 +3076,8 @@ _:c14n0 <https://w3id.org/security#verificationMethod> <https://example.org/foo/
             .await;
         println!("{:#?}", verification_result);
         assert_ne!(verification_result.errors.len(), 0);
+        assert_eq!(verification_result.status.len(), 1);
+        assert!(verification_result.status[0].is_set);
     }
 
     #[async_std::test]
@@ -3067,6 +3114,9 @@ _:c14n0 <https://w3id.org/security#verificationMethod> <https://example.org/foo/
             .await;
         println!("{:#?}", vres);
         assert_eq!(vres.errors.len(), 0);
+        assert_eq!(vres.status.len(), 1);
+        assert_eq!(vres.status[0].entry_type, "StatusList2021Entry");
+        assert!(!vres.status[0].is_set);
 
         let revoked_credential: Credential = serde_json::from_value(json!({
           "@context": [
@@ -3096,6 +3146,9 @@ _:c14n0 <https://w3id.org/security#verificationMethod> <https://example.org/foo/
             .await;
         println!("{:#?}", vres);
         assert_ne!(vres.errors.len(), 0);
+        assert_eq!(vres.status.len(), 1);
+        assert_eq!(vres.status[0].entry_type, "StatusList2021Entry");
+        assert!(vres.status[0].is_set);
     }
 
     #[async_std::test]
@@ -3129,6 +3182,16 @@ _:c14n0 <https://w3id.org/security#verificationMethod> <https://example.org/foo/
         println!("{:#?}", vres);
         assert_eq!(vres.errors.len(), 0);
 
+        // Structured outcome: an active credential should still
+        // emit a StatusCheckEntry with is_set=false so consumers
+        // can affirmatively render "active" rather than guessing
+        // from the absence of an error.
+        assert_eq!(vres.status.len(), 1);
+        assert_eq!(vres.status[0].entry_type, "BitstringStatusListEntry");
+        assert_eq!(vres.status[0].status_purpose, "revocation");
+        assert!(!vres.status[0].is_set);
+        assert_eq!(vres.status[0].status_list_index.as_deref(), Some("94567"));
+
         let revoked_credential: Credential = serde_json::from_value(json!({
           "@context": [
             "https://www.w3.org/ns/credentials/v2"
@@ -3156,6 +3219,142 @@ _:c14n0 <https://w3id.org/security#verificationMethod> <https://example.org/foo/
             .await;
         println!("{:#?}", vres);
         assert_ne!(vres.errors.len(), 0);
+
+        // Structured outcome on the revoked branch: human-readable
+        // error AND structured entry should both be present, so
+        // legacy consumers (errors only) and new consumers
+        // (status[]) both work.
+        assert_eq!(vres.status.len(), 1);
+        assert_eq!(vres.status[0].entry_type, "BitstringStatusListEntry");
+        assert_eq!(vres.status[0].status_purpose, "revocation");
+        assert!(vres.status[0].is_set);
+    }
+
+    #[async_std::test]
+    async fn credential_status_array_form() {
+        // VC 2.0 §4.9 explicitly allows credentialStatus to be a
+        // set. This test exercises a credential carrying two
+        // BitstringStatusListEntry rows in array form — one
+        // revocation-purpose entry pointing at an unset index
+        // (active), and one suspension-purpose entry also at an
+        // unset index. Both entries should round-trip through
+        // OneOrMany::Many, both should be checked, and both
+        // should appear in VerificationResult::status.
+        use serde_json::json;
+        let credential: Credential = serde_json::from_value(json!({
+          "@context": ["https://www.w3.org/ns/credentials/v2"],
+          "id": "https://example.com/credentials/array-status",
+          "type": ["VerifiableCredential"],
+          "issuer": "did:example:12345",
+          "validFrom": "2021-04-05T14:27:42Z",
+          "credentialStatus": [
+            {
+              "type": "BitstringStatusListEntry",
+              "statusPurpose": "revocation",
+              "statusListIndex": "94567",
+              "statusListCredential": EXAMPLE_BITSTRING_STATUS_LIST_URL
+            },
+            {
+              "type": "BitstringStatusListEntry",
+              "statusPurpose": "suspension",
+              "statusListIndex": "94568",
+              "statusListCredential": EXAMPLE_BITSTRING_STATUS_LIST_URL
+            }
+          ],
+          "credentialSubject": {
+            "id": "did:example:6789",
+            "type": "Person"
+          }
+        }))
+        .unwrap();
+
+        // Confirm OneOrMany::Many round-trip. If the field were
+        // still typed as Option<Status>, the from_value above
+        // would have failed.
+        match credential.credential_status {
+            Some(OneOrMany::Many(ref entries)) => assert_eq!(entries.len(), 2),
+            other => panic!("expected Many(2), got {:?}", other),
+        }
+
+        let mut context_loader = ssi_json_ld::ContextLoader::default();
+        let vres = credential
+            .check_status(&DIDExample, &mut context_loader)
+            .await;
+        println!("{:#?}", vres);
+        assert_eq!(vres.errors.len(), 0);
+
+        // Both entries should have been processed and recorded.
+        assert_eq!(vres.status.len(), 2);
+        assert_eq!(vres.status[0].status_purpose, "revocation");
+        assert!(!vres.status[0].is_set);
+        assert_eq!(vres.status[1].status_purpose, "suspension");
+        assert!(!vres.status[1].is_set);
+
+        // The Status check marker is appended exactly once even
+        // though we processed two entries.
+        assert_eq!(
+            vres.checks
+                .iter()
+                .filter(|c| matches!(c, Check::Status))
+                .count(),
+            1
+        );
+    }
+
+    #[async_std::test]
+    async fn credential_status_array_form_short_circuits_on_revoked() {
+        // When the first entry in an array-form credentialStatus
+        // is revoked, the second entry should NOT be processed —
+        // we don't want to hit the network for additional list
+        // fetches when the credential is already known to be
+        // dishonourable, and we don't want a second entry's
+        // unrelated network failure to mask a real revocation.
+        use serde_json::json;
+        let credential: Credential = serde_json::from_value(json!({
+          "@context": ["https://www.w3.org/ns/credentials/v2"],
+          "id": "https://example.com/credentials/array-status-revoked",
+          "type": ["VerifiableCredential"],
+          "issuer": "did:example:12345",
+          "validFrom": "2021-04-05T14:27:42Z",
+          "credentialStatus": [
+            {
+              "type": "BitstringStatusListEntry",
+              "statusPurpose": "revocation",
+              "statusListIndex": "1",
+              "statusListCredential": EXAMPLE_BITSTRING_STATUS_LIST_URL
+            },
+            {
+              // Pointing at an intentionally-bogus URL — if this
+              // entry were checked it would error on the network
+              // load. The short-circuit guarantees we never
+              // reach it.
+              "type": "BitstringStatusListEntry",
+              "statusPurpose": "suspension",
+              "statusListIndex": "0",
+              "statusListCredential": "https://nope.invalid/never-loaded"
+            }
+          ],
+          "credentialSubject": {
+            "id": "did:example:6789",
+            "type": "Person"
+          }
+        }))
+        .unwrap();
+
+        let mut context_loader = ssi_json_ld::ContextLoader::default();
+        let vres = credential
+            .check_status(&DIDExample, &mut context_loader)
+            .await;
+        println!("{:#?}", vres);
+
+        // Exactly one revocation error from the first entry,
+        // exactly one structured status row, and the second
+        // entry's nope.invalid URL did not get touched.
+        assert_eq!(vres.errors.len(), 1);
+        assert!(vres.errors[0].contains("revoked"));
+        assert_eq!(vres.status.len(), 1);
+        assert!(vres.status[0].is_set);
+        assert_eq!(vres.status[0].status_purpose, "revocation");
     }
 
     #[async_std::test]

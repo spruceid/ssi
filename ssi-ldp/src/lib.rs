@@ -77,6 +77,57 @@ pub struct VerificationResult {
     pub warnings: Vec<String>,
     /// Errors
     pub errors: Vec<String>,
+    /// Per-entry results for the credentialStatus check.
+    ///
+    /// Populated by the status-list verifiers in `ssi-vc::revocation`
+    /// when a credential carries one or more `credentialStatus`
+    /// entries. The shape preserves the entry type, claimed purpose
+    /// (e.g. `"revocation"` / `"suspension"`), and whether the bit
+    /// at the credential's index in the status list was set, so
+    /// downstream consumers can render structured UI ("this
+    /// credential was revoked" vs "suspended" vs "active") without
+    /// string-matching on the human-readable error text.
+    ///
+    /// Empty for credentials without a `credentialStatus`, and for
+    /// non-VC verification flows. Serialized only when non-empty
+    /// to avoid breaking existing wire consumers that pre-date this
+    /// field.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub status: Vec<StatusCheckEntry>,
+}
+
+/// Structured result for a single `credentialStatus` entry.
+///
+/// One of these is appended to `VerificationResult::status` for each
+/// status entry the verifier processes. When the bit is set
+/// (`is_set = true`) and the entry's purpose is `"revocation"` or
+/// `"suspension"`, the verifier ALSO records a human-readable error
+/// in `errors` for backwards compatibility with existing consumers.
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct StatusCheckEntry {
+    /// The `credentialStatus.type` value as it appeared on the
+    /// credential — e.g. `"BitstringStatusListEntry"`,
+    /// `"StatusList2021Entry"`, `"RevocationList2020Status"`.
+    pub entry_type: String,
+    /// The `statusPurpose` claimed by the entry. Standard values are
+    /// `"revocation"` and `"suspension"`; the spec allows arbitrary
+    /// strings, so this is left as a free-form `String` rather than
+    /// an enum.
+    pub status_purpose: String,
+    /// `true` if the bit at the credential's index in the status
+    /// list bitstring is set. Combined with `status_purpose`, this
+    /// is what callers use to determine "revoked", "suspended", etc.
+    pub is_set: bool,
+    /// URL of the Status List Credential, if known. Always populated
+    /// for `BitstringStatusListEntry` and `StatusList2021Entry`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub status_list_credential: Option<String>,
+    /// The credential's index within the status list bitstring, as
+    /// the original (pre-parse) string so callers can round-trip it
+    /// without numeric loss.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub status_list_index: Option<String>,
 }
 
 impl VerificationResult {
@@ -89,6 +140,7 @@ impl VerificationResult {
             checks: vec![],
             warnings: vec![],
             errors: vec![err.to_string()],
+            status: vec![],
         }
     }
 
@@ -96,10 +148,18 @@ impl VerificationResult {
         self.checks.append(&mut other.checks);
         self.warnings.append(&mut other.warnings);
         self.errors.append(&mut other.errors);
+        self.status.append(&mut other.status);
     }
 
     pub fn with_error(mut self, error: String) -> Self {
         self.errors.push(error);
+        self
+    }
+
+    /// Attach a structured `StatusCheckEntry` to this result. Used
+    /// by the `credentialStatus` verifiers in `ssi-vc::revocation`.
+    pub fn with_status(mut self, entry: StatusCheckEntry) -> Self {
+        self.status.push(entry);
         self
     }
 }
@@ -111,11 +171,13 @@ impl From<Result<VerificationWarnings, Error>> for VerificationResult {
                 checks: vec![],
                 warnings,
                 errors: vec![],
+                status: vec![],
             },
             Err(error) => Self {
                 checks: vec![],
                 warnings: vec![],
                 errors: vec![error.to_string()],
+                status: vec![],
             },
         }
     }

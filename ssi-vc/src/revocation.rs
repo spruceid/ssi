@@ -13,7 +13,7 @@ use ssi_json_ld::{
     ContextLoader, CREDENTIALS_STATUS_V1_CONTEXT, REVOCATION_LIST_2020_V1_CONTEXT,
     STATUS_LIST_2021_V1_CONTEXT,
 };
-use ssi_ldp::VerificationResult;
+use ssi_ldp::{StatusCheckEntry, VerificationResult};
 use thiserror::Error;
 
 #[allow(clippy::upper_case_acronyms)]
@@ -623,6 +623,18 @@ impl CredentialStatus for RevocationList2020Status {
                     .with_error("Credential index in revocation list is invalid.".to_string());
             }
         };
+
+        // Structured outcome. RevocationList2020 doesn't carry a
+        // status_purpose field, so we synthesize "revocation" — that's
+        // the only purpose this entry type ever expressed.
+        result.status.push(StatusCheckEntry {
+            entry_type: "RevocationList2020Status".to_string(),
+            status_purpose: "revocation".to_string(),
+            is_set: revoked,
+            status_list_credential: Some(self.revocation_list_credential.clone()),
+            status_list_index: Some(self.revocation_list_index.0.to_string()),
+        });
+
         if revoked {
             return result.with_error("Credential is revoked.".to_string());
         }
@@ -748,8 +760,28 @@ impl CredentialStatus for StatusList2021Entry {
                     .with_error("Credential index in revocation list is invalid.".to_string());
             }
         };
+
+        // Mirror the BitstringStatusListEntry path: emit a structured
+        // entry alongside the (possibly empty) error so consumers can
+        // distinguish revoked / suspended / active without parsing
+        // the human-readable error text.
+        result.status.push(StatusCheckEntry {
+            entry_type: "StatusList2021Entry".to_string(),
+            status_purpose: self.status_purpose.clone(),
+            is_set: revoked,
+            status_list_credential: Some(self.status_list_credential.clone()),
+            status_list_index: Some(self.status_list_index.0.to_string()),
+        });
+
         if revoked {
-            return result.with_error("Credential is revoked.".to_string());
+            return match self.status_purpose.as_str() {
+                "revocation" => result.with_error("Credential is revoked.".to_string()),
+                "suspension" => result.with_error("Credential is suspended.".to_string()),
+                status_purpose => result.with_error(format!(
+                    "Credential status is set for purpose: {}",
+                    status_purpose
+                )),
+            };
         }
         result
     }
@@ -901,6 +933,19 @@ impl CredentialStatus for BitstringStatusListEntry {
                     .with_error("Credential index in status list is invalid.".to_string());
             }
         };
+
+        // Record the structured outcome before deciding whether to
+        // attach an error. Downstream consumers can read
+        // `result.status` for an unambiguous purpose+is_set result
+        // without parsing the human-readable error string.
+        result.status.push(StatusCheckEntry {
+            entry_type: "BitstringStatusListEntry".to_string(),
+            status_purpose: self.status_purpose.clone(),
+            is_set: status,
+            status_list_credential: Some(self.status_list_credential.clone()),
+            status_list_index: Some(self.status_list_index.0.to_string()),
+        });
+
         if status {
             return match self.status_purpose.as_str() {
                 "revocation" => result.with_error("Credential is revoked.".to_string()),
