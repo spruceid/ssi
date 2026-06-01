@@ -35,4 +35,11 @@ static-iref.workspace = true
 xsd-types.workspace = true
 tokio = { version = "1.0", features = ["macros"] }
 futures = "0.3"
-hyper = { version = "0.14", features = ["server", "client", "http1", "stream"] }
+hyper = { version = "0.14", features = [
+    "server",
+    "client",
+    "http1",
+    "stream",
+    "tcp",
+    "runtime",
+] }
