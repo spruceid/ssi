@@ -244,7 +244,7 @@ mod tests {
     // localhost web server for serving did:web DID documents.
     // TODO: pass arguments here instead of using const
     fn web_server() -> Result<(String, impl FnOnce() -> Result<(), ()>), hyper::Error> {
-        use http::header::{HeaderValue, CONTENT_TYPE};
+        use hyper::header::{HeaderValue, CONTENT_TYPE};
         use hyper::service::{make_service_fn, service_fn};
         use hyper::{Body, Response, Server};
         let addr = ([127, 0, 0, 1], 0).into();

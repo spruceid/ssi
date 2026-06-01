@@ -22,6 +22,11 @@
 //! $ cargo run --example status_list_server -- -t application/vc+ld+json examples/files/local-status-list-credential.jsonld
 //! serving /#statusList at 127.0.0.1:3000...
 //! ```
+
+// `reqwest` 0.13 nests its response futures more deeply, pushing the layout of
+// this example's async `main` past the default recursion limit.
+#![recursion_limit = "256"]
+
 use clap::Parser;
 use core::fmt;
 use ssi_claims_core::VerificationParameters;

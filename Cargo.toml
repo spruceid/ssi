@@ -112,6 +112,7 @@ contextual = "0.1.6"
 lazy_static = "1.4.0"
 indexmap = "2.0.0"
 uuid = "1.9"
+reqwest = { version = "0.13", default-features = false }
 
 [features]
 default = [

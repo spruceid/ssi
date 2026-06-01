@@ -1,6 +1,6 @@
 [package]
 name = "ssi-dids-core"
-version = "0.3.0"
+version = "0.3.1"
 edition = "2021"
 authors = ["Spruce Systems, Inc."]
 license = "Apache-2.0"
@@ -32,14 +32,11 @@ pin-project.workspace = true
 ssi-jwk.workspace = true
 
 # for the `http` feature.
-reqwest = { version = "0.11", default-features = false, features = [
-    "json",
-    "rustls-tls",
-], optional = true }
+reqwest = { workspace = true, features = ["json", "rustls"], optional = true }
 percent-encoding = { version = "2.1", optional = true }
 
 [target.'cfg(target_os = "android")'.dependencies.reqwest]
-version = "0.11"
+workspace = true
 features = ["json", "native-tls-vendored"]
 
 [dev-dependencies]

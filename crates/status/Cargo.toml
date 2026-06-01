@@ -1,6 +1,6 @@
 [package]
 name = "ssi-status"
-version = "0.8.0"
+version = "0.8.1"
 edition = "2021"
 authors = ["Spruce Systems, Inc."]
 license = "Apache-2.0"
@@ -28,7 +28,7 @@ serde_json.workspace = true
 rdf-types.workspace = true
 xsd-types.workspace = true
 log.workspace = true
-reqwest = "0.12.3"
+reqwest = { workspace = true, features = ["rustls"] }
 parking_lot = "0.12.1"
 flate2 = "1.0.28"
 
