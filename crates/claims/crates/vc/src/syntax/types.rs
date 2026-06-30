@@ -51,6 +51,21 @@ impl<B, T> Types<B, T> {
     }
 }
 
+impl<B: RequiredTypeSet, T> Types<B, T> {
+    pub fn contains(&self, ty: &str) -> bool {
+        B::REQUIRED_TYPES.contains(&ty) || self.0.iter().any(|t| t == ty)
+    }
+
+    pub fn insert(&mut self, ty: String) -> bool {
+        if self.contains(&ty) {
+            false
+        } else {
+            self.0.push(ty);
+            true
+        }
+    }
+}
+
 impl<B: RequiredType, T> Types<B, T> {
     pub fn to_json_ld_types(&'_ self) -> JsonLdTypes<'_> {
         JsonLdTypes::new(&[B::REQUIRED_TYPE], Cow::Borrowed(&self.0))
