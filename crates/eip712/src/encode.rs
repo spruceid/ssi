@@ -252,7 +252,7 @@ impl TypeDefinition {
         let mut referenced_types = HashMap::new();
         gather_referenced_struct_types(self, types, &mut referenced_types)?;
         let mut types: Vec<(&String, &TypeDefinition)> = referenced_types.into_iter().collect();
-        types.sort_by(|(name1, _), (name2, _)| name1.cmp(name2));
+        types.sort_by_key(|(name1, _)| *name1);
         for (name, type_) in types {
             encode_type_single(name, type_, &mut string);
         }

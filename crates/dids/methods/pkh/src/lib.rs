@@ -339,12 +339,10 @@ async fn resolve_bip122(did: &DID, account_address: &str, reference: &str) -> Re
                 ));
             }
         }
-        REFERENCE_BIP122_DOGECOIN_MAINNET => {
-            if !account_address.starts_with('D') {
-                return Err(Error::InvalidMethodSpecificId(
-                    did.method_specific_id().to_owned(),
-                ));
-            }
+        REFERENCE_BIP122_DOGECOIN_MAINNET if !account_address.starts_with('D') => {
+            return Err(Error::InvalidMethodSpecificId(
+                did.method_specific_id().to_owned(),
+            ));
         }
         _ => {
             // Unknown network address: no prefix hash check
