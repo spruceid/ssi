@@ -247,6 +247,9 @@ ssi-bbs = { workspace = true, optional = true }
 xsd-types.workspace = true                      # public reexport
 document-features = "0.2"
 
+# just for the docs.
+ssi-vc.workspace = true
+
 [dev-dependencies]
 async-std = { workspace = true, features = ["attributes"] }
 uuid = { workspace = true, features = ["v4", "serde"] }
