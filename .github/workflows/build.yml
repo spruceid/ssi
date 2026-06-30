@@ -37,7 +37,7 @@ jobs:
           cache-on-failure: "true"
       - uses: taiki-e/install-action@v2
         with:
-          tool: cargo-rdme
+          tool: cargo-rdme@1.5.1 # 2.x.x currently requires nightly.
       - uses: taiki-e/install-action@v2
         with:
           tool: cargo-deny
