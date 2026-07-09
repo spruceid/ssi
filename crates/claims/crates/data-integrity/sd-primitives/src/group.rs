@@ -13,7 +13,7 @@ use ssi_rdf::{urdna2015::NormalizingSubstitution, LexicalInterpretation};
 use crate::{
     canonicalize::label_replacement_canonicalize_nquads,
     select::{select_canonical_nquads, SelectError},
-    skolemize::{expanded_to_deskolemized_nquads, SkolemError, Skolemize},
+    skolemize::{compact_to_deskolemized_nquads, SkolemError, Skolemize},
 };
 
 #[derive(Debug, thiserror::Error)]
@@ -44,11 +44,20 @@ where
 {
     let mut skolemize = Skolemize::default();
 
-    let (skolemized_expanded_document, skolemized_compact_document) =
+    let (_skolemized_expanded_document, skolemized_compact_document) =
         skolemize.compact_document(loader, document).await?;
 
-    let deskolemized_quads =
-        expanded_to_deskolemized_nquads(&skolemize.urn_scheme, &skolemized_expanded_document)?;
+    // Serialize the full document with `to_rdf`, the same serializer the
+    // per-group selection uses. `to_lexical_quads` rewrites context-coerced
+    // literal datatypes to the canonical `http://…`, while `to_rdf` keeps the
+    // as-signed form. Since group membership is exact-quad equality, both sides
+    // must use the same serializer or coerced literals drop out of the groups.
+    let deskolemized_quads = compact_to_deskolemized_nquads(
+        loader,
+        &skolemize.urn_scheme,
+        skolemized_compact_document.clone(),
+    )
+    .await?;
 
     let (quads, label_map) =
         label_replacement_canonicalize_nquads(label_map_factory_function, &deskolemized_quads);

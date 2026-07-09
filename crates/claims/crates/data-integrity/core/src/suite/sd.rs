@@ -30,6 +30,16 @@ impl SelectionError {
 pub trait SelectiveCryptographicSuite: CryptographicSuite {
     /// Options specifying what claims to select and how.
     type SelectionOptions;
+
+    /// Whether this suite can derive a selectively-disclosed proof.
+    ///
+    /// Concrete SD suites are always selective (default `true`). Umbrella suites
+    /// like `AnySuite` override this to check their runtime variant. Used by
+    /// [`DataIntegrity::select`](crate::DataIntegrity::select) to find the lone
+    /// derivable proof in a proof set.
+    fn is_selective(&self) -> bool {
+        true
+    }
 }
 
 /// Cryptographic suite with selective disclosure capabilities on a given type

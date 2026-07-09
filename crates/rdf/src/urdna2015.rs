@@ -437,12 +437,16 @@ pub fn hash_n_degree_quads(
             // 5.4.4
             for related in permutation {
                 // 5.4.4.1
+                // If `related` already has a canonical identifier, append it to
+                // the path directly; it must not go through the recursion list,
+                // which would re-issue a temporary id and corrupt the path for
+                // symmetric/duplicate blank node structures. RDFC-1.0 §4.8
+                // (Hash N-Degree Quads), step 5.4.4.1.
                 if let Some(canonical_identifier) = normalization_state
                     .canonical_issuer
                     .find_issued_identifier(related)
-                    .as_ref()
                 {
-                    recursion_list.push((*canonical_identifier).to_owned());
+                    path.push_str(canonical_identifier.as_str());
                 // 5.4.4.2
                 } else {
                     // 5.4.4.2.1

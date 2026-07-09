@@ -56,7 +56,12 @@ pub fn label_replacement_canonicalize_nquads(
         .iter()
         .map(|quad| relabel_quad(&label_map, quad.as_lexical_quad_ref()))
         .collect();
-    canonical_quads.sort();
+    // RDFC-1.0 order is over the serialized N-Quad lines, not the structural
+    // `LexicalQuad` order. They diverge when subjects mix IRIs and blank nodes
+    // (`<` sorts before `_`, but structural Ord puts blank nodes first), which
+    // desyncs `mandatory_indexes` from the order the verifier reconstructs. Sort
+    // by the N-Quad string to match the verifier.
+    canonical_quads.sort_by_cached_key(|quad| ssi_rdf::NQuadsStatement(quad).to_string());
     canonical_quads.dedup();
 
     (canonical_quads, label_map)

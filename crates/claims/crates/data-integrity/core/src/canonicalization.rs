@@ -1,8 +1,13 @@
 use digest::Digest;
 use std::marker::PhantomData;
 
-use ssi_json_ld::{Expandable, JsonLdLoaderProvider, JsonLdNodeObject};
-use ssi_rdf::{AnyLdEnvironment, LdEnvironment};
+use rdf_types::{generator, Quad};
+use serde::Serialize;
+use ssi_json_ld::{
+    syntax::Value, Expandable, JsonLdLoaderProvider, JsonLdNodeObject, JsonLdProcessor,
+    RemoteDocument,
+};
+use ssi_rdf::{urdna2015, LexicalQuad};
 
 use crate::{
     hashing::ConcatOutputSize,
@@ -32,7 +37,7 @@ impl<S: CryptographicSuite> standard::TransformationAlgorithm<S>
 impl<S, T, C> standard::TypedTransformationAlgorithm<S, T, C> for CanonicalizeClaimsAndConfiguration
 where
     S: SerializeCryptographicSuite,
-    T: JsonLdNodeObject + Expandable,
+    T: JsonLdNodeObject + Expandable + Serialize,
     C: JsonLdLoaderProvider,
 {
     async fn transform(
@@ -42,17 +47,27 @@ where
         _verification_method: &S::VerificationMethod,
         _transformation_options: TransformationOptions<S>,
     ) -> Result<Self::Output, TransformationError> {
-        let mut ld = LdEnvironment::default();
-
-        let expanded = data
-            .expand_with(&mut ld, context.loader())
-            .await
+        // Serialize to RDF with `to_rdf`, which keeps the context's `@type`
+        // coercion on literals. `canonical_form_of` rewrites coerced datatypes to
+        // the canonical `http://…`, which no longer match what the issuer signed.
+        // Then apply RDFC-1.0 (urdna2015).
+        let value: Value = json_syntax::to_value(data)
             .map_err(|e| TransformationError::JsonLdExpansion(e.to_string()))?;
 
+        let mut generator = generator::Blank::new();
+        let quads: Vec<LexicalQuad> = RemoteDocument::new(None, None, value)
+            .to_rdf(&mut generator, context.loader())
+            .await
+            .map_err(|e| TransformationError::JsonLdExpansion(e.to_string()))?
+            .cloned_quads()
+            .map(|quad| quad.map_predicate(|p| p.into_iri().unwrap()))
+            .collect();
+
+        let claims =
+            urdna2015::normalize(quads.iter().map(Quad::as_lexical_quad_ref)).into_nquads_lines();
+
         Ok(CanonicalClaimsAndConfiguration {
-            claims: ld
-                .canonical_form_of(&expanded)
-                .map_err(TransformationError::JsonLdDeserialization)?,
+            claims,
             configuration: proof_configuration
                 .expand(context, data)
                 .await

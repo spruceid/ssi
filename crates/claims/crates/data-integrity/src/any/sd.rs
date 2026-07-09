@@ -41,6 +41,17 @@ impl From<AnySelectionOptions> for ssi_data_integrity_suites::ecdsa_sd_2023::Der
 
 impl SelectiveCryptographicSuite for AnySuite {
     type SelectionOptions = AnySelectionOptions;
+
+    /// Only the SD base-proof variants are derivable. Mirrors [`Self::select`].
+    fn is_selective(&self) -> bool {
+        match self {
+            #[cfg(all(feature = "w3c", feature = "secp256r1"))]
+            Self::EcdsaSd2023 => true,
+            #[cfg(all(feature = "w3c", feature = "bbs"))]
+            Self::Bbs2023 => true,
+            _ => false,
+        }
+    }
 }
 
 impl<T, P> CryptographicSuiteSelect<T, P> for AnySuite

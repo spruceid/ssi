@@ -1,0 +1,97 @@
+{
+  "@context": {
+    "@version": 1.1,
+    "@protected": true,
+    "name": "https://schema.org/name",
+    "description": "https://schema.org/description",
+    "image": {
+      "@id": "https://schema.org/image",
+      "@type": "@id"
+    },
+    "FirstResponderCredential": {
+      "@id": "https://w3id.org/first-responder#FirstResponderCredential",
+      "@context": {
+        "@version": 1.1,
+        "@protected": true,
+        "id": "@id",
+        "type": "@type",
+        "description": "https://schema.org/description",
+        "name": "https://schema.org/name",
+        "identifier": "https://schema.org/identifier",
+        "image": {
+          "@id": "https://schema.org/image",
+          "@type": "@id"
+        }
+      }
+    },
+    "deploymentDaysNumeric": "https://w3id.org/first-responder#deploymentDaysNumeric",
+    "deploymentStartDate": "https://w3id.org/first-responder#deploymentStartDate",
+    "deploymentSummary": "https://w3id.org/first-responder#deploymentSummary",
+    "homeUnit": "https://w3id.org/first-responder#homeUnit",
+    "jobTitleOrRole": "https://w3id.org/first-responder#jobTitleOrRole",
+    "jobTitleOrRoleName": "https://w3id.org/first-responder#jobTitleOrRoleName",
+    "jurisdictionName": "https://w3id.org/first-responder#jurisdictionName",
+    "organizationAffiliationCategoryCode": "https://w3id.org/first-responder#organizationAffiliationCategoryCode",
+    "organizationName": "https://w3id.org/first-responder#organizationName",
+    "ownerInformation": "https://w3id.org/first-responder#ownerInformation",
+    "FirstResponder": {
+      "@id": "https://w3id.org/first-responder#FirstResponder",
+      "@context": {
+        "@version": 1.1,
+        "@protected": true,
+        "id": "@id",
+        "type": "@type",
+        "badge": "https://w3id.org/first-responder#badge",
+        "badgeJobTitleText": "https://w3id.org/first-responder#badgeJobTitleText",
+        "experience": "https://w3id.org/first-responder#experience",
+        "skill": "https://w3id.org/first-responder#skill",
+        "training": "https://w3id.org/first-responder#training"
+      }
+    },
+    "agencySymbol": "https://w3id.org/first-responder#agencySymbol",
+    "cardPicture": "https://w3id.org/first-responder#cardPicture",
+    "eAssuranceLevelCode": "https://w3id.org/first-responder#eAssuranceLevelCode",
+    "fips201ConformanceCode": "https://w3id.org/first-responder#fips201ConformanceCode",
+    "idCategoryCodeAbstract": "https://w3id.org/first-responder#idCategoryCodeAbstract",
+    "nameOnCardText": "https://w3id.org/first-responder#nameOnCardText",
+    "personIDCard": "https://w3id.org/first-responder#personIDCard",
+    "signatureAuthorityName": "https://w3id.org/first-responder#signatureAuthorityName",
+    "Badge": {
+      "@id": "https://w3id.org/first-responder#Badge",
+      "@context": {
+        "@version": 1.1,
+        "@protected": true,
+        "id": "@id",
+        "type": "@type",
+        "badgeJobTitleText": "https://w3id.org/first-responder#badgeJobTitleText",
+        "personHumanResource": "https://w3id.org/first-responder#personHumanResource"
+      }
+    },
+    "Skill": {
+      "@id": "https://w3id.org/first-responder#Skill",
+      "@context": {
+        "@version": 1.1,
+        "@protected": true,
+        "id": "@id",
+        "type": "@type",
+        "skillAcquiredCategoryCode": "https://w3id.org/first-responder#skillAcquiredCategoryCode",
+        "skillDescriptionText": "https://w3id.org/first-responder#skillDescriptionText",
+        "skillName": "https://w3id.org/first-responder#skillName",
+        "skillUseHistoryText": "https://w3id.org/first-responder#skillUseHistoryText"
+      }
+    },
+    "Training": {
+      "@id": "https://w3id.org/first-responder#Training",
+      "@context": {
+        "@version": 1.1,
+        "@protected": true,
+        "id": "@id",
+        "type": "@type",
+        "courseLevelText": "https://w3id.org/first-responder#courseLevelText",
+        "courseText": "https://w3id.org/first-responder#courseText",
+        "isIssuedCertificationIndicator": "https://w3id.org/first-responder#isIssuedCertificationIndicator",
+        "trainingDuration": "https://w3id.org/first-responder#trainingDuration"
+      }
+    }
+  }
+}

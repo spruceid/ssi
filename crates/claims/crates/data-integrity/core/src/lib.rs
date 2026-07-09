@@ -90,15 +90,22 @@ impl<T, S: CryptographicSuite> DataIntegrity<T, S> {
     where
         S: CryptographicSuiteSelect<T, P>,
     {
-        match self.proofs.split_first() {
-            Some((proof, [])) => {
+        // A proof set may hold several proofs over the same claims (e.g. a
+        // full-document `ecdsa-rdfc-2019` signature next to an `ecdsa-sd-2023`
+        // base proof). Only the SD base proof can be derived from, so we pick
+        // the unique selective proof and ignore its non-selective companions.
+        let mut selective = self.proofs.iter().filter(|p| p.suite().is_selective());
+        match (selective.next(), selective.next()) {
+            (Some(proof), None) => {
                 proof
                     .suite()
                     .select(&self.claims, proof.borrowed(), params, options)
                     .await
             }
-            Some(_) => Err(SelectionError::AmbiguousProof),
-            None => Err(SelectionError::MissingProof),
+            // More than one derivable proof.
+            (Some(_), Some(_)) => Err(SelectionError::AmbiguousProof),
+            // No selective proof to derive from.
+            (None, _) => Err(SelectionError::MissingProof),
         }
     }
 
