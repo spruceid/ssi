@@ -1,5 +1,10 @@
 use keccak_hash::keccak;
 
+/// Compute the keccak256 hash of arbitrary bytes.
+pub fn keccak256(data: &[u8]) -> [u8; 32] {
+    keccak(data).to_fixed_bytes()
+}
+
 pub fn bytes_to_lowerhex(bytes: &[u8]) -> String {
     use std::fmt::Write;
     bytes.iter().fold("0x".to_owned(), |mut s, byte| {

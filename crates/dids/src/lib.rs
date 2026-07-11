@@ -307,7 +307,7 @@ impl DIDResolver for AnyDidMethod {
     ) -> Result<resolution::Output<Vec<u8>>, resolution::Error> {
         match did.method_name() {
             "ethr" => {
-                ethr::DIDEthr
+                ethr::DIDEthr::<()>::default()
                     .resolve_method_representation(did.method_specific_id(), options)
                     .await
             }
