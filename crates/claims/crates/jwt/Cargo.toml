@@ -20,7 +20,6 @@ ssi-jwk.workspace = true
 ssi-jws.workspace = true
 ssi-claims-core.workspace = true
 iref = { workspace = true, features = ["serde"] }
-serde_with = "2.3.2"
 hashbrown = "0.14.3"
 slab = "0.4.9"
 ordered-float = { version = "4.2.0", features = ["serde"] }
