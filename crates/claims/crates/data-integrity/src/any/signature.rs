@@ -166,12 +166,3 @@ impl IntoAnySignatureAlgorithm
         WithProtocol(self.0.into(), self.1.into())
     }
 }
-
-#[cfg(feature = "aleo")]
-impl IntoAnySignatureAlgorithm
-    for WithProtocol<ssi_jwk::Algorithm, ssi_verification_methods::protocol::Base58BtcMultibase>
-{
-    fn into_any_signature_algorithm(self) -> AnySignatureAlgorithmInstance {
-        WithProtocol(self.0.into(), self.1.into())
-    }
-}

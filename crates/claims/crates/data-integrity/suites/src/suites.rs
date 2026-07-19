@@ -9,20 +9,10 @@ mod dif;
 #[allow(unused_imports)]
 pub use dif::*;
 
-#[cfg(any(
-    feature = "aleo",
-    feature = "ethereum",
-    feature = "tezos",
-    feature = "solana"
-))]
+#[cfg(any(feature = "ethereum", feature = "tezos", feature = "solana"))]
 mod unspecified;
 
-#[cfg(any(
-    feature = "aleo",
-    feature = "ethereum",
-    feature = "tezos",
-    feature = "solana"
-))]
+#[cfg(any(feature = "ethereum", feature = "tezos", feature = "solana"))]
 #[allow(unused_imports)]
 pub use unspecified::*;
 

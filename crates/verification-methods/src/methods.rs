@@ -49,9 +49,6 @@ ssi_verification_methods_core::complete_verification_method_union! {
         #[cfg(feature = "tezos")]
         TezosMethod2021,
 
-        #[cfg(feature = "aleo")]
-        AleoMethod2021,
-
         BlockchainVerificationMethod2021,
 
         #[cfg(all(feature = "eip712", feature = "secp256k1"))]
@@ -88,8 +85,6 @@ impl AnyMethod {
             Self::P256PublicKeyBLAKE2BDigestSize20Base58CheckEncoded2021(_) => None,
             #[cfg(feature = "tezos")]
             Self::TezosMethod2021(m) => m.public_key_jwk().map(Cow::Borrowed),
-            #[cfg(feature = "aleo")]
-            Self::AleoMethod2021(_) => None,
             Self::BlockchainVerificationMethod2021(_) => None,
             #[cfg(all(feature = "eip712", feature = "secp256k1"))]
             Self::Eip712Method2021(_) => None,
@@ -189,10 +184,6 @@ impl SigningMethod<JWK, ssi_crypto::Algorithm> for AnyMethod {
             }
             #[cfg(feature = "tezos")]
             Self::TezosMethod2021(m) => m.sign_bytes(secret, algorithm.try_into()?, bytes),
-            #[cfg(feature = "aleo")]
-            Self::AleoMethod2021(m) => {
-                m.sign_bytes(secret, bytes) // FIXME: check key algorithm?
-            }
             Self::BlockchainVerificationMethod2021(m) => {
                 m.sign_bytes(secret, algorithm.try_into()?, bytes)
             }

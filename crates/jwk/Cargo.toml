@@ -26,20 +26,6 @@ ed25519 = ["ed25519-dalek", "rand", "getrandom"]
 ## Enable RSA keys.
 rsa = ["dep:rsa"]
 
-## Enable aleo ecosystem keys.
-##
-## Not compatible with WASM targets.
-aleo = [
-    "rand",
-    "blake2",
-    "snarkvm-dpc",
-    "snarkvm-algorithms",
-    "snarkvm-curves",
-    "snarkvm-utilities",
-    "snarkvm-parameters",
-    "bs58",
-]
-
 ## enable ripemd-160 hashing for keys, e.g. for bitcoin.
 ripemd-160 = ["ssi-crypto/ripemd-160", "secp256k1"]
 
@@ -82,16 +68,6 @@ num-derive = "0.3"
 ssi-multicodec.workspace = true
 linked-data.workspace = true
 json-syntax = { workspace = true, features = ["serde", "canonicalize"] }
-
-# Required only for aleo
-# All of these dependencies are out of date becaus `snarkvm` since dropped
-# support for the `Schnorr` scheme, required by aleo.
-blake2 = { version = "0.9", optional = true }
-snarkvm-dpc = { version = "0.7.9", optional = true }
-snarkvm-algorithms = { version = "0.7.9", optional = true }
-snarkvm-curves = { version = "0.7.9", optional = true }
-snarkvm-utilities = { version = "0.7.9", optional = true }
-snarkvm-parameters = { version = "0.7.9", optional = true }
 
 [target.'cfg(target_arch = "wasm32")'.dependencies]
 getrandom = { workspace = true, features = ["js"], optional = true }

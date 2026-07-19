@@ -13,17 +13,12 @@ default = ["eip", "ripemd-160", "ssi-jwk/secp256k1"]
 eip = ["ssi-jwk/eip"]
 ripemd-160 = ["ssi-jwk/ripemd-160"]
 
-## Enable aleo accounts.
-##
-## Not compatible with WASM targets.
-aleo = ["ssi-jwk/aleo", "bech32"]
 tezos = ["ssi-jwk/tezos"]
 
 [dependencies]
 thiserror = "1"
 ssi-jwk.workspace = true
 bs58 = { workspace = true, features = ["check"] }
-bech32 = { version = "0.8", optional = true }
 serde.workspace = true
 linked-data.workspace = true
 xsd-types.workspace = true

@@ -16,7 +16,6 @@ default = ["ripemd-160", "eip", "tezos"]
 ripemd-160 = ["ssi-jwk/ripemd-160", "ssi-caips/ripemd-160"]
 eip = ["ssi-jwk/eip", "ssi-caips/eip"]
 tezos = ["ssi-jwk/tezos", "ssi-caips/tezos"]
-aleo = ["ssi-jwk/aleo", "ssi-caips/aleo"]
 solana = []
 
 [dependencies]
@@ -30,7 +29,6 @@ serde = { workspace = true, features = ["derive"] }
 serde_json.workspace = true
 async-trait.workspace = true
 bs58 = { workspace = true, features = ["check"] }
-bech32 = "0.8"
 chrono = { workspace = true, features = ["serde"] }
 thiserror.workspace = true
 
