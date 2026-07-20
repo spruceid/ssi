@@ -9,11 +9,9 @@ repository = "https://github.com/spruceid/ssi/"
 documentation = "https://docs.rs/ssi-rdf/"
 
 [dependencies]
-iref.workspace = true
 rdf-types.workspace = true
 ssi-crypto.workspace = true
 linked-data.workspace = true
-serde.workspace = true
 indexmap.workspace = true
 combination = "0.1"
 

@@ -10,9 +10,7 @@ documentation = "https://docs.rs/ssi-core/"
 
 [dependencies]
 thiserror.workspace = true
-async-trait.workspace = true
 serde = { workspace = true, features = ["derive"] }
-pin-project.workspace = true
 
 [dev-dependencies]
 serde_json.workspace = true

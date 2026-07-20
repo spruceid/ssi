@@ -13,14 +13,8 @@ documentation = "https://docs.rs/did-key/"
 
 [features]
 default = ["secp256k1", "secp256r1"]
-secp256k1 = [
-	"k256",
-	"ssi-jwk/secp256k1"
-]
-secp256r1 = [
-	"p256",
-	"ssi-jwk/secp256r1"
-]
+secp256k1 = ["ssi-jwk/secp256k1"]
+secp256r1 = ["ssi-jwk/secp256r1"]
 secp384r1 = ["ssi-jwk/secp384r1"]
 bbs = ["ssi-jwk/bbs"]
 
@@ -33,11 +27,7 @@ bs58 = { workspace = true, features = ["check"] }
 multibase.workspace = true
 iref.workspace = true
 static-iref.workspace = true
-thiserror.workspace = true
 serde_json.workspace = true
-simple_asn1 = "^0.5.2"
-k256 = { workspace = true, optional = true, features = ["ecdsa"] }
-p256 = { workspace = true, optional = true, features = ["ecdsa"] }
 
 [dev-dependencies]
 ssi-jwk = { workspace = true, features = ["rsa"] }
@@ -51,3 +41,8 @@ json-syntax.workspace = true
 serde = { workspace = true, features = ["derive"] }
 async-std = { version = "1.9", features = ["attributes"] }
 rand_chacha.workspace = true
+
+[package.metadata.cargo-machete]
+# Used only through the `static_iref::iri!` macro, which expands to `::iref::`
+# paths; cargo-machete's textual scan doesn't see it.
+ignored = ["iref"]

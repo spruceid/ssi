@@ -12,13 +12,11 @@ documentation = "https://docs.rs/ssi-zcap-ld/"
 serde = { workspace = true, features = ["derive"] }
 serde_json.workspace = true
 json-syntax.workspace = true
-async-trait = "0.1"
 thiserror.workspace = true
 iref.workspace = true
 static-iref.workspace = true
 rdf-types.workspace = true
 ssi-jwk = { workspace = true, features = ["ed25519"] }
-ssi-core.workspace = true
 ssi-dids-core.workspace = true
 ssi-rdf.workspace = true
 ssi-json-ld.workspace = true

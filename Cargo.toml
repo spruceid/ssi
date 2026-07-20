@@ -211,7 +211,7 @@ ripemd-160 = ["ssi-jwk/ripemd-160", "ssi-dids/ripemd-160"]
 bbs = ["ssi-crypto/bbs", "ssi-claims/bbs", "ssi-bbs"]
 
 ## Use the Ring crate for crypto operations
-ring = ["ssi-jwk/ring", "ssi-jws/ring", "ssi-crypto/ring"]
+ring = ["ssi-jwk/ring", "ssi-claims/ring", "ssi-crypto/ring"]
 
 ## Enable DID resolution tests using [hyper](https://crates.io/crates/hyper) and [tokio](https://crates.io/crates/tokio).
 http-did = ["ssi-dids/http"]
@@ -226,7 +226,6 @@ example = ["ssi-dids/example"]
 ssi-core.workspace = true
 ssi-crypto.workspace = true
 ssi-jwk.workspace = true
-ssi-jws.workspace = true
 ssi-rdf.workspace = true
 ssi-json-ld.workspace = true
 ssi-security.workspace = true
@@ -243,9 +242,6 @@ ssi-ssh.workspace = true
 ssi-bbs = { workspace = true, optional = true }
 xsd-types.workspace = true                      # public reexport
 document-features = "0.2"
-
-# just for the docs.
-ssi-vc.workspace = true
 
 [dev-dependencies]
 async-std = { workspace = true, features = ["attributes"] }

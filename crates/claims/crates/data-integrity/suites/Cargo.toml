@@ -61,7 +61,6 @@ secp256r1 = [
 secp384r1 = [
     "ssi-data-integrity-core/secp384r1",
     "ssi-verification-methods/secp384r1",
-    "p384",
 ]
 
 ## Signature suites based on RSA.
@@ -79,7 +78,6 @@ rsa = ["ssi-verification-methods/rsa"]
 ##   - `P256BLAKE2BDigestSize20Base58CheckEncodedSignature2021` (requires `secp256r1`)
 tezos = [
     "serde_json",
-    "serde_jcs",
     "ssi-tzkey",
     "bs58",
     "ssi-verification-methods/tezos",
@@ -108,7 +106,6 @@ bbs = ["ssi-bbs", "ssi-verification-methods/bbs"]
 [dependencies]
 ssi-data-integrity-core.workspace = true
 ssi-verification-methods.workspace = true
-async-trait.workspace = true
 rdf-types.workspace = true
 xsd-types = { workspace = true, features = ["serde"] }
 # treeldr-rust-prelude.workspace = true
@@ -124,22 +121,13 @@ ssi-claims-core.workspace = true
 ssi-security.workspace = true
 ssi-tzkey = { workspace = true, optional = true }
 ssi-eip712.workspace = true
-ssi-caips.workspace = true
 ssi-multicodec.workspace = true
-chrono.workspace = true
 multibase.workspace = true
 iref.workspace = true
 thiserror.workspace = true
 static-iref.workspace = true
-locspan.workspace = true
 hex.workspace = true
 serde = { workspace = true, features = ["derive"] }
-pin-project.workspace = true
-derivative.workspace = true
-educe.workspace = true
-futures.workspace = true
-self_cell = "1.0.1"
-contextual.workspace = true
 lazy_static.workspace = true
 rand.workspace = true
 getrandom.workspace = true
@@ -150,13 +138,10 @@ base64.workspace = true
 # ed25519-dalek = { workspace = true, optional = true }
 k256 = { workspace = true, optional = true, features = ["ecdsa", "sha256"] }
 p256 = { workspace = true, optional = true, features = ["ecdsa"] }
-p384 = { workspace = true, optional = true, features = ["ecdsa"] }
-sha2 = { workspace = true, optional = true }
 
 # only needed by non LD suites, EIP-712 and BBS.
 json-syntax = { workspace = true, features = ["canonicalize"] }
 serde_json = { workspace = true, optional = true }
-serde_jcs = { workspace = true, optional = true }
 
 # Selective disclosure.
 ssi-di-sd-primitives.workspace = true

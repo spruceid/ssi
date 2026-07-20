@@ -8,32 +8,9 @@ description = "Core types and traits for Verifiable Claims in the `ssi` library.
 repository = "https://github.com/spruceid/ssi/"
 documentation = "https://docs.rs/ssi-claims/"
 
-[features]
-default = ["serde", "linked-data"]
-
-## Compatibility layer with the [`serde`] library.
-##
-## Adds claims serialization utilities.
-##
-## [`serde`]: <https://serde.rs/>
-serde = ["dep:serde"]
-
-## Compatibility layer with the [`linked-data`] library.
-##
-## Allows one to serialize verifiable LD claims.
-##
-## [`linked-data`]: <https://github.com/spruceid/linked-data-rs>
-linked-data = ["dep:linked-data"]
-
 [dependencies]
-ssi-core.workspace = true
 ssi-crypto.workspace = true
-educe.workspace = true
 thiserror.workspace = true
 chrono.workspace = true
 ssi-json-ld.workspace = true
 ssi-eip712.workspace = true
-
-serde = { workspace = true, optional = true }
-linked-data = { workspace = true, optional = true }
-

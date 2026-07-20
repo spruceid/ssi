@@ -40,10 +40,6 @@ serde = { workspace = true, features = ["derive"] }
 zeroize = { version = "1.5", features = ["zeroize_derive"] }
 bs58 = { workspace = true, features = ["check"] }
 digest = "0.9"
-iref.workspace = true
-static-iref.workspace = true
-async-trait.workspace = true
-pin-project.workspace = true
 hex.workspace = true
 
 [target.'cfg(target_arch = "wasm32")'.dependencies]
@@ -52,3 +48,8 @@ getrandom = { workspace = true, features = ["js"], optional = true }
 [package.metadata.docs.rs]
 all-features = true
 rustdoc-args = ["--cfg", "docsrs"]
+
+[package.metadata.cargo-machete]
+# Optional dep pulled in by the `secp256k1` and `bbs` features (and required for
+# wasm targets); it is a transitive enabler, never used directly in code.
+ignored = ["getrandom"]

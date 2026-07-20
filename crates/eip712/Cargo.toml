@@ -23,3 +23,7 @@ iref.workspace = true
 
 [dev-dependencies]
 lazy_static = "1.4"
+
+[package.metadata.cargo-machete]
+# Required by the `linked_data::json_literal!(Value)` macro expansion (value.rs).
+ignored = ["json-syntax"]

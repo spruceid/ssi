@@ -15,14 +15,10 @@ serde = { workspace = true, features = ["derive"] }
 serde_json.workspace = true
 serde_with = { version = "1.14", features = ["base64"] }
 base64.workspace = true
-bs58.workspace = true
-hex.workspace = true
-multibase.workspace = true
 ssi-jwk.workspace = true
 ssi-jws.workspace = true
 ssi-jwt.workspace = true
 ssi-dids-core.workspace = true
-ssi-core.workspace = true
 ssi-verification-methods.workspace = true
 ssi-caips.workspace = true
 chrono = { workspace = true, features = ["serde"] }
