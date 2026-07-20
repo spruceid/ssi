@@ -104,7 +104,7 @@ pub fn sign(
     }
 }
 
-pub fn generate_secret_key(rng: &mut impl rand::RngCore) -> BBSplusSecretKey {
+pub fn generate_secret_key(rng: &mut impl rand::Rng) -> BBSplusSecretKey {
     let mut key_material = [0; Bls12381Sha256::IKM_LEN];
     rng.fill_bytes(&mut key_material);
     let pair = KeyPair::<BBSplus<Bls12381Sha256>>::generate(&key_material, None, None).unwrap();

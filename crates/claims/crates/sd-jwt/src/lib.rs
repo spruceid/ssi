@@ -37,7 +37,7 @@ use std::{
     str::FromStr,
 };
 
-use rand::{CryptoRng, RngCore};
+use rand::CryptoRng;
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use serde_json::Value;
 use ssi_claims_core::{
@@ -451,7 +451,7 @@ impl SdJwtBuf {
         sd_alg: SdAlg,
         pointers: &[impl Borrow<JsonPointer>],
         signer: impl JwsSigner,
-        rng: impl CryptoRng + RngCore,
+        rng: impl CryptoRng,
     ) -> Result<Self, SignatureError> {
         DecodedSdJwt::conceal_and_sign_with(claims, sd_alg, pointers, signer, rng)
             .await
@@ -815,7 +815,7 @@ impl DecodedSdJwt<'static> {
         sd_alg: SdAlg,
         pointers: &[impl Borrow<JsonPointer>],
         signer: impl JwsSigner,
-        rng: impl CryptoRng + RngCore,
+        rng: impl CryptoRng,
     ) -> Result<Self, SignatureError> {
         let (payload, disclosures) = SdJwtPayload::conceal_with(claims, sd_alg, pointers, rng)
             .map_err(SignatureError::other)?;

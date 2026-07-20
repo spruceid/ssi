@@ -124,6 +124,10 @@ pub enum Error {
     ))]
     #[error(transparent)]
     EC(#[from] p384::elliptic_curve::Error),
+    /// Error decoding a SEC1-encoded elliptic curve key
+    #[cfg(feature = "secp256k1")]
+    #[error(transparent)]
+    Sec1Decode(#[from] k256::elliptic_curve::DecodeError),
     /// Unexpected length for publicKeyMultibase
     #[error("Unexpected length for publicKeyMultibase")]
     MultibaseKeyLength(usize, usize),

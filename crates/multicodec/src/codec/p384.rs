@@ -10,7 +10,7 @@ impl Codec for p384::PublicKey {
     }
 
     fn to_bytes(&'_ self) -> Cow<'_, [u8]> {
-        use p384::elliptic_curve::sec1::ToEncodedPoint;
-        Cow::Owned(self.to_encoded_point(true).as_bytes().to_vec())
+        use p384::elliptic_curve::sec1::ToSec1Point;
+        Cow::Owned(self.to_sec1_point(true).as_bytes().to_vec())
     }
 }

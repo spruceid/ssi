@@ -635,7 +635,7 @@ impl StatusMapEntry for AnyStatusListReference<'_> {
 #[cfg(test)]
 mod tests {
     use flate2::Compression;
-    use rand::{rngs::StdRng, RngCore, SeedableRng};
+    use rand::{rngs::StdRng, Rng, SeedableRng};
 
     use crate::Overflow;
 

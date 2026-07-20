@@ -3,12 +3,12 @@ use ssi_bbs::{BBSplusPublicKey, BBSplusSecretKey};
 use crate::{Base64urlUInt, ECParams, Error, Params, JWK};
 
 impl JWK {
-    pub fn generate_bls12381g2_with(rng: &mut (impl rand::CryptoRng + rand::RngCore)) -> Self {
+    pub fn generate_bls12381g2_with(rng: &mut impl rand::CryptoRng) -> Self {
         ssi_bbs::generate_secret_key(rng).into()
     }
 
     pub fn generate_bls12381g2() -> Self {
-        let mut rng = rand::rngs::OsRng {};
+        let mut rng = rand::rng();
         Self::generate_bls12381g2_with(&mut rng)
     }
 }

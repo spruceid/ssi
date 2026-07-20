@@ -103,7 +103,7 @@ impl Multikey {
     pub fn generate_ed25519_key_pair(
         id: IriBuf,
         controller: UriBuf,
-        csprng: &mut (impl rand_core::RngCore + rand_core::CryptoRng),
+        csprng: &mut impl rand_core::CryptoRng,
     ) -> (Self, ed25519_dalek::SigningKey) {
         let key = ed25519_dalek::SigningKey::generate(csprng);
         (

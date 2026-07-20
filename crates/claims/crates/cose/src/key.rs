@@ -3,10 +3,7 @@ use coset::{
     CoseKey, KeyType, Label,
 };
 use ssi_claims_core::{ProofValidationError, SignatureError};
-use ssi_crypto::{
-    rand::{CryptoRng, RngCore},
-    PublicKey, SecretKey,
-};
+use ssi_crypto::{rand::CryptoRng, PublicKey, SecretKey};
 use std::borrow::Cow;
 
 use crate::{
@@ -303,8 +300,8 @@ impl CoseKeyEncode for CoseKey {
             }),
             #[cfg(feature = "secp256k1")]
             PublicKey::Secp256k1(key) => {
-                use ssi_crypto::k256::elliptic_curve::sec1::ToEncodedPoint;
-                let encoded_point = key.to_encoded_point(false);
+                use ssi_crypto::k256::elliptic_curve::sec1::ToSec1Point;
+                let encoded_point = key.to_sec1_point(false);
                 Ok(Self {
                     kty: KeyType::Assigned(iana::KeyType::EC2),
                     params: vec![
@@ -317,8 +314,8 @@ impl CoseKeyEncode for CoseKey {
             }
             #[cfg(feature = "secp256r1")]
             PublicKey::P256(key) => {
-                use ssi_crypto::p256::elliptic_curve::sec1::ToEncodedPoint;
-                let encoded_point = key.to_encoded_point(false);
+                use ssi_crypto::p256::elliptic_curve::sec1::ToSec1Point;
+                let encoded_point = key.to_sec1_point(false);
                 Ok(Self {
                     kty: KeyType::Assigned(iana::KeyType::EC2),
                     params: vec![
@@ -331,8 +328,8 @@ impl CoseKeyEncode for CoseKey {
             }
             #[cfg(feature = "secp384r1")]
             PublicKey::P384(key) => {
-                use ssi_crypto::p384::elliptic_curve::sec1::ToEncodedPoint;
-                let encoded_point = key.to_encoded_point(false);
+                use ssi_crypto::p384::elliptic_curve::sec1::ToSec1Point;
+                let encoded_point = key.to_sec1_point(false);
                 Ok(Self {
                     kty: KeyType::Assigned(iana::KeyType::EC2),
                     params: vec![
@@ -364,9 +361,9 @@ impl CoseKeyEncode for CoseKey {
             }
             #[cfg(feature = "secp256k1")]
             SecretKey::Secp256k1(key) => {
-                use ssi_crypto::k256::elliptic_curve::sec1::ToEncodedPoint;
+                use ssi_crypto::k256::elliptic_curve::sec1::ToSec1Point;
                 let public_key = key.public_key();
-                let encoded_point = public_key.to_encoded_point(false);
+                let encoded_point = public_key.to_sec1_point(false);
                 Ok(Self {
                     kty: KeyType::Assigned(iana::KeyType::EC2),
                     params: vec![
@@ -380,9 +377,9 @@ impl CoseKeyEncode for CoseKey {
             }
             #[cfg(feature = "secp256r1")]
             SecretKey::P256(key) => {
-                use ssi_crypto::p256::elliptic_curve::sec1::ToEncodedPoint;
+                use ssi_crypto::p256::elliptic_curve::sec1::ToSec1Point;
                 let public_key = key.public_key();
-                let encoded_point = public_key.to_encoded_point(false);
+                let encoded_point = public_key.to_sec1_point(false);
                 Ok(Self {
                     kty: KeyType::Assigned(iana::KeyType::EC2),
                     params: vec![
@@ -396,9 +393,9 @@ impl CoseKeyEncode for CoseKey {
             }
             #[cfg(feature = "secp384r1")]
             SecretKey::P384(key) => {
-                use ssi_crypto::p384::elliptic_curve::sec1::ToEncodedPoint;
+                use ssi_crypto::p384::elliptic_curve::sec1::ToSec1Point;
                 let public_key = key.public_key();
-                let encoded_point = public_key.to_encoded_point(false);
+                let encoded_point = public_key.to_sec1_point(false);
                 Ok(Self {
                     kty: KeyType::Assigned(iana::KeyType::EC2),
                     params: vec![
@@ -420,25 +417,25 @@ pub trait CoseKeyGenerate {
     fn generate_ed25519() -> Self;
 
     #[cfg(feature = "ed25519")]
-    fn generate_ed25519_from(rng: &mut (impl RngCore + CryptoRng)) -> Self;
+    fn generate_ed25519_from(rng: &mut impl CryptoRng) -> Self;
 
     #[cfg(feature = "secp256k1")]
     fn generate_secp256k1() -> Self;
 
     #[cfg(feature = "secp256k1")]
-    fn generate_secp256k1_from(rng: &mut (impl RngCore + CryptoRng)) -> Self;
+    fn generate_secp256k1_from(rng: &mut impl CryptoRng) -> Self;
 
     #[cfg(feature = "secp256r1")]
     fn generate_p256() -> Self;
 
     #[cfg(feature = "secp256r1")]
-    fn generate_p256_from(rng: &mut (impl RngCore + CryptoRng)) -> Self;
+    fn generate_p256_from(rng: &mut impl CryptoRng) -> Self;
 
     #[cfg(feature = "secp384r1")]
     fn generate_p384() -> Self;
 
     #[cfg(feature = "secp384r1")]
-    fn generate_p384_from(rng: &mut (impl RngCore + CryptoRng)) -> Self;
+    fn generate_p384_from(rng: &mut impl CryptoRng) -> Self;
 }
 
 impl CoseKeyGenerate for CoseKey {
@@ -448,7 +445,7 @@ impl CoseKeyGenerate for CoseKey {
     }
 
     #[cfg(feature = "ed25519")]
-    fn generate_ed25519_from(rng: &mut (impl RngCore + CryptoRng)) -> Self {
+    fn generate_ed25519_from(rng: &mut impl CryptoRng) -> Self {
         Self::encode_secret(&ssi_crypto::SecretKey::generate_ed25519_from(rng)).unwrap()
     }
 
@@ -458,7 +455,7 @@ impl CoseKeyGenerate for CoseKey {
     }
 
     #[cfg(feature = "secp256k1")]
-    fn generate_secp256k1_from(rng: &mut (impl RngCore + CryptoRng)) -> Self {
+    fn generate_secp256k1_from(rng: &mut impl CryptoRng) -> Self {
         Self::encode_secret(&ssi_crypto::SecretKey::generate_secp256k1_from(rng)).unwrap()
     }
 
@@ -468,7 +465,7 @@ impl CoseKeyGenerate for CoseKey {
     }
 
     #[cfg(feature = "secp256r1")]
-    fn generate_p256_from(rng: &mut (impl RngCore + CryptoRng)) -> Self {
+    fn generate_p256_from(rng: &mut impl CryptoRng) -> Self {
         Self::encode_secret(&ssi_crypto::SecretKey::generate_p256_from(rng)).unwrap()
     }
 
@@ -478,7 +475,7 @@ impl CoseKeyGenerate for CoseKey {
     }
 
     #[cfg(feature = "secp384r1")]
-    fn generate_p384_from(rng: &mut (impl RngCore + CryptoRng)) -> Self {
+    fn generate_p384_from(rng: &mut impl CryptoRng) -> Self {
         Self::encode_secret(&ssi_crypto::SecretKey::generate_p384_from(rng)).unwrap()
     }
 }

@@ -124,7 +124,7 @@ pub struct Group {
 mod tests {
     use std::{borrow::Cow, collections::HashMap};
 
-    use hmac::{Hmac, Mac};
+    use hmac::KeyInit;
     use lazy_static::lazy_static;
     use ssi_core::JsonPointerBuf;
     use ssi_json_ld::CompactJsonLd;
@@ -204,7 +204,7 @@ mod tests {
         let loader = ssi_json_ld::ContextLoader::default();
 
         let hmac_key = hex::decode(HMAC_KEY_STRING).unwrap();
-        let mut hmac = HmacShaAny::Sha256(Hmac::new_from_slice(&hmac_key).unwrap());
+        let mut hmac = HmacShaAny::Sha256(crate::HmacSha256::new_from_slice(&hmac_key).unwrap());
         let label_map_factory_function = create_hmac_id_label_map_function(&mut hmac);
 
         let mut group_definitions = HashMap::new();

@@ -14,8 +14,8 @@ pub fn bytes_to_lowerhex(bytes: &[u8]) -> String {
 /// bytes, lowercase-hex-encoded, and prefixed with "0x" to form the resulting string.
 #[cfg(feature = "secp256k1")]
 pub fn hash_public_key(k: &k256::PublicKey) -> String {
-    use k256::elliptic_curve::sec1::ToEncodedPoint;
-    let pk_ec = k.to_encoded_point(false);
+    use k256::elliptic_curve::sec1::ToSec1Point;
+    let pk_ec = k.to_sec1_point(false);
     let pk_bytes = pk_ec.as_bytes();
     let hash = keccak(&pk_bytes[1..65]).to_fixed_bytes();
     let hash_last20 = &hash[12..32];

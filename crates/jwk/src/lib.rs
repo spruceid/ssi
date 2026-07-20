@@ -288,8 +288,10 @@ impl JWK {
                 .as_ref()
                 .to_vec();
             // reference: ring/src/ec/curve25519/ed25519/signing.rs
+            // ring 0.17's PKCS#8 v2 template is 19 bytes: seed at 0x10, public key at
+            // 0x10 + 32 (seed) + (19 - 0x10) = 0x33.
             let private_key = key_pkcs8[0x10..0x30].to_vec();
-            let public_key = key_pkcs8[0x35..0x55].to_vec();
+            let public_key = key_pkcs8[0x33..0x53].to_vec();
             key_pkcs8.zeroize();
             Ok(JWK::from(Params::OKP(OctetParams {
                 curve: "Ed25519".to_string(),
@@ -299,7 +301,7 @@ impl JWK {
         }
         #[cfg(not(feature = "ring"))]
         {
-            let mut csprng = rand::rngs::OsRng {};
+            let mut csprng = rand::rng();
             let secret = ed25519_dalek::SigningKey::generate(&mut csprng);
             let public = secret.verifying_key();
             Ok(JWK::from(Params::OKP(OctetParams {
@@ -311,9 +313,7 @@ impl JWK {
     }
 
     #[cfg(feature = "ed25519")]
-    pub fn generate_ed25519_from(
-        rng: &mut (impl rand::CryptoRng + rand::RngCore),
-    ) -> Result<JWK, Error> {
+    pub fn generate_ed25519_from(rng: &mut impl rand::CryptoRng) -> Result<JWK, Error> {
         let secret = ed25519_dalek::SigningKey::generate(rng);
         let public = secret.verifying_key();
         Ok(JWK::from(Params::OKP(OctetParams {
@@ -325,13 +325,14 @@ impl JWK {
 
     #[cfg(feature = "secp256k1")]
     pub fn generate_secp256k1() -> JWK {
-        let mut rng = rand::rngs::OsRng {};
+        let mut rng = rand::rng();
         Self::generate_secp256k1_from(&mut rng)
     }
 
     #[cfg(feature = "secp256k1")]
-    pub fn generate_secp256k1_from(rng: &mut (impl rand::CryptoRng + rand::RngCore)) -> JWK {
-        let secret_key = k256::SecretKey::random(rng);
+    pub fn generate_secp256k1_from(rng: &mut impl rand::CryptoRng) -> JWK {
+        use k256::elliptic_curve::Generate;
+        let secret_key = k256::SecretKey::generate_from_rng(rng);
         let sk_bytes = zeroize::Zeroizing::new(secret_key.to_bytes().to_vec());
         let public_key = secret_key.public_key();
         let mut ec_params = ECParams::from(&public_key);
@@ -341,13 +342,14 @@ impl JWK {
 
     #[cfg(feature = "secp256r1")]
     pub fn generate_p256() -> JWK {
-        let mut rng = rand::rngs::OsRng {};
+        let mut rng = rand::rng();
         Self::generate_p256_from(&mut rng)
     }
 
     #[cfg(feature = "secp256r1")]
-    pub fn generate_p256_from(rng: &mut (impl rand::CryptoRng + rand::RngCore)) -> JWK {
-        let secret_key = p256::SecretKey::random(rng);
+    pub fn generate_p256_from(rng: &mut impl rand::CryptoRng) -> JWK {
+        use p256::elliptic_curve::Generate;
+        let secret_key = p256::SecretKey::generate_from_rng(rng);
         let sk_bytes = zeroize::Zeroizing::new(secret_key.to_bytes().to_vec());
         let public_key: p256::PublicKey = secret_key.public_key();
         let mut ec_params = ECParams::from(&public_key);
@@ -357,8 +359,9 @@ impl JWK {
 
     #[cfg(feature = "secp384r1")]
     pub fn generate_p384() -> JWK {
-        let mut rng = rand::rngs::OsRng {};
-        let secret_key = p384::SecretKey::random(&mut rng);
+        use p384::elliptic_curve::Generate;
+        let mut rng = rand::rng();
+        let secret_key = p384::SecretKey::generate_from_rng(&mut rng);
         let sk_bytes = zeroize::Zeroizing::new(secret_key.to_bytes().to_vec());
         let public_key: p384::PublicKey = secret_key.public_key();
         let mut ec_params = ECParams::from(&public_key);
@@ -937,7 +940,7 @@ impl From<p256::PublicKey> for JWK {
 
 #[cfg(feature = "secp256r1")]
 fn p256_parse_private(data: &[u8]) -> Result<JWK, Error> {
-    let k = p256::SecretKey::from_bytes(data.into())?;
+    let k = p256::SecretKey::from_slice(data)?;
     let jwk = JWK {
         params: Params::EC(ECParams::from(&k)),
         public_key_use: None,
@@ -988,7 +991,7 @@ impl From<p384::PublicKey> for JWK {
 
 #[cfg(feature = "secp384r1")]
 fn p384_parse_private(data: &[u8]) -> Result<JWK, Error> {
-    let k = p384::SecretKey::from_bytes(data.into())?;
+    let k = p384::SecretKey::from_slice(data)?;
     let jwk = JWK {
         params: Params::EC(ECParams::from(&k)),
         public_key_use: None,
@@ -1006,9 +1009,9 @@ fn p384_parse_private(data: &[u8]) -> Result<JWK, Error> {
 /// Serialize a secp256k1 public key as a 33-byte string with point compression.
 #[cfg(feature = "secp256k1")]
 pub fn serialize_secp256k1(params: &ECParams) -> Result<Vec<u8>, Error> {
-    use k256::elliptic_curve::sec1::ToEncodedPoint;
+    use k256::elliptic_curve::sec1::ToSec1Point;
     let pk = k256::PublicKey::try_from(params)?;
-    let pk_compressed_bytes = pk.to_encoded_point(true);
+    let pk_compressed_bytes = pk.to_sec1_point(true);
     Ok(pk_compressed_bytes.as_bytes().to_vec())
 }
 
@@ -1016,7 +1019,7 @@ pub fn serialize_secp256k1(params: &ECParams) -> Result<Vec<u8>, Error> {
 #[cfg(feature = "secp256r1")]
 pub fn serialize_p256(params: &ECParams) -> Result<Vec<u8>, Error> {
     // TODO: check that curve is P-256
-    use p256::elliptic_curve::{sec1::EncodedPoint, FieldBytes};
+    use p256::elliptic_curve::{sec1::Sec1Point, FieldBytes};
 
     #[allow(deprecated)] // TODO upgrade `digest` crate when possible.
     let x = FieldBytes::<p256::NistP256>::from_slice(
@@ -1027,7 +1030,7 @@ pub fn serialize_p256(params: &ECParams) -> Result<Vec<u8>, Error> {
     let y = FieldBytes::<p256::NistP256>::from_slice(
         &params.y_coordinate.as_ref().ok_or(Error::MissingPoint)?.0,
     );
-    let encoded_point = EncodedPoint::<p256::NistP256>::from_affine_coordinates(x, y, true);
+    let encoded_point = Sec1Point::<p256::NistP256>::from_affine_coordinates(x, y, true);
     let pk_compressed_bytes = encoded_point.to_bytes();
     Ok(pk_compressed_bytes.to_vec())
 }
@@ -1036,7 +1039,7 @@ pub fn serialize_p256(params: &ECParams) -> Result<Vec<u8>, Error> {
 #[cfg(feature = "secp384r1")]
 pub fn serialize_p384(params: &ECParams) -> Result<Vec<u8>, Error> {
     // TODO: check that curve is P-384
-    use p384::elliptic_curve::{sec1::EncodedPoint, FieldBytes};
+    use p384::elliptic_curve::{sec1::Sec1Point, FieldBytes};
     #[allow(deprecated)] // TODO upgrade `digest` crate when possible.
     let x = FieldBytes::<p384::NistP384>::from_slice(
         &params.x_coordinate.as_ref().ok_or(Error::MissingPoint)?.0,
@@ -1045,7 +1048,7 @@ pub fn serialize_p384(params: &ECParams) -> Result<Vec<u8>, Error> {
     let y = FieldBytes::<p384::NistP384>::from_slice(
         &params.y_coordinate.as_ref().ok_or(Error::MissingPoint)?.0,
     );
-    let encoded_point = EncodedPoint::<p384::NistP384>::from_affine_coordinates(x, y, true);
+    let encoded_point = Sec1Point::<p384::NistP384>::from_affine_coordinates(x, y, true);
     let pk_compressed_bytes = encoded_point.to_bytes();
     Ok(pk_compressed_bytes.to_vec())
 }
@@ -1110,7 +1113,7 @@ impl TryFrom<&ECParams> for k256::SecretKey {
             .ecc_private_key
             .as_ref()
             .ok_or(Error::MissingPrivateKey)?;
-        let secret_key = k256::SecretKey::from_bytes(private_key.0.as_slice().into())?;
+        let secret_key = k256::SecretKey::from_slice(private_key.0.as_slice())?;
         Ok(secret_key)
     }
 }
@@ -1127,7 +1130,7 @@ impl TryFrom<&ECParams> for p256::SecretKey {
             .ecc_private_key
             .as_ref()
             .ok_or(Error::MissingPrivateKey)?;
-        let secret_key = p256::SecretKey::from_bytes(private_key.0.as_slice().into())?;
+        let secret_key = p256::SecretKey::from_slice(private_key.0.as_slice())?;
         Ok(secret_key)
     }
 }
@@ -1144,7 +1147,7 @@ impl TryFrom<&ECParams> for p384::SecretKey {
             .ecc_private_key
             .as_ref()
             .ok_or(Error::MissingPrivateKey)?;
-        let secret_key = p384::SecretKey::from_bytes(private_key.0.as_slice().into())?;
+        let secret_key = p384::SecretKey::from_slice(private_key.0.as_slice())?;
         Ok(secret_key)
     }
 }
@@ -1203,8 +1206,8 @@ impl TryFrom<&ECParams> for p384::PublicKey {
 #[cfg(feature = "secp256k1")]
 impl From<&k256::PublicKey> for ECParams {
     fn from(pk: &k256::PublicKey) -> Self {
-        use k256::elliptic_curve::sec1::ToEncodedPoint;
-        let ec_points = pk.to_encoded_point(false);
+        use k256::elliptic_curve::sec1::ToSec1Point;
+        let ec_points = pk.to_sec1_point(false);
         ECParams {
             // TODO according to https://tools.ietf.org/id/draft-jones-webauthn-secp256k1-00.html#rfc.section.2 it should be P-256K?
             curve: Some("secp256k1".to_string()),
@@ -1219,8 +1222,8 @@ impl From<&k256::PublicKey> for ECParams {
 impl From<&k256::SecretKey> for ECParams {
     fn from(k: &k256::SecretKey) -> Self {
         let pk = k.public_key();
-        use k256::elliptic_curve::sec1::ToEncodedPoint;
-        let ec_points = pk.to_encoded_point(false);
+        use k256::elliptic_curve::sec1::ToSec1Point;
+        let ec_points = pk.to_sec1_point(false);
         ECParams {
             // TODO according to https://tools.ietf.org/id/draft-jones-webauthn-secp256k1-00.html#rfc.section.2 it should be P-256K?
             curve: Some("secp256k1".to_string()),
@@ -1234,8 +1237,8 @@ impl From<&k256::SecretKey> for ECParams {
 #[cfg(feature = "secp256r1")]
 impl From<&p256::PublicKey> for ECParams {
     fn from(pk: &p256::PublicKey) -> Self {
-        use p256::elliptic_curve::sec1::ToEncodedPoint;
-        let encoded_point = pk.to_encoded_point(false);
+        use p256::elliptic_curve::sec1::ToSec1Point;
+        let encoded_point = pk.to_sec1_point(false);
         ECParams {
             curve: Some("P-256".to_string()),
             x_coordinate: encoded_point.x().map(|x| Base64urlUInt(x.to_vec())),
@@ -1249,8 +1252,8 @@ impl From<&p256::PublicKey> for ECParams {
 impl From<&p256::SecretKey> for ECParams {
     fn from(k: &p256::SecretKey) -> Self {
         let pk = k.public_key();
-        use p256::elliptic_curve::sec1::ToEncodedPoint;
-        let encoded_point = pk.to_encoded_point(false);
+        use p256::elliptic_curve::sec1::ToSec1Point;
+        let encoded_point = pk.to_sec1_point(false);
         Self {
             curve: Some("P-256".to_string()),
             x_coordinate: encoded_point.x().map(|x| Base64urlUInt(x.to_vec())),
@@ -1263,8 +1266,8 @@ impl From<&p256::SecretKey> for ECParams {
 #[cfg(feature = "secp384r1")]
 impl From<&p384::PublicKey> for ECParams {
     fn from(pk: &p384::PublicKey) -> Self {
-        use p384::elliptic_curve::sec1::ToEncodedPoint;
-        let encoded_point = pk.to_encoded_point(false);
+        use p384::elliptic_curve::sec1::ToSec1Point;
+        let encoded_point = pk.to_sec1_point(false);
         ECParams {
             curve: Some("P-384".to_string()),
             x_coordinate: encoded_point.x().map(|x| Base64urlUInt(x.to_vec())),
@@ -1278,8 +1281,8 @@ impl From<&p384::PublicKey> for ECParams {
 impl From<&p384::SecretKey> for ECParams {
     fn from(k: &p384::SecretKey) -> Self {
         let pk = k.public_key();
-        use p384::elliptic_curve::sec1::ToEncodedPoint;
-        let encoded_point = pk.to_encoded_point(false);
+        use p384::elliptic_curve::sec1::ToSec1Point;
+        let encoded_point = pk.to_sec1_point(false);
         ECParams {
             curve: Some("P-384".to_string()),
             x_coordinate: encoded_point.x().map(|x| Base64urlUInt(x.to_vec())),

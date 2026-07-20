@@ -109,67 +109,70 @@ impl SecretKey {
 
     #[cfg(feature = "ed25519")]
     pub fn generate_ed25519() -> Self {
-        let mut rng = rand::rngs::OsRng {};
+        let mut rng = rand::rng();
         Self::generate_ed25519_from(&mut rng)
     }
 
     #[cfg(feature = "ed25519")]
-    pub fn generate_ed25519_from(rng: &mut (impl rand::CryptoRng + rand::RngCore)) -> Self {
+    pub fn generate_ed25519_from(rng: &mut impl rand::CryptoRng) -> Self {
         Self::Ed25519(ed25519_dalek::SigningKey::generate(rng))
     }
 
     #[cfg(feature = "secp256k1")]
     pub fn new_secp256k1(d: &[u8]) -> Result<Self, InvalidSecretKey> {
-        k256::SecretKey::from_bytes(d.into())
+        k256::SecretKey::from_slice(d)
             .map(Self::Secp256k1)
             .map_err(|_| InvalidSecretKey)
     }
 
     #[cfg(feature = "secp256k1")]
     pub fn generate_secp256k1() -> Self {
-        let mut rng = rand::rngs::OsRng {};
+        let mut rng = rand::rng();
         Self::generate_secp256k1_from(&mut rng)
     }
 
     #[cfg(feature = "secp256k1")]
-    pub fn generate_secp256k1_from(rng: &mut (impl rand::CryptoRng + rand::RngCore)) -> Self {
-        Self::Secp256k1(k256::SecretKey::random(rng))
+    pub fn generate_secp256k1_from(rng: &mut impl rand::CryptoRng) -> Self {
+        use k256::elliptic_curve::Generate;
+        Self::Secp256k1(k256::SecretKey::generate_from_rng(rng))
     }
 
     #[cfg(feature = "secp256r1")]
     pub fn new_p256(d: &[u8]) -> Result<Self, InvalidSecretKey> {
-        p256::SecretKey::from_bytes(d.into())
+        p256::SecretKey::from_slice(d)
             .map(Self::P256)
             .map_err(|_| InvalidSecretKey)
     }
 
     #[cfg(feature = "secp256r1")]
     pub fn generate_p256() -> Self {
-        let mut rng = rand::rngs::OsRng {};
+        let mut rng = rand::rng();
         Self::generate_p256_from(&mut rng)
     }
 
     #[cfg(feature = "secp256r1")]
-    pub fn generate_p256_from(rng: &mut (impl rand::CryptoRng + rand::RngCore)) -> Self {
-        Self::P256(p256::SecretKey::random(rng))
+    pub fn generate_p256_from(rng: &mut impl rand::CryptoRng) -> Self {
+        use p256::elliptic_curve::Generate;
+        Self::P256(p256::SecretKey::generate_from_rng(rng))
     }
 
     #[cfg(feature = "secp384r1")]
     pub fn new_p384(d: &[u8]) -> Result<Self, InvalidSecretKey> {
-        p384::SecretKey::from_bytes(d.into())
+        p384::SecretKey::from_slice(d)
             .map(Self::P384)
             .map_err(|_| InvalidSecretKey)
     }
 
     #[cfg(feature = "secp384r1")]
     pub fn generate_p384() -> Self {
-        let mut rng = rand::rngs::OsRng {};
+        let mut rng = rand::rng();
         Self::generate_p384_from(&mut rng)
     }
 
     #[cfg(feature = "secp384r1")]
-    pub fn generate_p384_from(rng: &mut (impl rand::CryptoRng + rand::RngCore)) -> Self {
-        Self::P384(p384::SecretKey::random(rng))
+    pub fn generate_p384_from(rng: &mut impl rand::CryptoRng) -> Self {
+        use p384::elliptic_curve::Generate;
+        Self::P384(p384::SecretKey::generate_from_rng(rng))
     }
 
     pub fn sign(

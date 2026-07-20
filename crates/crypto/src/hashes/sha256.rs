@@ -12,7 +12,7 @@ pub fn sha256(data: &[u8]) -> [u8; 32] {
 
         // we're pretty sure this will always be 32 bytes long
         assert!(
-            hash.as_ref().len() == digest::SHA256.output_len,
+            hash.as_ref().len() == digest::SHA256.output_len(),
             "ring's Sha256 implementation has returned a digest of len {}, expected 32",
             hash.as_ref().len()
         );

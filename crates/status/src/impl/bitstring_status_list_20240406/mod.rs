@@ -580,7 +580,7 @@ mod prefixed_hexadecimal {
 
 #[cfg(test)]
 mod tests {
-    use rand::{rngs::StdRng, RngCore, SeedableRng};
+    use rand::{rngs::StdRng, Rng, SeedableRng};
 
     use crate::Overflow;
 

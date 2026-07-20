@@ -2,7 +2,7 @@ use std::{borrow::Cow, hash::Hash, str::FromStr};
 
 use ed25519_dalek::{Signer, Verifier};
 use iref::{Iri, IriBuf, UriBuf};
-use rand_core::{CryptoRng, RngCore};
+use rand_core::CryptoRng;
 use rdf_types::{Interpretation, Vocabulary};
 use serde::{Deserialize, Serialize};
 use ssi_claims_core::{InvalidProof, MessageSignatureError, ProofValidationError, ProofValidity};
@@ -72,7 +72,7 @@ impl Ed25519VerificationKey2020 {
     pub fn generate_key_pair(
         id: IriBuf,
         controller: UriBuf,
-        csprng: &mut (impl RngCore + CryptoRng),
+        csprng: &mut impl CryptoRng,
     ) -> (Self, ed25519_dalek::SigningKey) {
         let key = ed25519_dalek::SigningKey::generate(csprng);
         (

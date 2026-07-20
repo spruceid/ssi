@@ -491,7 +491,7 @@ pub fn sign_bytes(algorithm: Algorithm, data: &[u8], key: &JWK) -> Result<Vec<u8
                 Algorithm::PS256 => &ring::signature::RSA_PSS_SHA256,
                 _ => return Err(Error::AlgorithmNotImplemented(algorithm.to_string())),
             };
-            let mut sig = vec![0u8; key_pair.public_modulus_len()];
+            let mut sig = vec![0u8; key_pair.public().modulus_len()];
             let rng = ring::rand::SystemRandom::new();
             key_pair.sign(padding_alg, &rng, data, &mut sig)?;
             sig
@@ -510,9 +510,11 @@ pub fn sign_bytes(algorithm: Algorithm, data: &[u8], key: &JWK) -> Result<Vec<u8
                 }
                 Algorithm::PS256 => {
                     let hash = rsa::hash::Hash::SHA2_256;
-                    let rng = rand::rngs::OsRng {};
-                    padding =
-                        rsa::PaddingScheme::new_pss_with_salt::<sha2::Sha256, _>(rng, hash.size());
+                    let rng = rand_0_8::rngs::OsRng {};
+                    padding = rsa::PaddingScheme::new_pss_with_salt::<sha2_0_10::Sha256, _>(
+                        rng,
+                        hash.size(),
+                    );
                     hashed = ssi_crypto::hashes::sha256::sha256(data);
                 }
                 _ => return Err(Error::AlgorithmNotImplemented(algorithm.to_string())),
@@ -593,7 +595,7 @@ pub fn sign_bytes(algorithm: Algorithm, data: &[u8], key: &JWK) -> Result<Vec<u8
                 //       uses Keccack as default hash function, not sha256.
                 //       See: <https://docs.rs/k256/0.11.0/k256/ecdsa/recoverable/struct.Signature.html#impl-PrehashSignature>
                 let (sig, rec_id) =
-                    signing_key.sign_digest_recoverable(sha2::Sha256::new_with_prefix(data))?;
+                    signing_key.sign_digest_recoverable(sha2::Sha256::new_with_prefix(data));
                 let mut res = sig.to_bytes().to_vec();
                 res.push(rec_id.to_byte());
                 res
@@ -610,43 +612,40 @@ pub fn sign_bytes(algorithm: Algorithm, data: &[u8], key: &JWK) -> Result<Vec<u8
                 // NOTE: in `k256` version 0.11, `recoverable::Signature`
                 //       uses Keccack as default hash function, not sha256.
                 //       See: <https://docs.rs/k256/0.11.0/k256/ecdsa/recoverable/struct.Signature.html#impl-PrehashSignature>
-                let (sig, rec_id) = signing_key
-                    .sign_digest_recoverable(sha3::Keccak256::new_with_prefix(data))
-                    .map_err(ssi_jwk::Error::from)?;
+                let (sig, rec_id) =
+                    signing_key.sign_digest_recoverable(sha3::Keccak256::new_with_prefix(data));
                 let mut res = sig.to_bytes().to_vec();
                 res.push(rec_id.to_byte());
                 res
             }
             #[cfg(feature = "secp256r1")]
             Algorithm::ESBlake2b => {
-                use p256::ecdsa::{
-                    signature::{
-                        digest::{consts::U32, Digest},
-                        DigestSigner,
-                    },
-                    Signature,
-                };
+                use blake2::digest::{consts::U32, Digest};
+                use p256::ecdsa::signature::hazmat::PrehashSigner;
                 let curve = ec.curve.as_ref().ok_or(Error::MissingCurve)?;
                 let secret_key = p256::SecretKey::try_from(ec)?;
                 let signing_key = p256::ecdsa::SigningKey::from(secret_key);
-                let sig: p256::ecdsa::Signature =
-                    signing_key.try_sign_digest(blake2::Blake2b::<U32>::new_with_prefix(data))?;
+                // `blake2` has no `digest 0.11` release, so hash with blake2's own API
+                // and sign the prehash (equivalent to signing the digest object).
+                let hash = blake2::Blake2b::<U32>::new_with_prefix(data).finalize();
+                let sig: p256::ecdsa::Signature = signing_key
+                    .sign_prehash(&hash)
+                    .map_err(ssi_jwk::Error::from)?;
                 sig.to_bytes().to_vec()
             }
             #[cfg(feature = "secp256k1")]
             Algorithm::ESBlake2bK => {
-                use k256::ecdsa::{
-                    signature::{
-                        digest::{consts::U32, Digest},
-                        DigestSigner,
-                    },
-                    Signature,
-                };
+                use blake2::digest::{consts::U32, Digest};
+                use k256::ecdsa::signature::hazmat::PrehashSigner;
                 let curve = ec.curve.as_ref().ok_or(Error::MissingCurve)?;
                 let secret_key = k256::SecretKey::try_from(ec)?;
                 let signing_key = k256::ecdsa::SigningKey::from(secret_key);
-                let sig: k256::ecdsa::Signature =
-                    signing_key.try_sign_digest(blake2::Blake2b::<U32>::new_with_prefix(data))?;
+                // `blake2` has no `digest 0.11` release, so hash with blake2's own API
+                // and sign the prehash (equivalent to signing the digest object).
+                let hash = blake2::Blake2b::<U32>::new_with_prefix(data).finalize();
+                let sig: k256::ecdsa::Signature = signing_key
+                    .sign_prehash(&hash)
+                    .map_err(ssi_jwk::Error::from)?;
                 sig.to_bytes().to_vec()
             }
             _ => {
@@ -714,8 +713,8 @@ pub fn verify_bytes_warnable(
                     hashed = ssi_crypto::hashes::sha256::sha256(data);
                 }
                 Algorithm::PS256 => {
-                    let rng = rand::rngs::OsRng {};
-                    padding = rsa::PaddingScheme::new_pss::<sha2::Sha256, _>(rng);
+                    let rng = rand_0_8::rngs::OsRng {};
+                    padding = rsa::PaddingScheme::new_pss::<sha2_0_10::Sha256, _>(rng);
                     hashed = ssi_crypto::hashes::sha256::sha256(data);
                 }
                 _ => return Err(Error::AlgorithmNotImplemented(algorithm.to_string())),
@@ -777,16 +776,19 @@ pub fn verify_bytes_warnable(
                 let verifying_key = k256::ecdsa::VerifyingKey::from(public_key);
                 let sig =
                     k256::ecdsa::Signature::try_from(signature).map_err(ssi_jwk::Error::from)?;
-                let normalized_sig = if let Some(s) = sig.normalize_s() {
-                    // For user convenience, output the normalized signature.
-                    let sig_normalized_b64 =
-                        base64::prelude::BASE64_URL_SAFE_NO_PAD.encode(s.to_bytes());
-                    warnings.push(format!(
-                        "Non-normalized ES256K signature. Normalized: {sig_normalized_b64}"
-                    ));
+                let normalized_sig = {
+                    // `normalize_s` now always returns the low-S form; warn when it
+                    // differs from the input (i.e. the input was non-normalized).
+                    let s = sig.normalize_s();
+                    if s != sig {
+                        // For user convenience, output the normalized signature.
+                        let sig_normalized_b64 =
+                            base64::prelude::BASE64_URL_SAFE_NO_PAD.encode(s.to_bytes());
+                        warnings.push(format!(
+                            "Non-normalized ES256K signature. Normalized: {sig_normalized_b64}"
+                        ));
+                    }
                     s
-                } else {
-                    sig
                 };
                 verifying_key
                     .verify(data, &normalized_sig)
@@ -861,41 +863,30 @@ pub fn verify_bytes_warnable(
             }
             #[cfg(feature = "secp256r1")]
             Algorithm::ESBlake2b => {
-                use p256::ecdsa::{
-                    signature::{
-                        digest::{consts::U32, Digest},
-                        DigestVerifier,
-                    },
-                    Signature,
-                };
+                use blake2::digest::{consts::U32, Digest};
+                use p256::ecdsa::signature::hazmat::PrehashVerifier;
                 let curve = ec.curve.as_ref().ok_or(ssi_jwk::Error::MissingCurve)?;
                 let public_key = p256::PublicKey::try_from(ec)?;
                 let verifying_key = p256::ecdsa::VerifyingKey::from(public_key);
                 let sig =
                     p256::ecdsa::Signature::try_from(signature).map_err(ssi_jwk::Error::from)?;
+                let hash = blake2::Blake2b::<U32>::new_with_prefix(data).finalize();
                 verifying_key
-                    .verify_digest(
-                        <blake2::Blake2b<U32> as Digest>::new_with_prefix(data),
-                        &sig,
-                    )
+                    .verify_prehash(&hash, &sig)
                     .map_err(ssi_jwk::Error::from)?;
             }
             #[cfg(feature = "secp256k1")]
             Algorithm::ESBlake2bK => {
-                use k256::ecdsa::signature::{
-                    digest::{consts::U32, Digest},
-                    DigestVerifier,
-                };
+                use blake2::digest::{consts::U32, Digest};
+                use k256::ecdsa::signature::hazmat::PrehashVerifier;
                 let curve = ec.curve.as_ref().ok_or(ssi_jwk::Error::MissingCurve)?;
                 let public_key = k256::PublicKey::try_from(ec)?;
                 let verifying_key = k256::ecdsa::VerifyingKey::from(public_key);
                 let sig =
                     k256::ecdsa::Signature::try_from(signature).map_err(ssi_jwk::Error::from)?;
+                let hash = blake2::Blake2b::<U32>::new_with_prefix(data).finalize();
                 verifying_key
-                    .verify_digest(
-                        <blake2::Blake2b<U32> as Digest>::new_with_prefix(data),
-                        &sig,
-                    )
+                    .verify_prehash(&hash, &sig)
                     .map_err(ssi_jwk::Error::from)?;
             }
             #[cfg(feature = "secp384r1")]

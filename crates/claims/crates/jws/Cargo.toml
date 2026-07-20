@@ -28,10 +28,14 @@ secp256r1 = ["ssi-jwk/secp256r1", "p256", "blake2"]
 secp384r1 = ["ssi-jwk/secp384r1", "p384"]
 
 ## Enable ed25519 (EdDSA) signatures.
-ed25519 = ["ssi-jwk/ed25519", "ed25519-dalek", "rand", "blake2"]
+ed25519 = ["ssi-jwk/ed25519", "ed25519-dalek", "blake2"]
 
 ## Enable RSA signatures.
-rsa = ["ssi-jwk/rsa", "dep:rsa", "dep:sha2", "rand"]
+# `rsa` is deferred to a follow-up upgrade PR: it stays on the pre-`digest 0.11`
+# generation (`digest 0.10` / `rand_core 0.6`), so the pure-Rust RSA-PSS path is fed
+# `sha2 0.10` + `rand 0.8` via the `sha2_0_10` / `rand_0_8` aliases below. These are
+# removed once `rsa` is bumped.
+rsa = ["ssi-jwk/rsa", "dep:rsa", "dep:sha2", "dep:sha2_0_10", "dep:rand_0_8"]
 
 ## Enable ethereum style signatures.
 eip = ["ssi-jwk/eip", "ssi-crypto/keccak", "k256", "secp256k1"]
@@ -40,7 +44,7 @@ eip = ["ssi-jwk/eip", "ssi-crypto/keccak", "k256", "secp256k1"]
 tezos = ["ssi-jwk/tezos", "secp256k1", "secp256r1", "ed25519"]
 
 ## Use the Ring crate for crypto operations.
-ring = ["ssi-jwk/ring", "dep:ring", "rand", "blake2"]
+ring = ["ssi-jwk/ring", "dep:ring", "blake2"]
 
 [dependencies]
 thiserror = "1.0"
@@ -55,8 +59,10 @@ ed25519-dalek = { workspace = true, optional = true }
 sha2 = { workspace = true, optional = true }
 sha3 = { workspace = true, optional = true }
 rsa = { workspace = true, optional = true }
-rand = { workspace = true, optional = true }
-ring = { version = "0.16", optional = true }
+# Aliases for the deferred `rsa 0.6` path (matches rsa's digest-0.10 / rand_core-0.6 generation).
+sha2_0_10 = { package = "sha2", version = "0.10", optional = true }
+rand_0_8 = { package = "rand", version = "0.8", optional = true }
+ring = { version = "0.17", optional = true }
 ssi-crypto.workspace = true
 ssi-jwk.workspace = true
 ssi-core.workspace = true

@@ -659,7 +659,7 @@ mod tests {
             "proof: {}",
             serde_json::to_string_pretty(&vc.proofs).unwrap()
         );
-        assert_eq!(vc.proofs.first().unwrap().signature.as_ref(), "eyJhbGciOiJFUzI1NksiLCJjcml0IjpbImI2NCJdLCJiNjQiOmZhbHNlfQ..jTUkFd_eYI72Y8j2OS5LRLhlc3gZn-gVsb76soi3FuJ5gWrbOb0W2CW6D-sjEsCuLkvSOfYd8Y8hB9pyeeZ2TQ");
+        assert_eq!(vc.proofs.first().unwrap().signature.as_ref(), "eyJhbGciOiJFUzI1NksiLCJjcml0IjpbImI2NCJdLCJiNjQiOmZhbHNlfQ..0iH-q09aS7aFR2HcCR4MVFGWSOqwFDggKB8TT7O6cBR6J1g6ukZ7Z4CqokMWGv-ZdenKQI_NaHamaH1NSHIsSg");
         assert!(vc.verify(&params).await.unwrap().is_ok());
 
         // test that issuer is verified

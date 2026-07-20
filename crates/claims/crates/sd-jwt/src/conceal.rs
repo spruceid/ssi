@@ -1,7 +1,7 @@
 use std::borrow::Borrow;
 
 use base64::Engine;
-use rand::{thread_rng, CryptoRng, RngCore};
+use rand::{rng, CryptoRng};
 use serde::Serialize;
 use serde_json::Value;
 use ssi_claims_core::SignatureError;
@@ -52,7 +52,7 @@ pub trait ConcealJwtClaims {
         &self,
         sd_alg: SdAlg,
         pointers: &[impl Borrow<JsonPointer>],
-        rng: impl CryptoRng + RngCore,
+        rng: impl CryptoRng,
     ) -> Result<(SdJwtPayload, Vec<DecodedDisclosure<'static>>), ConcealError>;
 
     /// Conceals and signs these JWT claims.
@@ -71,7 +71,7 @@ pub trait ConcealJwtClaims {
         sd_alg: SdAlg,
         pointers: &[impl Borrow<JsonPointer>],
         signer: impl JwsSigner,
-        rng: impl CryptoRng + RngCore,
+        rng: impl CryptoRng,
     ) -> Result<SdJwtBuf, SignatureError>;
 }
 
@@ -88,7 +88,7 @@ impl<T: Serialize> ConcealJwtClaims for JWTClaims<T> {
         &self,
         sd_alg: SdAlg,
         pointers: &[impl Borrow<JsonPointer>],
-        rng: impl CryptoRng + RngCore,
+        rng: impl CryptoRng,
     ) -> Result<(SdJwtPayload, Vec<DecodedDisclosure<'static>>), ConcealError> {
         SdJwtPayload::conceal_with(self, sd_alg, pointers, rng)
     }
@@ -107,7 +107,7 @@ impl<T: Serialize> ConcealJwtClaims for JWTClaims<T> {
         sd_alg: SdAlg,
         pointers: &[impl Borrow<JsonPointer>],
         signer: impl JwsSigner,
-        rng: impl CryptoRng + RngCore,
+        rng: impl CryptoRng,
     ) -> Result<SdJwtBuf, SignatureError> {
         SdJwtBuf::conceal_and_sign_with(self, sd_alg, pointers, signer, rng).await
     }
@@ -121,7 +121,7 @@ impl SdJwtPayload {
         sd_alg: SdAlg,
         pointers: &[impl Borrow<JsonPointer>],
     ) -> Result<(Self, Vec<DecodedDisclosure<'static>>), ConcealError> {
-        Self::conceal_with(value, sd_alg, pointers, thread_rng())
+        Self::conceal_with(value, sd_alg, pointers, rng())
     }
 
     /// Conceal a value using the given JSON pointers, returning a SD-JWT
@@ -130,7 +130,7 @@ impl SdJwtPayload {
         value: &T,
         sd_alg: SdAlg,
         pointers: &[impl Borrow<JsonPointer>],
-        rng: impl CryptoRng + RngCore,
+        rng: impl CryptoRng,
     ) -> Result<(Self, Vec<DecodedDisclosure<'static>>), ConcealError> {
         match serde_json::to_value(value)? {
             Value::Object(obj) => Self::conceal_claims(obj, rng, sd_alg, pointers),
@@ -142,7 +142,7 @@ impl SdJwtPayload {
     /// payload and disclosures.
     pub fn conceal_claims(
         mut claims: serde_json::Map<String, Value>,
-        mut rng: impl CryptoRng + RngCore,
+        mut rng: impl CryptoRng,
         sd_alg: SdAlg,
         pointers: &[impl Borrow<JsonPointer>],
     ) -> Result<(Self, Vec<DecodedDisclosure<'static>>), ConcealError> {
@@ -164,7 +164,7 @@ impl SdJwtPayload {
     }
 }
 
-fn generate_salt(rng: &mut (impl CryptoRng + RngCore)) -> String {
+fn generate_salt(rng: &mut impl CryptoRng) -> String {
     // TODO: link to rfc wrt suggested bit size of salt
     const DEFAULT_SALT_SIZE: usize = 128 / 8;
     let mut salt_bytes = [0u8; DEFAULT_SALT_SIZE];
@@ -174,7 +174,7 @@ fn generate_salt(rng: &mut (impl CryptoRng + RngCore)) -> String {
 
 fn conceal_at(
     value: &mut Value,
-    rng: &mut (impl CryptoRng + RngCore),
+    rng: &mut impl CryptoRng,
     sd_alg: SdAlg,
     pointer: &JsonPointer,
 ) -> Result<DecodedDisclosure<'static>, ConcealError> {
@@ -187,7 +187,7 @@ fn conceal_at(
 
 fn conceal_object_at(
     object: &mut serde_json::Map<String, Value>,
-    rng: &mut (impl CryptoRng + RngCore),
+    rng: &mut impl CryptoRng,
     sd_alg: SdAlg,
     pointer: &JsonPointer,
 ) -> Result<DecodedDisclosure<'static>, ConcealError> {
@@ -219,7 +219,7 @@ fn conceal_object_at(
 
 fn conceal_array_at(
     array: &mut [Value],
-    rng: &mut (impl CryptoRng + RngCore),
+    rng: &mut impl CryptoRng,
     sd_alg: SdAlg,
     pointer: &JsonPointer,
 ) -> Result<DecodedDisclosure<'static>, ConcealError> {

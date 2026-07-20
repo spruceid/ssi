@@ -31,11 +31,12 @@ where
             multi_encoded.decode().map_err(SignatureError::other)?
         }
         None => {
-            let mut rng = rand::thread_rng();
+            use p256::elliptic_curve::Generate;
+            let mut rng = rand::rng();
 
             // Locally generated P-256 ECDSA key pair, scoped to the specific proof and
             // destroyed with this algorithm terminates.
-            p256::SecretKey::random(&mut rng)
+            p256::SecretKey::generate_from_rng(&mut rng)
         }
     };
 

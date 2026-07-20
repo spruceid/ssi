@@ -53,7 +53,7 @@ ssi-crypto.workspace = true
 k256 = { workspace = true, optional = true, features = ["ecdsa"] }
 p256 = { workspace = true, optional = true, features = ["ecdsa"] }
 p384 = { workspace = true, optional = true, features = ["ecdsa"] }
-ring = { version = "0.16", optional = true }
+ring = { version = "0.17", optional = true }
 rsa = { workspace = true, optional = true }
 rand = { workspace = true, optional = true }
 ed25519-dalek = { workspace = true, optional = true, features = ["rand_core"] }
@@ -67,7 +67,10 @@ linked-data.workspace = true
 json-syntax = { workspace = true, features = ["serde", "canonicalize"] }
 
 [target.'cfg(target_arch = "wasm32")'.dependencies]
-getrandom = { workspace = true, features = ["js"], optional = true }
+getrandom = { workspace = true, features = ["wasm_js"], optional = true }
+# `im` (via json-ld/linked-data) pulls a transitive `getrandom 0.2` through `rand_core 0.6`;
+# enable its `js` backend so wasm builds keep working alongside the direct `getrandom 0.4`.
+getrandom_0_2 = { package = "getrandom", version = "0.2", features = ["js"] }
 
 [dev-dependencies]
 hex.workspace = true

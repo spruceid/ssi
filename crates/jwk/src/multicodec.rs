@@ -73,24 +73,24 @@ impl JWK {
                 match curve.as_str() {
                     #[cfg(feature = "secp256k1")]
                     "secp256k1" => {
-                        use k256::elliptic_curve::sec1::ToEncodedPoint;
+                        use k256::elliptic_curve::sec1::ToSec1Point;
                         let pk = k256::PublicKey::try_from(params)
                             .map_err(ToMulticodecError::InvalidInputKey)?;
 
                         Ok(MultiEncodedBuf::encode_bytes(
                             ssi_multicodec::SECP256K1_PUB,
-                            pk.to_encoded_point(true).as_bytes(),
+                            pk.to_sec1_point(true).as_bytes(),
                         ))
                     }
                     #[cfg(feature = "secp256r1")]
                     "P-256" => {
-                        use p256::elliptic_curve::sec1::ToEncodedPoint;
+                        use p256::elliptic_curve::sec1::ToSec1Point;
                         let pk = p256::PublicKey::try_from(params)
                             .map_err(ToMulticodecError::InvalidInputKey)?;
 
                         Ok(MultiEncodedBuf::encode_bytes(
                             ssi_multicodec::P256_PUB,
-                            pk.to_encoded_point(true).as_bytes(),
+                            pk.to_sec1_point(true).as_bytes(),
                         ))
                     }
                     #[cfg(feature = "secp384r1")]

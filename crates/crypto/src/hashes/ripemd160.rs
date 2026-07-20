@@ -1,10 +1,10 @@
 use crate::hashes::sha256::sha256;
 
-use k256::{elliptic_curve::sec1::ToEncodedPoint, PublicKey};
-use ripemd160::{Digest, Ripemd160};
+use k256::{elliptic_curve::sec1::ToSec1Point, PublicKey};
+use ripemd::{Digest, Ripemd160};
 
 pub fn hash_public_key(pk: &PublicKey, version: u8) -> String {
-    let pk_bytes = pk.to_encoded_point(true);
+    let pk_bytes = pk.to_sec1_point(true);
     // as long as its a PublicKey input, I think we can skip the len check
     let pk_sha256 = sha256(pk_bytes.as_bytes());
     let pk_ripemd160 = Ripemd160::digest(&pk_sha256);

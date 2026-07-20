@@ -1,15 +1,15 @@
 use std::ops::Deref;
 
-use getrandom::getrandom;
-pub use hmac::Hmac;
-use hmac::Mac;
+use getrandom::fill;
+pub use hmac::{Hmac, HmacReset};
+use hmac::{KeyInit, Mac};
 use serde::{Deserialize, Serialize};
 use sha2::{Sha256, Sha384};
 
 pub use ssi_core::{JsonPointer, JsonPointerBuf};
 
-pub type HmacSha256 = Hmac<Sha256>;
-pub type HmacSha384 = Hmac<Sha384>;
+pub type HmacSha256 = HmacReset<Sha256>;
+pub type HmacSha384 = HmacReset<Sha384>;
 
 #[derive(Debug, Clone, Copy)]
 pub enum ShaAny {
@@ -25,12 +25,12 @@ impl ShaAny {
             (_, Some(_)) => Err(IntoHmacError::IncompatibleKey),
             (Self::Sha256, None) => {
                 let mut key = HmacSha256Key::default();
-                getrandom(&mut key).map_err(IntoHmacError::rng)?;
+                fill(&mut key).map_err(IntoHmacError::rng)?;
                 Ok(HmacShaAnyKey::Sha256(key))
             }
             (Self::Sha384, None) => {
                 let mut key = [0; 48];
-                getrandom(&mut key).map_err(IntoHmacError::rng)?;
+                fill(&mut key).map_err(IntoHmacError::rng)?;
                 Ok(HmacShaAnyKey::Sha384(key))
             }
         }
@@ -47,14 +47,14 @@ impl ShaAny {
             (_, Some(_)) => Err(IntoHmacError::IncompatibleKey),
             (Self::Sha256, None) => {
                 let mut key = HmacSha256Key::default();
-                getrandom(&mut key).map_err(IntoHmacError::rng)?;
+                fill(&mut key).map_err(IntoHmacError::rng)?;
                 Ok(HmacShaAny::Sha256(
                     HmacSha256::new_from_slice(&key).unwrap(),
                 ))
             }
             (Self::Sha384, None) => {
                 let mut key = [0; 48];
-                getrandom(&mut key).map_err(IntoHmacError::rng)?;
+                fill(&mut key).map_err(IntoHmacError::rng)?;
                 Ok(HmacShaAny::Sha384(
                     HmacSha384::new_from_slice(&key).unwrap(),
                 ))

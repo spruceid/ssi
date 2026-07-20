@@ -56,7 +56,7 @@ where
         FeatureOption::PseudonymIssuerPid => {
             // See: <https://www.ietf.org/archive/id/draft-vasilis-bbs-per-verifier-linkability-00.html#section-4.1>
             let mut pid = [0u8; 32];
-            getrandom::getrandom(&mut pid).map_err(SignatureError::other)?;
+            getrandom::fill(&mut pid).map_err(SignatureError::other)?;
 
             messages.push(pid.to_vec());
 

@@ -1,6 +1,6 @@
 use std::{borrow::Cow, collections::HashMap, hash::Hash};
 
-use getrandom::getrandom;
+use getrandom::fill;
 use ssi_data_integrity_core::suite::standard::TransformationError;
 use ssi_di_sd_primitives::{group::canonicalize_and_group, HmacSha256Key, HmacShaAnyKey};
 use ssi_json_ld::{Expandable, ExpandedDocument, JsonLdNodeObject};
@@ -27,7 +27,7 @@ where
         None => {
             // Generate a random key
             let mut key = HmacSha256Key::default();
-            getrandom(&mut key).map_err(TransformationError::internal)?;
+            fill(&mut key).map_err(TransformationError::internal)?;
             key
         }
     };

@@ -2,7 +2,6 @@
 //! with TreeLDR, using the `Ed25519Signature2020` cryptographic suite.
 use iref::{Iri, IriBuf, Uri, UriBuf};
 use linked_data::{LinkedDataResource, LinkedDataSubject};
-use rand_chacha::rand_core::SeedableRng;
 use ssi_claims_core::{SignatureError, VerificationParameters};
 use ssi_data_integrity::{suites::Ed25519Signature2020, CryptographicSuite, ProofOptions};
 use ssi_json_ld::{Expandable, Loader};
@@ -135,7 +134,7 @@ async fn main() {
     let mut keyring = Keyring::default();
 
     // Create a new key `https://example.com/controller#key`.
-    let mut csprng = rand_chacha::ChaCha8Rng::from_entropy();
+    let mut csprng = rand::rng();
     let secret_key = ssi_verification_methods::ed25519_dalek::SigningKey::generate(&mut csprng);
     keyring.insert_key_pair(
         Ed25519VerificationKey2020::from_public_key(
