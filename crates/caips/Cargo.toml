@@ -9,24 +9,48 @@ repository = "https://github.com/spruceid/ssi/"
 documentation = "https://docs.rs/ssi-caips/"
 
 [features]
-default = ["eip", "ripemd-160", "ssi-jwk/secp256k1"]
-eip = ["ssi-jwk/eip"]
-ripemd-160 = ["ssi-jwk/ripemd-160"]
+default = ["caip10", "eip", "ripemd-160", "ssi-jwk/secp256k1"]
+
+## Enable the `caip2` module, providing CAIP-2 blockchain ids.
+##
+## `thiserror` is the only dependency required by this feature.
+caip2 = []
+
+## Enable the `caip10` module, providing CAIP-10 blockchain account ids.
+##
+## This requires a public key implementation (`ssi-jwk`) and RDF/serde support,
+## which is most of the weight of this crate. Implies `caip2`.
+caip10 = [
+  "caip2",
+  "dep:ssi-jwk",
+  "dep:bs58",
+  "dep:serde",
+  "dep:linked-data",
+  "dep:xsd-types",
+]
+
+## Enable the verification of `eip155` accounts.
+eip = ["caip10", "ssi-jwk/eip"]
+
+## Enable the verification of `bip122` (Bitcoin, Dogecoin) accounts.
+ripemd-160 = ["caip10", "ssi-jwk/ripemd-160"]
 
 ## Enable aleo accounts.
 ##
 ## Not compatible with WASM targets.
-aleo = ["ssi-jwk/aleo", "bech32"]
-tezos = ["ssi-jwk/tezos"]
+aleo = ["caip10", "ssi-jwk/aleo", "bech32"]
+
+## Enable the verification of `tezos` accounts.
+tezos = ["caip10", "ssi-jwk/tezos"]
 
 [dependencies]
 thiserror = "1"
-ssi-jwk.workspace = true
-bs58 = { workspace = true, features = ["check"] }
+ssi-jwk = { workspace = true, optional = true }
+bs58 = { workspace = true, features = ["check"], optional = true }
 bech32 = { version = "0.8", optional = true }
-serde.workspace = true
-linked-data.workspace = true
-xsd-types.workspace = true
+serde = { workspace = true, optional = true }
+linked-data = { workspace = true, optional = true }
+xsd-types = { workspace = true, optional = true }
 
 [dev-dependencies]
 serde_json = "1.0"

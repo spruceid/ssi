@@ -238,7 +238,7 @@ ssi-status.workspace = true
 ssi-verification-methods.workspace = true
 ssi-dids.workspace = true
 ssi-eip712.workspace = true
-ssi-caips.workspace = true
+ssi-caips = { workspace = true, features = ["caip10"] }
 ssi-ucan.workspace = true
 ssi-zcap-ld.workspace = true
 ssi-multicodec.workspace = true

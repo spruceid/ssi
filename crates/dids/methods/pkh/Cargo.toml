@@ -21,7 +21,7 @@ solana = []
 
 [dependencies]
 ssi-crypto.workspace = true
-ssi-caips.workspace = true
+ssi-caips = { workspace = true, features = ["caip10"] }
 ssi-dids-core.workspace = true
 ssi-jwk.workspace = true
 iref.workspace = true
@@ -53,7 +53,7 @@ ssi-claims = { workspace = true, features = [
 ] }
 ssi-tzkey.workspace = true
 ssi-eip712.workspace = true
-ssi-caips = { workspace = true, features = ["eip"] }
+ssi-caips = { workspace = true, features = ["caip10", "eip"] }
 ssi-jws.workspace = true
 rdf-types.workspace = true
 xsd-types.workspace = true

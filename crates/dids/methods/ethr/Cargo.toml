@@ -13,7 +13,7 @@ documentation = "https://docs.rs/did-ethr/"
 
 [dependencies]
 ssi-dids-core.workspace = true
-ssi-caips = { workspace = true, features = ["eip"] }
+ssi-caips = { workspace = true, features = ["caip10", "eip"] }
 ssi-jwk.workspace = true
 iref.workspace = true
 static-iref.workspace = true
