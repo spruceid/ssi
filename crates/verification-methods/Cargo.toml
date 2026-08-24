@@ -64,7 +64,7 @@ ssi-crypto.workspace = true
 ssi-jwk.workspace = true
 ssi-jws.workspace = true
 ssi-security.workspace = true
-ssi-caips.workspace = true
+ssi-caips = { workspace = true, features = ["caip10"] }
 ssi-claims-core.workspace = true
 ssi-verification-methods-core.workspace = true
 ssi-tzkey = { workspace = true, optional = true }

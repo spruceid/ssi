@@ -86,7 +86,7 @@ tezos = [
 ]
 
 ## Enables `AleoSignature2021`.
-aleo = ["ssi-jwk/aleo", "ssi-verification-methods/aleo", "k256"]
+aleo = ["ssi-jwk/aleo", "ssi-verification-methods/aleo", "ssi-caips/aleo", "k256"]
 
 ## Signature suites based on Ethereum EIP-712.
 ##

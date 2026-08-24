@@ -24,7 +24,7 @@ ssi-jwt.workspace = true
 ssi-dids-core.workspace = true
 ssi-core.workspace = true
 ssi-verification-methods.workspace = true
-ssi-caips.workspace = true
+ssi-caips = { workspace = true, features = ["caip10"] }
 chrono = { workspace = true, features = ["serde"] }
 serde_ipld_dagjson = "0.2.0"
 cid = "0.11.1"
