@@ -106,8 +106,14 @@ impl DIDMethodResolver for DIDWeb {
         let url = did_web_url(method_specific_id)?;
         // TODO: https://w3c-ccg.github.io/did-method-web/#in-transit-security
 
+        #[cfg_attr(target_arch = "wasm32", allow(unused_mut))]
         let mut headers = reqwest::header::HeaderMap::new();
 
+        // In a browser the User-Agent belongs to the browser: setting it turns
+        // the did.json GET into a preflighted CORS request (the header is not
+        // CORS-safelisted), which did:web hosts do not generally allowlist.
+        // Native clients keep identifying themselves.
+        #[cfg(not(target_arch = "wasm32"))]
         headers.insert(
             "User-Agent",
             reqwest::header::HeaderValue::from_static(USER_AGENT),
