@@ -35,7 +35,7 @@ ssi-rdf = { path = "./crates/rdf", version = "0.1", default-features = false }
 ssi-contexts = { path = "./crates/contexts", version = "0.1.10", default-features = false }
 ssi-json-ld = { path = "./crates/json-ld", version = "0.3.3", default-features = false }
 ssi-security = { path = "./crates/security", version = "0.1", default-features = false }
-ssi-caips = { path = "./crates/caips", version = "0.3", default-features = false }
+ssi-caips = { path = "./crates/caips", version = "0.4", default-features = false }
 ssi-ucan = { path = "./crates/ucan", version = "0.5", default-features = false }
 ssi-zcap-ld = { path = "./crates/zcap-ld", version = "0.8", default-features = false }
 ssi-ssh = { path = "./crates/ssh", version = "0.3", default-features = false }
