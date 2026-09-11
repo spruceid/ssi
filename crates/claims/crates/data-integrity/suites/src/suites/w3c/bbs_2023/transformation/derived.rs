@@ -2,8 +2,10 @@ use super::TransformedDerived;
 use rdf_types::Quad;
 use serde::Serialize;
 use ssi_data_integrity_core::suite::standard::TransformationError;
-use ssi_json_ld::{Expandable, ExpandedDocument, JsonLdNodeObject};
-use ssi_rdf::{LdEnvironment, LexicalInterpretation};
+use ssi_json_ld::{
+    syntax::Value, Expandable, ExpandedDocument, JsonLdNodeObject, JsonLdProcessor, RemoteDocument,
+};
+use ssi_rdf::{LexicalInterpretation, LexicalQuad};
 
 /// See: <https://www.w3.org/TR/vc-di-bbs/#createverifydata>
 pub async fn create_verify_data1<T>(
@@ -15,17 +17,20 @@ where
     T: Serialize + JsonLdNodeObject + Expandable,
     T::Expanded<LexicalInterpretation, ()>: Into<ExpandedDocument>,
 {
-    let mut ld = LdEnvironment::default();
+    // Serialize with `to_rdf`, matching the issuer-side `canonicalize_and_group`.
+    // `linked_data::to_lexical_quads` rewrites context-coerced literal datatypes
+    // and would not reproduce the signed quads. Expansion stays strict.
+    let value: Value = json_syntax::to_value(unsecured_document)
+        .map_err(TransformationError::json_ld_expansion)?;
 
-    let mut expanded: ExpandedDocument = unsecured_document
-        .expand_with(&mut ld, loader)
+    let mut generator = rdf_types::generator::Blank::new();
+    let quads: Vec<LexicalQuad> = RemoteDocument::new(None, None, value)
+        .to_rdf_using(&mut generator, loader, ssi_json_ld::strict_options())
         .await
         .map_err(TransformationError::json_ld_expansion)?
-        .into();
-    expanded.canonicalize();
-
-    let quads =
-        linked_data::to_lexical_quads_with(&mut ld.vocabulary, &mut ld.interpretation, &expanded)?;
+        .cloned_quads()
+        .map(|quad| quad.map_predicate(|p| p.into_iri().unwrap()))
+        .collect();
 
     let canonical_id_map =
         ssi_rdf::urdna2015::normalize(quads.iter().map(Quad::as_lexical_quad_ref))

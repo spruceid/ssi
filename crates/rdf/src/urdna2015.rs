@@ -437,12 +437,15 @@ pub fn hash_n_degree_quads(
             // 5.4.4
             for related in permutation {
                 // 5.4.4.1
+                // An already-canonical `related` is appended to the path as-is.
+                // Recursing on it instead re-issues a temporary identifier in
+                // 5.4.5 and corrupts the path (wrong labels for symmetric
+                // blank-node structures, e.g. repeated `@list`s).
                 if let Some(canonical_identifier) = normalization_state
                     .canonical_issuer
                     .find_issued_identifier(related)
-                    .as_ref()
                 {
-                    recursion_list.push((*canonical_identifier).to_owned());
+                    path.push_str(canonical_identifier.as_str());
                 // 5.4.4.2
                 } else {
                     // 5.4.4.2.1

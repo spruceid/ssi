@@ -39,6 +39,25 @@ pub enum JsonLdError {
     Interpretation(#[from] linked_data::IntoQuadsError),
 }
 
+/// Expansion policy that rejects undefined or invalid terms.
+///
+/// Data Integrity (§2.4.3) requires an error whenever a JSON-LD processor
+/// would drop data, so transformations must use this instead of the lenient
+/// `json_ld` default.
+pub const STRICT_EXPANSION_POLICY: json_ld::expansion::Policy = json_ld::expansion::Policy {
+    invalid: Action::Reject,
+    vocab: Action::Keep,
+    allow_undefined: false,
+};
+
+/// JSON-LD processor options using [`STRICT_EXPANSION_POLICY`].
+pub fn strict_options<I>() -> json_ld::Options<I> {
+    json_ld::Options {
+        expansion_policy: STRICT_EXPANSION_POLICY,
+        ..Default::default()
+    }
+}
+
 #[repr(transparent)]
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(transparent)]
@@ -112,11 +131,7 @@ impl Expandable for CompactJsonLd {
                 None,
                 loader,
                 json_ld::expansion::Options {
-                    policy: json_ld::expansion::Policy {
-                        invalid: Action::Reject,
-                        allow_undefined: false,
-                        ..Default::default()
-                    },
+                    policy: STRICT_EXPANSION_POLICY,
                     ..Default::default()
                 },
                 (),
