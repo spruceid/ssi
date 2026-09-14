@@ -440,9 +440,8 @@ pub fn hash_n_degree_quads(
                 if let Some(canonical_identifier) = normalization_state
                     .canonical_issuer
                     .find_issued_identifier(related)
-                    .as_ref()
                 {
-                    recursion_list.push((*canonical_identifier).to_owned());
+                    path.push_str(canonical_identifier.as_str());
                 // 5.4.4.2
                 } else {
                     // 5.4.4.2.1

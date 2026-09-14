@@ -1,8 +1,12 @@
 use digest::Digest;
 use std::marker::PhantomData;
 
-use ssi_json_ld::{Expandable, JsonLdLoaderProvider, JsonLdNodeObject};
-use ssi_rdf::{AnyLdEnvironment, LdEnvironment};
+use rdf_types::{generator, Quad};
+use serde::Serialize;
+use ssi_json_ld::{
+    syntax::Value, JsonLdLoaderProvider, JsonLdNodeObject, JsonLdProcessor, RemoteDocument,
+};
+use ssi_rdf::{urdna2015, LexicalQuad};
 
 use crate::{
     hashing::ConcatOutputSize,
@@ -32,7 +36,7 @@ impl<S: CryptographicSuite> standard::TransformationAlgorithm<S>
 impl<S, T, C> standard::TypedTransformationAlgorithm<S, T, C> for CanonicalizeClaimsAndConfiguration
 where
     S: SerializeCryptographicSuite,
-    T: JsonLdNodeObject + Expandable,
+    T: JsonLdNodeObject + Serialize,
     C: JsonLdLoaderProvider,
 {
     async fn transform(
@@ -42,17 +46,33 @@ where
         _verification_method: &S::VerificationMethod,
         _transformation_options: TransformationOptions<S>,
     ) -> Result<Self::Output, TransformationError> {
-        let mut ld = LdEnvironment::default();
-
-        let expanded = data
-            .expand_with(&mut ld, context.loader())
-            .await
+        // Serialize via json-ld `to_rdf`, which keeps the datatype IRI the
+        // context coerces a literal to (e.g. OpenBadge's
+        // `https://www.w3.org/2001/XMLSchema#boolean`). The previous
+        // `linked_data::to_lexical_quads` path rewrote such datatypes to the
+        // canonical `http://…` form and broke verification of those credentials.
+        // Expansion stays strict: undefined terms are an error, not dropped.
+        let value: Value = json_syntax::to_value(data)
             .map_err(|e| TransformationError::JsonLdExpansion(e.to_string()))?;
 
+        let mut generator = generator::Blank::new();
+        let quads: Vec<LexicalQuad> = RemoteDocument::new(None, None, value)
+            .to_rdf_using(
+                &mut generator,
+                context.loader(),
+                ssi_json_ld::strict_options(),
+            )
+            .await
+            .map_err(|e| TransformationError::JsonLdExpansion(e.to_string()))?
+            .cloned_quads()
+            .map(|quad| quad.map_predicate(|p| p.into_iri().unwrap()))
+            .collect();
+
+        let claims =
+            urdna2015::normalize(quads.iter().map(Quad::as_lexical_quad_ref)).into_nquads_lines();
+
         Ok(CanonicalClaimsAndConfiguration {
-            claims: ld
-                .canonical_form_of(&expanded)
-                .map_err(TransformationError::JsonLdDeserialization)?,
+            claims,
             configuration: proof_configuration
                 .expand(context, data)
                 .await

@@ -122,5 +122,6 @@ chrono.workspace = true
 
 [dev-dependencies]
 ssi-multicodec.workspace = true
+ssi-dids = { workspace = true, features = ["secp256r1"] }
 serde = { workspace = true, features = ["derive"] }
 async-std = { workspace = true, features = ["attributes"] }

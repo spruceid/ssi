@@ -1,0 +1,42 @@
+{
+  "@context": {
+    "@protected": true,
+    "id": "@id",
+    "type": "@type",
+    "TemplateRenderMethod": {
+      "@id": "https://w3id.org/vc/render-method#TemplateRenderMethod",
+      "@context": {
+        "@protected": true,
+        "id": "@id",
+        "type": "@type",
+        "description": "https://schema.org/description",
+        "name": "https://schema.org/name",
+        "renderSuite": "https://w3id.org/vc/render-method#renderSuite",
+        "renderProperty": {
+          "@id": "https://w3id.org/vc/render-method#renderProperty",
+          "@container": "@set"
+        },
+        "outputPreference": {
+          "@id": "https://w3id.org/vc/render-method#outputPreference",
+          "@context": {
+            "@protected": true,
+            "id": "@id",
+            "mode": {
+              "@id": "https://w3id.org/vc/render-method#mode",
+              "@container": "@set"
+            },
+            "mediaType": "https://schema.org/encodingFormat",
+            "style": {
+              "@id": "https://w3id.org/vc/render-method#style",
+              "@type": "@json"
+            }
+          }
+        },
+        "template": {
+          "@id": "https://w3id.org/vc/render-method#template",
+          "@type": "@id"
+        }
+      }
+    }
+  }
+}
