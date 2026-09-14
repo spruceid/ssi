@@ -93,19 +93,18 @@ impl<T, S: CryptographicSuite> DataIntegrity<T, S> {
         // A proof set may pair full-document signatures (e.g. `ecdsa-rdfc-2019`)
         // with one SD base proof (e.g. `ecdsa-sd-2023`). Only the SD proof can
         // be derived from, so select it and ignore the others.
-        let mut selective = self.proofs.iter().filter(|p| p.suite().is_selective());
-        match (selective.next(), selective.next()) {
-            (Some(proof), None) => {
-                proof
-                    .suite()
-                    .select(&self.claims, proof.borrowed(), params, options)
-                    .await
+        let mut selected = None;
+        for proof in self.proofs.iter() {
+            if proof.suite().is_selective() && selected.replace(proof).is_some() {
+                return Err(SelectionError::AmbiguousProof);
             }
-            // More than one derivable proof.
-            (Some(_), Some(_)) => Err(SelectionError::AmbiguousProof),
-            // No derivable proof (empty set, or only full-document signatures).
-            (None, _) => Err(SelectionError::MissingProof),
         }
+
+        let proof = selected.ok_or(SelectionError::MissingProof)?;
+        proof
+            .suite()
+            .select(&self.claims, proof.borrowed(), params, options)
+            .await
     }
 
     pub fn map<U>(self, f: impl FnOnce(T) -> U) -> DataIntegrity<U, S> {
