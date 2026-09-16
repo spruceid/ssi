@@ -1,374 +1,15 @@
-use iref::Iri;
-use ssi_caips::caip10::BlockchainAccountId;
-use ssi_caips::caip2::ChainId;
-use ssi_dids_core::{
-    document::{
-        self,
-        representation::{self, MediaType},
-        DIDVerificationMethod,
-    },
-    resolution::{self, DIDMethodResolver, Error, Output},
-    DIDBuf, DIDMethod, DIDURLBuf, Document, DIDURL,
-};
-use static_iref::iri;
-use std::str::FromStr;
-
+mod abi;
+mod events;
 mod json_ld_context;
-use json_ld_context::JsonLdContext;
-use ssi_jwk::JWK;
+mod network;
+mod provider;
+mod resolver;
+mod vm;
 
-/// did:ethr DID Method
-///
-/// [Specification](https://github.com/decentralized-identity/ethr-did-resolver/)
-pub struct DIDEthr;
-
-impl DIDEthr {
-    pub fn generate(jwk: &JWK) -> Result<DIDBuf, ssi_jwk::Error> {
-        let hash = ssi_jwk::eip155::hash_public_key(jwk)?;
-        Ok(DIDBuf::from_string(format!("did:ethr:{}", hash)).unwrap())
-    }
-}
-
-impl DIDMethod for DIDEthr {
-    const DID_METHOD_NAME: &'static str = "ethr";
-}
-
-impl DIDMethodResolver for DIDEthr {
-    async fn resolve_method_representation<'a>(
-        &'a self,
-        method_specific_id: &'a str,
-        options: resolution::Options,
-    ) -> Result<Output<Vec<u8>>, Error> {
-        let decoded_id = DecodedMethodSpecificId::from_str(method_specific_id)
-            .map_err(|_| Error::InvalidMethodSpecificId(method_specific_id.to_owned()))?;
-
-        let mut json_ld_context = JsonLdContext::default();
-
-        let doc = match decoded_id.address_or_public_key.len() {
-            42 => resolve_address(
-                &mut json_ld_context,
-                method_specific_id,
-                decoded_id.network_chain,
-                decoded_id.address_or_public_key,
-            ),
-            68 => resolve_public_key(
-                &mut json_ld_context,
-                method_specific_id,
-                decoded_id.network_chain,
-                &decoded_id.address_or_public_key,
-            ),
-            _ => Err(Error::InvalidMethodSpecificId(
-                method_specific_id.to_owned(),
-            )),
-        }?;
-
-        let content_type = options.accept.unwrap_or(MediaType::JsonLd);
-        let represented = doc.into_representation(representation::Options::from_media_type(
-            content_type,
-            move || representation::json_ld::Options {
-                context: representation::json_ld::Context::array(
-                    representation::json_ld::DIDContext::V1,
-                    json_ld_context.into_entries(),
-                ),
-            },
-        ));
-
-        Ok(resolution::Output::new(
-            represented.to_bytes(),
-            document::Metadata::default(),
-            resolution::Metadata::from_content_type(Some(content_type.to_string())),
-        ))
-    }
-}
-
-struct DecodedMethodSpecificId {
-    network_chain: NetworkChain,
-    address_or_public_key: String,
-}
-
-impl FromStr for DecodedMethodSpecificId {
-    type Err = InvalidNetwork;
-
-    fn from_str(method_specific_id: &str) -> Result<Self, Self::Err> {
-        // https://github.com/decentralized-identity/ethr-did-resolver/blob/master/doc/did-method-spec.md#method-specific-identifier
-        let (network_name, address_or_public_key) = match method_specific_id.split_once(':') {
-            None => ("mainnet".to_string(), method_specific_id.to_string()),
-            Some((network, address_or_public_key)) => {
-                (network.to_string(), address_or_public_key.to_string())
-            }
-        };
-
-        Ok(DecodedMethodSpecificId {
-            network_chain: network_name.parse()?,
-            address_or_public_key,
-        })
-    }
-}
-
-#[derive(Debug, thiserror::Error)]
-#[error("invalid network `{0}`")]
-struct InvalidNetwork(String);
-
-enum NetworkChain {
-    Mainnet,
-    Morden,
-    Ropsten,
-    Rinkeby,
-    Georli,
-    Kovan,
-    Other(u64),
-}
-
-impl NetworkChain {
-    pub fn id(&self) -> u64 {
-        match self {
-            Self::Mainnet => 1,
-            Self::Morden => 2,
-            Self::Ropsten => 3,
-            Self::Rinkeby => 4,
-            Self::Georli => 5,
-            Self::Kovan => 42,
-            Self::Other(i) => *i,
-        }
-    }
-}
-
-impl FromStr for NetworkChain {
-    type Err = InvalidNetwork;
-
-    fn from_str(network_name: &str) -> Result<Self, Self::Err> {
-        match network_name {
-            "mainnet" => Ok(Self::Mainnet),
-            "morden" => Ok(Self::Morden),
-            "ropsten" => Ok(Self::Ropsten),
-            "rinkeby" => Ok(Self::Rinkeby),
-            "goerli" => Ok(Self::Georli),
-            "kovan" => Ok(Self::Kovan),
-            network_chain_id if network_chain_id.starts_with("0x") => {
-                match u64::from_str_radix(&network_chain_id[2..], 16) {
-                    Ok(chain_id) => Ok(Self::Other(chain_id)),
-                    Err(_) => Err(InvalidNetwork(network_name.to_owned())),
-                }
-            }
-            _ => Err(InvalidNetwork(network_name.to_owned())),
-        }
-    }
-}
-
-fn resolve_address(
-    json_ld_context: &mut JsonLdContext,
-    method_specific_id: &str,
-    network_chain: NetworkChain,
-    account_address: String,
-) -> Result<Document, Error> {
-    let blockchain_account_id = BlockchainAccountId {
-        account_address,
-        chain_id: ChainId {
-            namespace: "eip155".to_string(),
-            reference: network_chain.id().to_string(),
-        },
-    };
-
-    let did = DIDBuf::from_string(format!("did:ethr:{method_specific_id}")).unwrap();
-
-    let vm = VerificationMethod::EcdsaSecp256k1RecoveryMethod2020 {
-        id: DIDURLBuf::from_string(format!("{did}#controller")).unwrap(),
-        controller: did.to_owned(),
-        blockchain_account_id: blockchain_account_id.clone(),
-    };
-
-    let eip712_vm = VerificationMethod::Eip712Method2021 {
-        id: DIDURLBuf::from_string(format!("{did}#Eip712Method2021")).unwrap(),
-        controller: did.to_owned(),
-        blockchain_account_id,
-    };
-
-    json_ld_context.add_verification_method_type(vm.type_());
-    json_ld_context.add_verification_method_type(eip712_vm.type_());
-
-    let mut doc = Document::new(did);
-    doc.verification_relationships.assertion_method =
-        vec![vm.id().to_owned().into(), eip712_vm.id().to_owned().into()];
-    doc.verification_relationships.authentication =
-        vec![vm.id().to_owned().into(), eip712_vm.id().to_owned().into()];
-    doc.verification_method = vec![vm.into(), eip712_vm.into()];
-
-    Ok(doc)
-}
-
-/// Resolve an Ethr DID that uses a public key hex string instead of an account address
-fn resolve_public_key(
-    json_ld_context: &mut JsonLdContext,
-    method_specific_id: &str,
-    network_chain: NetworkChain,
-    public_key_hex: &str,
-) -> Result<Document, Error> {
-    if !public_key_hex.starts_with("0x") {
-        return Err(Error::InvalidMethodSpecificId(
-            method_specific_id.to_owned(),
-        ));
-    }
-
-    let pk_bytes = hex::decode(&public_key_hex[2..])
-        .map_err(|_| Error::InvalidMethodSpecificId(method_specific_id.to_owned()))?;
-
-    let pk_jwk = ssi_jwk::secp256k1_parse(&pk_bytes)
-        .map_err(|_| Error::InvalidMethodSpecificId(method_specific_id.to_owned()))?;
-
-    let account_address = ssi_jwk::eip155::hash_public_key_eip55(&pk_jwk)
-        .map_err(|_| Error::InvalidMethodSpecificId(method_specific_id.to_owned()))?;
-
-    let blockchain_account_id = BlockchainAccountId {
-        account_address,
-        chain_id: ChainId {
-            namespace: "eip155".to_string(),
-            reference: network_chain.id().to_string(),
-        },
-    };
-
-    let did = DIDBuf::from_string(format!("did:ethr:{method_specific_id}")).unwrap();
-
-    let vm = VerificationMethod::EcdsaSecp256k1RecoveryMethod2020 {
-        id: DIDURLBuf::from_string(format!("{did}#controller")).unwrap(),
-        controller: did.to_owned(),
-        blockchain_account_id,
-    };
-
-    let key_vm = VerificationMethod::EcdsaSecp256k1VerificationKey2019 {
-        id: DIDURLBuf::from_string(format!("{did}#controllerKey")).unwrap(),
-        controller: did.to_owned(),
-        public_key_jwk: pk_jwk,
-    };
-
-    json_ld_context.add_verification_method_type(vm.type_());
-    json_ld_context.add_verification_method_type(key_vm.type_());
-
-    let mut doc = Document::new(did);
-    doc.verification_relationships.assertion_method =
-        vec![vm.id().to_owned().into(), key_vm.id().to_owned().into()];
-    doc.verification_relationships.authentication =
-        vec![vm.id().to_owned().into(), key_vm.id().to_owned().into()];
-    doc.verification_method = vec![vm.into(), key_vm.into()];
-
-    Ok(doc)
-}
-
-#[allow(clippy::large_enum_variant)]
-pub enum VerificationMethod {
-    EcdsaSecp256k1VerificationKey2019 {
-        id: DIDURLBuf,
-        controller: DIDBuf,
-        public_key_jwk: JWK,
-    },
-    EcdsaSecp256k1RecoveryMethod2020 {
-        id: DIDURLBuf,
-        controller: DIDBuf,
-        blockchain_account_id: BlockchainAccountId,
-    },
-    Eip712Method2021 {
-        id: DIDURLBuf,
-        controller: DIDBuf,
-        blockchain_account_id: BlockchainAccountId,
-    },
-}
-
-impl VerificationMethod {
-    pub fn id(&self) -> &DIDURL {
-        match self {
-            Self::EcdsaSecp256k1VerificationKey2019 { id, .. } => id,
-            Self::EcdsaSecp256k1RecoveryMethod2020 { id, .. } => id,
-            Self::Eip712Method2021 { id, .. } => id,
-        }
-    }
-
-    pub fn type_(&self) -> VerificationMethodType {
-        match self {
-            Self::EcdsaSecp256k1VerificationKey2019 { .. } => {
-                VerificationMethodType::EcdsaSecp256k1VerificationKey2019
-            }
-            Self::EcdsaSecp256k1RecoveryMethod2020 { .. } => {
-                VerificationMethodType::EcdsaSecp256k1RecoveryMethod2020
-            }
-            Self::Eip712Method2021 { .. } => VerificationMethodType::Eip712Method2021,
-        }
-    }
-}
-
-pub enum VerificationMethodType {
-    EcdsaSecp256k1VerificationKey2019,
-    EcdsaSecp256k1RecoveryMethod2020,
-    Eip712Method2021,
-}
-
-impl VerificationMethodType {
-    pub fn name(&self) -> &'static str {
-        match self {
-            Self::EcdsaSecp256k1VerificationKey2019 => "EcdsaSecp256k1VerificationKey2019",
-            Self::EcdsaSecp256k1RecoveryMethod2020 => "EcdsaSecp256k1RecoveryMethod2020",
-            Self::Eip712Method2021 => "Eip712Method2021",
-        }
-    }
-
-    pub fn iri(&self) -> &'static Iri {
-        match self {
-            Self::EcdsaSecp256k1VerificationKey2019 => iri!("https://w3id.org/security#EcdsaSecp256k1VerificationKey2019"),
-            Self::EcdsaSecp256k1RecoveryMethod2020 => iri!("https://identity.foundation/EcdsaSecp256k1RecoverySignature2020#EcdsaSecp256k1RecoveryMethod2020"),
-            Self::Eip712Method2021 => iri!("https://w3id.org/security#Eip712Method2021")
-        }
-    }
-}
-
-impl From<VerificationMethod> for DIDVerificationMethod {
-    fn from(value: VerificationMethod) -> Self {
-        match value {
-            VerificationMethod::EcdsaSecp256k1VerificationKey2019 {
-                id,
-                controller,
-                public_key_jwk,
-            } => Self {
-                id,
-                type_: "EcdsaSecp256k1VerificationKey2019".to_owned(),
-                controller,
-                properties: [(
-                    "publicKeyJwk".into(),
-                    serde_json::to_value(&public_key_jwk).unwrap(),
-                )]
-                .into_iter()
-                .collect(),
-            },
-            VerificationMethod::EcdsaSecp256k1RecoveryMethod2020 {
-                id,
-                controller,
-                blockchain_account_id,
-            } => Self {
-                id,
-                type_: "EcdsaSecp256k1RecoveryMethod2020".to_owned(),
-                controller,
-                properties: [(
-                    "blockchainAccountId".into(),
-                    blockchain_account_id.to_string().into(),
-                )]
-                .into_iter()
-                .collect(),
-            },
-            VerificationMethod::Eip712Method2021 {
-                id,
-                controller,
-                blockchain_account_id,
-            } => Self {
-                id,
-                type_: "Eip712Method2021".to_owned(),
-                controller,
-                properties: [(
-                    "blockchainAccountId".into(),
-                    blockchain_account_id.to_string().into(),
-                )]
-                .into_iter()
-                .collect(),
-            },
-        }
-    }
-}
+pub use network::NetworkChain;
+pub use provider::{BlockRef, EthProvider, Log, LogFilter, NetworkConfig};
+pub use resolver::DIDEthr;
+pub use vm::{VerificationMethod, VerificationMethodType};
 
 #[cfg(test)]
 mod tests {
@@ -408,7 +49,8 @@ mod tests {
     #[tokio::test]
     async fn resolve_did_ethr_addr() {
         // https://github.com/decentralized-identity/ethr-did-resolver/blob/master/doc/did-method-spec.md#create-register
-        let doc = DIDEthr
+        let resolver = DIDEthr::<()>::default();
+        let doc = resolver
             .resolve(did!("did:ethr:0xb9c5714089478a327f09197987f16f9e5d936e8a"))
             .await
             .unwrap()
@@ -451,7 +93,8 @@ mod tests {
 
     #[tokio::test]
     async fn resolve_did_ethr_pk() {
-        let doc = DIDEthr
+        let resolver = DIDEthr::<()>::default();
+        let doc = resolver
             .resolve(did!(
                 "did:ethr:0x03fdd57adec3d438ea237fe46b33ee1e016eda6b585c3e27ea66686c2ea5358479"
             ))
@@ -476,7 +119,7 @@ mod tests {
     }
 
     async fn credential_prove_verify_did_ethr2(eip712: bool) {
-        let didethr = DIDEthr.into_vm_resolver();
+        let didethr = DIDEthr::<()>::default().into_vm_resolver();
         let verifier = VerificationParameters::from_resolver(&didethr);
         let key: JWK = serde_json::from_value(json!({
             "alg": "ES256K-R",
@@ -595,7 +238,7 @@ mod tests {
 
     #[tokio::test]
     async fn credential_verify_eip712vm() {
-        let didethr = DIDEthr.into_vm_resolver();
+        let didethr = DIDEthr::<()>::default().into_vm_resolver();
         let vc = ssi_claims::vc::v1::data_integrity::any_credential_from_json_str(include_str!(
             "../tests/vc.jsonld"
         ))
@@ -606,5 +249,191 @@ mod tests {
             .await
             .unwrap()
             .is_ok())
+    }
+
+    #[tokio::test]
+    async fn metadata_serializes_correctly_in_json() {
+        // Test 7.3: versionId/updated appear when present, omitted when None
+        use ssi_dids_core::document::Metadata;
+
+        // Metadata with all fields set
+        let meta_full = Metadata {
+            deactivated: Some(true),
+            version_id: Some("42".to_string()),
+            updated: Some("2024-06-01T12:00:00Z".to_string()),
+            ..Default::default()
+        };
+        let json = serde_json::to_value(&meta_full).unwrap();
+        assert_eq!(json["deactivated"], true);
+        assert_eq!(json["versionId"], "42");
+        assert_eq!(json["updated"], "2024-06-01T12:00:00Z");
+
+        // Metadata with no fields set — all should be omitted
+        let meta_empty = Metadata::default();
+        let json = serde_json::to_value(&meta_empty).unwrap();
+        assert!(json.get("deactivated").is_none());
+        assert!(json.get("versionId").is_none());
+        assert!(json.get("updated").is_none());
+
+        // Metadata with only versionId/updated (no deactivated)
+        let meta_partial = Metadata {
+            deactivated: None,
+            version_id: Some("100".to_string()),
+            updated: Some("2024-01-15T09:50:00Z".to_string()),
+            ..Default::default()
+        };
+        let json = serde_json::to_value(&meta_partial).unwrap();
+        assert!(json.get("deactivated").is_none());
+        assert_eq!(json["versionId"], "100");
+        assert_eq!(json["updated"], "2024-01-15T09:50:00Z");
+    }
+
+    // ── Phase 9: Network Configuration Cleanup ──
+
+    #[tokio::test]
+    async fn sepolia_network_parses_with_correct_chain_id() {
+        let resolver = DIDEthr::<()>::default();
+        let output = resolver
+            .resolve(did!("did:ethr:sepolia:0xb9c5714089478a327f09197987f16f9e5d936e8a"))
+            .await
+            .unwrap();
+        let doc_value = serde_json::to_value(&output.document).unwrap();
+        // blockchainAccountId should use eip155:11155111
+        let vm = &doc_value["verificationMethod"][0];
+        assert_eq!(
+            vm["blockchainAccountId"],
+            "eip155:11155111:0xb9c5714089478a327f09197987f16f9e5d936e8a"
+        );
+    }
+
+    #[tokio::test]
+    async fn goerli_network_still_works() {
+        let resolver = DIDEthr::<()>::default();
+        let output = resolver
+            .resolve(did!("did:ethr:goerli:0xb9c5714089478a327f09197987f16f9e5d936e8a"))
+            .await
+            .unwrap();
+        let doc_value = serde_json::to_value(&output.document).unwrap();
+        let vm = &doc_value["verificationMethod"][0];
+        assert_eq!(
+            vm["blockchainAccountId"],
+            "eip155:5:0xb9c5714089478a327f09197987f16f9e5d936e8a"
+        );
+    }
+
+    #[tokio::test]
+    async fn deprecated_network_ropsten_still_parses() {
+        let resolver = DIDEthr::<()>::default();
+        let output = resolver
+            .resolve(did!("did:ethr:ropsten:0xb9c5714089478a327f09197987f16f9e5d936e8a"))
+            .await
+            .unwrap();
+        let doc_value = serde_json::to_value(&output.document).unwrap();
+        let vm = &doc_value["verificationMethod"][0];
+        assert_eq!(
+            vm["blockchainAccountId"],
+            "eip155:3:0xb9c5714089478a327f09197987f16f9e5d936e8a"
+        );
+    }
+
+    #[tokio::test]
+    async fn hex_chain_id_works() {
+        let resolver = DIDEthr::<()>::default();
+        let output = resolver
+            .resolve(did!("did:ethr:0x5:0xb9c5714089478a327f09197987f16f9e5d936e8a"))
+            .await
+            .unwrap();
+        let doc_value = serde_json::to_value(&output.document).unwrap();
+        let vm = &doc_value["verificationMethod"][0];
+        assert_eq!(
+            vm["blockchainAccountId"],
+            "eip155:5:0xb9c5714089478a327f09197987f16f9e5d936e8a"
+        );
+    }
+
+    #[tokio::test]
+    async fn unknown_network_name_returns_error() {
+        let resolver = DIDEthr::<()>::default();
+        let result = resolver
+            .resolve(did!("did:ethr:fakenet:0xb9c5714089478a327f09197987f16f9e5d936e8a"))
+            .await;
+        assert!(result.is_err());
+    }
+
+    // ── Phase 11: Eip712Method2021 for public-key DIDs ──
+
+    #[tokio::test]
+    async fn pubkey_did_genesis_includes_eip712method2021() {
+        // Public-key DID genesis doc should include Eip712Method2021 VM
+        // paired with #controller (same blockchainAccountId).
+        let resolver = DIDEthr::<()>::default();
+        let doc = resolver
+            .resolve(did!(
+                "did:ethr:0x03fdd57adec3d438ea237fe46b33ee1e016eda6b585c3e27ea66686c2ea5358479"
+            ))
+            .await
+            .unwrap()
+            .document;
+
+        let doc_value = serde_json::to_value(&doc).unwrap();
+        let vms = doc_value["verificationMethod"].as_array().unwrap();
+
+        // Should have 3 VMs: #controller, #controllerKey, #Eip712Method2021
+        assert_eq!(vms.len(), 3, "public-key DID should have 3 VMs");
+
+        // Find the Eip712Method2021 VM
+        let eip712_vm = vms.iter()
+            .find(|vm| vm["type"].as_str() == Some("Eip712Method2021"))
+            .expect("should have Eip712Method2021 VM");
+
+        assert!(
+            eip712_vm["id"].as_str().unwrap().ends_with("#Eip712Method2021"),
+            "Eip712Method2021 VM should have #Eip712Method2021 fragment"
+        );
+
+        // Same blockchainAccountId as #controller
+        let controller_vm = vms.iter()
+            .find(|vm| vm["id"].as_str().unwrap().ends_with("#controller"))
+            .unwrap();
+        assert_eq!(
+            eip712_vm["blockchainAccountId"],
+            controller_vm["blockchainAccountId"],
+            "Eip712Method2021 should share blockchainAccountId with #controller"
+        );
+
+        // Referenced in assertionMethod and authentication
+        let assertion = doc_value["assertionMethod"].as_array().unwrap();
+        let auth = doc_value["authentication"].as_array().unwrap();
+        let eip712_id = eip712_vm["id"].as_str().unwrap();
+        assert!(
+            assertion.iter().any(|r| r.as_str() == Some(eip712_id)),
+            "Eip712Method2021 should be in assertionMethod"
+        );
+        assert!(
+            auth.iter().any(|r| r.as_str() == Some(eip712_id)),
+            "Eip712Method2021 should be in authentication"
+        );
+    }
+
+    #[tokio::test]
+    async fn resolve_address_did_has_no_public_key_jwk_in_context() {
+        // An address-only DID (no public key, no attribute keys) should NOT
+        // have publicKeyJwk in the @context — it was a bug where any
+        // EcdsaSecp256k1VerificationKey2019 VM triggered publicKeyJwk context.
+        let resolver = DIDEthr::<()>::default();
+        let doc = resolver
+            .resolve(did!("did:ethr:0xb9c5714089478a327f09197987f16f9e5d936e8a"))
+            .await
+            .unwrap()
+            .document;
+
+        let doc_value = serde_json::to_value(&doc).unwrap();
+        let context = doc_value["@context"].as_array().unwrap();
+        let ctx_obj = context.iter().find(|c| c.is_object()).unwrap();
+
+        assert!(
+            ctx_obj.get("publicKeyJwk").is_none(),
+            "address-only DID should NOT have publicKeyJwk in context"
+        );
     }
 }
