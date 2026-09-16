@@ -581,4 +581,47 @@ mod tests {
             assert!(DID::new(input).is_err());
         }
     }
+
+    #[test]
+    fn did_accessors() {
+        let did = DID::new(b"did:web:example.com%3A443:u:bob").unwrap();
+
+        assert_eq!(did.as_str(), "did:web:example.com%3A443:u:bob");
+        assert_eq!(did.as_bytes(), b"did:web:example.com%3A443:u:bob");
+        assert_eq!(did.method_name(), "web");
+        assert_eq!(did.method_name_bytes(), b"web");
+        assert_eq!(did.method_specific_id(), "example.com%3A443:u:bob");
+        assert_eq!(did.method_specific_id_bytes(), b"example.com%3A443:u:bob");
+        assert_eq!(did.to_string(), "did:web:example.com%3A443:u:bob");
+        assert_eq!(&**did, "did:web:example.com%3A443:u:bob");
+    }
+
+    #[test]
+    fn did_accessors_keep_consecutive_colons_in_method_specific_id() {
+        let did = DID::new(b"did:m::si:::1").unwrap();
+
+        assert_eq!(did.method_name(), "m");
+        assert_eq!(did.method_specific_id(), ":si:::1");
+    }
+
+    #[test]
+    fn did_buf_accessors() {
+        let did = DIDBuf::from_string("did:m1:foo_bar".to_owned()).unwrap();
+
+        assert_eq!(did.as_did().method_name(), "m1");
+        assert_eq!(did.as_did().method_specific_id(), "foo_bar");
+        assert_eq!(did.as_str(), "did:m1:foo_bar");
+        assert_eq!(did, "did:m1:foo_bar");
+        assert_eq!(did.to_string(), "did:m1:foo_bar");
+    }
+
+    #[test]
+    fn did_to_owned_roundtrip() {
+        let borrowed = DID::new(b"did:a:b").unwrap();
+        let owned = borrowed.to_owned();
+
+        assert_eq!(owned.as_did(), borrowed);
+        assert_eq!(owned.method_name(), "a");
+        assert_eq!(owned.method_specific_id(), "b");
+    }
 }
