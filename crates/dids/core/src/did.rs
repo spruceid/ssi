@@ -498,11 +498,18 @@ mod tests {
 
     #[test]
     fn parse_did_accept() {
-        let vectors: [&[u8]; 4] = [
+        let vectors: &[&[u8]] = &[
             b"did:method:foo",
             b"did:a:b",
             b"did:jwk:eyJjcnYiOiJQLTI1NiIsImt0eSI6IkVDIiwieCI6ImFjYklRaXVNczNpOF91c3pFakoydHBUdFJNNEVVM3l6OTFQSDZDZEgyVjAiLCJ5IjoiX0tjeUxqOXZXTXB0bm1LdG00NkdxRHo4d2Y3NEk1TEtncmwyR3pIM25TRSJ9",
-            b"did:web:example.com%3A443:u:bob"
+            b"did:web:example.com%3A443:u:bob",
+            // digits in method
+            b"did:m1:1",
+            // '-' and '_' in method specific id
+            b"did:m:-",
+            b"did:m:_",
+            // lowercase pct-encoding
+            b"did:m:%af",
         ];
 
         for input in vectors {
@@ -511,11 +518,67 @@ mod tests {
     }
 
     #[test]
+    fn parse_did_accepts_consecutive_colons() {
+        // method-specific-id = *( *idchar ":" ) 1*idchar
+        DID::new(b"did:m::si:::1").unwrap();
+    }
+
+    #[test]
     fn parse_did_reject() {
-        let vectors: [&[u8]; 3] = [b"http:a:b", b"did::b", b"did:a:"];
+        let vectors: &[&[u8]] = &[
+            // invalid prefix
+            b"http:a:b",
+            b"did",
+            b"di:m:si",
+            b":m:si",
+            // invalid characters in method
+            b"did:M:si",
+            b"did:-:si",
+            // invalid character in method specific id
+            b"did:m:~",
+        ];
 
         for input in vectors {
-            assert!(DID::new(input).is_err())
+            assert!(DID::new(input).is_err());
+        }
+    }
+
+    #[test]
+    fn parse_did_rejects_empty_slice() {
+        assert!(DID::new(b"").is_err());
+    }
+
+    #[test]
+    fn parse_did_rejects_empty_method() {
+        assert!(DID::new("did:").is_err());
+        assert!(DID::new(b"did::si").is_err());
+    }
+
+    #[test]
+    fn parse_did_rejects_trailing_colon() {
+        assert!(DID::new(b"did:m:si:").is_err());
+    }
+
+    #[test]
+    fn parse_did_rejects_malformed_pct_encoding() {
+        let vectors: &[&[u8]] = &[b"did:m:%", b"did:m:%0", b"did:m:%0G"];
+
+        for input in vectors {
+            assert!(DID::new(input).is_err());
+        }
+    }
+
+    #[test]
+    fn parse_did_rejects_did_urls() {
+        let vectors: &[&[u8]] = &[
+            // path / query / fragment => DID URL, not a DID
+            b"did:m:si/p",
+            b"did:m:si?q",
+            b"did:m:si#f",
+        ];
+
+        for input in vectors {
+            assert!(DID::new(input).is_err());
         }
     }
 }
