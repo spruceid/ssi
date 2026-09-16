@@ -498,11 +498,18 @@ mod tests {
 
     #[test]
     fn parse_did_accept() {
-        let vectors: [&[u8]; 4] = [
+        let vectors: &[&[u8]] = &[
             b"did:method:foo",
             b"did:a:b",
             b"did:jwk:eyJjcnYiOiJQLTI1NiIsImt0eSI6IkVDIiwieCI6ImFjYklRaXVNczNpOF91c3pFakoydHBUdFJNNEVVM3l6OTFQSDZDZEgyVjAiLCJ5IjoiX0tjeUxqOXZXTXB0bm1LdG00NkdxRHo4d2Y3NEk1TEtncmwyR3pIM25TRSJ9",
-            b"did:web:example.com%3A443:u:bob"
+            b"did:web:example.com%3A443:u:bob",
+            // digits in method
+            b"did:m1:1",
+            // '-' and '_' in method specific id
+            b"did:m:-",
+            b"did:m:_",
+            // lowercase pct-encoding
+            b"did:m:%af",
         ];
 
         for input in vectors {
@@ -511,11 +518,110 @@ mod tests {
     }
 
     #[test]
+    fn parse_did_accepts_consecutive_colons() {
+        // method-specific-id = *( *idchar ":" ) 1*idchar
+        DID::new(b"did:m::si:::1").unwrap();
+    }
+
+    #[test]
     fn parse_did_reject() {
-        let vectors: [&[u8]; 3] = [b"http:a:b", b"did::b", b"did:a:"];
+        let vectors: &[&[u8]] = &[
+            // invalid prefix
+            b"http:a:b",
+            b"did",
+            b"di:m:si",
+            b":m:si",
+            // invalid characters in method
+            b"did:M:si",
+            b"did:-:si",
+            // invalid character in method specific id
+            b"did:m:~",
+        ];
 
         for input in vectors {
-            assert!(DID::new(input).is_err())
+            assert!(DID::new(input).is_err());
         }
+    }
+
+    #[test]
+    fn parse_did_rejects_empty_slice() {
+        assert!(DID::new(b"").is_err());
+    }
+
+    #[test]
+    fn parse_did_rejects_empty_method() {
+        assert!(DID::new("did:").is_err());
+        assert!(DID::new(b"did::si").is_err());
+    }
+
+    #[test]
+    fn parse_did_rejects_trailing_colon() {
+        assert!(DID::new(b"did:m:si:").is_err());
+    }
+
+    #[test]
+    fn parse_did_rejects_malformed_pct_encoding() {
+        let vectors: &[&[u8]] = &[b"did:m:%", b"did:m:%0", b"did:m:%0G"];
+
+        for input in vectors {
+            assert!(DID::new(input).is_err());
+        }
+    }
+
+    #[test]
+    fn parse_did_rejects_did_urls() {
+        let vectors: &[&[u8]] = &[
+            // path / query / fragment => DID URL, not a DID
+            b"did:m:si/p",
+            b"did:m:si?q",
+            b"did:m:si#f",
+        ];
+
+        for input in vectors {
+            assert!(DID::new(input).is_err());
+        }
+    }
+
+    #[test]
+    fn did_accessors() {
+        let did = DID::new(b"did:web:example.com%3A443:u:bob").unwrap();
+
+        assert_eq!(did.as_str(), "did:web:example.com%3A443:u:bob");
+        assert_eq!(did.as_bytes(), b"did:web:example.com%3A443:u:bob");
+        assert_eq!(did.method_name(), "web");
+        assert_eq!(did.method_name_bytes(), b"web");
+        assert_eq!(did.method_specific_id(), "example.com%3A443:u:bob");
+        assert_eq!(did.method_specific_id_bytes(), b"example.com%3A443:u:bob");
+        assert_eq!(did.to_string(), "did:web:example.com%3A443:u:bob");
+        assert_eq!(&**did, "did:web:example.com%3A443:u:bob");
+    }
+
+    #[test]
+    fn did_accessors_keep_consecutive_colons_in_method_specific_id() {
+        let did = DID::new(b"did:m::si:::1").unwrap();
+
+        assert_eq!(did.method_name(), "m");
+        assert_eq!(did.method_specific_id(), ":si:::1");
+    }
+
+    #[test]
+    fn did_buf_accessors() {
+        let did = DIDBuf::from_string("did:m1:foo_bar".to_owned()).unwrap();
+
+        assert_eq!(did.as_did().method_name(), "m1");
+        assert_eq!(did.as_did().method_specific_id(), "foo_bar");
+        assert_eq!(did.as_str(), "did:m1:foo_bar");
+        assert_eq!(did, "did:m1:foo_bar");
+        assert_eq!(did.to_string(), "did:m1:foo_bar");
+    }
+
+    #[test]
+    fn did_to_owned_roundtrip() {
+        let borrowed = DID::new(b"did:a:b").unwrap();
+        let owned = borrowed.to_owned();
+
+        assert_eq!(owned.as_did(), borrowed);
+        assert_eq!(owned.method_name(), "a");
+        assert_eq!(owned.method_specific_id(), "b");
     }
 }
