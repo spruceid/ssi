@@ -27,9 +27,11 @@ pub struct KbJwtPayload<T = serde_json::Map<String, serde_json::Value>> {
     pub sd_hash: SdHash,
 
     /// Expiration date.
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub exp: Option<ExpirationTime>,
 
     /// Validity start date.
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub nbf: Option<NotBefore>,
 
     /// Other claims.
