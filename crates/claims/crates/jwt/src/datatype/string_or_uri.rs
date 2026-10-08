@@ -49,8 +49,8 @@ impl StringOrURI {
     }
 
     /// Turns this value into a URI, if it is one.
-    pub fn into_uri(self) -> Option<UriBuf> {
-        UriBuf::try_from(self.0).ok()
+    pub fn into_uri(self) -> Result<UriBuf, Self> {
+        UriBuf::try_from(self.0).map_err(|InvalidUri(string)| Self(string))
     }
 }
 
@@ -100,7 +100,7 @@ mod tests {
         assert_eq!(value.as_str(), "foo");
         assert!(!value.is_uri());
         assert!(value.as_uri().is_none());
-        assert!(value.into_uri().is_none());
+        assert_eq!(value.into_uri().unwrap_err().as_str(), "foo");
     }
 
     #[test]
