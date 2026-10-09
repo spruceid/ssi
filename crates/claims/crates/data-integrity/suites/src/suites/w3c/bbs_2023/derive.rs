@@ -8,7 +8,7 @@ use ssi_di_sd_primitives::{
     HmacShaAnyKey, JsonPointerBuf,
 };
 use ssi_json_ld::{Expandable, ExpandedDocument, JsonLdNodeObject};
-use ssi_rdf::LexicalInterpretation;
+use ssi_rdf::{IntoNQuads, LexicalInterpretation};
 use ssi_verification_methods::{
     multikey::{self, DecodedMultikey},
     Multikey,
@@ -212,28 +212,26 @@ where
     let mandatory_group = canonical.groups.get(&Group::Mandatory).unwrap();
     let selective_group = canonical.groups.get(&Group::Selective).unwrap();
 
-    let mandatory_match = &mandatory_group.matching;
-    let combined_match = &combined_group.matching;
-    let combined_indexes: Vec<_> = combined_match.keys().copied().collect();
-    let mut mandatory_indexes = Vec::with_capacity(mandatory_match.len());
-    for i in mandatory_match.keys() {
-        let offset = combined_indexes.binary_search(i).unwrap();
+    let combined_lines = combined_group.matching.values().into_nquads_lines();
+    let mandatory_lines = mandatory_group.matching.values().into_nquads_lines();
+    let mut mandatory_indexes = Vec::with_capacity(mandatory_lines.len());
+    for line in mandatory_lines {
+        let offset = combined_lines.binary_search(&line).unwrap();
         mandatory_indexes.push(offset);
     }
 
-    let selective_match = &selective_group.matching;
-    let mandatory_non_match = &mandatory_group.non_matching;
-    let non_mandatory_indexes: Vec<_> = mandatory_non_match.keys().copied().collect();
-    let mut selective_indexes = Vec::with_capacity(mandatory_non_match.len());
-    for i in selective_match.keys() {
-        if let Ok(offset) = non_mandatory_indexes.binary_search(i) {
+    let bbs_message_lines = mandatory_group.non_matching.values().into_nquads_lines();
+    let selective_lines = selective_group.matching.values().into_nquads_lines();
+    let mut selective_indexes = Vec::with_capacity(selective_lines.len());
+    for line in selective_lines {
+        if let Ok(offset) = bbs_message_lines.binary_search(&line) {
             selective_indexes.push(offset);
         }
     }
 
-    let bbs_messages: Vec<_> = mandatory_non_match
-        .values()
-        .map(|quad| format!("{quad} .\n").into_bytes())
+    let bbs_messages: Vec<_> = bbs_message_lines
+        .into_iter()
+        .map(String::into_bytes)
         .collect();
 
     let DecodedMultikey::Bls12_381(pk) = verification_method.public_key.decode()? else {
