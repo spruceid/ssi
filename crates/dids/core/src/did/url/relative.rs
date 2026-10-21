@@ -104,7 +104,7 @@ impl RelativeDIDURL {
 
     pub fn fragment(&self) -> Option<&Fragment> {
         let start = self.fragment_delimiter_offset();
-        let end = self.fragment_delimiter_offset_from(start);
+        let end = self.0.len();
         if start == end {
             None
         } else {
@@ -372,6 +372,54 @@ impl RelativeDIDURL {
             }
 
             i += 1
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_relative_did_url_path_query_fragment() {
+        // Test all combinations of path, query, and fragment presence.
+        for path_str in ["", "/path", "/path/subpath"] {
+            for query_str in [None, Some("query=value")] {
+                for fragment_str in [None, Some("fragment")] {
+                    let mut relative_did_url_str = String::new();
+                    if !path_str.is_empty() {
+                        relative_did_url_str.push_str(path_str);
+                    }
+                    if let Some(query_str) = query_str {
+                        relative_did_url_str.push_str("?");
+                        relative_did_url_str.push_str(query_str);
+                    }
+                    if let Some(fragment_str) = fragment_str {
+                        relative_did_url_str.push_str("#");
+                        relative_did_url_str.push_str(fragment_str);
+                    }
+                    let relative_did_url =
+                        RelativeDIDURL::new(&relative_did_url_str.as_bytes()).unwrap();
+                    assert_eq!(
+                        relative_did_url.path().as_str(),
+                        path_str,
+                        "relative_did_url str: {:?}",
+                        relative_did_url_str
+                    );
+                    assert_eq!(
+                        relative_did_url.query().map(|x| x.as_str()),
+                        query_str,
+                        "relative_did_url str: {:?}",
+                        relative_did_url_str
+                    );
+                    assert_eq!(
+                        relative_did_url.fragment().map(|x| x.as_str()),
+                        fragment_str,
+                        "relative_did_url str: {:?}",
+                        relative_did_url_str
+                    );
+                }
+            }
         }
     }
 }
