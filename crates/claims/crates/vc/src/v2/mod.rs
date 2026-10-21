@@ -5,9 +5,11 @@ use iref::Iri;
 
 use crate::syntax::RequiredContext;
 
+mod algorithm;
 mod data_model;
 pub mod syntax;
 
+pub use algorithm::*;
 pub use data_model::*;
 pub use syntax::{Context, JsonCredential, JsonCredentialTypes, SpecializedJsonCredential};
 
