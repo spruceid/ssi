@@ -14,10 +14,7 @@ documentation = "https://docs.rs/did-web/"
 [dependencies]
 ssi-dids-core.workspace = true
 thiserror.workspace = true
-reqwest = { version = "0.12", default-features = false, features = [
-    "rustls-tls",
-    "http2",
-] }
+reqwest = { workspace = true, features = ["rustls-tls", "http2"] }
 http = "1"
 iref.workspace = true
 
