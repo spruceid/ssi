@@ -33,9 +33,6 @@ ed25519 = ["ssi-jwk/ed25519", "ed25519-dalek", "rand", "blake2"]
 ## Enable RSA signatures.
 rsa = ["ssi-jwk/rsa", "dep:rsa", "dep:sha2", "rand"]
 
-## Enable aleo ecosystem signatures.
-aleo = ["ssi-jwk/aleo"]
-
 ## Enable ethereum style signatures.
 eip = ["ssi-jwk/eip", "ssi-crypto/keccak", "k256", "secp256k1"]
 

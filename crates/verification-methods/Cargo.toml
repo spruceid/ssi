@@ -44,11 +44,6 @@ tezos = ["ssi-tzkey", "ssi-caips/tezos"]
 
 eip712 = ["ssi-eip712", "sha3"]
 
-## Enable aleo keys.
-##
-## Not compatible with WASM targets.
-aleo = ["ssi-caips/aleo"]
-
 solana = []
 
 bbs = [

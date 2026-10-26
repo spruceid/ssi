@@ -23,9 +23,6 @@ pub use set::*;
 #[cfg(feature = "ripemd-160")]
 pub mod ripemd160;
 
-#[cfg(feature = "aleo")]
-pub mod aleo;
-
 #[cfg(feature = "eip")]
 pub mod eip155;
 
@@ -369,11 +366,6 @@ impl JWK {
         JWK::from(Params::EC(ec_params))
     }
 
-    #[cfg(feature = "aleo")]
-    pub fn generate_aleo() -> Result<JWK, Error> {
-        crate::aleo::generate_private_key_jwk().map_err(Error::AleoGeneratePrivateKey)
-    }
-
     pub fn get_algorithm(&self) -> Option<Algorithm> {
         if let Some(algorithm) = self.algorithm {
             return Some(algorithm);
@@ -384,10 +376,6 @@ impl JWK {
             }
             Params::OKP(okp_params) if okp_params.curve == "Ed25519" => {
                 return Some(Algorithm::EdDSA);
-            }
-            #[cfg(feature = "aleo")]
-            Params::OKP(okp_params) if okp_params.curve == crate::aleo::OKP_CURVE => {
-                return Some(Algorithm::AleoTestnet1Signature);
             }
             Params::EC(ec_params) => {
                 let curve = match &ec_params.curve {

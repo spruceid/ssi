@@ -83,10 +83,6 @@ macros::crypto_suites! {
     #[cfg(feature = "solana")]
     solana_signature_2021: SolanaSignature2021,
 
-    /// Unspecified Aleo Signature 2021.
-    #[cfg(feature = "aleo")]
-    aleo_signature_2021: AleoSignature2021,
-
     /// Unspecified Tezos Ed25519 Blake2b, digest size 20, base 58 check encoded, Signature 2021.
     #[cfg(all(feature = "tezos", feature = "ed25519"))]
     ed25519_blake2b_digest_size20_base58_check_encoded_signature_2021: Ed25519BLAKE2BDigestSize20Base58CheckEncodedSignature2021,

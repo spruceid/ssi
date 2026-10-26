@@ -20,7 +20,6 @@ secp384r1 = ["did-method-key/secp384r1"]
 ripemd-160 = ["did-pkh/ripemd-160"]
 eip = ["did-pkh/eip"]
 tezos = ["did-pkh/tezos"]
-aleo = ["did-pkh/aleo"]
 solana = ["did-pkh/solana"]
 
 [dependencies]

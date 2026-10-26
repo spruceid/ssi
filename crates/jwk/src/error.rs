@@ -1,6 +1,4 @@
 //! Error types for `ssi-jwk` crate
-#[cfg(feature = "aleo")]
-use crate::aleo::AleoGeneratePrivateKeyError;
 use crate::JWK;
 use base64::DecodeError as Base64Error;
 #[cfg(feature = "ring")]
@@ -85,10 +83,6 @@ pub enum Error {
     /// Error converting slice to array
     #[error(transparent)]
     TryFromSlice(#[from] TryFromSliceError),
-    /// Error generating Aleo private key
-    #[cfg(feature = "aleo")]
-    #[error(transparent)]
-    AleoGeneratePrivateKey(#[from] AleoGeneratePrivateKeyError),
     /// Expected 64 byte uncompressed key or 33 bytes compressed key
     #[error("Expected 64 byte uncompressed key or 33 bytes compressed key but found length: {0}")]
     P256KeyLength(usize),

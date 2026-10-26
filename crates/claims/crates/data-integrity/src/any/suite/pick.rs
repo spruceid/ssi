@@ -25,8 +25,6 @@ impl AnySuite {
             Algorithm::PS256 => Some(Self::JsonWebSignature2020),
             #[cfg(feature = "w3c")]
             Algorithm::ES384 => Some(Self::JsonWebSignature2020),
-            #[cfg(feature = "aleo")]
-            Algorithm::AleoTestnet1Signature => Some(Self::AleoSignature2021),
             Algorithm::EdDSA | Algorithm::EdBlake2b => match verification_method {
                 #[cfg(feature = "solana")]
                 Some(vm)

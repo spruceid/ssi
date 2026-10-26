@@ -277,11 +277,8 @@ algorithms! {
     ESBlake2bK: "ESBlake2bK",
 
     /// BBS scheme.
-    Bbs(BbsInstance): "BBS",
+    Bbs(BbsInstance): "BBS"
     // Bbs: "BBS",
-
-    #[doc(hidden)]
-    AleoTestnet1Signature: "AleoTestnet1Signature"
 }
 
 impl Algorithm {
