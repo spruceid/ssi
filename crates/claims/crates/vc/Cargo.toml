@@ -35,7 +35,6 @@ bitvec = "0.20"
 flate2 = "1.0"
 reqwest = { workspace = true, features = ["json", "rustls"] }
 ssi-verification-methods.workspace = true
-ssi-dids-core.workspace = true
 ssi-data-integrity.workspace = true
 
 [target.'cfg(target_os = "android")'.dependencies.reqwest]

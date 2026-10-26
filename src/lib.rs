@@ -40,8 +40,8 @@
 //! in compact textual form. One can load a JWS using [`new`] and verify
 //! it using [`verify`].
 //!
-//! [`new`]: ssi_jws::JwsBuf::new
-//! [`verify`]: ssi_jws::JwsSlice::verify
+//! [`new`]: crate::claims::jws::JwsBuf::new
+//! [`verify`]: crate::claims::jws::JwsSlice::verify
 //!
 //! ```
 //! # use ssi_dids::example::ExampleDIDResolver;
@@ -79,7 +79,7 @@
 //! that will simply load a VC from a string, assuming it is signed using
 //! any Data-Integrity proof supported by SSI.
 //!
-//! [`any_credential_from_json_str`]: ssi_vc::v1::data_integrity::any_credential_from_json_str
+//! [`any_credential_from_json_str`]: crate::claims::vc::v1::data_integrity::any_credential_from_json_str
 //!
 //! ```
 //! # use ssi_dids::example::ExampleDIDResolver;
@@ -164,7 +164,7 @@
 //! implementation of the VC data-model 1.1 where you can set the credential type
 //! yourself.
 //!
-//! [`SpecializedJsonCredential`]: ssi_vc::v1::syntax::SpecializedJsonCredential
+//! [`SpecializedJsonCredential`]: crate::claims::vc::v1::syntax::SpecializedJsonCredential
 //!
 //! ```
 //! # #[async_std::main]
@@ -230,7 +230,7 @@
 //! [`SpecializedJsonCredential`]'s [`context`] field or leveraging its context type
 //! parameter.
 //!
-//! [`context`]: ssi_vc::v1::syntax::SpecializedJsonCredential::context
+//! [`context`]: crate::claims::vc::v1::syntax::SpecializedJsonCredential::context
 //!
 //! # Data-Models
 //!
@@ -238,8 +238,8 @@
 //! - [`VC data-model 2.0`]
 //! - [`A wrapper type to accept both`]
 //!
-//! [`VC data-model 2.0`]: ssi_vc::v2
-//! [`A wrapper type to accept both`]: ssi_vc::syntax::AnySpecializedJsonCredential
+//! [`VC data-model 2.0`]: crate::claims::vc::v2
+//! [`A wrapper type to accept both`]: crate::claims::vc::syntax::AnySpecializedJsonCredential
 //!
 //! # Features
 #![doc = document_features::document_features!()]

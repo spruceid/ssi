@@ -10,19 +10,15 @@ documentation = "https://docs.rs/ssi-jwt/"
 
 [dependencies]
 thiserror = "1.0"
-async-trait.workspace = true
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 json-syntax = { workspace = true, features = ["serde"] }
 ssi-core.workspace = true
-ssi-crypto.workspace = true
 ssi-jwk.workspace = true
 ssi-jws.workspace = true
 ssi-claims-core.workspace = true
 iref = { workspace = true, features = ["serde"] }
-serde_with = "2.3.2"
 hashbrown = "0.14.3"
-slab = "0.4.9"
 ordered-float = { version = "4.2.0", features = ["serde"] }
 
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]

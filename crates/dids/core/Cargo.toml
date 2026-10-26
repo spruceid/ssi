@@ -14,19 +14,15 @@ example = []
 
 [dependencies]
 ssi-core.workspace = true
-ssi-crypto.workspace = true
 ssi-verification-methods-core.workspace = true
 ssi-claims-core.workspace = true
-ssi-jws.workspace = true
 ssi-json-ld.workspace = true
 serde = { workspace = true, features = ["derive"] }
 serde_json.workspace = true
 serde_urlencoded = "0.7"
-async-trait.workspace = true
 thiserror.workspace = true
 iref = { workspace = true, features = ["serde"] }
 static-iref.workspace = true
-pin-project.workspace = true
 
 # for registration
 ssi-jwk.workspace = true

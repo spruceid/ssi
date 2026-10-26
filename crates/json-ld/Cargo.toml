@@ -16,7 +16,6 @@ static-iref.workspace = true
 json-syntax = { workspace = true, features = ["serde"] }
 linked-data.workspace = true
 lazy_static = "1.4"
-combination = "0.1"
 ssi-contexts.workspace = true
 ssi-rdf.workspace = true
 serde.workspace = true

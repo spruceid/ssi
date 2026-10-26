@@ -19,21 +19,16 @@ tezos = ["ssi-jwk/tezos", "ssi-caips/tezos"]
 solana = []
 
 [dependencies]
-ssi-crypto.workspace = true
 ssi-caips.workspace = true
 ssi-dids-core.workspace = true
 ssi-jwk.workspace = true
 iref.workspace = true
 static-iref.workspace = true
-serde = { workspace = true, features = ["derive"] }
 serde_json.workspace = true
-async-trait.workspace = true
 bs58 = { workspace = true, features = ["check"] }
-chrono = { workspace = true, features = ["serde"] }
 thiserror.workspace = true
 
 [target.'cfg(target_arch = "wasm32")'.dependencies]
-chrono = { workspace = true, features = ["serde", "wasmbind"] }
 
 [dev-dependencies]
 ssi-core.workspace = true

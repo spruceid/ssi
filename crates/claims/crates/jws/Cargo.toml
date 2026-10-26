@@ -57,11 +57,8 @@ sha3 = { workspace = true, optional = true }
 rsa = { workspace = true, optional = true }
 rand = { workspace = true, optional = true }
 ring = { version = "0.16", optional = true }
-iref.workspace = true
 ssi-crypto.workspace = true
 ssi-jwk.workspace = true
-linked-data.workspace = true
-hex.workspace = true
 ssi-core.workspace = true
 ssi-claims-core.workspace = true
 

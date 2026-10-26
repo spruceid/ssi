@@ -23,22 +23,16 @@ ssi-jwk.workspace = true
 ssi-jws.workspace = true
 ssi-rdf.workspace = true
 ssi-json-ld.workspace = true
-ssi-claims-core = { workspace = true, features = ["serde"] }
+ssi-claims-core.workspace = true
 ssi-security.workspace = true
 chrono.workspace = true
 iref.workspace = true
 thiserror.workspace = true
 static-iref.workspace = true
-locspan.workspace = true
-hex.workspace = true
 serde = { workspace = true, features = ["derive"] }
 serde_json.workspace = true
 json-syntax.workspace = true
-derivative.workspace = true
 educe.workspace = true
-futures.workspace = true
-self_cell = "1.0.1"
-contextual.workspace = true
 multibase.workspace = true
 digest.workspace = true
 

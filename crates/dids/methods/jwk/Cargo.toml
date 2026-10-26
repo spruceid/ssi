@@ -12,18 +12,19 @@ homepage = "https://github.com/spruceid/ssi/tree/main/did-jwk/"
 documentation = "https://docs.rs/did-jwk/"
 
 [dependencies]
-ssi-crypto.workspace = true
 ssi-dids-core.workspace = true
 ssi-jwk.workspace = true
 ssi-verification-methods.workspace = true
-async-trait.workspace = true
 multibase = "0.8"
 serde_json.workspace = true
 serde_jcs = "0.1"
 iref.workspace = true
 static-iref.workspace = true
-thiserror.workspace = true
 
 [dev-dependencies]
 ssi-jwk = { workspace = true, features = ["ed25519", "secp256k1", "secp256r1"] }
 async-std = { version = "1.9", features = ["attributes"] }
+
+[package.metadata.cargo-machete]
+# Used only via the `static_iref::iri!` macro, which expands to `::iref::...`.
+ignored = ["iref"]

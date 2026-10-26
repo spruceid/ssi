@@ -18,7 +18,6 @@ hmac = { version = "0.12.1", features = ["reset"] }
 sha2.workspace = true
 rdf-types.workspace = true
 base64.workspace = true
-digest.workspace = true
 serde = { workspace = true, features = ["derive"] }
 thiserror.workspace = true
 uuid = { workspace = true, features = ["v4"] }

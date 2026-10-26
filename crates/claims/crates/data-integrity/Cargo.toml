@@ -91,13 +91,12 @@ solana = ["ssi-data-integrity-suites/solana"]
 ethereum = ["ssi-data-integrity-suites/ethereum"]
 
 ## BBS cryptographic suites.
-bbs = ["ssi-bbs", "ssi-data-integrity-suites/bbs"]
+bbs = ["ssi-data-integrity-suites/bbs"]
 
 [dependencies]
 ssi-data-integrity-core.workspace = true
 ssi-data-integrity-suites.workspace = true
 ssi-core.workspace = true
-ssi-security.workspace = true
 ssi-crypto.workspace = true
 ssi-jws.workspace = true
 ssi-jwk.workspace = true
@@ -107,15 +106,10 @@ ssi-verification-methods.workspace = true
 ssi-eip712.workspace = true
 ssi-claims-core.workspace = true
 ssi-di-sd-primitives.workspace = true
-ssi-bbs = { workspace = true, optional = true }
 iref.workspace = true
-rdf-types.workspace = true
-linked-data.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 json-syntax.workspace = true
-thiserror.workspace = true
-chrono.workspace = true
 
 [dev-dependencies]
 ssi-multicodec.workspace = true

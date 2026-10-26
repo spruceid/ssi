@@ -41,6 +41,9 @@ jobs:
       - uses: taiki-e/install-action@v2
         with:
           tool: cargo-deny
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-machete
 
       - name: Fmt
         run: cargo fmt -- --check
@@ -67,6 +70,9 @@ jobs:
 
       - run: cargo deny check bans
       - run: cargo deny check licenses
+
+      - name: Unused dependencies
+        run: cargo machete
 
   test-each-feature:
     if: ${{ !github.event.pull_request.draft }}
