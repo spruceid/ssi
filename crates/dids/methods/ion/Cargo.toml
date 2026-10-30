@@ -28,10 +28,6 @@ sha2 = "0.10"
 json-patch = "0.2.6"
 reqwest = { workspace = true, features = ["json", "rustls"] }
 
-[target.'cfg(target_os = "android")'.dependencies.reqwest]
-workspace = true
-features = ["json", "native-tls-vendored"]
-
 # [target.'cfg(target_arch = "wasm32", target_arch = "wasm64")'.dependencies]
 
 
