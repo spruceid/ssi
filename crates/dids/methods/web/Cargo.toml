@@ -18,10 +18,6 @@ reqwest = { workspace = true, features = ["rustls"] }
 http = "1"
 iref.workspace = true
 
-[target.'cfg(target_os = "android")'.dependencies.reqwest]
-workspace = true
-features = ["native-tls-vendored"]
-
 [dev-dependencies]
 ssi-verification-methods-core.workspace = true
 ssi-claims = { workspace = true, features = ["w3c", "ed25519"] }
