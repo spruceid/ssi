@@ -9,6 +9,7 @@ use serde::de::DeserializeOwned;
 use serde_json::Value;
 use ssi_core::{JsonPointer, JsonPointerBuf};
 use ssi_jwt::JWTClaims;
+use std::collections::HashSet;
 
 /// Reveal error.
 ///
@@ -38,6 +39,16 @@ pub enum RevealError {
     /// Disclosure used multiple times.
     #[error("disclosure is used multiple times")]
     DisclosureUsedMultipleTimes,
+
+    /// The same digest appears more than once in the payload, directly or
+    /// through disclosures (RFC 9901 Section 7.1, step 4).
+    #[error("digest `{0}` appears more than once")]
+    RepeatedDigest(String),
+
+    /// An object entry disclosure uses the reserved claim name `_sd` or `...`
+    /// (RFC 9901 Section 7.1, step 3).
+    #[error("disclosure uses the reserved claim name `{0}`")]
+    ReservedClaimName(String),
 
     /// Expected object entry, found array item disclosure.
     #[error("expected object entry disclosure, found array item disclosure")]
@@ -94,6 +105,7 @@ impl SdJwtPayload {
             &JsonPointerBuf::default(),
             &mut disclosed_claims,
             &mut disclosures,
+            &mut HashSet::new(),
         )?;
 
         for (_, disclosure) in disclosures {
@@ -123,41 +135,56 @@ impl<'a> InProgressDisclosure<'a> {
     }
 }
 
+/// Records a digest, refusing one already seen anywhere in the payload.
+fn record_digest(seen: &mut HashSet<String>, digest: &str) -> Result<(), RevealError> {
+    if seen.insert(digest.to_owned()) {
+        Ok(())
+    } else {
+        Err(RevealError::RepeatedDigest(digest.to_owned()))
+    }
+}
+
 fn reveal_value(
     pointer: &JsonPointer,
     value: &mut Value,
     disclosures: &mut IndexMap<String, InProgressDisclosure>,
+    seen: &mut HashSet<String>,
 ) -> Result<(), RevealError> {
     match value {
-        Value::Object(object) => reveal_object(pointer, object, disclosures),
+        Value::Object(object) => reveal_object(pointer, object, disclosures, seen),
         Value::Array(array) => array.try_retain_mut(|i, item| {
             let mut pointer = pointer.to_owned();
             pointer.push_index(i);
 
             match as_concealed_array_item(item) {
-                Some(hash) => match disclosures.get_mut(hash) {
-                    Some(in_progress_disclosure) => match &in_progress_disclosure.disclosure.desc {
-                        DisclosureDescription::ArrayItem(value) => {
-                            if in_progress_disclosure
-                                .pointer
-                                .replace(pointer.clone())
-                                .is_some()
-                            {
-                                return Err(RevealError::DisclosureUsedMultipleTimes);
-                            }
+                Some(hash) => {
+                    record_digest(seen, hash)?;
+                    match disclosures.get_mut(hash) {
+                        Some(in_progress_disclosure) => {
+                            match &in_progress_disclosure.disclosure.desc {
+                                DisclosureDescription::ArrayItem(value) => {
+                                    if in_progress_disclosure
+                                        .pointer
+                                        .replace(pointer.clone())
+                                        .is_some()
+                                    {
+                                        return Err(RevealError::DisclosureUsedMultipleTimes);
+                                    }
 
-                            *item = value.clone();
-                            reveal_value(&pointer, item, disclosures)?;
-                            Ok(true)
+                                    *item = value.clone();
+                                    reveal_value(&pointer, item, disclosures, seen)?;
+                                    Ok(true)
+                                }
+                                DisclosureDescription::ObjectEntry { .. } => {
+                                    Err(RevealError::ExpectedArrayItemDisclosure)
+                                }
+                            }
                         }
-                        DisclosureDescription::ObjectEntry { .. } => {
-                            Err(RevealError::ExpectedArrayItemDisclosure)
-                        }
-                    },
-                    None => Ok(false),
-                },
+                        None => Ok(false),
+                    }
+                }
                 None => {
-                    reveal_value(&pointer, item, disclosures)?;
+                    reveal_value(&pointer, item, disclosures, seen)?;
                     Ok(true)
                 }
             }
@@ -170,10 +197,11 @@ fn reveal_object(
     pointer: &JsonPointer,
     object: &mut serde_json::Map<String, Value>,
     disclosures: &mut IndexMap<String, InProgressDisclosure>,
+    seen: &mut HashSet<String>,
 ) -> Result<(), RevealError> {
     // Process `_sd` claim.
     if let Some(sd_claims) = object.remove(SD_CLAIM_NAME) {
-        for (key, value) in reveal_sd_claim(pointer, &sd_claims, disclosures)? {
+        for (key, value) in reveal_sd_claim(pointer, &sd_claims, disclosures, seen)? {
             if object.insert(key, value).is_some() {
                 return Err(RevealError::Collision);
             }
@@ -184,7 +212,7 @@ fn reveal_object(
     for (key, sub_value) in object {
         let mut pointer = pointer.to_owned();
         pointer.push(key);
-        reveal_value(&pointer, sub_value, disclosures)?
+        reveal_value(&pointer, sub_value, disclosures, seen)?
     }
 
     Ok(())
@@ -194,6 +222,7 @@ fn reveal_sd_claim(
     pointer: &JsonPointer,
     sd_claim: &serde_json::Value,
     disclosures: &mut IndexMap<String, InProgressDisclosure>,
+    seen: &mut HashSet<String>,
 ) -> Result<Vec<(String, serde_json::Value)>, RevealError> {
     let hashes = sd_claim
         .as_array()
@@ -205,6 +234,7 @@ fn reveal_sd_claim(
         let disclosure_hash = disclosure_hash
             .as_str()
             .ok_or(RevealError::InvalidDisclosureHash)?;
+        record_digest(seen, disclosure_hash)?;
 
         if let Some(in_progress_disclosure) = disclosures.get_mut(disclosure_hash) {
             match &in_progress_disclosure.disclosure.desc {
@@ -212,6 +242,10 @@ fn reveal_sd_claim(
                     return Err(RevealError::ExpectedObjectEntryDisclosure)
                 }
                 DisclosureDescription::ObjectEntry { key, value } => {
+                    if key == SD_CLAIM_NAME || key == ARRAY_CLAIM_ITEM_PROPERTY_NAME {
+                        return Err(RevealError::ReservedClaimName(key.clone()));
+                    }
+
                     let mut pointer = pointer.to_owned();
                     pointer.push(key);
 
