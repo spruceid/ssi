@@ -722,15 +722,26 @@ impl ToASN1 for OctetParams {
     }
 }
 
+/// Uses a precision derived from the input length. Only use it for public
+/// values.
 #[cfg(feature = "rsa")]
-impl From<&Base64urlUInt> for rsa::BigUint {
+impl From<&Base64urlUInt> for rsa::BoxedUint {
     fn from(uint: &Base64urlUInt) -> Self {
-        Self::from_bytes_be(&uint.0)
+        Self::from_be_slice_vartime(&uint.0)
     }
 }
 
 #[cfg(feature = "rsa")]
-impl TryFrom<&RSAParams> for rsa::RsaPublicKey {
+impl Base64urlUInt {
+    /// Decodes the integer with a fixed precision of `bits_precision` bits.
+    fn to_boxed_uint(&self, bits_precision: u32) -> Result<rsa::BoxedUint, Error> {
+        rsa::BoxedUint::from_be_slice(&self.0, bits_precision)
+            .map_err(|_| Error::Rsa(rsa::Error::InvalidArguments))
+    }
+}
+
+#[cfg(feature = "rsa")]
+impl TryFrom<&RSAParams> for rsa::PublicKey {
     type Error = Error;
     fn try_from(params: &RSAParams) -> Result<Self, Self::Error> {
         let n = params.modulus.as_ref().ok_or(Error::MissingModulus)?;
@@ -740,7 +751,7 @@ impl TryFrom<&RSAParams> for rsa::RsaPublicKey {
 }
 
 #[cfg(feature = "rsa")]
-impl TryFrom<&RSAParams> for rsa::RsaPrivateKey {
+impl TryFrom<&RSAParams> for rsa::PrivateKey {
     type Error = Error;
     #[allow(clippy::many_single_char_names)]
     fn try_from(params: &RSAParams) -> Result<Self, Self::Error> {
@@ -758,11 +769,22 @@ impl TryFrom<&RSAParams> for rsa::RsaPrivateKey {
             .second_prime_factor
             .as_ref()
             .ok_or(Error::MissingPrime)?;
-        let mut primes = vec![p.into(), q.into()];
+        // Use the modulus precision for secret values, so that the precision
+        // does not depend on their own length.
+        let bits = u32::try_from(n.0.len())
+            .ok()
+            .and_then(|len| len.checked_mul(8))
+            .ok_or(Error::Rsa(rsa::Error::ModulusTooLarge))?;
+        let mut primes = vec![p.to_boxed_uint(bits)?, q.to_boxed_uint(bits)?];
         for prime in params.other_primes_info.iter().flatten() {
-            primes.push((&prime.prime_factor).into());
+            primes.push(prime.prime_factor.to_boxed_uint(bits)?);
         }
-        Ok(Self::from_components(n.into(), e.into(), d.into(), primes))
+        Ok(Self::from_components(
+            n.into(),
+            e.into(),
+            d.to_boxed_uint(bits)?,
+            primes,
+        )?)
     }
 }
 

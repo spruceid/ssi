@@ -31,11 +31,7 @@ secp384r1 = ["ssi-jwk/secp384r1", "p384"]
 ed25519 = ["ssi-jwk/ed25519", "ed25519-dalek", "blake2"]
 
 ## Enable RSA signatures.
-# `rsa` is deferred to a follow-up upgrade PR: it stays on the pre-`digest 0.11`
-# generation (`digest 0.10` / `rand_core 0.6`), so the pure-Rust RSA-PSS path is fed
-# `sha2 0.10` + `rand 0.8` via the `sha2_0_10` / `rand_0_8` aliases below. These are
-# removed once `rsa` is bumped.
-rsa = ["ssi-jwk/rsa", "dep:rsa", "dep:sha2", "dep:sha2_0_10", "dep:rand_0_8"]
+rsa = ["ssi-jwk/rsa", "dep:rsa", "dep:sha2"]
 
 ## Enable ethereum style signatures.
 eip = ["ssi-jwk/eip", "ssi-crypto/keccak", "k256", "secp256k1"]
@@ -58,10 +54,7 @@ blake2 = { workspace = true, optional = true }
 ed25519-dalek = { workspace = true, optional = true }
 sha2 = { workspace = true, optional = true }
 sha3 = { workspace = true, optional = true }
-rsa = { workspace = true, optional = true }
-# Aliases for the deferred `rsa 0.6` path (matches rsa's digest-0.10 / rand_core-0.6 generation).
-sha2_0_10 = { package = "sha2", version = "0.10", optional = true }
-rand_0_8 = { package = "rand", version = "0.8", optional = true }
+rsa = { workspace = true, optional = true, features = ["pkcs1v15"] }
 ring = { version = "0.17", optional = true }
 ssi-crypto.workspace = true
 ssi-jwk.workspace = true

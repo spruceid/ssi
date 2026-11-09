@@ -499,29 +499,16 @@ pub fn sign_bytes(algorithm: Algorithm, data: &[u8], key: &JWK) -> Result<Vec<u8
         #[cfg(all(feature = "rsa", not(feature = "ring")))]
         JWKParams::RSA(rsa_params) => {
             rsa_params.validate_key_size()?;
-            let private_key = rsa::RsaPrivateKey::try_from(rsa_params)?;
-            let padding;
-            let hashed;
+            let private_key = rsa::PrivateKey::try_from(rsa_params)?;
+            let hashed = ssi_crypto::hashes::sha256::sha256(data);
             match algorithm {
                 Algorithm::RS256 => {
-                    let hash = rsa::hash::Hash::SHA2_256;
-                    padding = rsa::padding::PaddingScheme::new_pkcs1v15_sign(Some(hash));
-                    hashed = ssi_crypto::hashes::sha256::sha256(data);
+                    private_key.sign(rsa::Pkcs1v15Sign::new::<sha2::Sha256>(), &hashed)
                 }
-                Algorithm::PS256 => {
-                    let hash = rsa::hash::Hash::SHA2_256;
-                    let rng = rand_0_8::rngs::OsRng {};
-                    padding = rsa::PaddingScheme::new_pss_with_salt::<sha2_0_10::Sha256, _>(
-                        rng,
-                        hash.size(),
-                    );
-                    hashed = ssi_crypto::hashes::sha256::sha256(data);
-                }
+                Algorithm::PS256 => private_key.sign(rsa::Pss::<sha2::Sha256>::new(), &hashed),
                 _ => return Err(Error::AlgorithmNotImplemented(algorithm.to_string())),
             }
-            private_key
-                .sign(padding, &hashed)
-                .map_err(ssi_jwk::Error::from)?
+            .map_err(ssi_jwk::Error::from)?
         }
         #[cfg(any(feature = "ring", feature = "ed25519"))]
         JWKParams::OKP(okp) => {
@@ -702,26 +689,23 @@ pub fn verify_bytes_warnable(
         #[cfg(all(feature = "rsa", not(feature = "ring")))]
         JWKParams::RSA(rsa_params) => {
             rsa_params.validate_key_size()?;
-            use rsa::PublicKey;
-            let public_key = rsa::RsaPublicKey::try_from(rsa_params)?;
-            let padding;
-            let hashed;
+            let public_key = rsa::PublicKey::try_from(rsa_params)?;
+            let hashed = ssi_crypto::hashes::sha256::sha256(data);
             match algorithm {
                 Algorithm::RS256 => {
-                    let hash = rsa::hash::Hash::SHA2_256;
-                    padding = rsa::padding::PaddingScheme::new_pkcs1v15_sign(Some(hash));
-                    hashed = ssi_crypto::hashes::sha256::sha256(data);
+                    public_key.verify(rsa::Pkcs1v15Sign::new::<sha2::Sha256>(), &hashed, signature)
                 }
                 Algorithm::PS256 => {
-                    let rng = rand_0_8::rngs::OsRng {};
-                    padding = rsa::PaddingScheme::new_pss::<sha2_0_10::Sha256, _>(rng);
-                    hashed = ssi_crypto::hashes::sha256::sha256(data);
+                    // Accept any salt length, like `rsa 0.6`'s `new_pss` did.
+                    let padding = rsa::Pss::<sha2::Sha256> {
+                        salt_len: None,
+                        ..Default::default()
+                    };
+                    public_key.verify(padding, &hashed, signature)
                 }
                 _ => return Err(Error::AlgorithmNotImplemented(algorithm.to_string())),
             }
-            public_key
-                .verify(padding, &hashed, signature)
-                .map_err(ssi_jwk::Error::from)?;
+            .map_err(ssi_jwk::Error::from)?;
         }
         // TODO: SymmetricParams
         #[cfg(any(feature = "ring", feature = "ed25519"))]
@@ -1207,6 +1191,19 @@ mod tests {
         assert_eq!(jws, "eyJhbGciOiJSUzI1NiJ9.eyJpc3MiOiJqb2UiLA0KICJleHAiOjEzMDA4MTkzODAsDQogImh0dHA6Ly9leGFtcGxlLmNvbS9pc19yb290Ijp0cnVlfQ.cC4hiUPoj9Eetdgtv3hF80EGrhuB__dzERat0XF9g2VtQgr9PJbu3XOiZj5RZmh7AAuHIm4Bh-0Qc_lF5YKt_O8W2Fp5jujGbds9uJdbF9CUAr7t1dnZcAcQjbKBYNX4BAynRFdiuB--f_nZLgrnbyTyWzO75vRK5h6xBArLIARNPvkSjtQBMHlb1L07Qe7K0GarZRmB_eSN9383LcOLn6_dO--xi12jzDwusC-eOkHWEsqtFZESc6BfI7noOPqvhJ1phCnvWh6IeYI2w9QOYEUipUTI8np6LbgGY9Fs98rqVt5AXLIhWkWywlVmtVrBp0igcN_IoypGlUPQGe77Rw");
 
         decode_verify(&jws, &key).unwrap();
+    }
+
+    #[test]
+    #[cfg(feature = "rsa")]
+    fn ps256_sign_verify() {
+        let key: JWK =
+            serde_json::from_str(include_str!("../../../../../tests/rsa2048-2020-08-25.json"))
+                .unwrap();
+        let data = b"asdf";
+        let bad_data = b"no";
+        let sig = sign_bytes(Algorithm::PS256, data, &key).unwrap();
+        verify_bytes(Algorithm::PS256, data, &key, &sig).unwrap();
+        verify_bytes(Algorithm::PS256, bad_data, &key, &sig).unwrap_err();
     }
 
     #[test]
