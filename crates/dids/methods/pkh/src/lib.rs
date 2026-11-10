@@ -379,74 +379,6 @@ async fn resolve_bip122(did: &DID, account_address: &str, reference: &str) -> Re
     Ok((doc, json_ld_context))
 }
 
-async fn resolve_aleo(did: &DID, account_address: &str, reference: &str) -> ResolutionResult {
-    use bech32::FromBase32;
-    let (hrp, data, _variant) = match bech32::decode(account_address) {
-        Err(_e) => {
-            return Err(Error::InvalidMethodSpecificId(
-                did.method_specific_id().to_owned(),
-            ))
-        }
-        Ok(data) => data,
-    };
-    if data.is_empty() {
-        return Err(Error::InvalidMethodSpecificId(
-            did.method_specific_id().to_owned(),
-        ));
-    }
-    if hrp != "aleo" {
-        return Err(Error::InvalidMethodSpecificId(
-            did.method_specific_id().to_owned(),
-        ));
-    }
-    let data = match Vec::<u8>::from_base32(&data) {
-        Err(_e) => {
-            return Err(Error::InvalidMethodSpecificId(
-                did.method_specific_id().to_owned(),
-            ))
-        }
-        Ok(data) => data,
-    };
-    // Address data is decoded for validation only.
-    // The verification method object just uses the account address in blockchainAccountId.
-    if data.len() != 32 {
-        return Err(Error::InvalidMethodSpecificId(
-            did.method_specific_id().to_owned(),
-        ));
-    }
-    let chain_id = ChainId {
-        namespace: "aleo".to_string(),
-        reference: reference.to_string(),
-    };
-    let blockchain_account_id = BlockchainAccountId {
-        account_address: account_address.to_owned(),
-        chain_id,
-    };
-    let vm_url = DIDURLBuf::from_string(format!("{did}#blockchainAccountId")).unwrap();
-    let vm = PkhVerificationMethod {
-        id: vm_url.clone(),
-        type_: PkhVerificationMethodType::BlockchainVerificationMethod2021,
-        controller: did.to_owned(),
-        blockchain_account_id,
-        public_key: None,
-    };
-
-    let mut json_ld_context = JsonLdContext::default();
-    json_ld_context.add_blockchain_2021_v1();
-    json_ld_context.add_verification_method(&vm);
-
-    let mut doc = Document::new(did.to_owned());
-    doc.verification_method.push(vm.into());
-    doc.verification_relationships
-        .authentication
-        .push(ValueOrReference::Reference(vm_url.clone().into()));
-    doc.verification_relationships
-        .assertion_method
-        .push(ValueOrReference::Reference(vm_url.into()));
-
-    Ok((doc, json_ld_context))
-}
-
 async fn resolve_caip10(did: &DID, account_id: &str) -> ResolutionResult {
     let account_id = match BlockchainAccountId::from_str(account_id) {
         Ok(account_id) => account_id,
@@ -464,7 +396,6 @@ async fn resolve_caip10(did: &DID, account_id: &str) -> ResolutionResult {
         "eip155" => resolve_eip155(did, &account_id.account_address, &reference, false).await,
         "bip122" => resolve_bip122(did, &account_id.account_address, &reference).await,
         "solana" => resolve_solana(did, &account_id.account_address, &reference).await,
-        "aleo" => resolve_aleo(did, &account_id.account_address, &reference).await,
         _ => Err(Error::InvalidMethodSpecificId(
             did.method_specific_id().to_owned(),
         )),
@@ -642,32 +573,6 @@ fn generate_caip10_solana(
     })
 }
 
-#[cfg(feature = "aleo")]
-fn generate_caip10_aleo(
-    key: &JWK,
-    ref_opt: Option<String>,
-) -> Result<BlockchainAccountId, GenerateError> {
-    let reference = ref_opt.unwrap_or_else(|| "1".to_string());
-    let chain_id = ChainId {
-        namespace: "aleo".to_string(),
-        reference,
-    };
-    use bech32::ToBase32;
-    let pk_bs58 = match key.params {
-        Params::OKP(ref params) if params.curve == "AleoTestnet1Key" => bech32::encode(
-            "aleo",
-            params.public_key.0.to_base32(),
-            bech32::Variant::Bech32m,
-        )
-        .unwrap(),
-        _ => return Err(GenerateError::UnsupportedKeyType),
-    };
-    Ok(BlockchainAccountId {
-        account_address: pk_bs58,
-        chain_id,
-    })
-}
-
 #[allow(unused, unreachable_code)]
 fn generate_caip10_did(key: &JWK, name: &str) -> Result<DIDBuf, GenerateError> {
     // Require name to be a either CAIP-2 namespace or a
@@ -690,8 +595,6 @@ fn generate_caip10_did(key: &JWK, name: &str) -> Result<DIDBuf, GenerateError> {
         "bip122" => generate_caip10_bip122(key, reference_opt)?,
         #[cfg(feature = "solana")]
         "solana" => generate_caip10_solana(key, reference_opt)?,
-        #[cfg(feature = "aleo")]
-        "aleo" => generate_caip10_aleo(key, reference_opt)?,
         _ => return Err(GenerateError::UnsupportedNamespace),
     };
 
@@ -877,11 +780,6 @@ mod tests {
         test_resolve(
             did!("did:pkh:bip122:1a91e3dace36e2be3bf030a65679fe82:DH5yaieqoZN36fDVciNyRueRGvGLR3mr7L"),
             include_str!("../tests/did-doge.jsonld"),
-        )
-        .await;
-        test_resolve(
-            did!("did:pkh:aleo:1:aleo1y90yg3yzs4g7q25f9nn8khuu00m8ysynxmcw8aca2d0phdx8dgpq4vw348"),
-            include_str!("../tests/did-aleo.jsonld"),
         )
         .await;
 

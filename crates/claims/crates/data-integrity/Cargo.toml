@@ -73,9 +73,6 @@ rsa = ["ssi-data-integrity-suites/rsa"]
 ##   - `P256BLAKE2BDigestSize20Base58CheckEncodedSignature2021` (requires `secp256r1`)
 tezos = ["ssi-data-integrity-suites/tezos"]
 
-## Enables `AleoSignature2021`.
-aleo = ["ssi-data-integrity-suites/aleo"]
-
 ## Signature suites based on Ethereum EIP-712.
 ##
 ## This includes:

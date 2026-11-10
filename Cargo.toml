@@ -187,9 +187,6 @@ rsa = ["ssi-claims/rsa"]
 ##   - `P256BLAKE2BDigestSize20Base58CheckEncodedSignature2021` (requires `secp256r1`)
 tezos = ["ssi-claims/tezos", "ssi-caips/tezos", "ssi-dids/tezos"]
 
-## Enables `AleoSignature2021`.
-aleo = ["ssi-claims/aleo", "ssi-caips/aleo", "ssi-dids/aleo"]
-
 ## Signature suites based on Ethereum EIP-712.
 ##
 ## This includes:

@@ -209,10 +209,7 @@ algorithms! {
     ESBlake2b: "ESBlake2b",
 
     /// ECDSA using secp256k1 (K-256) and Blake2b.
-    ESBlake2bK: "ESBlake2bK",
-
-    #[doc(hidden)]
-    AleoTestnet1Signature: "AleoTestnet1Signature"
+    ESBlake2bK: "ESBlake2bK"
 }
 
 impl Algorithm {

@@ -64,14 +64,6 @@ rsa = ["ssi-jws/rsa", "ssi-data-integrity/rsa", "ssi-verification-methods/rsa"]
 # - `TezosSignature2021`
 tezos = ["ssi-jws/tezos", "ssi-data-integrity/tezos"]
 
-# Enables `AleoSignature2021`
-aleo = [
-    "ssi-jwk/aleo",
-    "ssi-jws/aleo",
-    "ssi-data-integrity/aleo",
-    "ssi-verification-methods/aleo",
-]
-
 # Enables `Eip712Signature2021`
 eip712 = ["ssi-eip712", "ssi-data-integrity/eip712", "ssi-vc/eip712"]
 

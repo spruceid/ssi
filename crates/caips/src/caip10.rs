@@ -28,17 +28,11 @@ use linked_data::{
     LinkedDataPredicateObjects, LinkedDataSubject,
 };
 use ssi_jwk::{Params, JWK};
+use std::fmt;
 use std::str::FromStr;
-use std::{fmt, marker::PhantomData, ops::Deref};
 
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
-
-#[cfg(feature = "aleo")]
-mod aleo;
-
-#[cfg(feature = "aleo")]
-pub use aleo::*;
 
 /// A parsed [CAIP-10] blockchain account id as a string.
 ///
@@ -203,9 +197,6 @@ impl BlockchainAccountId {
                 ssi_jwk::ripemd160::hash_public_key(jwk, 0x1e)
                     .map_err(|e| BlockchainAccountIdVerifyError::HashError(e.to_string()))
             }
-            #[cfg(feature = "aleo")]
-            ("aleo", network_id) => encode_aleo_address(jwk, network_id)
-                .map_err(|e| BlockchainAccountIdVerifyError::HashError(e.to_string())),
             _ => Err(BlockchainAccountIdVerifyError::UnknownChainId(
                 self.chain_id.to_string(),
             )),
@@ -314,127 +305,6 @@ impl FromStr for BlockchainAccountId {
 impl fmt::Display for BlockchainAccountId {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "{}:{}", self.chain_id, self.account_address)
-    }
-}
-
-#[derive(Debug, thiserror::Error)]
-pub enum AleoBlockchainAccountIdError {
-    #[error(transparent)]
-    Parsing(#[from] BlockchainAccountIdParseError),
-
-    #[error("expected CAIP-2 namespace `{0}`, found `{1}`")]
-    Caip2Namespace(String, String),
-
-    #[error("unexpected network `{0}`, `{1}`")]
-    Network(String, String),
-}
-
-pub trait BlockchainAccountIdType {
-    const NAMESPACE: &'static str;
-
-    const REFERENCE: &'static str;
-}
-
-#[derive(Clone, PartialEq, Eq, Hash, Debug)]
-pub struct TypedBlockchainAccountId<T>(BlockchainAccountId, PhantomData<T>);
-
-impl<T: BlockchainAccountIdType> TypedBlockchainAccountId<T> {
-    pub fn new(id: BlockchainAccountId) -> Result<Self, AleoBlockchainAccountIdError> {
-        if id.chain_id.namespace != T::NAMESPACE {
-            return Err(AleoBlockchainAccountIdError::Caip2Namespace(
-                T::NAMESPACE.to_owned(),
-                id.chain_id.namespace.clone(),
-            ));
-        }
-
-        if id.chain_id.reference != T::REFERENCE {
-            return Err(AleoBlockchainAccountIdError::Network(
-                T::REFERENCE.to_owned(),
-                id.chain_id.reference.clone(),
-            ));
-        }
-
-        Ok(Self(id, PhantomData))
-    }
-}
-
-impl<T> Deref for TypedBlockchainAccountId<T> {
-    type Target = BlockchainAccountId;
-
-    fn deref(&self) -> &Self::Target {
-        &self.0
-    }
-}
-
-impl<T: BlockchainAccountIdType> TryFrom<BlockchainAccountId> for TypedBlockchainAccountId<T> {
-    type Error = AleoBlockchainAccountIdError;
-
-    fn try_from(value: BlockchainAccountId) -> Result<Self, Self::Error> {
-        Self::new(value)
-    }
-}
-
-impl<T: BlockchainAccountIdType> FromStr for TypedBlockchainAccountId<T> {
-    type Err = AleoBlockchainAccountIdError;
-
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        let id: BlockchainAccountId = s.parse()?;
-        Self::new(id)
-    }
-}
-
-impl<T> Serialize for TypedBlockchainAccountId<T> {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: serde::Serializer,
-    {
-        self.0.serialize(serializer)
-    }
-}
-
-impl<'de, T: BlockchainAccountIdType> Deserialize<'de> for TypedBlockchainAccountId<T> {
-    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-    where
-        D: serde::Deserializer<'de>,
-    {
-        let id = BlockchainAccountId::deserialize(deserializer)?;
-        Self::new(id).map_err(serde::de::Error::custom)
-    }
-}
-
-impl<V: Vocabulary, I: Interpretation, T> linked_data::LinkedDataResource<I, V>
-    for TypedBlockchainAccountId<T>
-{
-    fn interpretation(
-        &'_ self,
-        _vocabulary: &mut V,
-        _interpretation: &mut I,
-    ) -> linked_data::ResourceInterpretation<'_, I, V> {
-        use linked_data::{rdf_types::Term, CowRdfTerm, RdfLiteral, ResourceInterpretation};
-        ResourceInterpretation::Uninterpreted(Some(CowRdfTerm::Owned(Term::Literal(
-            RdfLiteral::Xsd(xsd_types::Value::String(self.to_string())),
-        ))))
-    }
-}
-
-impl<V: Vocabulary, I: Interpretation, T> LinkedDataPredicateObjects<I, V>
-    for TypedBlockchainAccountId<T>
-{
-    fn visit_objects<S>(&self, mut visitor: S) -> Result<S::Ok, S::Error>
-    where
-        S: linked_data::PredicateObjectsVisitor<I, V>,
-    {
-        visitor.object(self)?;
-        visitor.end()
-    }
-}
-
-impl<V: Vocabulary, I: Interpretation, T> LinkedDataSubject<I, V> for TypedBlockchainAccountId<T> {
-    fn visit_subject<S>(&self, visitor: S) -> Result<S::Ok, S::Error>
-    where
-        S: linked_data::SubjectVisitor<I, V>,
-    {
-        visitor.end()
     }
 }
 
