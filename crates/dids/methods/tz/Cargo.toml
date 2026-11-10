@@ -34,10 +34,6 @@ chrono = { workspace = true, features = ["serde"] }
 [target.'cfg(target_arch = "wasm32")'.dependencies]
 chrono = { workspace = true, features = ["serde", "wasmbind"] }
 
-[target.'cfg(target_os = "android")'.dependencies.reqwest]
-workspace = true
-features = ["json", "query", "native-tls-vendored"]
-
 [dev-dependencies]
 ssi-tzkey.workspace = true
 ssi-verification-methods-core.workspace = true

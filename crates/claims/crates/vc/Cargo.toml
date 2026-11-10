@@ -38,10 +38,6 @@ ssi-verification-methods.workspace = true
 ssi-dids-core.workspace = true
 ssi-data-integrity.workspace = true
 
-[target.'cfg(target_os = "android")'.dependencies.reqwest]
-workspace = true
-features = ["json", "native-tls-vendored"]
-
 [dev-dependencies]
 ssi-verification-methods.workspace = true
 ssi-jwk.workspace = true
