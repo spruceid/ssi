@@ -13,6 +13,7 @@ secp256r1 = ["ssi-verification-methods/secp256r1"]
 secp384r1 = ["ssi-verification-methods/secp384r1"]
 
 [dependencies]
+base64.workspace = true
 ssi-verification-methods.workspace = true
 rdf-types.workspace = true
 xsd-types = { workspace = true, features = ["serde"] }
@@ -41,6 +42,9 @@ self_cell = "1.0.1"
 contextual.workspace = true
 multibase.workspace = true
 digest.workspace = true
+
+[dev-dependencies]
+ssi-jws = { workspace = true, features = ["ed25519"] }
 
 [package.metadata.docs.rs]
 all-features = true
